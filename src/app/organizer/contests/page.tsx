@@ -178,6 +178,11 @@ export default async function ContestsPage() {
                       <Link href={`/organizer/contests/${contest.id}/edit`}>
                         <Button variant="outline" size="sm">Edit</Button>
                       </Link>
+                      <Link href={`/organizer/contests/${contest.id}/judging-scheme`}>
+                        <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200">
+                          Judging Scheme
+                        </Button>
+                      </Link>
                     </div>
                   </TableCell>
                 </TableRow>

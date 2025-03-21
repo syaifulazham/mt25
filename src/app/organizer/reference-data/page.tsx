@@ -11,6 +11,7 @@ import { StatesTab } from "./_components/states-tab";
 import { SchoolsTab } from "./_components/schools-tab";
 import { HigherInstitutionsTab } from "./_components/higher-institutions-tab";
 import { TargetGroupsTab } from "./_components/target-groups-tab";
+import { ThemesTab } from "./_components/themes-tab";
 
 export default function ReferenceDataPage() {
   const [activeTab, setActiveTab] = useState("zones");
@@ -31,12 +32,13 @@ export default function ReferenceDataPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="zones">Zones</TabsTrigger>
           <TabsTrigger value="states">States</TabsTrigger>
           <TabsTrigger value="schools">Schools</TabsTrigger>
           <TabsTrigger value="higher-institutions">Higher Institutions</TabsTrigger>
           <TabsTrigger value="target-groups">Target Groups</TabsTrigger>
+          <TabsTrigger value="themes">Competition Themes</TabsTrigger>
         </TabsList>
         
         <TabsContent value="zones" className="space-y-4">
@@ -57,6 +59,10 @@ export default function ReferenceDataPage() {
         
         <TabsContent value="target-groups" className="space-y-4">
           <TargetGroupsTab />
+        </TabsContent>
+
+        <TabsContent value="themes" className="space-y-4">
+          <ThemesTab />
         </TabsContent>
       </Tabs>
     </div>

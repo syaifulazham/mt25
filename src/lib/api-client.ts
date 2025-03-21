@@ -522,53 +522,38 @@ export const contestApi = {
    * Get all contests with optional filters
    */
   async getContests(filters?: { search?: string; contestType?: string; status?: string }) {
-    const queryParams = new URLSearchParams();
-    
-    if (filters?.search) {
-      queryParams.append('search', filters.search);
-    }
-    
-    if (filters?.contestType) {
-      queryParams.append('contestType', filters.contestType);
-    }
-    
-    if (filters?.status) {
-      queryParams.append('status', filters.status);
-    }
-    
-    const queryString = queryParams.toString();
-    const url = `/api/contests${queryString ? `?${queryString}` : ''}`;
-    
-    return apiRequest(url);
+    return apiRequest('/api/contests', {
+      params: filters,
+    });
   },
-  
+
   /**
    * Get a specific contest by ID
    */
   async getContest(id: number) {
     return apiRequest(`/api/contests/${id}`);
   },
-  
+
   /**
    * Create a new contest
    */
   async createContest(data: any) {
     return apiRequest('/api/contests', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
-  
+
   /**
    * Update an existing contest
    */
   async updateContest(id: number, data: any) {
     return apiRequest(`/api/contests/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
+      method: 'PATCH',
+      body: data,
     });
   },
-  
+
   /**
    * Delete a contest
    */
@@ -577,4 +562,129 @@ export const contestApi = {
       method: 'DELETE',
     });
   },
+};
+
+/**
+ * Theme API client
+ */
+export const themeApi = {
+  /**
+   * Get all themes with optional search
+   */
+  getThemes(search?: string) {
+    return apiRequest<any[]>('/api/themes', {
+      params: { search }
+    });
+  },
+
+  /**
+   * Get themes with pagination
+   */
+  getThemesPaginated(params?: { 
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    return apiRequest<{ data: any[]; meta: any }>('/api/themes', {
+      params
+    });
+  },
+
+  /**
+   * Get a specific theme by ID
+   */
+  getTheme(id: number | string) {
+    return apiRequest<any>(`/api/themes/${id}`);
+  },
+
+  /**
+   * Create a new theme
+   */
+  createTheme(data: {
+    name: string;
+    color?: string | null;
+    logoPath?: string | null;
+    description?: string | null;
+  }) {
+    return apiRequest<any>('/api/themes', {
+      method: 'POST',
+      body: data
+    });
+  },
+
+  /**
+   * Update an existing theme
+   */
+  updateTheme(id: number | string, data: {
+    name: string;
+    color?: string | null;
+    logoPath?: string | null;
+    description?: string | null;
+  }) {
+    return apiRequest<any>(`/api/themes/${id}`, {
+      method: 'PUT',
+      body: data
+    });
+  },
+
+  /**
+   * Delete a theme
+   */
+  deleteTheme(id: number | string) {
+    return apiRequest<any>(`/api/themes/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+/**
+ * Judging Template API client
+ */
+export const judgingTemplateApi = {
+  // Get all judging templates
+  getJudgingTemplates: async (contestType?: string) => {
+    const queryParams = contestType ? `?contestType=${contestType}` : '';
+    return apiRequest(`/api/judging-templates${queryParams}`);
+  },
+
+  // Get a specific judging template
+  getJudgingTemplate: async (id: string) => {
+    return apiRequest(`/api/judging-templates/${id}`);
+  },
+
+  // Create a new judging template
+  createJudgingTemplate: async (templateData: any) => {
+    return apiRequest('/api/judging-templates', {
+      method: 'POST',
+      body: JSON.stringify(templateData)
+    });
+  },
+
+  // Update a judging template
+  updateJudgingTemplate: async (id: string, templateData: any) => {
+    return apiRequest(`/api/judging-templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(templateData)
+    });
+  },
+
+  // Delete a judging template
+  deleteJudgingTemplate: async (id: string) => {
+    return apiRequest(`/api/judging-templates/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Get a contest's judging template
+  getContestJudgingTemplate: async (contestId: string) => {
+    return apiRequest(`/api/contests/${contestId}/judging-template`);
+  },
+
+  // Assign a judging template to a contest
+  assignJudgingTemplate: async (contestId: string, templateId: string | null) => {
+    return apiRequest(`/api/contests/${contestId}/judging-template`, {
+      method: 'PUT',
+      body: JSON.stringify({ templateId })
+    });
+  }
 };

@@ -31,6 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { contestApi } from '@/lib/api-client';
 import { targetGroupApi } from '@/lib/api-client';
+import { themeApi } from '@/lib/api-client';
 import { format } from 'date-fns';
 
 // Define contest form schema with Zod
@@ -63,6 +64,7 @@ const contestFormSchema = z.object({
   targetGroupIds: z.array(z.number()).min(1, {
     message: "Please select at least one target group.",
   }),
+  themeId: z.number().nullable().optional(),
 });
 
 // Define the form values type
@@ -76,8 +78,11 @@ const defaultValues: Partial<ContestFormValues> = {
   contestType: "",
   method: "",
   judgingMethod: "",
+  startDate: "",
+  endDate: "",
   accessibility: false,
   targetGroupIds: [],
+  themeId: null,
 };
 
 interface ContestFormProps {
@@ -88,7 +93,9 @@ export function ContestForm({ initialData }: ContestFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetGroups, setTargetGroups] = useState<any[]>([]);
+  const [themes, setThemes] = useState<any[]>([]);
   const [selectedTargetGroups, setSelectedTargetGroups] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const isEditMode = !!initialData;
 
   // Fetch target groups
@@ -106,6 +113,42 @@ export function ContestForm({ initialData }: ContestFormProps) {
     };
 
     fetchTargetGroups();
+  }, []);
+
+  // Fetch themes
+  useEffect(() => {
+    const fetchThemes = async () => {
+      try {
+        setIsLoading(true);
+        console.log("Fetching themes...");
+        
+        // Use the API client to get all themes (unpaginated)
+        const response = await themeApi.getThemesPaginated({ 
+          pageSize: 100 // Get up to 100 themes to ensure we get all of them
+        });
+        
+        console.log("Themes API response:", response);
+        
+        // Extract themes from the paginated response
+        const themesData = response.data || [];
+        
+        if (Array.isArray(themesData) && themesData.length > 0) {
+          setThemes(themesData);
+          console.log("Themes loaded successfully:", themesData.length, "themes");
+        } else {
+          console.warn("No themes found or invalid response format");
+          setThemes([]);
+        }
+      } catch (error) {
+        console.error('Error fetching themes:', error);
+        toast.error('Failed to load themes');
+        setThemes([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchThemes();
   }, []);
 
   // Set initial target groups if in edit mode
@@ -131,6 +174,7 @@ export function ContestForm({ initialData }: ContestFormProps) {
       endDate: format(new Date(initialData.endDate), 'yyyy-MM-dd'),
       accessibility: initialData.accessibility || false,
       targetGroupIds: initialData.targetGroup ? initialData.targetGroup.map((tg: any) => tg.id) : [],
+      themeId: initialData.themeId || null,
     };
   };
 
@@ -172,24 +216,26 @@ export function ContestForm({ initialData }: ContestFormProps) {
         // Update existing contest
         await contestApi.updateContest(initialData.id, {
           ...data,
-          targetGroupIds: selectedTargetGroups,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
         });
-        toast.success("Contest has been updated successfully.");
+        toast.success('Contest updated successfully');
       } else {
         // Create new contest
         await contestApi.createContest({
           ...data,
-          targetGroupIds: selectedTargetGroups,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
         });
-        toast.success("Contest has been created successfully.");
+        toast.success('Contest created successfully');
       }
       
-      // Redirect to contests page
+      // Redirect back to contests list
       router.push('/organizer/contests');
       router.refresh();
-    } catch (error: any) {
-      console.error('Error submitting form:', error);
-      toast.error(error.message || "There was a problem saving the contest.");
+    } catch (error) {
+      console.error('Error saving contest:', error);
+      toast.error('Failed to save contest');
     } finally {
       setIsSubmitting(false);
     }
@@ -313,12 +359,12 @@ export function ContestForm({ initialData }: ContestFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="INDIVIDUAL">Individual</SelectItem>
-                        <SelectItem value="TEAM">Team</SelectItem>
+                        <SelectItem value="ONLINE">Online</SelectItem>
+                        <SelectItem value="PHYSICAL">Physical</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Whether participants compete individually or in teams.
+                      Whether the contest is conducted online or requires physical presence.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -344,9 +390,10 @@ export function ContestForm({ initialData }: ContestFormProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="AUTOMATIC">Automatic</SelectItem>
-                        <SelectItem value="MANUAL">Manual</SelectItem>
-                        <SelectItem value="HYBRID">Hybrid</SelectItem>
+                        <SelectItem value="AI">AI</SelectItem>
+                        <SelectItem value="JURY">Jury</SelectItem>
+                        <SelectItem value="POINT_SCORE">Point Score</SelectItem>
+                        <SelectItem value="TIME_COMPLETION">Time Completion</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
@@ -418,6 +465,63 @@ export function ContestForm({ initialData }: ContestFormProps) {
                 )}
               />
             </div>
+
+            {/* Theme */}
+            <FormField
+              control={form.control}
+              name="themeId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Contest Theme (Optional)</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === "0" ? null : parseInt(value))}
+                    value={field.value?.toString() || "0"}
+                    disabled={isLoading}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={isLoading ? "Loading themes..." : "Select a theme (optional)"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="0">No theme</SelectItem>
+                      {themes.length > 0 ? (
+                        themes.map((theme) => (
+                          <SelectItem key={theme.id} value={theme.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              {theme.logoPath && (
+                                <div className="w-4 h-4 rounded-full overflow-hidden">
+                                  <img 
+                                    src={theme.logoPath} 
+                                    alt={theme.name} 
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+                              {theme.color && (
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: theme.color }}
+                                />
+                              )}
+                              {theme.name}
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-themes" disabled>
+                          No themes available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Themes help categorize contests and provide visual identity
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Target Groups */}
             <FormField

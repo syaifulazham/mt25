@@ -52,6 +52,10 @@ model Contest {
   judgings      Judging[]
   results       Result[]
   contingents   Contingent[]
+  themeId       Int?
+  theme         Theme?        @relation(fields: [themeId], references: [id])
+  judgingTemplateId Int?
+  judgingTemplate   JudgingTemplate?        @relation(fields: [judgingTemplateId], references: [id])
 }
 
 enum ContestType {
@@ -157,16 +161,31 @@ enum SubmissionStatus {
 
 model Judging {
   id           Int       @id @default(autoincrement())
-  contestId    Int
-  contest      Contest   @relation(fields: [contestId], references: [id])
   submissionId Int
   submission   Submission @relation(fields: [submissionId], references: [id])
-  userId       Int
-  user         User      @relation(fields: [userId], references: [id])
+  judgeId      Int
+  judge        User      @relation(fields: [judgeId], references: [id])
+  contestId    Int
+  contest      Contest   @relation(fields: [contestId], references: [id])
   score        Float
   feedback     String?
   judgingTime  DateTime  @default(now())
   results      Result[]
+  criteriaScores  JudgingCriteriaScore[]
+}
+
+model JudgingCriteriaScore {
+  id              Int                     @id @default(autoincrement())
+  judgingId       Int
+  judging         Judging                 @relation(fields: [judgingId], references: [id])
+  criteriaName    String                  // Store the name directly for historical record
+  criteriaDescription String?             // Store the description directly for historical record
+  evaluationType  EvaluationType
+  weight          Int
+  score           Float                   // The actual score given
+  feedback        String?                 // Optional feedback for this specific criterion
+  discreteValue   String?                 // If using discrete evaluation, the selected value
+  createdAt       DateTime                @default(now())
 }
 
 model Result {
@@ -225,4 +244,48 @@ model State {
   zone     Zone   @relation(fields: [zoneId], references: [id])
   schools  School[]
   higherInstitutions HigherInstitution[]
+}
+
+model Theme {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  color       String?
+  logoPath    String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  contests    Contest[]
+}
+
+model JudgingTemplate {
+  id                Int                     @id @default(autoincrement())
+  name              String
+  description       String?
+  isDefault         Boolean                 @default(false)
+  contestType       ContestType?            // Optional association with a specific contest type
+  criteria          JudgingTemplateCriteria[]
+  contests          Contest[]               // Contests using this template
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+}
+
+model JudgingTemplateCriteria {
+  id                Int                     @id @default(autoincrement())
+  name              String
+  description       String?
+  needsJuryCourtesy Boolean                 @default(false)
+  evaluationType    EvaluationType
+  weight            Int                     @default(1)
+  maxScore          Int?                    // Used if evaluationType is POINTS
+  discreteValues    String?                 // JSON array of possible values if evaluationType is DISCRETE
+  templateId        Int
+  template          JudgingTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+}
+
+enum EvaluationType {
+  POINTS
+  TIME
+  DISCRETE
 }
