@@ -1,0 +1,11 @@
+code,name,level,category,ppd,address,city,postcode,stateId
+JHR001,SK Taman Perling,Primary,Public,PPD Johor Bahru,"Jalan Perling 1, Taman Perling",Johor Bahru,81200,1
+JHR002,SMK Taman Perling,Secondary,Public,PPD Johor Bahru,"Jalan Perling 2, Taman Perling",Johor Bahru,81200,1
+KUL001,SK Bukit Damansara,Primary,Public,PPD Kuala Lumpur,"Jalan Damansara, Bukit Damansara",Kuala Lumpur,50490,14
+KUL002,SMK Sri Hartamas,Secondary,Public,PPD Kuala Lumpur,"Jalan Sri Hartamas 1, Sri Hartamas",Kuala Lumpur,50480,14
+SEL001,SK Bandar Utama,Primary,Public,PPD Petaling,"Jalan BU 1/1, Bandar Utama",Petaling Jaya,47800,12
+SEL002,SMK Damansara Jaya,Secondary,Public,PPD Petaling,"Jalan SS 22/40, Damansara Jaya",Petaling Jaya,47400,12
+PNG001,SK Minden Heights,Primary,Public,PPD Pulau Pinang,"Jalan Minden Heights, Minden Heights",Georgetown,11700,9
+PNG002,SMK Bukit Jambul,Secondary,Public,PPD Pulau Pinang,"Jalan Bukit Jambul, Bukit Jambul",Bayan Lepas,11900,9
+SBH001,SK Likas,Primary,Public,PPD Kota Kinabalu,"Jalan Likas, Likas",Kota Kinabalu,88400,10
+SBH002,SMK Likas,Secondary,Public,PPD Kota Kinabalu,"Jalan Likas, Likas",Kota Kinabalu,88400,10

@@ -1,0 +1,228 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique
+  email           String    @unique
+  name            String?
+  password        String?
+  role            Role      @default(PARTICIPANT)
+  isActive        Boolean   @default(true)
+  lastLogin       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  submissions     Submission[]
+  judgings        Judging[]
+  contingents     Contingent[]
+  notifications   Notification[]
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  VIEWER
+  PARTICIPANT
+  JUDGE
+}
+
+model Contest {
+  id            Int          @id @default(autoincrement())
+  name          String
+  code          String       @unique
+  description   String?
+  contestType   ContestType
+  method        ContestMethod
+  targetGroup   TargetGroup[]
+  accessibility Boolean      @default(false)
+  judgingMethod JudgingMethod
+  startDate     DateTime
+  endDate       DateTime
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  submissions   Submission[]
+  judgings      Judging[]
+  results       Result[]
+  contingents   Contingent[]
+}
+
+enum ContestType {
+  QUIZ
+  CODING
+  STRUCTURE_BUILDING
+  FASTEST_COMPLETION
+  POSTER_PRESENTATION
+  SCIENCE_PROJECT
+  ENGINEERING_DESIGN
+  ANALYSIS_CHALLENGE
+}
+
+enum ContestMethod {
+  ONLINE
+  PHYSICAL
+}
+
+enum JudgingMethod {
+  AI
+  JURY
+  POINT_SCORE
+  TIME_COMPLETION
+}
+
+model TargetGroup {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  name          String
+  ageGroup      String
+  minAge        Int       @default(0) // 0 means no limit
+  maxAge        Int       @default(0) // 0 means no limit
+  schoolLevel   String
+  contests      Contest[]
+}
+
+model School {
+  id          Int      @id @default(autoincrement())
+  name        String
+  ppd         String?
+  level       String
+  category    String
+  code        String  @unique
+  address     String?
+  city        String?
+  postcode    String?
+  stateId     Int
+  state       State   @relation(fields: [stateId], references: [id])
+  latitude    Float?
+  longitude   Float?
+  contingent  Contingent[]
+  createdAt   DateTime @default(now())
+}
+
+model HigherInstitution {
+  id        Int     @id @default(autoincrement())
+  name      String
+  code      String  @unique
+  address   String?
+  city      String?
+  postcode  String?
+  stateId   Int
+  state     State   @relation(fields: [stateId], references: [id])
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+}
+
+model Contingent {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  contestId   Int
+  contest     Contest  @relation(fields: [contestId], references: [id])
+  schoolId    Int
+  school      School   @relation(fields: [schoolId], references: [id])
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Submission {
+  id         Int      @id @default(autoincrement())
+  contestId  Int
+  contest    Contest  @relation(fields: [contestId], references: [id])
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  title       String
+  description String?
+  fileUrl     String?
+  submittedAt DateTime  @default(now())
+  status      SubmissionStatus @default(PENDING)
+  judgings    Judging[]
+  results     Result[]
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Judging {
+  id           Int       @id @default(autoincrement())
+  contestId    Int
+  contest      Contest   @relation(fields: [contestId], references: [id])
+  submissionId Int
+  submission   Submission @relation(fields: [submissionId], references: [id])
+  userId       Int
+  user         User      @relation(fields: [userId], references: [id])
+  score        Float
+  feedback     String?
+  judgingTime  DateTime  @default(now())
+  results      Result[]
+}
+
+model Result {
+  id           Int      @id @default(autoincrement())
+  contestId    Int
+  contest      Contest  @relation(fields: [contestId], references: [id])
+  submissionId Int
+  submission   Submission @relation(fields: [submissionId], references: [id])
+  judgingId    Int
+  judging      Judging  @relation(fields: [judgingId], references: [id])
+  score        Float
+  rank         Int?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ReferenceData {
+  id          Int      @id @default(autoincrement())
+  type        String
+  code        String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([type, code])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Analytics {
+  id        Int      @id @default(autoincrement())
+  metric    String
+  value     Float
+  createdAt DateTime @default(now())
+}
+
+model Zone {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  states State[]
+}
+
+model State {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  zoneId   Int
+  zone     Zone   @relation(fields: [zoneId], references: [id])
+  schools  School[]
+  higherInstitutions HigherInstitution[]
+}
