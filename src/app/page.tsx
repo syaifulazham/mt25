@@ -1,6 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import MTLogo from "@/lib/images/techlympics-white.png"
+import ThemesSection from "./_components/themes-section";
+import AnnouncementSection from "./_components/announcement-section";
+import NewsSection from "./_components/news-section";
 
 export default function Home() {
   return (
@@ -67,6 +70,15 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Competition Themes Section */}
+      <ThemesSection />
+
+      {/* Announcement Section */}
+      <AnnouncementSection />
+
+      {/* News Section */}
+      <NewsSection />
 
       {/* Features Section */}
       <section id="features" className="py-16 bg-black bg-opacity-30">
