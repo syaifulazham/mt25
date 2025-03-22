@@ -8,21 +8,18 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'Invalid template ID' },
-        { status: 400 }
-      );
-    }
-
+    const id = params.id;
+    
     const template = await prisma.judgingTemplate.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         criteria: true
       }
@@ -62,19 +59,16 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'Invalid template ID' },
-        { status: 400 }
-      );
-    }
-
+    const id = params.id;
+    
     const data = await request.json();
     const { name, description, isDefault, contestType, criteria } = data;
 
@@ -95,7 +89,7 @@ export async function PUT(
 
     // Check if template exists
     const existingTemplate = await prisma.judgingTemplate.findUnique({
-      where: { id }
+      where: { id: parseInt(id) }
     });
 
     if (!existingTemplate) {
@@ -109,12 +103,12 @@ export async function PUT(
     await prisma.$transaction(async (tx) => {
       // Delete existing criteria
       await tx.judgingTemplateCriteria.deleteMany({
-        where: { templateId: id }
+        where: { templateId: parseInt(id) }
       });
 
       // Update template and create new criteria
       return tx.judgingTemplate.update({
-        where: { id },
+        where: { id: parseInt(id) },
         data: {
           name,
           description,
@@ -139,7 +133,7 @@ export async function PUT(
 
     // Fetch updated template
     const updatedTemplate = await prisma.judgingTemplate.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         criteria: true
       }
@@ -179,22 +173,19 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: 'Invalid template ID' },
-        { status: 400 }
-      );
-    }
-
+    const id = params.id;
+    
     // Check if template exists
     const existingTemplate = await prisma.judgingTemplate.findUnique({
-      where: { id },
+      where: { id: parseInt(id) },
       include: {
         contests: {
           select: { id: true }
@@ -213,16 +204,16 @@ export async function DELETE(
     if (existingTemplate.contests.length > 0) {
       return NextResponse.json(
         { 
-          error: 'Cannot delete template as it is in use by contests',
+          error: 'Cannot delete template that is in use by contests',
           contests: existingTemplate.contests
         },
         { status: 400 }
       );
     }
 
-    // Delete the template (criteria will be deleted due to cascade)
+    // Delete the template (criteria will be deleted automatically due to cascade)
     await prisma.judgingTemplate.delete({
-      where: { id }
+      where: { id: parseInt(id) }
     });
 
     return NextResponse.json({ success: true });

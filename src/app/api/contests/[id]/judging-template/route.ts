@@ -8,22 +8,19 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const contestId = parseInt(params.id);
-    if (isNaN(contestId)) {
-      return NextResponse.json(
-        { error: 'Invalid contest ID' },
-        { status: 400 }
-      );
-    }
-
+    const contestId = params.id;
+    
     // Get the contest with its judging template
     const contest = await prisma.contest.findUnique({
-      where: { id: contestId },
+      where: { id: parseInt(contestId) },
       include: {
         judgingTemplate: {
           include: {
@@ -71,24 +68,35 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const contestId = parseInt(params.id);
-    if (isNaN(contestId)) {
-      return NextResponse.json(
-        { error: 'Invalid contest ID' },
-        { status: 400 }
-      );
-    }
-
+    const contestId = params.id;
+    
     const data = await request.json();
     const { templateId } = data;
 
     // Validate required fields
-    if (!templateId && templateId !== null) {
+    if (templateId !== null && templateId !== undefined) {
+      // If templateId is provided, check if template exists
+      if (templateId !== null) {
+        const template = await prisma.judgingTemplate.findUnique({
+          where: { id: parseInt(templateId) }
+        });
+
+        if (!template) {
+          return NextResponse.json(
+            { error: 'Judging template not found' },
+            { status: 404 }
+          );
+        }
+      }
+    } else {
       return NextResponse.json(
         { error: 'Template ID is required (or null to remove template)' },
         { status: 400 }
@@ -97,7 +105,7 @@ export async function PUT(
 
     // Check if contest exists
     const contest = await prisma.contest.findUnique({
-      where: { id: contestId }
+      where: { id: parseInt(contestId) }
     });
 
     if (!contest) {
@@ -107,25 +115,11 @@ export async function PUT(
       );
     }
 
-    // If templateId is provided, check if template exists
-    if (templateId !== null) {
-      const template = await prisma.judgingTemplate.findUnique({
-        where: { id: templateId }
-      });
-
-      if (!template) {
-        return NextResponse.json(
-          { error: 'Judging template not found' },
-          { status: 404 }
-        );
-      }
-    }
-
     // Update the contest with the template
     const updatedContest = await prisma.contest.update({
-      where: { id: contestId },
+      where: { id: parseInt(contestId) },
       data: {
-        judgingTemplateId: templateId
+        judgingTemplateId: templateId ? parseInt(templateId) : null
       },
       include: {
         judgingTemplate: {

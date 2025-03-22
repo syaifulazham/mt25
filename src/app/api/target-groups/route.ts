@@ -17,11 +17,14 @@ const targetGroupSchema = z.object({
 // GET /api/target-groups - Get all target groups
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const user = await getCurrentUser();
-    
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      // Check authentication
+      const user = await getCurrentUser();
+      
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
     }
 
     // Get query parameters
@@ -92,22 +95,35 @@ export async function GET(request: NextRequest) {
 // POST /api/target-groups - Create a new target group
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication and authorization
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      // Check authentication and authorization
+      const currentUser = await getCurrentUser();
+      if (!currentUser) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
 
-    // Only ADMIN and OPERATOR can create target groups
-    if (!hasRequiredRole(currentUser, ["ADMIN", "OPERATOR"])) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      // Only ADMIN and OPERATOR can create target groups
+      if (!hasRequiredRole(currentUser, ["ADMIN", "OPERATOR"])) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     // Validate request body
     const body = await request.json();
-    const validationResult = targetGroupSchema.safeParse(body);
+    console.log("Received target group data:", body);
+    
+    // Handle potential string values for numeric fields
+    const processedBody = {
+      ...body,
+      minAge: typeof body.minAge === 'string' ? parseInt(body.minAge) : body.minAge,
+      maxAge: typeof body.maxAge === 'string' ? parseInt(body.maxAge) : body.maxAge,
+    };
+    
+    const validationResult = targetGroupSchema.safeParse(processedBody);
     
     if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.format());
       return NextResponse.json(
         { error: "Validation error", details: validationResult.error.format() },
         { status: 400 }

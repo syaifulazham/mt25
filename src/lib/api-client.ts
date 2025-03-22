@@ -41,7 +41,7 @@ export async function apiRequest<T = any>(
     headers: {
       'Content-Type': 'application/json',
     },
-    credentials: 'include', // Include cookies for authentication
+    credentials: 'include', // Always include cookies for authentication
   };
 
   // Add body if needed
@@ -50,20 +50,30 @@ export async function apiRequest<T = any>(
   }
 
   try {
-    // Make the request
-    console.log(`Making ${method} request to ${url}`);
     const response = await fetch(url, requestOptions);
 
-    // Handle errors
+    // Handle API errors
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error(`API error (${response.status}):`, errorData);
-      throw new Error(errorData.error || `API request failed with status ${response.status}`);
+      const errorMessage = errorData.error || `API request failed with status ${response.status}`;
+      
+      // Log more details in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('API Error:', {
+          url,
+          method,
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+        });
+      }
+      
+      throw new Error(errorMessage);
     }
 
-    // Parse and return the response
+    // Parse JSON response
     const data = await response.json();
-    return data;
+    return data as T;
   } catch (error) {
     console.error('API request error:', error);
     throw error;
@@ -490,7 +500,7 @@ export const targetGroupApi = {
   async createTargetGroup(data: any) {
     return apiRequest('/api/target-groups', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
   
@@ -500,7 +510,7 @@ export const targetGroupApi = {
   async updateTargetGroup(id: number, data: any) {
     return apiRequest(`/api/target-groups/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(data),
+      body: data,
     });
   },
   
@@ -641,50 +651,99 @@ export const themeApi = {
  * Judging Template API client
  */
 export const judgingTemplateApi = {
-  // Get all judging templates
-  getJudgingTemplates: async (contestType?: string) => {
-    const queryParams = contestType ? `?contestType=${contestType}` : '';
-    return apiRequest(`/api/judging-templates${queryParams}`);
+  /**
+   * Get all judging templates
+   */
+  async getJudgingTemplates(contestType?: string) {
+    try {
+      const params = contestType ? { contestType } : undefined;
+      return await apiRequest('/api/judging-templates', { params });
+    } catch (error) {
+      console.error('Error fetching judging templates:', error);
+      throw error;
+    }
   },
 
-  // Get a specific judging template
-  getJudgingTemplate: async (id: string) => {
-    return apiRequest(`/api/judging-templates/${id}`);
+  /**
+   * Get a specific judging template
+   */
+  async getJudgingTemplate(id: string) {
+    try {
+      return await apiRequest(`/api/judging-templates/${id}`);
+    } catch (error) {
+      console.error(`Error fetching judging template ${id}:`, error);
+      throw error;
+    }
   },
 
-  // Create a new judging template
-  createJudgingTemplate: async (templateData: any) => {
-    return apiRequest('/api/judging-templates', {
-      method: 'POST',
-      body: JSON.stringify(templateData)
-    });
+  /**
+   * Create a new judging template
+   */
+  async createJudgingTemplate(templateData: any) {
+    try {
+      return await apiRequest('/api/judging-templates', {
+        method: 'POST',
+        body: templateData,
+      });
+    } catch (error) {
+      console.error('Error creating judging template:', error);
+      throw error;
+    }
   },
 
-  // Update a judging template
-  updateJudgingTemplate: async (id: string, templateData: any) => {
-    return apiRequest(`/api/judging-templates/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(templateData)
-    });
+  /**
+   * Update a judging template
+   */
+  async updateJudgingTemplate(id: string, templateData: any) {
+    try {
+      return await apiRequest(`/api/judging-templates/${id}`, {
+        method: 'PUT',
+        body: templateData,
+      });
+    } catch (error) {
+      console.error(`Error updating judging template ${id}:`, error);
+      throw error;
+    }
   },
 
-  // Delete a judging template
-  deleteJudgingTemplate: async (id: string) => {
-    return apiRequest(`/api/judging-templates/${id}`, {
-      method: 'DELETE'
-    });
+  /**
+   * Delete a judging template
+   */
+  async deleteJudgingTemplate(id: string) {
+    try {
+      return await apiRequest(`/api/judging-templates/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error(`Error deleting judging template ${id}:`, error);
+      throw error;
+    }
   },
 
-  // Get a contest's judging template
-  getContestJudgingTemplate: async (contestId: string) => {
-    return apiRequest(`/api/contests/${contestId}/judging-template`);
+  /**
+   * Get a contest's judging template
+   */
+  async getContestJudgingTemplate(contestId: string) {
+    try {
+      return await apiRequest(`/api/contests/${contestId}/judging-template`);
+    } catch (error) {
+      console.error(`Error fetching contest ${contestId} judging template:`, error);
+      throw error;
+    }
   },
 
-  // Assign a judging template to a contest
-  assignJudgingTemplate: async (contestId: string, templateId: string | null) => {
-    return apiRequest(`/api/contests/${contestId}/judging-template`, {
-      method: 'PUT',
-      body: JSON.stringify({ templateId })
-    });
+  /**
+   * Assign a judging template to a contest
+   */
+  async assignJudgingTemplate(contestId: string, templateId: string | null) {
+    try {
+      return await apiRequest(`/api/contests/${contestId}/judging-template`, {
+        method: 'PUT',
+        body: { templateId },
+      });
+    } catch (error) {
+      console.error(`Error assigning judging template to contest ${contestId}:`, error);
+      throw error;
+    }
   }
 };

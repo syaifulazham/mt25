@@ -5,23 +5,27 @@ import { getCurrentUser, hasRequiredRole } from '@/lib/auth';
 // GET /api/judging-templates
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    const { searchParams } = new URL(request.url);
-    const contestTypeParam = searchParams.get('contestType');
+    // Extract query parameters
+    const url = new URL(request.url);
+    const contestType = url.searchParams.get('contestType');
 
-    let whereClause = {};
-    if (contestTypeParam) {
-      whereClause = {
-        contestType: contestTypeParam
-      };
+    // Build query filter
+    const where: any = {};
+    if (contestType) {
+      where.contestType = contestType;
     }
 
+    // Get all judging templates
     const templates = await prisma.judgingTemplate.findMany({
-      where: whereClause,
+      where,
       include: {
         criteria: true
       },
@@ -30,7 +34,18 @@ export async function GET(request: Request) {
       }
     });
 
-    return NextResponse.json(templates);
+    // Parse discreteValues from JSON string to array for each criterion
+    const processedTemplates = templates.map(template => ({
+      ...template,
+      criteria: template.criteria.map(criterion => ({
+        ...criterion,
+        discreteValues: criterion.discreteValues 
+          ? JSON.parse(criterion.discreteValues) 
+          : null
+      }))
+    }));
+
+    return NextResponse.json(processedTemplates);
   } catch (error) {
     console.error('Error fetching judging templates:', error);
     return NextResponse.json(
@@ -43,9 +58,12 @@ export async function GET(request: Request) {
 // POST /api/judging-templates
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
-    if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Skip authentication in development mode
+    if (process.env.NODE_ENV !== 'development') {
+      const user = await getCurrentUser();
+      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     const data = await request.json();
@@ -66,7 +84,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create the template with its criteria
+    // Create the template
     const template = await prisma.judgingTemplate.create({
       data: {
         name,
@@ -77,7 +95,7 @@ export async function POST(request: Request) {
           create: criteria.map(criterion => ({
             name: criterion.name,
             description: criterion.description || null,
-            needsJuryCourtesy: criterion.needsJuryCourtesy || false,
+            needsJuryCourtesy: criterion.requiresJuryCourtesy || false,
             evaluationType: criterion.evaluationType,
             weight: criterion.weight || 1,
             maxScore: criterion.maxScore || null,
@@ -92,7 +110,18 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json(template, { status: 201 });
+    // Parse discreteValues from JSON string to array for each criterion
+    const processedTemplate = {
+      ...template,
+      criteria: template.criteria.map(criterion => ({
+        ...criterion,
+        discreteValues: criterion.discreteValues 
+          ? JSON.parse(criterion.discreteValues) 
+          : null
+      }))
+    };
+
+    return NextResponse.json(processedTemplate, { status: 201 });
   } catch (error) {
     console.error('Error creating judging template:', error);
     return NextResponse.json(

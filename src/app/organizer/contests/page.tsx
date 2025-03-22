@@ -16,6 +16,7 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import prisma from '@/lib/prisma';
+import Image from 'next/image';
 import { format } from 'date-fns';
 
 // Helper function to get status badge color
@@ -69,7 +70,8 @@ export default async function ContestsPage() {
           contingents: true
         }
       },
-      targetGroup: true
+      targetGroup: true,
+      theme: true
     },
     orderBy: {
       startDate: 'desc'
@@ -154,9 +156,7 @@ export default async function ContestsPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Theme</TableHead>
                 <TableHead>Participants</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -166,9 +166,22 @@ export default async function ContestsPage() {
                 <TableRow key={contest.id}>
                   <TableCell className="font-medium">{contest.name}</TableCell>
                   <TableCell>{getContestTypeDisplay(contest.contestType)}</TableCell>
-                  <TableCell>{format(contest.startDate, 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>{format(contest.endDate, 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>{getStatusBadge(contest.startDate, contest.endDate)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {contest.theme?.logoPath && (
+                        <div className="h-6 w-6 relative overflow-hidden rounded-sm">
+                          <Image 
+                            src={contest.theme.logoPath} 
+                            alt={contest.theme?.name || "Theme logo"} 
+                            width={24} 
+                            height={24}
+                            className="object-contain"
+                          />
+                        </div>
+                      )}
+                      <span>{contest.theme?.name || "No theme"}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>{contest._count.contingents}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
