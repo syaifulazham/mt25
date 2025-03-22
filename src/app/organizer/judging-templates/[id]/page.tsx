@@ -411,7 +411,8 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
 
   // Handle contest type selection
   const handleContestTypeChange = (value: string) => {
-    setTemplate({ ...template, contestType: value });
+    // If ANY is selected, set contestType to empty string in the database
+    setTemplate({ ...template, contestType: value === "ANY" ? "" : value });
   };
 
   // Handle default toggle
@@ -647,14 +648,14 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
               <div className="grid gap-2">
                 <Label htmlFor="contestType">Contest Type</Label>
                 <Select
-                  value={template.contestType}
+                  value={template.contestType || "ANY"}
                   onValueChange={handleContestTypeChange}
                 >
                   <SelectTrigger id="contestType">
                     <SelectValue placeholder="Select contest type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Any contest type</SelectItem>
+                    <SelectItem value="ANY">Any contest type</SelectItem>
                     <SelectItem value="HACKATHON">Hackathon</SelectItem>
                     <SelectItem value="PROGRAMMING">Programming</SelectItem>
                     <SelectItem value="DATASCIENCE">Data Science</SelectItem>

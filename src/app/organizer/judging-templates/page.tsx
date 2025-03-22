@@ -45,7 +45,7 @@ export default function JudgingTemplatesPage() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [contestTypeFilter, setContestTypeFilter] = useState('');
+  const [contestTypeFilter, setContestTypeFilter] = useState('ALL');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<any>(null);
 
@@ -72,7 +72,7 @@ export default function JudgingTemplatesPage() {
     const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (template.description && template.description.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    const matchesContestType = !contestTypeFilter || 
+    const matchesContestType = contestTypeFilter === "ALL" || 
       template.contestType === contestTypeFilter;
     
     return matchesSearch && matchesContestType;
@@ -141,7 +141,7 @@ export default function JudgingTemplatesPage() {
                   <SelectValue placeholder="Filter by contest type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All contest types</SelectItem>
+                  <SelectItem value="ALL">All contest types</SelectItem>
                   <SelectItem value="HACKATHON">Hackathon</SelectItem>
                   <SelectItem value="PROGRAMMING">Programming</SelectItem>
                   <SelectItem value="DATASCIENCE">Data Science</SelectItem>
