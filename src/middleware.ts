@@ -32,13 +32,34 @@ async function generateMockToken(): Promise<string> {
 
 // This function can be marked `async` if using `await` inside
 export async function middleware(request: NextRequest) {
+  // Check if we need to clear cookies (from error redirect)
+  if (request.nextUrl.searchParams.has('message') && 
+      (request.nextUrl.searchParams.get('message')?.includes('Session+expired') || 
+       request.nextUrl.searchParams.get('message')?.includes('Error+decrypting'))) {
+    
+    const response = NextResponse.redirect(request.nextUrl);
+    
+    // Clear problematic cookies
+    const cookiesToClear = ['next-auth.session-token', 'next-auth.csrf-token', 'next-auth.callback-url', 'techlympics-auth'];
+    cookiesToClear.forEach(name => {
+      response.cookies.delete(name);
+    });
+    
+    return response;
+  }
+
   // Only run in development mode
   if (process.env.NODE_ENV !== 'development') {
     return NextResponse.next();
   }
 
-  // Only apply to API routes
-  if (!request.nextUrl.pathname.startsWith('/api')) {
+  // Skip middleware for auth-related paths and static assets
+  if (
+    request.nextUrl.pathname.includes('/api/auth') ||
+    request.nextUrl.pathname.includes('/organizer/auth') ||
+    request.nextUrl.pathname.startsWith('/_next') ||
+    request.nextUrl.pathname.includes('/favicon.ico')
+  ) {
     return NextResponse.next();
   }
 
@@ -50,7 +71,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // For API routes without auth, add a mock auth cookie
+  // For all routes without auth in development, add a mock auth cookie
   const token = await generateMockToken();
   const response = NextResponse.next();
   
@@ -64,18 +85,23 @@ export async function middleware(request: NextRequest) {
     sameSite: 'lax',
   });
 
+  // Also add the NextAuth session token for compatibility
+  response.cookies.set({
+    name: 'next-auth.session-token',
+    value: token,
+    httpOnly: true,
+    path: '/',
+    maxAge: 60 * 60 * 8, // 8 hours
+    sameSite: 'lax',
+  });
+
   return response;
 }
 
 // See "Matching Paths" below to learn more
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
+    // Skip auth routes and static assets
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

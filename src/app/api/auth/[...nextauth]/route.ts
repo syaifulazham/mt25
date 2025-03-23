@@ -112,7 +112,7 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 8 * 60 * 60, // 8 hours
   },
-  secret: process.env.NEXTAUTH_SECRET || "techlympics-2025-secret-key",
+  secret: process.env.NEXTAUTH_SECRET || "8Li3veTh1515MySeCr3t", // Match the secret used in mock-auth.ts
 };
 
 const handler = NextAuth(authOptions);

@@ -1,5 +1,3 @@
-// schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,56 +7,314 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id              Int       @id @default(autoincrement())
-  username        String    @unique
-  email           String    @unique
-  name            String?
-  password        String?
-  role            Role      @default(PARTICIPANT)
-  isActive        Boolean   @default(true)
-  lastLogin       DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  submissions     Submission[]
-  judgings        Judging[]
-  contingents     Contingent[]
-  notifications   Notification[]
+model analytics {
+  id        Int      @id @default(autoincrement())
+  metric    String
+  value     Float
+  createdAt DateTime @default(now())
 }
 
-enum Role {
-  ADMIN
-  OPERATOR
-  VIEWER
-  PARTICIPANT
-  JUDGE
+model announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  date        DateTime @default(now())
+  icon        String?
+  link        String?
+  linkText    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  userId      Int
+  user        user     @relation(fields: [userId], references: [id], map: "Announcement_userId_fkey")
+
+  @@index([userId], map: "Announcement_userId_fkey")
 }
 
-model Contest {
-  id            Int          @id @default(autoincrement())
-  name          String
-  code          String       @unique
-  description   String?
-  contestType   ContestType
-  method        ContestMethod
-  targetGroup   TargetGroup[]
-  accessibility Boolean      @default(false)
-  judgingMethod JudgingMethod
-  startDate     DateTime
-  endDate       DateTime
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  submissions   Submission[]
-  judgings      Judging[]
-  results       Result[]
-  contingents   Contingent[]
-  themeId       Int?
-  theme         Theme?        @relation(fields: [themeId], references: [id])
+model contest {
+  id                Int                   @id @default(autoincrement())
+  name              String
+  code              String                @unique(map: "Contest_code_key")
+  description       String?
+  contestType       contest_contestType
+  method            contest_method
+  accessibility     Boolean               @default(false)
+  judgingMethod     contest_judgingMethod
+  startDate         DateTime
+  endDate           DateTime
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime
+  themeId           Int?
   judgingTemplateId Int?
-  judgingTemplate   JudgingTemplate?        @relation(fields: [judgingTemplateId], references: [id])
+  judgingtemplate   judgingtemplate?      @relation(fields: [judgingTemplateId], references: [id], map: "Contest_judgingTemplateId_fkey")
+  theme             theme?                @relation(fields: [themeId], references: [id], map: "Contest_themeId_fkey")
+  contingent        contingent[]
+  judging           judging[]
+  result            result[]
+  submission        submission[]
+  targetgroup       targetgroup[]         @relation("contesttotargetgroup")
+
+  @@index([judgingTemplateId], map: "Contest_judgingTemplateId_fkey")
+  @@index([themeId], map: "Contest_themeId_fkey")
 }
 
-enum ContestType {
+model contingent {
+  id          Int      @id @default(autoincrement())
+  name        String
+  userId      Int
+  schoolId    Int
+  createdAt   DateTime @default(now())
+  contestId   Int
+  description String?
+  updatedAt   DateTime
+  contest     contest  @relation(fields: [contestId], references: [id], map: "Contingent_contestId_fkey")
+  school      school   @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
+  user        user     @relation(fields: [userId], references: [id], map: "Contingent_userId_fkey")
+
+  @@index([contestId], map: "Contingent_contestId_fkey")
+  @@index([schoolId], map: "Contingent_schoolId_fkey")
+  @@index([userId], map: "Contingent_userId_fkey")
+}
+
+model higherinstitution {
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String   @unique(map: "HigherInstitution_code_key")
+  address   String?
+  city      String?
+  postcode  String?
+  stateId   Int
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime @default(now())
+  state     state    @relation(fields: [stateId], references: [id], map: "HigherInstitution_stateId_fkey")
+
+  @@index([stateId], map: "HigherInstitution_stateId_fkey")
+}
+
+model judging {
+  id                   Int                    @id @default(autoincrement())
+  submissionId         Int
+  score                Float
+  feedback             String?
+  contestId            Int
+  judgingTime          DateTime               @default(now())
+  judgeId              Int
+  contest              contest                @relation(fields: [contestId], references: [id], map: "Judging_contestId_fkey")
+  user                 user                   @relation(fields: [judgeId], references: [id], map: "Judging_judgeId_fkey")
+  submission           submission             @relation(fields: [submissionId], references: [id], map: "Judging_submissionId_fkey")
+  judgingcriteriascore judgingcriteriascore[]
+  result               result[]
+
+  @@index([contestId], map: "Judging_contestId_fkey")
+  @@index([judgeId], map: "Judging_judgeId_fkey")
+  @@index([submissionId], map: "Judging_submissionId_fkey")
+}
+
+model judgingcriteriascore {
+  id                  Int                                 @id @default(autoincrement())
+  judgingId           Int
+  criteriaName        String
+  criteriaDescription String?
+  evaluationType      judgingcriteriascore_evaluationType
+  weight              Int
+  score               Float
+  feedback            String?
+  discreteValue       String?
+  createdAt           DateTime                            @default(now())
+  judging             judging                             @relation(fields: [judgingId], references: [id], map: "JudgingCriteriaScore_judgingId_fkey")
+
+  @@index([judgingId], map: "JudgingCriteriaScore_judgingId_fkey")
+}
+
+model judgingtemplate {
+  id                      Int                          @id @default(autoincrement())
+  name                    String
+  description             String?
+  isDefault               Boolean                      @default(false)
+  contestType             judgingtemplate_contestType?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime
+  contest                 contest[]
+  judgingtemplatecriteria judgingtemplatecriteria[]
+}
+
+model judgingtemplatecriteria {
+  id                Int                                    @id @default(autoincrement())
+  name              String
+  description       String?
+  needsJuryCourtesy Boolean                                @default(false)
+  evaluationType    judgingtemplatecriteria_evaluationType
+  weight            Int                                    @default(1)
+  maxScore          Int?
+  discreteValues    String?
+  templateId        Int
+  createdAt         DateTime                               @default(now())
+  updatedAt         DateTime
+  judgingtemplate   judgingtemplate                        @relation(fields: [templateId], references: [id], onDelete: Cascade, map: "JudgingTemplateCriteria_templateId_fkey")
+
+  @@index([templateId], map: "JudgingTemplateCriteria_templateId_fkey")
+}
+
+model news {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique(map: "News_slug_key")
+  excerpt     String   @db.Text
+  content     String   @db.LongText
+  coverImage  String?
+  date        DateTime @default(now())
+  readTime    String?
+  author      String?
+  featured    Boolean  @default(false)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  userId      Int
+  user        user     @relation(fields: [userId], references: [id], map: "News_userId_fkey")
+
+  @@index([userId], map: "News_userId_fkey")
+}
+
+model notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], map: "Notification_userId_fkey")
+
+  @@index([userId], map: "Notification_userId_fkey")
+}
+
+model referencedata {
+  id          Int      @id @default(autoincrement())
+  type        String
+  code        String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@unique([type, code], map: "ReferenceData_type_code_key")
+}
+
+model result {
+  id           Int        @id @default(autoincrement())
+  contestId    Int
+  score        Float
+  rank         Int?
+  createdAt    DateTime   @default(now())
+  judgingId    Int
+  submissionId Int
+  updatedAt    DateTime
+  contest      contest    @relation(fields: [contestId], references: [id], map: "Result_contestId_fkey")
+  judging      judging    @relation(fields: [judgingId], references: [id], map: "Result_judgingId_fkey")
+  submission   submission @relation(fields: [submissionId], references: [id], map: "Result_submissionId_fkey")
+
+  @@index([contestId], map: "Result_contestId_fkey")
+  @@index([judgingId], map: "Result_judgingId_fkey")
+  @@index([submissionId], map: "Result_submissionId_fkey")
+}
+
+model school {
+  id         Int          @id @default(autoincrement())
+  name       String
+  ppd        String?
+  code       String       @unique(map: "School_code_key")
+  address    String?
+  city       String?
+  postcode   String?
+  stateId    Int
+  latitude   Float?
+  longitude  Float?
+  createdAt  DateTime     @default(now())
+  category   String
+  level      String
+  contingent contingent[]
+  state      state        @relation(fields: [stateId], references: [id], map: "School_stateId_fkey")
+
+  @@index([stateId], map: "School_stateId_fkey")
+}
+
+model state {
+  id                Int                 @id @default(autoincrement())
+  name              String              @unique(map: "State_name_key")
+  zoneId            Int
+  higherinstitution higherinstitution[]
+  school            school[]
+  zone              zone                @relation(fields: [zoneId], references: [id], map: "State_zoneId_fkey")
+
+  @@index([zoneId], map: "State_zoneId_fkey")
+}
+
+model submission {
+  id          Int               @id @default(autoincrement())
+  userId      Int
+  contestId   Int
+  fileUrl     String?
+  status      submission_status @default(PENDING)
+  description String?
+  submittedAt DateTime          @default(now())
+  title       String
+  judging     judging[]
+  result      result[]
+  contest     contest           @relation(fields: [contestId], references: [id], map: "Submission_contestId_fkey")
+  user        user              @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
+
+  @@index([contestId], map: "Submission_contestId_fkey")
+  @@index([userId], map: "Submission_userId_fkey")
+}
+
+model targetgroup {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique(map: "TargetGroup_code_key")
+  name        String
+  ageGroup    String
+  schoolLevel String
+  maxAge      Int       @default(0)
+  minAge      Int       @default(0)
+  contest     contest[] @relation("contesttotargetgroup")
+}
+
+model theme {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique(map: "Theme_name_key")
+  color       String?
+  logoPath    String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  contest     contest[]
+}
+
+model user {
+  id           Int            @id @default(autoincrement())
+  name         String?
+  email        String         @unique(map: "User_email_key")
+  password     String?
+  role         user_role      @default(PARTICIPANT)
+  username     String         @unique(map: "User_username_key")
+  isActive     Boolean        @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  announcement announcement[]
+  contingent   contingent[]
+  judging      judging[]
+  news         news[]
+  notification notification[]
+  submission   submission[]
+}
+
+model zone {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique(map: "Zone_name_key")
+  state state[]
+}
+
+enum contest_contestType {
   QUIZ
   CODING
   STRUCTURE_BUILDING
@@ -69,223 +325,51 @@ enum ContestType {
   ANALYSIS_CHALLENGE
 }
 
-enum ContestMethod {
-  ONLINE
-  PHYSICAL
+enum judgingcriteriascore_evaluationType {
+  POINTS
+  TIME
+  DISCRETE
 }
 
-enum JudgingMethod {
-  AI
-  JURY
-  POINT_SCORE
-  TIME_COMPLETION
+enum judgingtemplate_contestType {
+  QUIZ
+  CODING
+  STRUCTURE_BUILDING
+  FASTEST_COMPLETION
+  POSTER_PRESENTATION
+  SCIENCE_PROJECT
+  ENGINEERING_DESIGN
+  ANALYSIS_CHALLENGE
 }
 
-model TargetGroup {
-  id            Int       @id @default(autoincrement())
-  code          String    @unique
-  name          String
-  ageGroup      String
-  minAge        Int       @default(0) // 0 means no limit
-  maxAge        Int       @default(0) // 0 means no limit
-  schoolLevel   String
-  contests      Contest[]
+enum judgingtemplatecriteria_evaluationType {
+  POINTS
+  TIME
+  DISCRETE
 }
 
-model School {
-  id          Int      @id @default(autoincrement())
-  name        String
-  ppd         String?
-  level       String
-  category    String
-  code        String  @unique
-  address     String?
-  city        String?
-  postcode    String?
-  stateId     Int
-  state       State   @relation(fields: [stateId], references: [id])
-  latitude    Float?
-  longitude   Float?
-  contingent  Contingent[]
-  createdAt   DateTime @default(now())
-}
-
-model HigherInstitution {
-  id        Int     @id @default(autoincrement())
-  name      String
-  code      String  @unique
-  address   String?
-  city      String?
-  postcode  String?
-  stateId   Int
-  state     State   @relation(fields: [stateId], references: [id])
-  latitude  Float?
-  longitude Float?
-  createdAt DateTime @default(now())
-}
-
-model Contingent {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id])
-  contestId   Int
-  contest     Contest  @relation(fields: [contestId], references: [id])
-  schoolId    Int
-  school      School   @relation(fields: [schoolId], references: [id])
-  name        String
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Submission {
-  id         Int      @id @default(autoincrement())
-  contestId  Int
-  contest    Contest  @relation(fields: [contestId], references: [id])
-  userId     Int
-  user       User     @relation(fields: [userId], references: [id])
-  title       String
-  description String?
-  fileUrl     String?
-  submittedAt DateTime  @default(now())
-  status      SubmissionStatus @default(PENDING)
-  judgings    Judging[]
-  results     Result[]
-}
-
-enum SubmissionStatus {
+enum submission_status {
   PENDING
   APPROVED
   REJECTED
 }
 
-model Judging {
-  id           Int       @id @default(autoincrement())
-  submissionId Int
-  submission   Submission @relation(fields: [submissionId], references: [id])
-  judgeId      Int
-  judge        User      @relation(fields: [judgeId], references: [id])
-  contestId    Int
-  contest      Contest   @relation(fields: [contestId], references: [id])
-  score        Float
-  feedback     String?
-  judgingTime  DateTime  @default(now())
-  results      Result[]
-  criteriaScores  JudgingCriteriaScore[]
+enum user_role {
+  ADMIN
+  OPERATOR
+  VIEWER
+  PARTICIPANT
+  JUDGE
 }
 
-model JudgingCriteriaScore {
-  id              Int                     @id @default(autoincrement())
-  judgingId       Int
-  judging         Judging                 @relation(fields: [judgingId], references: [id])
-  criteriaName    String                  // Store the name directly for historical record
-  criteriaDescription String?             // Store the description directly for historical record
-  evaluationType  EvaluationType
-  weight          Int
-  score           Float                   // The actual score given
-  feedback        String?                 // Optional feedback for this specific criterion
-  discreteValue   String?                 // If using discrete evaluation, the selected value
-  createdAt       DateTime                @default(now())
+enum contest_method {
+  ONLINE
+  PHYSICAL
 }
 
-model Result {
-  id           Int      @id @default(autoincrement())
-  contestId    Int
-  contest      Contest  @relation(fields: [contestId], references: [id])
-  submissionId Int
-  submission   Submission @relation(fields: [submissionId], references: [id])
-  judgingId    Int
-  judging      Judging  @relation(fields: [judgingId], references: [id])
-  score        Float
-  rank         Int?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}
-
-model ReferenceData {
-  id          Int      @id @default(autoincrement())
-  type        String
-  code        String
-  name        String
-  description String?
-  isActive    Boolean  @default(true)
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([type, code])
-}
-
-model Notification {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  message   String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-model Analytics {
-  id        Int      @id @default(autoincrement())
-  metric    String
-  value     Float
-  createdAt DateTime @default(now())
-}
-
-model Zone {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  states State[]
-}
-
-model State {
-  id       Int    @id @default(autoincrement())
-  name     String @unique
-  zoneId   Int
-  zone     Zone   @relation(fields: [zoneId], references: [id])
-  schools  School[]
-  higherInstitutions HigherInstitution[]
-}
-
-model Theme {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  color       String?
-  logoPath    String?
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  contests    Contest[]
-}
-
-model JudgingTemplate {
-  id                Int                     @id @default(autoincrement())
-  name              String
-  description       String?
-  isDefault         Boolean                 @default(false)
-  contestType       ContestType?            // Optional association with a specific contest type
-  criteria          JudgingTemplateCriteria[]
-  contests          Contest[]               // Contests using this template
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-}
-
-model JudgingTemplateCriteria {
-  id                Int                     @id @default(autoincrement())
-  name              String
-  description       String?
-  needsJuryCourtesy Boolean                 @default(false)
-  evaluationType    EvaluationType
-  weight            Int                     @default(1)
-  maxScore          Int?                    // Used if evaluationType is POINTS
-  discreteValues    String?                 // JSON array of possible values if evaluationType is DISCRETE
-  templateId        Int
-  template          JudgingTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
-}
-
-enum EvaluationType {
-  POINTS
-  TIME
-  DISCRETE
+enum contest_judgingMethod {
+  AI
+  JURY
+  POINT_SCORE
+  TIME_COMPLETION
 }

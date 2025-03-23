@@ -747,3 +747,172 @@ export const judgingTemplateApi = {
     }
   }
 };
+
+/**
+ * Announcement API client
+ */
+export const announcementApi = {
+  /**
+   * Get all announcements with optional search and filters
+   */
+  getAnnouncements(params?: { 
+    search?: string;
+    activeOnly?: boolean;
+  }) {
+    return apiRequest<any[]>('/api/announcements', {
+      params
+    });
+  },
+
+  /**
+   * Get announcements with pagination
+   */
+  getAnnouncementsPaginated(params?: { 
+    search?: string;
+    activeOnly?: boolean;
+    page?: number;
+    pageSize?: number;
+  }) {
+    return apiRequest<{ data: any[]; meta: any }>('/api/announcements', {
+      params
+    });
+  },
+
+  /**
+   * Get a specific announcement by ID
+   */
+  getAnnouncement(id: number | string) {
+    return apiRequest<any>(`/api/announcements/${id}`);
+  },
+
+  /**
+   * Create a new announcement
+   */
+  createAnnouncement(data: {
+    title: string;
+    description: string;
+    icon?: string;
+    link?: string;
+    linkText?: string;
+  }) {
+    return apiRequest<any>('/api/announcements', {
+      method: 'POST',
+      body: data
+    });
+  },
+
+  /**
+   * Update an announcement
+   */
+  updateAnnouncement(id: number | string, data: {
+    title?: string;
+    description?: string;
+    icon?: string;
+    link?: string;
+    linkText?: string;
+    isActive?: boolean;
+  }) {
+    return apiRequest<any>(`/api/announcements/${id}`, {
+      method: 'PUT',
+      body: data
+    });
+  },
+
+  /**
+   * Delete an announcement
+   */
+  deleteAnnouncement(id: number | string) {
+    return apiRequest<{ success: boolean }>(`/api/announcements/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+/**
+ * News API client
+ */
+export const newsApi = {
+  /**
+   * Get all news with optional search and filters
+   */
+  getNews(params?: { 
+    search?: string;
+    publishedOnly?: boolean;
+    featuredOnly?: boolean;
+  }) {
+    return apiRequest<any[]>('/api/news', {
+      params
+    });
+  },
+
+  /**
+   * Get news with pagination
+   */
+  getNewsPaginated(params?: { 
+    search?: string;
+    publishedOnly?: boolean;
+    featuredOnly?: boolean;
+    page?: number;
+    pageSize?: number;
+  }) {
+    return apiRequest<{ data: any[]; meta: any }>('/api/news', {
+      params
+    });
+  },
+
+  /**
+   * Get a specific news item by ID
+   */
+  getNewsItem(id: number | string) {
+    return apiRequest<any>(`/api/news/${id}`);
+  },
+
+  /**
+   * Create a new news item
+   */
+  createNews(data: {
+    title: string;
+    excerpt: string;
+    content: string;
+    coverImage?: string;
+    readTime?: string;
+    author?: string;
+    featured?: boolean;
+    isPublished?: boolean;
+    slug?: string;
+  }) {
+    return apiRequest<any>('/api/news', {
+      method: 'POST',
+      body: data
+    });
+  },
+
+  /**
+   * Update a news item
+   */
+  updateNews(id: number | string, data: {
+    title?: string;
+    excerpt?: string;
+    content?: string;
+    coverImage?: string;
+    readTime?: string;
+    author?: string;
+    featured?: boolean;
+    isPublished?: boolean;
+    slug?: string;
+  }) {
+    return apiRequest<any>(`/api/news/${id}`, {
+      method: 'PUT',
+      body: data
+    });
+  },
+
+  /**
+   * Delete a news item
+   */
+  deleteNews(id: number | string) {
+    return apiRequest<{ success: boolean }>(`/api/news/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
