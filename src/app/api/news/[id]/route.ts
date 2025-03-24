@@ -22,7 +22,7 @@ export async function GET(
     const news = await prisma.news.findUnique({
       where: { id },
       include: {
-        createdBy: {
+        user: {
           select: {
             id: true,
             name: true,

@@ -21,7 +21,7 @@ export async function GET(
     const announcement = await prisma.announcement.findUnique({
       where: { id },
       include: {
-        createdBy: {
+        user: {
           select: {
             id: true,
             name: true,

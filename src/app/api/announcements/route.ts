@@ -17,7 +17,7 @@ const mockAnnouncements = [
     createdAt: new Date("2025-02-15").toISOString(),
     updatedAt: new Date("2025-02-15").toISOString(),
     userId: 1,
-    createdBy: {
+    user: {
       id: 1,
       name: "Admin User",
       username: "admin"
@@ -35,7 +35,7 @@ const mockAnnouncements = [
     createdAt: new Date("2025-03-05").toISOString(),
     updatedAt: new Date("2025-03-05").toISOString(),
     userId: 1,
-    createdBy: {
+    user: {
       id: 1,
       name: "Admin User",
       username: "admin"
@@ -53,7 +53,7 @@ const mockAnnouncements = [
     createdAt: new Date("2025-03-10").toISOString(),
     updatedAt: new Date("2025-03-10").toISOString(),
     userId: 1,
-    createdBy: {
+    user: {
       id: 1,
       name: "Admin User",
       username: "admin"
@@ -71,7 +71,7 @@ const mockAnnouncements = [
     createdAt: new Date("2025-03-15").toISOString(),
     updatedAt: new Date("2025-03-15").toISOString(),
     userId: 1,
-    createdBy: {
+    user: {
       id: 1,
       name: "Admin User",
       username: "admin"
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         take: pageSize,
         orderBy: { date: "desc" },
         include: {
-          createdBy: {
+          user: {
             select: {
               id: true,
               name: true,

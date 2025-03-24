@@ -18,7 +18,7 @@ const mockNews = [
     featured: true,
     slug: "techlympics-2025-registration-now-open",
     isPublished: true,
-    createdBy: {
+    user: {
       id: "1",
       name: "Admin User",
       username: "admin",
@@ -36,7 +36,7 @@ const mockNews = [
     featured: false,
     slug: "new-ai-competition-added",
     isPublished: true,
-    createdBy: {
+    user: {
       id: "1",
       name: "Admin User",
       username: "admin",
@@ -54,7 +54,7 @@ const mockNews = [
     featured: false,
     slug: "sponsorship-opportunities",
     isPublished: true,
-    createdBy: {
+    user: {
       id: "1",
       name: "Admin User",
       username: "admin",
@@ -72,7 +72,7 @@ const mockNews = [
     featured: false,
     slug: "venue-announced",
     isPublished: true,
-    createdBy: {
+    user: {
       id: "1",
       name: "Admin User",
       username: "admin",
@@ -90,7 +90,7 @@ const mockNews = [
     featured: false,
     slug: "international-judges-panel",
     isPublished: true,
-    createdBy: {
+    user: {
       id: "1",
       name: "Admin User",
       username: "admin",
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
         take: pageSize,
         orderBy: { date: "desc" },
         include: {
-          createdBy: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -267,6 +267,7 @@ export async function POST(request: NextRequest) {
         featured: featured || false,
         isPublished: isPublished || false,
         userId: user.id,
+        updatedAt: new Date(),
       },
     });
 
