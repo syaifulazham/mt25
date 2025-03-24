@@ -43,12 +43,6 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         zone: true,
-        _count: {
-          select: { 
-            schools: true,
-            higherInstitutions: true
-          }
-        }
       },
       orderBy: { name: "asc" },
     });

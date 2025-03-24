@@ -189,7 +189,7 @@ export default async function ContestDetailPage({ params }: { params: { id: stri
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground">Target Groups</h3>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {contest.targetGroup && contest.targetGroup.map((group: any) => (
+                        {contest.targetgroup && contest.targetgroup.map((group: any) => (
                           <Badge key={group.id} variant="outline">{group.name}</Badge>
                         ))}
                       </div>

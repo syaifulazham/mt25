@@ -22,9 +22,9 @@ export async function GET(
     const contest = await prisma.contest.findUnique({
       where: { id: parseInt(contestId) },
       include: {
-        judgingTemplate: {
+        judgingtemplate: {
           include: {
-            criteria: true
+            judgingtemplatecriteria: true
           }
         }
       }
@@ -37,14 +37,14 @@ export async function GET(
       );
     }
 
-    if (!contest.judgingTemplate) {
+    if (!contest.judgingtemplate) {
       return NextResponse.json({ template: null });
     }
 
     // Parse discreteValues from JSON string to array for each criterion
     const processedTemplate = {
-      ...contest.judgingTemplate,
-      criteria: contest.judgingTemplate.criteria.map(criterion => ({
+      ...contest.judgingtemplate,
+      judgingtemplatecriteria: (contest.judgingtemplate as any).judgingtemplatecriteria.map((criterion: any) => ({
         ...criterion,
         discreteValues: criterion.discreteValues 
           ? JSON.parse(criterion.discreteValues) 
@@ -85,7 +85,7 @@ export async function PUT(
     if (templateId !== null && templateId !== undefined) {
       // If templateId is provided, check if template exists
       if (templateId !== null) {
-        const template = await prisma.judgingTemplate.findUnique({
+        const template = await prisma.judgingtemplate.findUnique({
           where: { id: parseInt(templateId) }
         });
 
@@ -115,16 +115,16 @@ export async function PUT(
       );
     }
 
-    // Update the contest with the template
+    // Update the contest with the template ID
     const updatedContest = await prisma.contest.update({
       where: { id: parseInt(contestId) },
       data: {
         judgingTemplateId: templateId ? parseInt(templateId) : null
       },
       include: {
-        judgingTemplate: {
+        judgingtemplate: {
           include: {
-            criteria: true
+            judgingtemplatecriteria: true
           }
         }
       }
@@ -136,9 +136,9 @@ export async function PUT(
     }
 
     // Parse discreteValues from JSON string to array for each criterion
-    const processedTemplate = updatedContest.judgingTemplate ? {
-      ...updatedContest.judgingTemplate,
-      criteria: updatedContest.judgingTemplate.criteria.map(criterion => ({
+    const processedTemplate = updatedContest.judgingtemplate ? {
+      ...updatedContest.judgingtemplate,
+      judgingtemplatecriteria: (updatedContest.judgingtemplate as any).judgingtemplatecriteria.map((criterion: any) => ({
         ...criterion,
         discreteValues: criterion.discreteValues 
           ? JSON.parse(criterion.discreteValues) 

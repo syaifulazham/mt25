@@ -102,10 +102,20 @@ export function ContestForm({ initialData }: ContestFormProps) {
   useEffect(() => {
     const fetchTargetGroups = async () => {
       try {
+        console.log("Fetching target groups...");
         const response = await targetGroupApi.getTargetGroups();
+        console.log("Target groups API response:", response);
+        
         // Check if the response is an array (old format) or has a data property (new format)
         const data = Array.isArray(response) ? response : response.data;
-        setTargetGroups(data || []);
+        
+        if (Array.isArray(data) && data.length > 0) {
+          setTargetGroups(data);
+          console.log("Target groups loaded successfully:", data.length, "groups");
+        } else {
+          console.warn("No target groups found or invalid response format");
+          setTargetGroups([]);
+        }
       } catch (error) {
         console.error('Error fetching target groups:', error);
         toast.error('Failed to load target groups');
@@ -153,8 +163,8 @@ export function ContestForm({ initialData }: ContestFormProps) {
 
   // Set initial target groups if in edit mode
   useEffect(() => {
-    if (initialData && initialData.targetGroup) {
-      const targetGroupIds = initialData.targetGroup.map((tg: any) => tg.id);
+    if (initialData && initialData.targetgroup) {
+      const targetGroupIds = initialData.targetgroup.map((tg: any) => tg.id);
       setSelectedTargetGroups(targetGroupIds);
     }
   }, [initialData]);
@@ -173,7 +183,7 @@ export function ContestForm({ initialData }: ContestFormProps) {
       startDate: format(new Date(initialData.startDate), 'yyyy-MM-dd'),
       endDate: format(new Date(initialData.endDate), 'yyyy-MM-dd'),
       accessibility: initialData.accessibility || false,
-      targetGroupIds: initialData.targetGroup ? initialData.targetGroup.map((tg: any) => tg.id) : [],
+      targetGroupIds: initialData.targetgroup ? initialData.targetgroup.map((tg: any) => tg.id) : [],
       themeId: initialData.themeId || null,
     };
   };
@@ -183,6 +193,13 @@ export function ContestForm({ initialData }: ContestFormProps) {
     resolver: zodResolver(contestFormSchema),
     defaultValues: getInitialValues(),
   });
+
+  // Update selected target groups when form values change
+  useEffect(() => {
+    const targetGroupIds = form.getValues('targetGroupIds') || [];
+    console.log("Initial targetGroupIds from form:", targetGroupIds);
+    setSelectedTargetGroups(targetGroupIds);
+  }, [form]);
 
   // Handle target group selection
   const handleTargetGroupChange = (targetGroupId: number, checked: boolean) => {
@@ -208,38 +225,35 @@ export function ContestForm({ initialData }: ContestFormProps) {
   };
 
   // Handle form submission
-  async function onSubmit(data: ContestFormValues) {
-    setIsSubmitting(true);
+  const onSubmit = async (data: ContestFormValues) => {
+    console.log("Form submitted with data:", data);
+    console.log("Selected target groups:", selectedTargetGroups);
     
     try {
+      setIsSubmitting(true);
+      
+      // Ensure the targetGroupIds in the form data match the selected target groups
+      data.targetGroupIds = selectedTargetGroups;
+      
       if (isEditMode) {
         // Update existing contest
-        await contestApi.updateContest(initialData.id, {
-          ...data,
-          startDate: new Date(data.startDate),
-          endDate: new Date(data.endDate),
-        });
-        toast.success('Contest updated successfully');
+        await contestApi.updateContest(initialData.id, data);
+        toast.success("Contest updated successfully");
       } else {
         // Create new contest
-        await contestApi.createContest({
-          ...data,
-          startDate: new Date(data.startDate),
-          endDate: new Date(data.endDate),
-        });
-        toast.success('Contest created successfully');
+        await contestApi.createContest(data);
+        toast.success("Contest created successfully");
       }
       
       // Redirect back to contests list
       router.push('/organizer/contests');
-      router.refresh();
     } catch (error) {
       console.error('Error saving contest:', error);
-      toast.error('Failed to save contest');
+      toast.error("Failed to save contest");
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Card>

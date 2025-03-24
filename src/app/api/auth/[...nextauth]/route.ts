@@ -3,7 +3,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "@/lib/prisma";
 import { compare } from "bcrypt";
-import { Role } from "@prisma/client";
+//import { Role } from "@prisma/client";
 
 // Extend Next Auth types to include our custom properties
 declare module "next-auth" {

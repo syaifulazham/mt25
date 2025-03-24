@@ -32,22 +32,24 @@ model announcement {
 }
 
 model contest {
-  id                Int                   @id @default(autoincrement())
+  id                Int                  @id @default(autoincrement())
   name              String
-  code              String                @unique(map: "Contest_code_key")
+  code              String               @unique(map: "Contest_code_key")
   description       String?
   contestType       contest_contestType
   method            contest_method
-  accessibility     Boolean               @default(false)
   judgingMethod     contest_judgingMethod
   startDate         DateTime
   endDate           DateTime
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime
+  accessibility     Boolean              @default(false)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   themeId           Int?
   judgingTemplateId Int?
   judgingtemplate   judgingtemplate?      @relation(fields: [judgingTemplateId], references: [id], map: "Contest_judgingTemplateId_fkey")
   theme             theme?                @relation(fields: [themeId], references: [id], map: "Contest_themeId_fkey")
+  eventId           Int?                 // New field for event relation
+  event             event?               @relation("eventToContest", fields: [eventId], references: [id], map: "Contest_eventId_fkey")
   contingent        contingent[]
   judging           judging[]
   result            result[]
@@ -56,6 +58,7 @@ model contest {
 
   @@index([judgingTemplateId], map: "Contest_judgingTemplateId_fkey")
   @@index([themeId], map: "Contest_themeId_fkey")
+  @@index([eventId], map: "Contest_eventId_fkey")
 }
 
 model contingent {
@@ -74,6 +77,32 @@ model contingent {
   @@index([contestId], map: "Contingent_contestId_fkey")
   @@index([schoolId], map: "Contingent_schoolId_fkey")
   @@index([userId], map: "Contingent_userId_fkey")
+}
+
+model event {
+  id          Int       @id @default(autoincrement())
+  name        String
+  scopeArea   scope_area @default(OPEN)
+  code        String    @unique(map: "Event_code_key")
+  description String?
+  startDate   DateTime
+  endDate     DateTime
+  venue       String?
+  address     String?
+  city        String?
+  addressState     String?
+  zoneId      Int?
+  stateId     Int?
+  latitude    Float?
+  longitude   Float?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  contests    contest[] @relation("eventToContest")
+  zone        zone?     @relation(fields: [zoneId], references: [id])
+  state       state?    @relation(fields: [stateId], references: [id])
 }
 
 model higherinstitution {
@@ -244,6 +273,7 @@ model state {
   zoneId            Int
   higherinstitution higherinstitution[]
   school            school[]
+  events            event[]
   zone              zone                @relation(fields: [zoneId], references: [id], map: "State_zoneId_fkey")
 
   @@index([zoneId], map: "State_zoneId_fkey")
@@ -312,6 +342,7 @@ model zone {
   id    Int     @id @default(autoincrement())
   name  String  @unique(map: "Zone_name_key")
   state state[]
+  events event[]
 }
 
 enum contest_contestType {
@@ -372,4 +403,11 @@ enum contest_judgingMethod {
   JURY
   POINT_SCORE
   TIME_COMPLETION
+}
+
+enum scope_area {
+  NATIONAL
+  ZONE
+  STATE
+  OPEN
 }

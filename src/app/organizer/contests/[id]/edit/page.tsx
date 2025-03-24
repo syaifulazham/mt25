@@ -25,7 +25,7 @@ export default async function EditContestPage({ params }: { params: { id: string
   const contest = await prisma.contest.findUnique({
     where: { id: contestId },
     include: {
-      targetGroup: true,
+      targetgroup: true,
       theme: true
     }
   });
@@ -40,7 +40,7 @@ export default async function EditContestPage({ params }: { params: { id: string
     ...contest,
     startDate: contest.startDate.toISOString().split('T')[0],
     endDate: contest.endDate.toISOString().split('T')[0],
-    targetGroupIds: contest.targetGroup.map(tg => tg.id),
+    targetGroupIds: contest.targetgroup.map(tg => tg.id),
     themeId: contest.themeId
   };
 
@@ -52,6 +52,24 @@ export default async function EditContestPage({ params }: { params: { id: string
           <p className="text-sm text-muted-foreground mt-1">
             Update details for {contest.name}
           </p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {contest.theme && (
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-muted-foreground">Theme:</span>
+                <span className="text-sm font-medium">{contest.theme.name}</span>
+              </div>
+            )}
+            {contest.targetgroup && contest.targetgroup.length > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-muted-foreground">Target Groups:</span>
+                <div className="flex flex-wrap gap-1">
+                  {contest.targetgroup.map((group) => (
+                    <span key={group.id} className="text-sm font-medium">{group.name}{contest.targetgroup.indexOf(group) < contest.targetgroup.length - 1 ? ', ' : ''}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <Link href={`/organizer/contests/${params.id}/judging-scheme`}>
           <Button className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200">

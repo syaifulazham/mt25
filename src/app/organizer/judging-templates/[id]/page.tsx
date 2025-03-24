@@ -70,7 +70,7 @@ interface JudgingCriteria {
   weight: number;
   evaluationType: string;
   discreteValues?: string[];
-  requiresJuryCourtesy?: boolean;
+  needsJuryCourtesy?: boolean;
 }
 
 interface JudgingTemplate {
@@ -79,7 +79,7 @@ interface JudgingTemplate {
   description: string;
   contestType: string;
   isDefault: boolean;
-  criteria: JudgingCriteria[];
+  judgingtemplatecriteria: JudgingCriteria[];
 }
 
 // Sortable Criteria Item Component
@@ -138,7 +138,7 @@ function SortableCriteriaItem({
       </TableCell>
       <TableCell>{criteria.weight}%</TableCell>
       <TableCell>
-        {criteria.requiresJuryCourtesy && (
+        {criteria.needsJuryCourtesy && (
           <CheckCircledIcon className="h-4 w-4 text-green-600" />
         )}
       </TableCell>
@@ -328,14 +328,14 @@ function CriteriaEditForm({
           
           <div className="flex items-center space-x-2 mt-2">
             <Switch
-              id="requiresJuryCourtesy"
-              checked={formData.requiresJuryCourtesy || false}
+              id="needsJuryCourtesy"
+              checked={formData.needsJuryCourtesy || false}
               onCheckedChange={(checked) => setFormData({ 
                 ...formData, 
-                requiresJuryCourtesy: checked 
+                needsJuryCourtesy: checked 
               })}
             />
-            <Label htmlFor="requiresJuryCourtesy">Requires Jury Courtesy</Label>
+            <Label htmlFor="needsJuryCourtesy">Requires Jury Courtesy</Label>
             <p className="text-xs text-muted-foreground ml-2">
               Flag this criterion for special consideration by the jury
             </p>
@@ -368,7 +368,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
     description: '',
     contestType: '',
     isDefault: false,
-    criteria: []
+    judgingtemplatecriteria: []
   });
   
   // Criteria editing state
@@ -436,14 +436,14 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
     
     if (editingCriteriaIndex !== null) {
       // Update existing criteria
-      updatedCriteria = [...template.criteria];
+      updatedCriteria = [...template.judgingtemplatecriteria];
       updatedCriteria[editingCriteriaIndex] = criteria;
     } else {
       // Add new criteria
-      updatedCriteria = [...template.criteria, criteria];
+      updatedCriteria = [...template.judgingtemplatecriteria, criteria];
     }
     
-    setTemplate({ ...template, criteria: updatedCriteria });
+    setTemplate({ ...template, judgingtemplatecriteria: updatedCriteria });
     setShowCriteriaForm(false);
     setEditingCriteriaIndex(null);
   };
@@ -454,9 +454,9 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
   };
 
   const handleDeleteCriteria = (index: number) => {
-    const updatedCriteria = [...template.criteria];
+    const updatedCriteria = [...template.judgingtemplatecriteria];
     updatedCriteria.splice(index, 1);
-    setTemplate({ ...template, criteria: updatedCriteria });
+    setTemplate({ ...template, judgingtemplatecriteria: updatedCriteria });
   };
 
   // Handle drag end for reordering criteria
@@ -464,16 +464,16 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
     const { active, over } = event;
     
     if (over && active.id !== over.id) {
-      const oldIndex = template.criteria.findIndex(
-        (item) => (item.id || `new-${template.criteria.indexOf(item)}`) === active.id
+      const oldIndex = template.judgingtemplatecriteria.findIndex(
+        (c, i) => (c.id || `new-${i}`) === active.id
       );
-      const newIndex = template.criteria.findIndex(
-        (item) => (item.id || `new-${template.criteria.indexOf(item)}`) === over.id
+      const newIndex = template.judgingtemplatecriteria.findIndex(
+        (c, i) => (c.id || `new-${i}`) === over.id
       );
       
       setTemplate({
         ...template,
-        criteria: arrayMove(template.criteria, oldIndex, newIndex),
+        judgingtemplatecriteria: arrayMove(template.judgingtemplatecriteria, oldIndex, newIndex),
       });
     }
   };
@@ -486,13 +486,13 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
       return;
     }
     
-    if (template.criteria.length === 0) {
+    if (template.judgingtemplatecriteria.length === 0) {
       toast.error('At least one criterion is required');
       return;
     }
     
     // Validate criteria weights sum to 100%
-    const totalWeight = template.criteria.reduce((sum, c) => sum + (c.weight || 0), 0);
+    const totalWeight = template.judgingtemplatecriteria.reduce((sum, c) => sum + (c.weight || 0), 0);
     if (totalWeight !== 100) {
       toast.error(`Criteria weights must sum to 100% (currently ${totalWeight}%)`);
       return;
@@ -656,13 +656,14 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ANY">Any contest type</SelectItem>
-                    <SelectItem value="HACKATHON">Hackathon</SelectItem>
-                    <SelectItem value="PROGRAMMING">Programming</SelectItem>
-                    <SelectItem value="DATASCIENCE">Data Science</SelectItem>
-                    <SelectItem value="DESIGN">Design</SelectItem>
-                    <SelectItem value="ROBOTICS">Robotics</SelectItem>
-                    <SelectItem value="CYBERSECURITY">Cybersecurity</SelectItem>
-                    <SelectItem value="OTHER">Other</SelectItem>
+                    <SelectItem value="QUIZ">Quiz</SelectItem>
+                    <SelectItem value="CODING">Coding</SelectItem>
+                    <SelectItem value="STRUCTURE_BUILDING">Structure Building</SelectItem>
+                    <SelectItem value="FASTEST_COMPLETION">Fastest Completion</SelectItem>
+                    <SelectItem value="POSTER_PRESENTATION">Poster Presentation</SelectItem>
+                    <SelectItem value="SCIENCE_PROJECT">Science Project</SelectItem>
+                    <SelectItem value="ENGINEERING_DESIGN">Engineering Design</SelectItem>
+                    <SelectItem value="ANALYSIS_CHALLENGE">Analysis Challenge</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -693,7 +694,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
         <CriteriaEditForm
           criteria={
             editingCriteriaIndex !== null
-              ? template.criteria[editingCriteriaIndex]
+              ? template.judgingtemplatecriteria[editingCriteriaIndex]
               : {
                   name: '',
                   description: '',
@@ -720,7 +721,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
             </Button>
           </CardHeader>
           <CardContent>
-            {template.criteria.length === 0 ? (
+            {template.judgingtemplatecriteria.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-center">
                 <p className="text-muted-foreground mb-4">No criteria defined yet</p>
                 <Button onClick={handleAddCriteria}>
@@ -749,12 +750,12 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                   </TableHeader>
                   <TableBody>
                     <SortableContext
-                      items={template.criteria.map(
+                      items={template.judgingtemplatecriteria.map(
                         (c, i) => c.id || `new-${i}`
                       )}
                       strategy={verticalListSortingStrategy}
                     >
-                      {template.criteria.map((criteria, index) => (
+                      {template.judgingtemplatecriteria.map((criteria, index) => (
                         <SortableCriteriaItem
                           key={criteria.id || `new-${index}`}
                           criteria={criteria}

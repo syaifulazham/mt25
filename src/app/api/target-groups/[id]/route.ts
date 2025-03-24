@@ -36,12 +36,12 @@ export async function GET(
     }
 
     // Get target group from database
-    const targetGroup = await prisma.targetGroup.findUnique({
+    const targetGroup = await prisma.targetgroup.findUnique({
       where: { id },
       include: {
-        contests: true,
+        contest: true,
         _count: {
-          select: { contests: true }
+          select: { contest: true }
         }
       }
     });
@@ -102,7 +102,7 @@ async function updateTargetGroup(
     }
 
     // Check if target group exists
-    const existingTargetGroup = await prisma.targetGroup.findUnique({
+    const existingTargetGroup = await prisma.targetgroup.findUnique({
       where: { id },
     });
 
@@ -132,7 +132,7 @@ async function updateTargetGroup(
     }
 
     // Update target group in database
-    const updatedTargetGroup = await prisma.targetGroup.update({
+    const updatedTargetGroup = await prisma.targetgroup.update({
       where: { id },
       data: {
         code: validationResult.data.code,
@@ -189,11 +189,11 @@ export async function DELETE(
     }
 
     // Check if target group exists
-    const existingTargetGroup = await prisma.targetGroup.findUnique({
+    const existingTargetGroup = await prisma.targetgroup.findUnique({
       where: { id },
       include: {
         _count: {
-          select: { contests: true }
+          select: { contest: true }
         }
       }
     });
@@ -203,7 +203,7 @@ export async function DELETE(
     }
 
     // Check if target group has related contests
-    if (existingTargetGroup._count.contests > 0) {
+    if (existingTargetGroup._count.contest > 0) {
       return NextResponse.json(
         { error: "Cannot delete target group with related contests. Remove the contests first." },
         { status: 400 }
@@ -211,7 +211,7 @@ export async function DELETE(
     }
 
     // Delete target group from database
-    await prisma.targetGroup.delete({
+    await prisma.targetgroup.delete({
       where: { id },
     });
 

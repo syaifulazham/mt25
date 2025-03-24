@@ -130,13 +130,13 @@ export async function POST(request: NextRequest) {
             }
 
             // Check if target group already exists
-            const existingTargetGroup = await prisma.targetGroup.findFirst({
+            const existingTargetGroup = await prisma.targetgroup.findFirst({
               where: { code: row.code },
             });
 
             if (existingTargetGroup) {
               // Update existing target group
-              await prisma.targetGroup.update({
+              await prisma.targetgroup.update({
                 where: { id: existingTargetGroup.id },
                 data: {
                   name: row.name.trim(),
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
               results.updated++;
             } else {
               // Create new target group
-              await prisma.targetGroup.create({
+              await prisma.targetgroup.create({
                 data: {
                   code: row.code.trim(),
                   name: row.name.trim(),

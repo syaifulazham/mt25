@@ -62,11 +62,11 @@ export async function GET(req: NextRequest) {
       include: {
         _count: {
           select: {
-            submissions: true,
-            contingents: true
+            submission: true,
+            contingent: true
           }
         },
-        targetGroup: true,
+        targetgroup: true,
         theme: true
       },
       orderBy: {
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
 
     // Add target groups if provided
     if (data.targetGroupIds && Array.isArray(data.targetGroupIds) && data.targetGroupIds.length > 0) {
-      contestData.targetGroup = {
+      contestData.targetgroup = {
         connect: data.targetGroupIds.map((id: number | string) => ({ 
           id: typeof id === 'string' ? parseInt(id) : id 
         }))
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
     const contest = await prisma.contest.create({
       data: contestData,
       include: {
-        targetGroup: true,
+        targetgroup: true,
         theme: true
       }
     });

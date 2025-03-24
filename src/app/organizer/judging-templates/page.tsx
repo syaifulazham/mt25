@@ -205,7 +205,7 @@ export default function JudgingTemplatesPage() {
                         <span className="text-muted-foreground">Any</span>
                       )}
                     </TableCell>
-                    <TableCell>{template.criteria?.length || 0}</TableCell>
+                    <TableCell>{template.judgingtemplatecriteria?.length || 0}</TableCell>
                     <TableCell>
                       {template.isDefault && (
                         <Badge className="bg-green-100 text-green-800 hover:bg-green-100">

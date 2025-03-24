@@ -67,10 +67,10 @@ export default async function ContestsPage() {
     include: {
       _count: {
         select: {
-          contingents: true
+          contingent: true
         }
       },
-      targetGroup: true,
+      targetgroup: true,
       theme: true
     },
     orderBy: {
@@ -182,7 +182,7 @@ export default async function ContestsPage() {
                       <span>{contest.theme?.name || "No theme"}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{contest._count.contingents}</TableCell>
+                  <TableCell>{contest._count.contingent}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Link href={`/organizer/contests/${contest.id}`}>

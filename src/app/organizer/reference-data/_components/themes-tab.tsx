@@ -47,7 +47,7 @@ type Theme = {
   logoPath: string | null;
   description: string | null;
   _count?: {
-    contests: number;
+    contest: number;
   };
 };
 
@@ -68,7 +68,7 @@ interface ThemeFormData {
   logoPath?: string;
   description?: string;
   _count?: {
-    contests: number;
+    contest: number;
   };
 }
 
@@ -400,10 +400,10 @@ export function ThemesTab() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
+              <TableHead>Theme</TableHead>
               <TableHead>Color</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead className="text-right">Contests</TableHead>
+              <TableHead className="text-right">Contest</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -436,7 +436,7 @@ export function ThemesTab() {
                   <TableCell className="max-w-md truncate">
                     {theme.description || 'No description'}
                   </TableCell>
-                  <TableCell className="text-right">{theme._count?.contests || 0}</TableCell>
+                  <TableCell className="text-center">{theme._count?.contest || 0}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -451,7 +451,7 @@ export function ThemesTab() {
                         variant="ghost"
                         size="icon"
                         onClick={() => openDeleteDialog(theme.id as number)}
-                        disabled={theme._count?.contests ? theme._count.contests > 0 : false}
+                        disabled={theme._count?.contest ? theme._count.contest > 0 : false}
                       >
                         <Trash2 className="h-4 w-4" />
                         <span className="sr-only">Delete</span>

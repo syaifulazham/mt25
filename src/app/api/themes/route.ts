@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       include: {
         _count: {
           select: {
-            contests: true,
+            contest: true,
           },
         },
       },
@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         color,
         logoPath,
         description,
+        updatedAt: new Date(), // Add the current date for updatedAt
       },
     });
 

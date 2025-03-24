@@ -24,10 +24,10 @@ export async function GET(request: Request) {
     }
 
     // Get all judging templates
-    const templates = await prisma.judgingTemplate.findMany({
+    const templates = await prisma.judgingtemplate.findMany({
       where,
       include: {
-        criteria: true
+        judgingtemplatecriteria: true
       },
       orderBy: {
         name: 'asc'
@@ -35,17 +35,21 @@ export async function GET(request: Request) {
     });
 
     // Parse discreteValues from JSON string to array for each criterion
-    const processedTemplates = templates.map(template => ({
-      ...template,
-      criteria: template.criteria.map(criterion => ({
-        ...criterion,
-        discreteValues: criterion.discreteValues 
-          ? JSON.parse(criterion.discreteValues) 
-          : null
-      }))
-    }));
+    const templatesWithParsedCriteria = templates.map(template => {
+      const parsedCriteria = template.judgingtemplatecriteria.map((criterion: any) => {
+        return {
+          ...criterion,
+          discreteValues: criterion.discreteValues ? JSON.parse(criterion.discreteValues) : null
+        };
+      });
 
-    return NextResponse.json(processedTemplates);
+      return {
+        ...template,
+        judgingtemplatecriteria: parsedCriteria
+      };
+    });
+
+    return NextResponse.json(templatesWithParsedCriteria);
   } catch (error) {
     console.error('Error fetching judging templates:', error);
     return NextResponse.json(
@@ -85,13 +89,14 @@ export async function POST(request: Request) {
     }
 
     // Create the template
-    const template = await prisma.judgingTemplate.create({
+    const template = await prisma.judgingtemplate.create({
       data: {
         name,
         description,
         isDefault: isDefault || false,
         contestType: contestType || null,
-        criteria: {
+        updatedAt: new Date(), // Add updatedAt for the template
+        judgingtemplatecriteria: {
           create: criteria.map(criterion => ({
             name: criterion.name,
             description: criterion.description || null,
@@ -101,24 +106,27 @@ export async function POST(request: Request) {
             maxScore: criterion.maxScore || null,
             discreteValues: criterion.discreteValues 
               ? JSON.stringify(criterion.discreteValues) 
-              : null
+              : null,
+            updatedAt: new Date() // Add updatedAt for each criterion
           }))
         }
       },
       include: {
-        criteria: true
+        judgingtemplatecriteria: true
       }
-    });
+    }) as any;
 
     // Parse discreteValues from JSON string to array for each criterion
+    const parsedCriteria = template.judgingtemplatecriteria.map((criterion: any) => {
+      return {
+        ...criterion,
+        discreteValues: criterion.discreteValues ? JSON.parse(criterion.discreteValues) : null
+      };
+    });
+
     const processedTemplate = {
       ...template,
-      criteria: template.criteria.map(criterion => ({
-        ...criterion,
-        discreteValues: criterion.discreteValues 
-          ? JSON.parse(criterion.discreteValues) 
-          : null
-      }))
+      judgingtemplatecriteria: parsedCriteria
     };
 
     return NextResponse.json(processedTemplate, { status: 201 });

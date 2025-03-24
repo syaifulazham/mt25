@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count for pagination
-    const totalCount = await prisma.targetGroup.count({ where });
+    const totalCount = await prisma.targetgroup.count({ where });
     
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalCount / pageSize);
@@ -59,14 +59,14 @@ export async function GET(request: NextRequest) {
     const hasPreviousPage = page > 1;
 
     // Get target groups from database with pagination
-    const targetGroups = await prisma.targetGroup.findMany({
+    const targetGroups = await prisma.targetgroup.findMany({
       where,
       orderBy: { name: "asc" },
       skip: skip,
       take: pageSize,
       include: {
         _count: {
-          select: { contests: true }
+          select: { contest: true }
         }
       }
     });
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create target group in database
-    const targetGroup = await prisma.targetGroup.create({
+    const targetGroup = await prisma.targetgroup.create({
       data: {
         code: validationResult.data.code,
         name: validationResult.data.name,

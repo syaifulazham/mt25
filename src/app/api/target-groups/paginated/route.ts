@@ -50,18 +50,18 @@ export async function GET(request: NextRequest) {
 
     // Get target groups from database with pagination
     const [targetGroups, totalCount] = await Promise.all([
-      prisma.targetGroup.findMany({
+      prisma.targetgroup.findMany({
         where,
         orderBy,
         skip,
         take: pageSize,
         include: {
           _count: {
-            select: { contests: true }
+            select: { contest: true }
           }
         }
       }),
-      prisma.targetGroup.count({ where })
+      prisma.targetgroup.count({ where })
     ]);
 
     // Calculate pagination metadata

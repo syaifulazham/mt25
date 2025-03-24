@@ -18,10 +18,10 @@ export async function GET(
 
     const id = params.id;
     
-    const template = await prisma.judgingTemplate.findUnique({
+    const template = await prisma.judgingtemplate.findUnique({
       where: { id: parseInt(id) },
       include: {
-        criteria: true
+        judgingtemplatecriteria: true
       }
     });
 
@@ -33,14 +33,18 @@ export async function GET(
     }
 
     // Parse discreteValues from JSON string to array for each criterion
-    const processedTemplate = {
-      ...template,
-      criteria: template.criteria.map(criterion => ({
+    const parsedCriteria = template.judgingtemplatecriteria.map((criterion: any) => {
+      return {
         ...criterion,
         discreteValues: criterion.discreteValues 
           ? JSON.parse(criterion.discreteValues) 
           : null
-      }))
+      };
+    });
+
+    const processedTemplate = {
+      ...template,
+      judgingtemplatecriteria: parsedCriteria
     };
 
     return NextResponse.json(processedTemplate);
@@ -70,7 +74,7 @@ export async function PUT(
     const id = params.id;
     
     const data = await request.json();
-    const { name, description, isDefault, contestType, criteria } = data;
+    const { name, description, isDefault, contestType, judgingtemplatecriteria } = data;
 
     // Validate required fields
     if (!name) {
@@ -80,7 +84,7 @@ export async function PUT(
       );
     }
 
-    if (!criteria || !Array.isArray(criteria) || criteria.length === 0) {
+    if (!judgingtemplatecriteria || !Array.isArray(judgingtemplatecriteria) || judgingtemplatecriteria.length === 0) {
       return NextResponse.json(
         { error: 'At least one judging criterion is required' },
         { status: 400 }
@@ -88,7 +92,7 @@ export async function PUT(
     }
 
     // Check if template exists
-    const existingTemplate = await prisma.judgingTemplate.findUnique({
+    const existingTemplate = await prisma.judgingtemplate.findUnique({
       where: { id: parseInt(id) }
     });
 
@@ -102,20 +106,21 @@ export async function PUT(
     // Update the template
     await prisma.$transaction(async (tx) => {
       // Delete existing criteria
-      await tx.judgingTemplateCriteria.deleteMany({
+      await tx.judgingtemplatecriteria.deleteMany({
         where: { templateId: parseInt(id) }
       });
 
       // Update template and create new criteria
-      return tx.judgingTemplate.update({
+      return tx.judgingtemplate.update({
         where: { id: parseInt(id) },
         data: {
           name,
           description,
           isDefault: isDefault || false,
           contestType: contestType || null,
-          criteria: {
-            create: criteria.map(criterion => ({
+          updatedAt: new Date(), 
+          judgingtemplatecriteria: {
+            create: judgingtemplatecriteria.map(criterion => ({
               name: criterion.name,
               description: criterion.description || null,
               needsJuryCourtesy: criterion.needsJuryCourtesy || false,
@@ -124,7 +129,8 @@ export async function PUT(
               maxScore: criterion.maxScore || null,
               discreteValues: criterion.discreteValues 
                 ? JSON.stringify(criterion.discreteValues) 
-                : null
+                : null,
+              updatedAt: new Date() 
             }))
           }
         }
@@ -132,10 +138,10 @@ export async function PUT(
     });
 
     // Fetch updated template
-    const updatedTemplate = await prisma.judgingTemplate.findUnique({
+    const updatedTemplate = await prisma.judgingtemplate.findUnique({
       where: { id: parseInt(id) },
       include: {
-        criteria: true
+        judgingtemplatecriteria: true
       }
     });
 
@@ -147,14 +153,18 @@ export async function PUT(
     }
 
     // Parse discreteValues from JSON string to array for each criterion
-    const processedTemplate = {
-      ...updatedTemplate,
-      criteria: updatedTemplate.criteria.map(criterion => ({
+    const parsedCriteria = updatedTemplate.judgingtemplatecriteria.map((criterion: any) => {
+      return {
         ...criterion,
         discreteValues: criterion.discreteValues 
           ? JSON.parse(criterion.discreteValues) 
           : null
-      }))
+      };
+    });
+
+    const processedTemplate = {
+      ...updatedTemplate,
+      judgingtemplatecriteria: parsedCriteria
     };
 
     return NextResponse.json(processedTemplate);
@@ -184,10 +194,10 @@ export async function DELETE(
     const id = params.id;
     
     // Check if template exists
-    const existingTemplate = await prisma.judgingTemplate.findUnique({
+    const existingTemplate = await prisma.judgingtemplate.findUnique({
       where: { id: parseInt(id) },
       include: {
-        contests: {
+        contest: {
           select: { id: true }
         }
       }
@@ -200,19 +210,16 @@ export async function DELETE(
       );
     }
 
-    // Check if template is in use by any contests
-    if (existingTemplate.contests.length > 0) {
+    // Check if template is used in any contests
+    if (existingTemplate.contest && existingTemplate.contest.length > 0) {
       return NextResponse.json(
-        { 
-          error: 'Cannot delete template that is in use by contests',
-          contests: existingTemplate.contests
-        },
+        { error: 'Cannot delete template that is used in contests' },
         { status: 400 }
       );
     }
 
     // Delete the template (criteria will be deleted automatically due to cascade)
-    await prisma.judgingTemplate.delete({
+    await prisma.judgingtemplate.delete({
       where: { id: parseInt(id) }
     });
 

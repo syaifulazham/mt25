@@ -632,7 +632,7 @@ export const themeApi = {
     description?: string | null;
   }) {
     return apiRequest<any>(`/api/themes/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: data
     });
   },
@@ -915,4 +915,89 @@ export const newsApi = {
       method: 'DELETE'
     });
   }
+};
+
+/**
+ * Event API client
+ */
+export const eventApi = {
+  /**
+   * Get all events with optional filters
+   */
+  getEvents: (filters?: { search?: string; activeOnly?: boolean; addressState?: string; scopeArea?: string }) =>
+    apiRequest<any[]>('/api/events', { params: filters }),
+
+  /**
+   * Get events with pagination
+   */
+  getEventsPaginated: (params?: { 
+    search?: string;
+    activeOnly?: boolean;
+    addressState?: string;
+    scopeArea?: string;
+    page?: number;
+    pageSize?: number;
+  }) => apiRequest<{ data: any[]; meta: any }>('/api/events/paginated', { params }),
+
+  /**
+   * Get a specific event by ID
+   */
+  getEvent: (id: number | string) =>
+    apiRequest<any>(`/api/events/${id}`),
+
+  /**
+   * Create a new event
+   */
+  createEvent: (data: {
+    name: string;
+    code: string;
+    description?: string | null;
+    startDate: Date;
+    endDate: Date;
+    venue?: string | null;
+    address?: string | null;
+    city?: string | null;
+    addressState?: string | null;
+    scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN';
+    zoneId?: number | null;
+    stateId?: number | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    isActive?: boolean;
+  }) => apiRequest<any>('/api/events', {
+    method: 'POST',
+    body: data,
+  }),
+
+  /**
+   * Update an existing event
+   */
+  updateEvent: (id: number | string, data: {
+    name?: string;
+    code?: string;
+    description?: string | null;
+    startDate?: Date;
+    endDate?: Date;
+    venue?: string | null;
+    address?: string | null;
+    city?: string | null;
+    addressState?: string | null;
+    scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN';
+    zoneId?: number | null;
+    stateId?: number | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    isActive?: boolean;
+  }) => apiRequest<any>(`/api/events/${id}`, {
+    method: 'PATCH',
+    body: data,
+  }),
+
+  /**
+   * Delete an event
+   */
+  deleteEvent: (id: number | string) =>
+    apiRequest<{ success: boolean; message: string }>(`/api/events/${id}`, {
+      method: 'DELETE',
+    }),
 };

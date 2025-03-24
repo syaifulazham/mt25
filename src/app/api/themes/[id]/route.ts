@@ -28,7 +28,7 @@ export async function GET(
       include: {
         _count: {
           select: {
-            contests: true,
+            contest: true,
           },
         },
       },
@@ -116,6 +116,7 @@ export async function PATCH(
         color,
         logoPath,
         description,
+        updatedAt: new Date(), // Add the current date for updatedAt
       },
     });
 
@@ -155,7 +156,7 @@ export async function DELETE(
       include: {
         _count: {
           select: {
-            contests: true,
+            contest: true,
           },
         },
       },
@@ -169,7 +170,7 @@ export async function DELETE(
     }
 
     // Check if theme is being used by any contests
-    if (theme._count.contests > 0) {
+    if (theme._count.contest > 0) {
       return NextResponse.json(
         { error: "Cannot delete theme that is being used by contests" },
         { status: 400 }

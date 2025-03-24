@@ -31,18 +31,18 @@ export async function GET(
     const contest = await prisma.contest.findUnique({
       where: { id },
       include: {
-        targetGroup: true,
-        judgingTemplate: {
+        targetgroup: true,
+        judgingtemplate: {
           include: {
-            criteria: true
+            judgingtemplatecriteria: true
           }
         },
         _count: {
           select: {
-            submissions: true,
-            contingents: true,
-            judgings: true,
-            results: true
+            submission: true,
+            contingent: true,
+            judging: true,
+            result: true
           }
         }
       }
@@ -58,9 +58,9 @@ export async function GET(
     // Parse discreteValues from JSON string to array for each criterion if judging template exists
     const processedContest = {
       ...contest,
-      judgingTemplate: contest.judgingTemplate ? {
-        ...contest.judgingTemplate,
-        criteria: contest.judgingTemplate.criteria.map(criterion => ({
+      judgingtemplate: contest.judgingtemplate ? {
+        ...contest.judgingtemplate,
+        judgingtemplatecriteria: contest.judgingtemplate.judgingtemplatecriteria.map(criterion => ({
           ...criterion,
           discreteValues: criterion.discreteValues 
             ? JSON.parse(criterion.discreteValues) 
@@ -191,7 +191,7 @@ async function updateContest(
       await prisma.contest.update({
         where: { id },
         data: {
-          targetGroup: {
+          targetgroup: {
             set: []
           }
         }
@@ -201,7 +201,7 @@ async function updateContest(
       await prisma.contest.update({
         where: { id },
         data: {
-          targetGroup: {
+          targetgroup: {
             connect: data.targetGroupIds.map((id: number) => ({ id }))
           }
         }
@@ -266,10 +266,10 @@ export async function DELETE(
       include: {
         _count: {
           select: {
-            submissions: true,
-            contingents: true,
-            judgings: true,
-            results: true
+            submission: true,
+            contingent: true,
+            judging: true,
+            result: true
           }
         }
       }
@@ -277,10 +277,10 @@ export async function DELETE(
 
     if (contestWithRelations?._count) {
       const hasRelations = 
-        contestWithRelations._count.submissions > 0 ||
-        contestWithRelations._count.contingents > 0 ||
-        contestWithRelations._count.judgings > 0 ||
-        contestWithRelations._count.results > 0;
+        contestWithRelations._count.submission > 0 ||
+        contestWithRelations._count.contingent > 0 ||
+        contestWithRelations._count.judging > 0 ||
+        contestWithRelations._count.result > 0;
       
       if (hasRelations) {
         return NextResponse.json(
@@ -294,7 +294,7 @@ export async function DELETE(
     await prisma.contest.update({
       where: { id },
       data: {
-        targetGroup: {
+        targetgroup: {
           set: []
         }
       }

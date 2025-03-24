@@ -180,8 +180,6 @@ export function StatesTab() {
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Zone</TableHead>
-                <TableHead>Schools</TableHead>
-                <TableHead>Higher Institutions</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -198,8 +196,6 @@ export function StatesTab() {
                     <TableCell>{state.id}</TableCell>
                     <TableCell>{state.name}</TableCell>
                     <TableCell>{state.zone?.name || "Unknown"}</TableCell>
-                    <TableCell>{state._count?.schools || 0}</TableCell>
-                    <TableCell>{state._count?.higherInstitutions || 0}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
