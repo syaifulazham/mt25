@@ -11,7 +11,7 @@ const updateUserSchema = z.object({
   email: z.string().email("Invalid email address").optional(),
   username: z.string().min(3, "Username must be at least 3 characters").optional(),
   password: z.string().min(8, "Password must be at least 8 characters").optional(),
-  role: z.enum(["ADMIN", "OPERATOR", "VIEWER", "JUDGE", "PARTICIPANT"]).optional(),
+  role: z.enum(["ADMIN", "OPERATOR", "VIEWER", "JUDGE", "PARTICIPANTS_MANAGER"]).optional(),
   isActive: z.boolean().optional(),
 });
 

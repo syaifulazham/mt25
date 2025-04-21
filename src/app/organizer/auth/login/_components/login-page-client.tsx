@@ -45,6 +45,15 @@ export default function LoginPageClient() {
               </Link>
             </p>
           </div>
+          
+          <div className="mt-2 text-center text-sm text-muted-foreground">
+            <p>
+              Are you a participant?{" "}
+              <Link href="/participants/auth/register" className="text-primary hover:underline">
+                Register here
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </SessionProvider>

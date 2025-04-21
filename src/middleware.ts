@@ -5,6 +5,7 @@ import * as jose from 'jose';
 // Constants
 const JWT_SECRET = process.env.JWT_SECRET || 'techlympics-2025-secret-key';
 const COOKIE_NAME = 'techlympics-auth';
+const SESSION_COOKIE = 'next-auth.session-token';
 
 // Mock user for development
 const MOCK_USER = {
@@ -32,6 +33,18 @@ async function generateMockToken(): Promise<string> {
 
 // This function can be marked `async` if using `await` inside
 export async function middleware(request: NextRequest) {
+  // Skip auth pages to prevent redirect loops
+  if (request.nextUrl.pathname.includes('/auth/')) {
+    return NextResponse.next();
+  }
+
+  // Skip API routes and static assets
+  if (request.nextUrl.pathname.startsWith('/api/') || 
+      request.nextUrl.pathname.startsWith('/_next/') ||
+      request.nextUrl.pathname.includes('favicon.ico')) {
+    return NextResponse.next();
+  }
+
   // Check if we need to clear cookies (from error redirect)
   if (request.nextUrl.searchParams.has('message') && 
       (request.nextUrl.searchParams.get('message')?.includes('Session+expired') || 
@@ -48,60 +61,64 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Only run in development mode
-  if (process.env.NODE_ENV !== 'development') {
+  // Development mode authentication bypass
+  if (process.env.NODE_ENV === 'development' && process.env.MOCK_AUTH === 'true') {
+    // Generate a new token if needed
+    const token = request.cookies.get(COOKIE_NAME)?.value;
+    
+    if (!token) {
+      const newToken = await generateMockToken();
+      const response = NextResponse.next();
+      
+      // Set both cookies to ensure compatibility
+      response.cookies.set({
+        name: COOKIE_NAME,
+        value: newToken,
+        httpOnly: true,
+        path: '/',
+        maxAge: 8 * 60 * 60, // 8 hours
+      });
+      
+      // Also set the NextAuth session token for compatibility
+      response.cookies.set({
+        name: SESSION_COOKIE,
+        value: newToken,
+        httpOnly: true,
+        path: '/',
+        maxAge: 8 * 60 * 60, // 8 hours
+      });
+      
+      return response;
+    }
+    
     return NextResponse.next();
   }
 
-  // Skip middleware for auth-related paths and static assets
-  if (
-    request.nextUrl.pathname.includes('/api/auth') ||
-    request.nextUrl.pathname.includes('/organizer/auth') ||
-    request.nextUrl.pathname.startsWith('/_next') ||
-    request.nextUrl.pathname.includes('/favicon.ico')
-  ) {
-    return NextResponse.next();
+  // Production authentication handling
+  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
+  const isAuthenticated = !!sessionToken;
+
+  // Handle organizer routes
+  if (request.nextUrl.pathname.startsWith('/organizer')) {
+    if (!isAuthenticated) {
+      return NextResponse.redirect(new URL('/organizer/auth/login', request.url));
+    }
   }
 
-  // Check if the request already has the auth cookie
-  const authCookie = request.cookies.get(COOKIE_NAME);
+  // Handle participant routes
+  if (request.nextUrl.pathname.startsWith('/participants')) {
+    if (!isAuthenticated) {
+      return NextResponse.redirect(new URL('/participants/auth/login', request.url));
+    }
+  }
   
-  // If the cookie exists, let the request proceed
-  if (authCookie) {
-    return NextResponse.next();
-  }
-
-  // For all routes without auth in development, add a mock auth cookie
-  const token = await generateMockToken();
-  const response = NextResponse.next();
-  
-  // Add the auth cookie to the response
-  response.cookies.set({
-    name: COOKIE_NAME,
-    value: token,
-    httpOnly: true,
-    path: '/',
-    maxAge: 60 * 60 * 8, // 8 hours
-    sameSite: 'lax',
-  });
-
-  // Also add the NextAuth session token for compatibility
-  response.cookies.set({
-    name: 'next-auth.session-token',
-    value: token,
-    httpOnly: true,
-    path: '/',
-    maxAge: 60 * 60 * 8, // 8 hours
-    sameSite: 'lax',
-  });
-
-  return response;
+  return NextResponse.next();
 }
 
 // See "Matching Paths" below to learn more
 export const config = {
   matcher: [
-    // Skip auth routes and static assets
+    // Skip static assets
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

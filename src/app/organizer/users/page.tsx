@@ -150,7 +150,7 @@ export default function UsersPage() {
               <SelectItem value="OPERATOR">Operator</SelectItem>
               <SelectItem value="VIEWER">Viewer</SelectItem>
               <SelectItem value="JUDGE">Judge</SelectItem>
-              <SelectItem value="PARTICIPANT">Participant</SelectItem>
+              <SelectItem value="PARTICIPANTS_MANAGER">Participants Manager</SelectItem>
             </SelectContent>
           </Select>
         </div>

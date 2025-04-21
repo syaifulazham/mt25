@@ -522,6 +522,17 @@ export const targetGroupApi = {
       method: 'DELETE',
     });
   },
+
+  /**
+   * Upload target groups from CSV
+   */
+  async uploadTargetGroupsCsv(formData: FormData) {
+    return apiRequest('/api/target-groups/upload', {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header, browser will set it with boundary for FormData
+    });
+  },
 };
 
 /**

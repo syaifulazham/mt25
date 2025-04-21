@@ -147,7 +147,7 @@ export function UserForm({ user, onSubmit, onCancel, isEdit = false, isLoading =
             value={formData.username}
             onChange={(e) => handleChange("username", e.target.value)}
             placeholder="Enter username"
-            disabled={isLoading || (isEdit && formData.role === "PARTICIPANT")}
+            disabled={isLoading || (isEdit && formData.role === "PARTICIPANTS_MANAGER")}
           />
           {errors.username && (
             <p className="text-sm text-red-500">{errors.username}</p>
@@ -169,7 +169,7 @@ export function UserForm({ user, onSubmit, onCancel, isEdit = false, isLoading =
               <SelectItem value="OPERATOR">Operator</SelectItem>
               <SelectItem value="VIEWER">Viewer</SelectItem>
               <SelectItem value="JUDGE">Judge</SelectItem>
-              <SelectItem value="PARTICIPANT">Participant</SelectItem>
+              <SelectItem value="PARTICIPANTS_MANAGER">Participants Manager</SelectItem>
             </SelectContent>
           </Select>
         </div>

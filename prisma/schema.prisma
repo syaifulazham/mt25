@@ -64,19 +64,50 @@ model contest {
 model contingent {
   id          Int      @id @default(autoincrement())
   name        String
-  userId      Int
-  schoolId    Int
+  schoolId    Int?
+  higherInstId Int?
   createdAt   DateTime @default(now())
   contestId   Int
   description String?
   updatedAt   DateTime
   contest     contest  @relation(fields: [contestId], references: [id], map: "Contingent_contestId_fkey")
-  school      school   @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
-  user        user     @relation(fields: [userId], references: [id], map: "Contingent_userId_fkey")
+  school      school?   @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
+  higherInstitution higherinstitution? @relation(fields: [higherInstId], references: [id])
+  contestants contestant[]
+  participantId Int?
+  participant user_participant? @relation(fields: [participantId], references: [id])
+  requests    contingentRequest[]
+  managedByParticipant Boolean @default(true)
+  managers    contingentManager[] // New relation to contingent managers
 
   @@index([contestId], map: "Contingent_contestId_fkey")
   @@index([schoolId], map: "Contingent_schoolId_fkey")
-  @@index([userId], map: "Contingent_userId_fkey")
+  @@index([participantId])
+  @@index([higherInstId])
+}
+
+model contestant {
+  id          Int      @id @default(autoincrement())
+  name        String
+  ic          String   @unique
+  email       String?
+  phoneNumber String?
+  gender      String
+  age         Int
+  edu_level   String   // sekolah rendah, sekolah menengah, belia
+  class_name  String?
+  class_grade String?
+  hashcode    String   @unique
+  contingentId Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?  // Name of the participant who last updated this record
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
+  
+  contingent  contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  submissions submission[]
+  
+  @@index([contingentId])
 }
 
 model event {
@@ -117,6 +148,8 @@ model higherinstitution {
   longitude Float?
   createdAt DateTime @default(now())
   state     state    @relation(fields: [stateId], references: [id], map: "HigherInstitution_stateId_fkey")
+  participants user_participant[]
+  contingents contingent[]
 
   @@index([stateId], map: "HigherInstitution_stateId_fkey")
 }
@@ -263,6 +296,7 @@ model school {
   level      String
   contingent contingent[]
   state      state        @relation(fields: [stateId], references: [id], map: "School_stateId_fkey")
+  participants user_participant[]
 
   @@index([stateId], map: "School_stateId_fkey")
 }
@@ -281,7 +315,7 @@ model state {
 
 model submission {
   id          Int               @id @default(autoincrement())
-  userId      Int
+  userId      Int?
   contestId   Int
   fileUrl     String?
   status      submission_status @default(PENDING)
@@ -291,10 +325,16 @@ model submission {
   judging     judging[]
   result      result[]
   contest     contest           @relation(fields: [contestId], references: [id], map: "Submission_contestId_fkey")
-  user        user              @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
+  user        user?             @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
+  participantId Int?
+  participant user_participant? @relation(fields: [participantId], references: [id])
+  contestantId Int?
+  contestant  contestant?       @relation(fields: [contestantId], references: [id], onDelete: SetNull)
 
   @@index([contestId], map: "Submission_contestId_fkey")
   @@index([userId], map: "Submission_userId_fkey")
+  @@index([participantId])
+  @@index([contestantId])
 }
 
 model targetgroup {
@@ -324,18 +364,46 @@ model user {
   name         String?
   email        String         @unique(map: "User_email_key")
   password     String?
-  role         user_role      @default(PARTICIPANT)
+  role         user_role      @default(ADMIN)
   username     String         @unique(map: "User_username_key")
   isActive     Boolean        @default(true)
   lastLogin    DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime
   announcement announcement[]
-  contingent   contingent[]
   judging      judging[]
   news         news[]
   notification notification[]
   submission   submission[]
+}
+
+model user_participant {
+  id           Int            @id @default(autoincrement())
+  name         String?
+  email        String         @unique
+  password     String?
+  username     String         @unique
+  ic           String?        // IC number for Malaysian participants
+  phoneNumber  String?
+  gender       String?
+  dateOfBirth  DateTime?
+  schoolId     Int?
+  higherInstId Int?
+  isActive     Boolean        @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  
+  // Relations
+  school       school?        @relation(fields: [schoolId], references: [id])
+  higherInstitution higherinstitution? @relation(fields: [higherInstId], references: [id])
+  contingents  contingent[]
+  submissions  submission[]
+  contingentRequests contingentRequest[]
+  managedContingents contingentManager[] // Added relation to managed contingents
+  
+  @@index([schoolId])
+  @@index([higherInstId])
 }
 
 model zone {
@@ -389,7 +457,7 @@ enum user_role {
   ADMIN
   OPERATOR
   VIEWER
-  PARTICIPANT
+  PARTICIPANTS_MANAGER
   JUDGE
 }
 
@@ -410,4 +478,36 @@ enum scope_area {
   ZONE
   STATE
   OPEN
+}
+
+model contingentRequest {
+  id           Int      @id @default(autoincrement())
+  contingentId Int
+  participantId Int
+  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  contingent   contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  participant  user_participant @relation(fields: [participantId], references: [id])
+  
+  @@index([contingentId])
+  @@index([participantId])
+}
+
+// Join table for many-to-many relationship between participants and contingents
+model contingentManager {
+  id              Int      @id @default(autoincrement())
+  participantId   Int     // Changed from userId to participantId
+  contingentId    Int
+  isOwner         Boolean  @default(false) // Indicates if this participant is the primary owner of the contingent
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  participant     user_participant @relation(fields: [participantId], references: [id], onDelete: Cascade) // Changed relation to user_participant
+  contingent      contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  
+  @@unique([participantId, contingentId]) // Prevent duplicate manager entries
+  @@index([participantId])
+  @@index([contingentId])
 }

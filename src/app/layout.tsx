@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from 'sonner';
 import DevAuthProvider from "@/components/dev/auth-provider";
+import AuthSessionProvider from "@/providers/session-provider";
 
 //
 
@@ -16,15 +17,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
   return (
     <html lang="en">
       <body 
         className={`antialiased`}
       >
         <Toaster position="top-right" />
-        <DevAuthProvider>
-          {children}
-        </DevAuthProvider>
+        <AuthSessionProvider>
+          <DevAuthProvider>
+            {children}
+          </DevAuthProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

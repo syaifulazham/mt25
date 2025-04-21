@@ -1,11 +1,50 @@
 import { Metadata } from "next";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
-import { Role } from "@prisma/client";
+import { user_role } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import React from "react";
+import { getSessionUser } from "@/lib/session";
+import { PrismaClient } from "@prisma/client";
+
+// Initialize Prisma client
+const prisma = new PrismaClient();
+
+/**
+ * Checks if there are any users in the system and creates an initial admin user if none exist
+ */
+async function initializeSystem() {
+  try {
+    // Check if any users exist
+    const userCount = await prisma.user.count();
+    
+    if (userCount === 0) {
+      console.log('No users found in database. Creating initial admin user...');
+      
+      // Call the system initialization API
+      const response = await fetch('http://localhost:3000/api/system/init', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store'
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && !data.initialized) {
+        console.log('Initial admin user created with credentials:');
+        console.log(`Username: ${data.credentials.username}`);
+        console.log(`Password: ${data.credentials.password}`);
+        console.log('Please change this password after first login!');
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing system:', error);
+  }
+}
 
 export const metadata: Metadata = {
   title: "Organizer Portal | Techlympics 2025",
@@ -17,6 +56,9 @@ export default async function OrganizerLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Initialize system with admin user if needed
+  await initializeSystem();
+  
   // Get the current URL path from headers
   const headersList = headers();
   const pathname = headersList.get("x-pathname") || "";
@@ -39,7 +81,7 @@ export default async function OrganizerLayout({
       id: 1,
       name: "Development User",
       email: "dev@techlympics.com",
-      role: "ADMIN" as Role,
+      role: "ADMIN" as user_role,
       username: "devuser"
     };
     
@@ -60,29 +102,31 @@ export default async function OrganizerLayout({
   }
   
   try {
-    // Get the session
-    const session = await getServerSession(authOptions);
+    // Get the current user without redirecting (middleware handles redirects for unauthenticated users)
+    const user = await getSessionUser({ 
+      redirectToLogin: false
+    });
     
-    // If no session, redirect to login
-    if (!session || !session.user) {
-      console.log("No session found, redirecting to login");
-      return redirect("/organizer/auth/login?redirect=/organizer/dashboard");
+    // If no user, let middleware handle the redirect
+    if (!user) {
+      console.log("No user found, middleware will handle redirect");
+      return null;
     }
     
     // Check if user has organizer role
-    const role = session.user.role;
+    const role = (user as any).role;
     if (!role || !["ADMIN", "OPERATOR", "VIEWER"].includes(role)) {
       console.log("User does not have organizer role, redirecting to login");
       return redirect("/organizer/auth/login?message=You+do+not+have+permission+to+access+the+organizer+portal");
     }
     
-    // Convert session user to the format expected by DashboardNav
+    // Convert user to the format expected by DashboardNav
     const dashboardUser = {
-      id: parseInt(session.user.id),
-      name: session.user.name || "",
-      email: session.user.email || "",
-      role: session.user.role as Role,
-      username: session.user.username || null
+      id: user.id,
+      name: user.name || "",
+      email: user.email || "",
+      role: (user as any).role as user_role,
+      username: user.username || null
     };
     
     return (

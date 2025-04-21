@@ -1,0 +1,199 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import prisma from "@/lib/prisma";
+
+// GET handler - Get a specific contingent by ID
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const contingentId = parseInt(params.id);
+    
+    // Find the participant by email
+    const participant = await prisma.user_participant.findUnique({
+      where: { email: session.user.email! }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Get the contingent with related data
+    const contingent = await prisma.contingent.findUnique({
+      where: { id: contingentId },
+      include: {
+        school: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        higherInstitution: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        contest: {
+          select: {
+            id: true,
+            name: true,
+            contestType: true
+          }
+        }
+      }
+    });
+    
+    if (!contingent) {
+      return NextResponse.json({ error: "Contingent not found" }, { status: 404 });
+    }
+    
+    // Check if the participant has access to view this contingent
+    // Either they are a manager or they have a pending request to join
+    const isManager = await prisma.contingentManager.findFirst({
+      where: {
+        participantId: participant.id,
+        contingentId
+      }
+    });
+    
+    const hasPendingRequest = await prisma.contingentRequest.findFirst({
+      where: {
+        participantId: participant.id,
+        contingentId
+      }
+    });
+    
+    // Also check legacy relationship
+    const legacyAccess = contingent.managedByParticipant && contingent.participantId === participant.id;
+    
+    const hasAccess = isManager !== null || hasPendingRequest !== null || legacyAccess;
+    
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "You do not have permission to view this contingent" },
+        { status: 403 }
+      );
+    }
+    
+    // Get the count of contestants in this contingent
+    const contestantCount = await prisma.contestant.count({
+      where: { contingentId }
+    });
+    
+    return NextResponse.json({
+      contingent,
+      contestantCount
+    });
+  } catch (error) {
+    console.error("Error fetching contingent:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch contingent" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT handler - Update a contingent
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const contingentId = parseInt(params.id);
+    const body = await request.json();
+    
+    // Find the participant by email
+    const participant = await prisma.user_participant.findUnique({
+      where: { email: session.user.email! }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if the contingent exists
+    const contingent = await prisma.contingent.findUnique({
+      where: { id: contingentId }
+    });
+    
+    if (!contingent) {
+      return NextResponse.json({ error: "Contingent not found" }, { status: 404 });
+    }
+    
+    // Check if the participant is a manager of this contingent
+    const isManager = await prisma.contingentManager.findFirst({
+      where: {
+        participantId: participant.id,
+        contingentId
+      }
+    });
+    
+    // Also check legacy relationship
+    const hasAccess = isManager !== null || 
+      (contingent.managedByParticipant && contingent.participantId === participant.id);
+    
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "You must be a manager to update this contingent" },
+        { status: 403 }
+      );
+    }
+    
+    // Prepare update data
+    const updateData: any = {};
+    
+    // Only update fields that are provided
+    if (body.name) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    
+    // Update the contingent
+    const updatedContingent = await prisma.contingent.update({
+      where: { id: contingentId },
+      data: updateData,
+      include: {
+        school: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        higherInstitution: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        contest: {
+          select: {
+            id: true,
+            name: true,
+            contestType: true
+          }
+        }
+      }
+    });
+    
+    return NextResponse.json({ contingent: updatedContingent });
+  } catch (error) {
+    console.error("Error updating contingent:", error);
+    return NextResponse.json(
+      { error: "Failed to update contingent" },
+      { status: 500 }
+    );
+  }
+}

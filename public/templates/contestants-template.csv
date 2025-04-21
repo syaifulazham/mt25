@@ -1,0 +1,3 @@
+name,ic,gender,age,edu_level,class_name,class_grade,email,phoneNumber
+John Doe,990101012345,MALE,25,sekolah menengah,5A,5,john@example.com,0123456789
+Jane Smith,000202023456,FEMALE,23,sekolah rendah,3B,3,jane@example.com,0123456789

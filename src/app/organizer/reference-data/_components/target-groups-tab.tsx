@@ -204,7 +204,7 @@ export function TargetGroupsTab() {
     }
 
     try {
-      await targetGroupApi.updateTargetGroup(String(editTargetGroup.id), {
+      await targetGroupApi.updateTargetGroup(editTargetGroup.id, {
         ...editTargetGroup,
         minAge: Number(editTargetGroup.minAge),
         maxAge: Number(editTargetGroup.maxAge),
@@ -224,7 +224,7 @@ export function TargetGroupsTab() {
     if (targetGroupToDelete === null) return;
     
     try {
-      await targetGroupApi.deleteTargetGroup(String(targetGroupToDelete));
+      await targetGroupApi.deleteTargetGroup(targetGroupToDelete);
       setIsDeleteDialogOpen(false);
       toast.success("Target group deleted successfully");
       

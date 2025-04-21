@@ -1,0 +1,77 @@
+/* Thematic Gradient Card Styles */
+
+.gradient-card-blue {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(37, 99, 235, 0.1) 100%);
+  border-color: rgba(59, 130, 246, 0.2);
+  transition: all 0.3s ease;
+}
+
+.gradient-card-blue:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.15) 100%);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.gradient-card-purple {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(124, 58, 237, 0.1) 100%);
+  border-color: rgba(139, 92, 246, 0.2);
+  transition: all 0.3s ease;
+}
+
+.gradient-card-purple:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.15) 100%);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.gradient-card-green {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.1) 100%);
+  border-color: rgba(16, 185, 129, 0.2);
+  transition: all 0.3s ease;
+}
+
+.gradient-card-green:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.15) 100%);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.gradient-card-amber {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(217, 119, 6, 0.1) 100%);
+  border-color: rgba(245, 158, 11, 0.2);
+  transition: all 0.3s ease;
+}
+
+.gradient-card-amber:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.15) 100%);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.gradient-card-red {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border-color: rgba(239, 68, 68, 0.2);
+  transition: all 0.3s ease;
+}
+
+.gradient-card-red:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.15) 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Accent colors for icons inside gradient cards */
+.gradient-card-blue .accent-icon {
+  color: rgba(59, 130, 246, 0.8);
+}
+
+.gradient-card-purple .accent-icon {
+  color: rgba(139, 92, 246, 0.8);
+}
+
+.gradient-card-green .accent-icon {
+  color: rgba(16, 185, 129, 0.8);
+}
+
+.gradient-card-amber .accent-icon {
+  color: rgba(245, 158, 11, 0.8);
+}
+
+.gradient-card-red .accent-icon {
+  color: rgba(239, 68, 68, 0.8);
+}
