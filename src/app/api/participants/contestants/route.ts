@@ -90,12 +90,50 @@ export async function GET(request: NextRequest) {
         return NextResponse.json([]);
       }
       
-      // Get contestants for all managed contingents
+      // Get query parameters for filtering
+      const page = parseInt(searchParams.get("page") || "1");
+      const limit = parseInt(searchParams.get("limit") || "20");
+      const class_grade = searchParams.get("class_grade");
+      const class_name = searchParams.get("class_name");
+      const age = searchParams.get("age") ? parseInt(searchParams.get("age")!) : undefined;
+      
+      // Calculate pagination values
+      const skip = (page - 1) * limit;
+      
+      // Build the where clause
+      const where: any = {
+        contingentId: {
+          in: contingentIds
+        }
+      };
+      
+      // Add filters if provided
+      if (class_grade) {
+        where.class_grade = class_grade;
+      }
+      
+      if (class_name) {
+        where.class_name = {
+          contains: class_name
+        };
+      }
+      
+      if (age) {
+        where.age = age;
+      }
+      
+      // Get total count for pagination
+      const totalCount = await prisma.contestant.count({
+        where
+      });
+      
+      // Get contestants for all managed contingents with filters and pagination
       const contestants = await prisma.contestant.findMany({
-        where: {
-          contingentId: {
-            in: contingentIds
-          }
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          name: 'asc'
         },
         include: {
           contingent: {
@@ -120,7 +158,16 @@ export async function GET(request: NextRequest) {
         }
       });
       
-      return NextResponse.json(contestants);
+      // Return contestants with pagination metadata
+      return NextResponse.json({
+        data: contestants,
+        pagination: {
+          total: totalCount,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
     }
     
     // If contingentId is provided, check if participant is a manager of this contingent

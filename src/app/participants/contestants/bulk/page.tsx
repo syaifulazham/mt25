@@ -707,9 +707,9 @@ export default function BulkUploadPage() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 ">
         <div className="flex items-center justify-center">
-          <Tabs defaultValue={activeStep} className="w-full max-w-3xl" value={activeStep}>
+          <Tabs defaultValue={activeStep} className="w-full" value={activeStep}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="upload" disabled={activeStep !== 'upload'}>
                 1. Upload File

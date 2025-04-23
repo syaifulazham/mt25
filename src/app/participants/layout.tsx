@@ -36,12 +36,12 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center justify-between">
+      <header className="sticky top-0 z-50 border-b bg-gradient-to-r from-blue-900 via-indigo-900 to-purple-900 text-white">
+        <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <a href="/participants" className="flex items-center space-x-2">
-              <span className="font-bold">Techlympics</span>
-              <span className="rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hidden sm:inline-block">
+              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">TECHLYMPICS 2025</span>
+              <span className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-2 py-1 text-xs text-white hidden sm:inline-block">
                 Participant
               </span>
             </a>
@@ -56,24 +56,30 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[80vw] sm:w-[350px]">
-                <nav className="flex flex-col gap-4">
-                  <a href="/participants/profile" className="text-lg font-medium px-2 py-1 hover:bg-accent rounded-md">
+              <SheetContent side="right" className="w-[80vw] sm:w-[350px] bg-gradient-to-b from-blue-900 via-indigo-900 to-purple-900 text-white border-l-0">
+                <nav className="flex flex-col gap-4 pt-4">
+                  <a href="/participants/dashboard" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
+                    Dashboard
+                  </a>
+                  <a href="/participants/profile" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
                     Profile
                   </a>
-                  <a href="/participants/contingents" className="text-lg font-medium px-2 py-1 hover:bg-accent rounded-md">
+                  <a href="/participants/contingents" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
                     My Teams
                   </a>
-                  <a href="/participants/contests" className="text-lg font-medium px-2 py-1 hover:bg-accent rounded-md">
+                  <a href="/participants/contestants" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
+                    Contestants
+                  </a>
+                  <a href="/participants/contests" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
                     Contests
                   </a>
-                  <div className="border-t my-4"></div>
+                  <div className="border-t border-blue-700 my-4"></div>
                   {user ? (
-                    <a href="/api/auth/signout" className="text-lg font-medium px-2 py-1 hover:bg-accent rounded-md text-destructive">
+                    <a href="/api/auth/signout" className="text-lg font-medium mx-4 px-4 py-2 rounded-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 transition-all text-center">
                       Sign Out
                     </a>
                   ) : (
-                    <a href="/participants/auth/login" className="text-lg font-medium px-2 py-1 hover:bg-accent rounded-md text-primary">
+                    <a href="/participants/auth/login" className="text-lg font-medium mx-4 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all text-center">
                       Sign In
                     </a>
                   )}
@@ -84,30 +90,36 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
           
           {/* Desktop navigation */}
           <nav className="hidden md:flex flex-1 items-center justify-between space-x-2">
-            <div className="flex items-center gap-4 ml-6">
-              <a href="/" className="text-sm font-medium hover:text-primary">
+            <div className="flex items-center gap-6 ml-6">
+              <a href="/" className="text-sm font-medium hover:text-yellow-400 transition-colors">
                 Home
               </a>
-              <a href="/participants/profile" className="text-sm font-medium hover:text-primary">
+              <a href="/participants/dashboard" className="text-sm font-medium hover:text-yellow-400 transition-colors">
+                Dashboard
+              </a>
+              <a href="/participants/profile" className="text-sm font-medium hover:text-yellow-400 transition-colors">
                 Profile
               </a>
-              <a href="/participants/contingents" className="text-sm font-medium hover:text-primary">
+              <a href="/participants/contingents" className="text-sm font-medium hover:text-yellow-400 transition-colors">
                 My Teams
               </a>
-              <a href="/participants/contests" className="text-sm font-medium hover:text-primary">
+              <a href="/participants/contestants" className="text-sm font-medium hover:text-yellow-400 transition-colors">
+                Contestants
+              </a>
+              <a href="/participants/contests" className="text-sm font-medium hover:text-yellow-400 transition-colors">
                 Contests
               </a>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-muted-foreground text-white">
                 {user?.name || user?.username || 'Guest'}
               </span>
               {user ? (
-                <a href="/api/auth/signout" className="text-sm font-medium hover:text-destructive">
+                <a href="/api/auth/signout" className="px-4 py-2 rounded-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 transition-all text-white">
                   Sign Out
                 </a>
               ) : (
-                <a href="/participants/auth/login" className="text-sm font-medium hover:text-primary">
+                <a href="/participants/auth/login" className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all text-white">
                   Sign In
                 </a>
               )}

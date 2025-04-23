@@ -29,8 +29,9 @@ import {
   FileText
 } from "lucide-react";
 import Link from "next/link";
-// // import BulkUploadModal from "./_components/bulk-upload-modal";
 import EditContestantModal from "./_components/edit-contestant-modal";
+import ContestantsFilters from "./_components/contestants-filters";
+import Pagination from "./_components/pagination";
 import { 
   Table, 
   TableBody, 
@@ -67,6 +68,17 @@ export default function ContestantsPage() {
   const [eduLevelFilter, setEduLevelFilter] = useState("all");
   const [error, setError] = useState<string | null>(null);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalContestants, setTotalContestants] = useState(0);
+  const [limit] = useState(20); // 20 records per page
+  
+  // Filter state
+  const [classGradeFilter, setClassGradeFilter] = useState("");
+  const [classNameFilter, setClassNameFilter] = useState("");
+  const [ageFilter, setAgeFilter] = useState("");
+  
   // Redirect if not logged in
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -74,42 +86,65 @@ export default function ContestantsPage() {
     }
   }, [status]);
   
-  // Fetch contestants for all contingents managed by the user
-  useEffect(() => {
-    const fetchContestants = async () => {
-      if (!session?.user?.email) return;
-      
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Fetch all contestants from managed contingents in a single API call
-        const contestantsResponse = await fetch('/api/participants/contestants');
-        
-        if (!contestantsResponse.ok) {
-          const errorData = await contestantsResponse.json();
-          throw new Error(errorData.error || "Failed to fetch contestants");
-        }
-        
-        const contestantsData = await contestantsResponse.json();
-        setContestants(contestantsData);
-        
-        // If no contestants are found but the API call was successful
-        if (contestantsData.length === 0) {
-          console.log("No contestants found for managed contingents");
-        }
-      } catch (error) {
-        console.error("Error fetching contestants:", error);
-        setError("Failed to load contestants. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fetch contestants with filters and pagination
+  const fetchContestants = async (page = currentPage) => {
+    if (!session?.user?.email) return;
     
-    fetchContestants();
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+      
+      if (classGradeFilter && classGradeFilter !== 'all') {
+        params.append('class_grade', classGradeFilter);
+      }
+      
+      if (classNameFilter) {
+        params.append('class_name', classNameFilter);
+      }
+      
+      if (ageFilter) {
+        params.append('age', ageFilter);
+      }
+      
+      // Fetch contestants with filters and pagination
+      const contestantsResponse = await fetch(`/api/participants/contestants?${params.toString()}`);
+      
+      if (!contestantsResponse.ok) {
+        const errorData = await contestantsResponse.json();
+        throw new Error(errorData.error || "Failed to fetch contestants");
+      }
+      
+      const result = await contestantsResponse.json();
+      setContestants(result.data);
+      setTotalContestants(result.pagination.total);
+      setTotalPages(result.pagination.totalPages);
+      setCurrentPage(result.pagination.page);
+      
+      // If no contestants are found but the API call was successful
+      if (result.data.length === 0 && result.pagination.total === 0) {
+        console.log("No contestants found for managed contingents");
+      }
+    } catch (error) {
+      console.error("Error fetching contestants:", error);
+      setError("Failed to load contestants. Please try again later.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Initial fetch
+  useEffect(() => {
+    if (session?.user?.email) {
+      fetchContestants(1);
+    }
   }, [session]);
   
-  // Filter contestants based on search query and education level
+  // Filter contestants based on search query and education level (client-side filtering for the search box only)
   const filteredContestants = contestants.filter(contestant => {
     const matchesSearch = 
       searchQuery === "" || 
@@ -122,6 +157,27 @@ export default function ContestantsPage() {
     
     return matchesSearch && matchesEduLevel;
   });
+  
+  // Handle filter apply
+  const handleFilterApply = () => {
+    fetchContestants(1); // Reset to first page when applying filters
+  };
+  
+  // Handle filter reset
+  const handleFilterReset = () => {
+    setClassGradeFilter("");
+    setClassNameFilter("");
+    setAgeFilter("");
+    // Fetch with reset filters
+    setTimeout(() => {
+      fetchContestants(1);
+    }, 0);
+  };
+  
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    fetchContestants(page);
+  };
   
   // Group contestants by education level
   const contestantsByEduLevel = {
@@ -185,19 +241,16 @@ export default function ContestantsPage() {
     
     if (error) {
       return (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{error}</p>
-          <Button variant="outline" className="mt-2" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
+        <div className="p-8 text-center">
+          <p className="text-red-500">{error}</p>
         </div>
       );
     }
     
     if (contestantsToRender.length === 0) {
       return (
-        <div className="text-center py-8 bg-muted/20 rounded-lg">
-          <p className="text-muted-foreground">No contestants found</p>
+        <div className="p-8 text-center">
+          <p className="text-muted-foreground">No contestants found.</p>
           <div className="flex justify-center mt-4">
             <Button asChild>
               <Link href="/participants/contestants/new">
@@ -209,58 +262,62 @@ export default function ContestantsPage() {
       );
     }
     
+    // Show pagination only when we're not doing client-side filtering
+    const shouldShowPagination = totalPages > 1 && searchQuery === "" && eduLevelFilter === "all";
+    
     return (
-      <Table>
-        <TableCaption>Total: {contestantsToRender.length} contestants</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>IC Number</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Gender</TableHead>
-            <TableHead>Age</TableHead>
-            <TableHead>Education Level</TableHead>
-            <TableHead>Class</TableHead>
-            <TableHead>Added By</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
+      <div className="space-y-4">
+        <Table>
+          <TableCaption>
+            {shouldShowPagination 
+              ? `Showing ${contestants.length} of ${totalContestants} contestants (Page ${currentPage} of ${totalPages})`
+              : `Total: ${contestantsToRender.length} contestants`
+            }
+          </TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>IC Number</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Gender</TableHead>
+              <TableHead>Age</TableHead>
+              <TableHead>Education Level</TableHead>
+              <TableHead>Class</TableHead>
+              <TableHead>Added By</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           {contestantsToRender.map((contestant) => (
             <TableRow key={contestant.id}>
-              <TableCell className="font-medium">{contestant.name}</TableCell>
+              <TableCell>
+                <div className="font-medium">{contestant.name}</div>
+              </TableCell>
               <TableCell>{contestant.ic}</TableCell>
               <TableCell>
-                {contestant.email && (
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">Email:</span> {contestant.email}
-                  </div>
-                )}
-                {contestant.phoneNumber && (
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">Phone:</span> {contestant.phoneNumber}
-                  </div>
-                )}
-                {!contestant.email && !contestant.phoneNumber && '-'}
+                <div className="space-y-1">
+                  {contestant.email && <div className="text-xs">{contestant.email}</div>}
+                  {contestant.phoneNumber && <div className="text-xs">{contestant.phoneNumber}</div>}
+                </div>
               </TableCell>
               <TableCell>{contestant.gender}</TableCell>
               <TableCell>{contestant.age}</TableCell>
               <TableCell>
                 <EduLevelBadge eduLevel={contestant.edu_level} />
               </TableCell>
-              <TableCell>{contestant.class_name || '-'}</TableCell>
+              <TableCell>
+                {contestant.class_grade && contestant.class_name 
+                  ? `${contestant.class_grade} - ${contestant.class_name}` 
+                  : contestant.class_name || contestant.class_grade || '-'}
+              </TableCell>
               <TableCell>
                 <div className="text-xs">{contestant.updatedBy || '-'}</div>
               </TableCell>
               <TableCell>
                 <Badge 
-                  variant="outline" 
-                  className={`
-                    ${contestant.status === 'ACTIVE' ? 'bg-green-500/10 text-green-600' : ''}
-                    ${contestant.status === 'INACTIVE' ? 'bg-gray-500/10 text-gray-600' : ''}
-                    ${contestant.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-600' : ''}
-                  `}
+                  variant={contestant.status === "ACTIVE" ? "default" : "secondary"}
+                  className={contestant.status === "ACTIVE" ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}
                 >
                   {contestant.status}
                 </Badge>
@@ -276,26 +333,35 @@ export default function ContestantsPage() {
                       );
                     }} 
                   />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => handleDeleteContestant(contestant.id, contestant.contingentId)}
+                    className="text-red-500 hover:text-red-700 hover:bg-red-100"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                   <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="h-4 w-4"
-                      >
-                        <circle cx="12" cy="12" r="1" />
-                        <circle cx="12" cy="5" r="1" />
-                        <circle cx="12" cy="19" r="1" />
-                      </svg>
-                    </Button>
-                  </DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4"
+                        >
+                          <circle cx="12" cy="12" r="1" />
+                          <circle cx="12" cy="5" r="1" />
+                          <circle cx="12" cy="19" r="1" />
+                        </svg>
+                      </Button>
+                    </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => {}}>
@@ -329,7 +395,17 @@ export default function ContestantsPage() {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+        </Table>
+        
+        {/* Pagination */}
+        {totalPages > 1 && searchQuery === "" && eduLevelFilter === "all" && (
+          <Pagination 
+            currentPage={currentPage} 
+            totalPages={totalPages} 
+            onPageChange={handlePageChange} 
+          />
+        )}
+      </div>
     );
   };
   
@@ -379,31 +455,45 @@ export default function ContestantsPage() {
         </div>
       </div>
       
-      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or IC..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      <div className="space-y-4">
+        {/* Search and filter controls */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search by name or IC number..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex flex-row gap-2">
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={eduLevelFilter}
+              onChange={(e) => setEduLevelFilter(e.target.value)}
+            >
+              <option value="all">All Education Levels</option>
+              <option value="sekolah rendah">Primary School</option>
+              <option value="sekolah menengah">Secondary School</option>
+              <option value="belia">Youth</option>
+            </select>
+          </div>
         </div>
         
-        <div className="flex gap-2 items-center">
-          <Label htmlFor="edu-level-filter" className="text-sm">Education Level:</Label>
-          <Select value={eduLevelFilter} onValueChange={setEduLevelFilter}>
-            <SelectTrigger id="edu-level-filter" className="w-[180px]">
-              <SelectValue placeholder="All Levels" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Levels</SelectItem>
-              <SelectItem value="sekolah rendah">Primary School</SelectItem>
-              <SelectItem value="sekolah menengah">Secondary School</SelectItem>
-              <SelectItem value="belia">Youth</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Advanced Filters */}
+        <ContestantsFilters
+          classGrade={classGradeFilter}
+          setClassGrade={setClassGradeFilter}
+          className={classNameFilter}
+          setClassName={setClassNameFilter}
+          age={ageFilter}
+          setAge={setAgeFilter}
+          onFilterApply={handleFilterApply}
+          onFilterReset={handleFilterReset}
+        />
       </div>
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
