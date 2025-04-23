@@ -35,7 +35,10 @@ export default function ContestantsSummary({ userId }: ContestantsSummaryProps) 
           throw new Error("Failed to fetch contestants");
         }
         
-        const contestants = await contestantsResponse.json();
+        const response = await contestantsResponse.json();
+        
+        // Handle the new API response format with pagination
+        const contestants = response.data || response;
         
         // Calculate statistics from the contestants data
         const byEduLevel: {[key: string]: number} = {};
