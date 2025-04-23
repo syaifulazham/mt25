@@ -85,6 +85,9 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
           {/* Desktop navigation */}
           <nav className="hidden md:flex flex-1 items-center justify-between space-x-2">
             <div className="flex items-center gap-4 ml-6">
+              <a href="/" className="text-sm font-medium hover:text-primary">
+                Home
+              </a>
               <a href="/participants/profile" className="text-sm font-medium hover:text-primary">
                 Profile
               </a>

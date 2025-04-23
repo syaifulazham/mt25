@@ -51,36 +51,13 @@ export default function BulkUploadPage() {
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<Record<string, any>>({});
-  const [contingentId, setContingentId] = useState<number | null>(null);
+  // No need to track contingentId as it's now handled by the API
   const [uploadResult, setUploadResult] = useState<{
     success: number;
     errors: Array<{ row: number; message: string }>;
   } | null>(null);
   
-  // Fetch the first available contingent when the page loads
-  useEffect(() => {
-    const fetchContingent = async () => {
-      try {
-        const response = await fetch('/api/participants/contingents');
-        if (response.ok) {
-          const contingents = await response.json();
-          if (contingents && contingents.length > 0) {
-            // Find the first contingent where the user is a manager
-            const managedContingent = contingents.find((c: { isManager: boolean; status: string; id: number }) => 
-              c.isManager && c.status === 'ACTIVE'
-            );
-            if (managedContingent) {
-              setContingentId(managedContingent.id);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching contingents:', error);
-      }
-    };
-    
-    fetchContingent();
-  }, []);
+  // No need to fetch the contingent ID as it's now handled by the API
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles && acceptedFiles.length > 0) {
@@ -199,10 +176,7 @@ export default function BulkUploadPage() {
     
     formData.append('data', JSON.stringify(validRecords));
     
-    // Add contingent ID if available
-    if (contingentId) {
-      formData.append('contingentId', contingentId.toString());
-    }
+    // No need to add contingent ID as it's now handled by the API
 
     try {
       // Simulate progress for better UX

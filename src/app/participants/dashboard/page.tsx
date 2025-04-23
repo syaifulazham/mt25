@@ -8,6 +8,7 @@ import ContingentSummary from "./_components/contingent-summary";
 import ProfileSummary from "./_components/profile-summary";
 import ContestantsSummary from "./_components/contestants-summary";
 import PendingRequestsAlert from "./_components/pending-requests-alert";
+import VideoGallery from "./_components/video-gallery";
 import prisma from "@/lib/prisma";
 
 // Import gradient card styles
@@ -92,26 +93,8 @@ export default async function DashboardPage() {
         <ContestantsSummary userId={Number(user.id)} />
       </div>
       
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg md:text-xl">Upcoming Events</CardTitle>
-          <CardDescription>Stay updated with the latest Techlympics events</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-muted/50">
-              <h3 className="font-medium mb-1">Registration Deadline</h3>
-              <p className="text-sm text-muted-foreground">May 15, 2025</p>
-              <p className="text-sm mt-2">Make sure to complete your team registration before the deadline.</p>
-            </div>
-            <div className="p-4 rounded-lg bg-muted/50">
-              <h3 className="font-medium mb-1">Orientation Session</h3>
-              <p className="text-sm text-muted-foreground">June 1, 2025</p>
-              <p className="text-sm mt-2">Virtual orientation for all participants.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Video Gallery */}
+      <VideoGallery />
       
       <div className="fixed bottom-4 right-4 md:hidden">
         <Button size="icon" className="rounded-full h-12 w-12 shadow-lg" asChild>

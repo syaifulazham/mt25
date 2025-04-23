@@ -14,42 +14,36 @@ export async function POST(req: NextRequest) {
     
     // Get the request form data
     const formData = await req.formData();
-    const contingentIdStr = formData.get('contingentId') as string;
     const dataJson = formData.get('data') as string;
-    let contingentId: number;
     
     if (!dataJson) {
       return NextResponse.json({ error: "No data provided" }, { status: 400 });
     }
     
-    if (contingentIdStr) {
-      // If contingentId is provided in the request, use it
-      contingentId = parseInt(contingentIdStr);
-      
-      // Verify the contingent exists
-      const contingent = await prisma.contingent.findUnique({
-        where: { id: contingentId }
-      });
-      
-      if (!contingent) {
-        return NextResponse.json(
-          { error: "Contingent not found" },
-          { status: 404 }
-        );
+    // Get the participant ID from the session
+    const participantId = parseInt(session.user.id as string);
+    
+    // Get the user's contingent ID directly from the contingentManager table
+    const managedContingent = await prisma.contingentManager.findFirst({
+      where: {
+        participantId: participantId
       }
-    } else {
-      // If no contingentId provided, get the first contingent
-      const contingent = await prisma.contingent.findFirst();
-      
-      if (!contingent) {
-        return NextResponse.json(
-          { error: "No contingents found" },
-          { status: 404 }
-        );
-      }
-      
-      contingentId = contingent.id;
+    });
+    
+    if (!managedContingent) {
+      return NextResponse.json(
+        { error: "You don't manage any contingents. Please create or join a contingent first." },
+        { status: 400 }
+      );
     }
+    
+    const contingentId = managedContingent.contingentId;
+    
+    // No need to verify the contingent exists since we got it directly from the database
+    // and the foreign key constraint ensures it exists
+    
+    // No need to check permissions since we're getting the contingent directly from
+    // the contingentManager table, which already confirms the user is a manager
 
     if (!dataJson) {
       return NextResponse.json({ error: "No data provided" }, { status: 400 });

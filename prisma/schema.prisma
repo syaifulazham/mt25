@@ -50,7 +50,7 @@ model contest {
   theme             theme?                @relation(fields: [themeId], references: [id], map: "Contest_themeId_fkey")
   eventId           Int?                 // New field for event relation
   event             event?               @relation("eventToContest", fields: [eventId], references: [id], map: "Contest_eventId_fkey")
-  contingent        contingent[]
+  contestants       contestParticipation[] // Direct relation to contestants through participation table
   judging           judging[]
   result            result[]
   submission        submission[]
@@ -67,10 +67,8 @@ model contingent {
   schoolId    Int?
   higherInstId Int?
   createdAt   DateTime @default(now())
-  contestId   Int
   description String?
   updatedAt   DateTime
-  contest     contest  @relation(fields: [contestId], references: [id], map: "Contingent_contestId_fkey")
   school      school?   @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
   higherInstitution higherinstitution? @relation(fields: [higherInstId], references: [id])
   contestants contestant[]
@@ -80,7 +78,6 @@ model contingent {
   managedByParticipant Boolean @default(true)
   managers    contingentManager[] // New relation to contingent managers
 
-  @@index([contestId], map: "Contingent_contestId_fkey")
   @@index([schoolId], map: "Contingent_schoolId_fkey")
   @@index([participantId])
   @@index([higherInstId])
@@ -106,8 +103,26 @@ model contestant {
   
   contingent  contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
   submissions submission[]
+  contests    contestParticipation[] // Direct relation to contests through participation table
   
   @@index([contingentId])
+}
+
+// Join table for many-to-many relationship between contestants and contests
+model contestParticipation {
+  id           Int       @id @default(autoincrement())
+  contestId    Int
+  contestantId Int
+  registeredAt DateTime  @default(now())
+  status       String    @default("REGISTERED") // REGISTERED, CONFIRMED, WITHDRAWN
+  notes        String?
+  
+  contest      contest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  
+  @@unique([contestId, contestantId]) // Prevent duplicate registrations
+  @@index([contestId])
+  @@index([contestantId])
 }
 
 model event {
@@ -510,4 +525,15 @@ model contingentManager {
   @@unique([participantId, contingentId]) // Prevent duplicate manager entries
   @@index([participantId])
   @@index([contingentId])
+}
+
+model video {
+  id               Int      @id @default(autoincrement())
+  group_name       String   // Category or group name for the video
+  title            String
+  video_description String?  @db.Text
+  video_link       String   // Google Drive file ID or full URL
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true)
 }

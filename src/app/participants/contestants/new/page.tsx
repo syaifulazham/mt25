@@ -342,8 +342,8 @@ export default function NewContestantPage() {
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Lelaki">Lelaki</SelectItem>
-                    <SelectItem value="Perempuan">Perempuan</SelectItem>
+                    <SelectItem value="MALE">Lelaki</SelectItem>
+                    <SelectItem value="FEMALE">Perempuan</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -378,6 +378,7 @@ export default function NewContestantPage() {
                       <SelectItem value="sekolah rendah">Sekolah Rendah</SelectItem>
                       <SelectItem value="sekolah menengah">Sekolah Menengah</SelectItem>
                       <SelectItem value="belia">Belia</SelectItem>
+                      <SelectItem value="pendidikan khas">Pendidikan Khas</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

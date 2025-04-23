@@ -21,10 +21,10 @@ export default function Home() {
             <Link href="#contact" className="hover:text-yellow-400 transition-colors">Contact</Link>
           </div>
           <div className="flex space-x-4">
-            <Link href="/organizer/auth/login" className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all">
+            <Link href="/participants/auth/login" className="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all">
               Login
             </Link>
-            <Link href="/register" className="px-4 py-2 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all">
+            <Link href="/participants/auth/register" className="px-4 py-2 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all">
               Register
             </Link>
           </div>
@@ -45,11 +45,8 @@ export default function Home() {
             Join the ultimate tech competition that brings together innovation, teamwork, and excellence.
           </p>
           <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-            <Link href="/participant-platform" className="px-8 py-3 text-center rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all font-medium">
+            <Link href="/participants/auth/register" className="px-8 py-3 text-center rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all font-medium">
               Join Now
-            </Link>
-            <Link href="/organizer" className="px-8 py-3 text-center rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all font-medium">
-              Go to Portal
             </Link>
           </div>
         </div>

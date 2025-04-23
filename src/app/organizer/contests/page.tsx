@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrentUser } from '@/lib/session';
 import { hasRequiredRole } from '@/lib/auth';
-import { PlusIcon, SearchIcon, FilterIcon } from 'lucide-react';
+import { PlusIcon, SearchIcon, FilterIcon, Eye, Edit, Scale, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,8 @@ import {
 import prisma from '@/lib/prisma';
 import Image from 'next/image';
 import { format } from 'date-fns';
+import DeleteContestButton from './_components/delete-contest-button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Helper function to get status badge color
 function getStatusBadge(startDate: Date, endDate: Date) {
@@ -65,11 +67,6 @@ export default async function ContestsPage() {
   // Fetch contests from database
   const contests = await prisma.contest.findMany({
     include: {
-      _count: {
-        select: {
-          contingent: true
-        }
-      },
       targetgroup: true,
       theme: true
     },
@@ -154,17 +151,18 @@ export default async function ContestsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Theme</TableHead>
-                <TableHead>Participants</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {contests.map((contest) => (
                 <TableRow key={contest.id}>
-                  <TableCell className="font-medium">{contest.name}</TableCell>
+                  <TableCell className="font-medium">{contest.code || `CNT-${contest.id}`}</TableCell>
+                  <TableCell>{contest.name}</TableCell>
                   <TableCell>{getContestTypeDisplay(contest.contestType)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -182,20 +180,50 @@ export default async function ContestsPage() {
                       <span>{contest.theme?.name || "No theme"}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{contest._count.contingent}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
-                      <Link href={`/organizer/contests/${contest.id}`}>
-                        <Button variant="outline" size="sm">View</Button>
-                      </Link>
-                      <Link href={`/organizer/contests/${contest.id}/edit`}>
-                        <Button variant="outline" size="sm">Edit</Button>
-                      </Link>
-                      <Link href={`/organizer/contests/${contest.id}/judging-scheme`}>
-                        <Button variant="outline" size="sm" className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200">
-                          Judging Scheme
-                        </Button>
-                      </Link>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/organizer/contests/${contest.id}`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View Contest</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/organizer/contests/${contest.id}/edit`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit Contest</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/organizer/contests/${contest.id}/judging-scheme`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600">
+                                <Scale className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Judging Scheme</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <DeleteContestButton contestId={contest.id} contestName={contest.name} />
                     </div>
                   </TableCell>
                 </TableRow>

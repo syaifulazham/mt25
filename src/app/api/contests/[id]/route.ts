@@ -40,7 +40,7 @@ export async function GET(
         _count: {
           select: {
             submission: true,
-            contingent: true,
+            contestants: true, // Changed from contingent to contestants (contestParticipation)
             judging: true,
             result: true
           }
@@ -267,7 +267,7 @@ export async function DELETE(
         _count: {
           select: {
             submission: true,
-            contingent: true,
+            contestants: true, // Changed from contingent to contestants (contestParticipation)
             judging: true,
             result: true
           }
@@ -278,7 +278,7 @@ export async function DELETE(
     if (contestWithRelations?._count) {
       const hasRelations = 
         contestWithRelations._count.submission > 0 ||
-        contestWithRelations._count.contingent > 0 ||
+        contestWithRelations._count.contestants > 0 || // Changed from contingent to contestants
         contestWithRelations._count.judging > 0 ||
         contestWithRelations._count.result > 0;
       
