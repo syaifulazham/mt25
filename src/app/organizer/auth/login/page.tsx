@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { redirect } from "next/navigation";
 
+// Force dynamic rendering for auth pages
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: "Login | Organizer Portal",
   description: "Login to the Techlympics 2025 Organizer Portal",
