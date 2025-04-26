@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get higher institutions from database
-    const higherInstitutions = await prisma.higherInstitution.findMany({
+    const higherInstitutions = await prisma.higherinstitution.findMany({
       where,
       include: {
         state: {
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create higher institution in database
-    const higherInstitution = await prisma.higherInstitution.create({
+    const higherInstitution = await prisma.higherinstitution.create({
       data: {
         name: validationResult.data.name,
         code: validationResult.data.code,
