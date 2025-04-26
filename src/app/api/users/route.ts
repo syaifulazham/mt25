@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
 
     // Only ADMIN and OPERATOR can view all users
     if (!hasRequiredRole(user, ["ADMIN", "OPERATOR"])) {
-      console.log("User role not authorized:", user.role);
+      // Use safe logging for role property as it might not exist on participant users
+      console.log("User not authorized:", 'role' in user ? user.role : 'No role assigned');
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
       data: {
         ...userData,
         password: hashedPassword,
+        updatedAt: new Date(),
       },
       select: {
         id: true,
