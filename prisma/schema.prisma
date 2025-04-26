@@ -42,6 +42,8 @@ model contest {
   startDate         DateTime
   endDate           DateTime
   accessibility     Boolean              @default(false)
+  minAge            Int?                 // Minimum age for contestants
+  maxAge            Int?                 // Maximum age for contestants
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   themeId           Int?

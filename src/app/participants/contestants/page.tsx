@@ -32,6 +32,8 @@ import Link from "next/link";
 import EditContestantModal from "./_components/edit-contestant-modal";
 import ContestantsFilters from "./_components/contestants-filters";
 import Pagination from "./_components/pagination";
+import BulkAssignContests from "./_components/bulk-assign-contests";
+import AssignContestsModal from "./_components/assign-contests-modal";
 import { 
   Table, 
   TableBody, 
@@ -324,6 +326,11 @@ export default function ContestantsPage() {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end items-center space-x-1">
+                  <AssignContestsModal
+                    contestantId={contestant.id}
+                    contestantName={contestant.name}
+                    onSuccess={() => fetchContestants(currentPage)}
+                  />
                   <EditContestantModal 
                     contestant={contestant} 
                     onUpdate={(updatedContestant) => {
@@ -381,6 +388,14 @@ export default function ContestantsPage() {
                       />
                       <span className="ml-2">Edit Contestant</span>
                     </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                      <AssignContestsModal
+                        contestantId={contestant.id}
+                        contestantName={contestant.name}
+                        onSuccess={() => fetchContestants(currentPage)}
+                      />
+                      <span className="ml-2">Assign Contests</span>
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"
@@ -435,7 +450,7 @@ export default function ContestantsPage() {
             Register and manage contestants for Techlympics 2025
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button asChild>
             <Link href="/participants/contestants/new">
               <UserPlus className="mr-2 h-4 w-4" /> Add Contestant
@@ -452,6 +467,7 @@ export default function ContestantsPage() {
               Template
             </Link>
           </Button>
+          <BulkAssignContests />
         </div>
       </div>
       
