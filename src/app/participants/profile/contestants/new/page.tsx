@@ -11,10 +11,24 @@ export const metadata: Metadata = {
 export default async function NewContestantPage() {
   const user = await getCurrentUser();
   
-  // Fetch contingents for the current user to allow assigning the contestant to a team
+  // Fetch contingents managed by the current user to allow assigning the contestant to a team
+  const managedContingents = await prisma.contingentManager.findMany({
+    where: {
+      participantId: Number(user?.id)
+    },
+    select: {
+      contingentId: true
+    }
+  });
+
+  const contingentIds = managedContingents.map(cm => cm.contingentId);
+
+  // Fetch the full contingent details
   const contingents = await prisma.contingent.findMany({
     where: {
-      userId: Number(user?.id)
+      id: {
+        in: contingentIds.length > 0 ? contingentIds : [-1] // Use -1 if no contingents (will find nothing)
+      }
     },
     orderBy: {
       name: 'asc'
