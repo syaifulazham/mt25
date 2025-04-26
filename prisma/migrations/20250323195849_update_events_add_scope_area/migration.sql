@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE `event` ADD COLUMN `scopeArea` ENUM('NATIONAL', 'ZONE', 'STATE', 'OPEN') NOT NULL DEFAULT 'OPEN';
