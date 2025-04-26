@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get reference data from database
-    const referenceData = await prisma.referenceData.findMany({
+    const referenceData = await prisma.referencedata.findMany({
       where,
       orderBy: [
         { type: "asc" },
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     const data = validationResult.data;
 
     // Check if reference data with same type and code already exists
-    const existingData = await prisma.referenceData.findFirst({
+    const existingData = await prisma.referencedata.findFirst({
       where: {
         type: data.type,
         code: data.code,
@@ -111,8 +111,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create reference data in database
-    const referenceData = await prisma.referenceData.create({
-      data,
+    const referenceData = await prisma.referencedata.create({
+      data: {
+        ...data,
+        updatedAt: new Date()
+      },
     });
 
     return NextResponse.json(referenceData, { status: 201 });
