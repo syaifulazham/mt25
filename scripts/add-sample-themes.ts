@@ -42,7 +42,10 @@ async function main() {
 
     if (!existingTheme) {
       await prisma.theme.create({
-        data: theme
+        data: {
+          ...theme,
+          updatedAt: new Date() // Add required updatedAt field
+        }
       });
       console.log(`Created theme: ${theme.name}`);
     } else {
