@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
     const { name, ic, gender, age, edu_level, class_name, contingentId } = body;
     
     // Validate required fields
-    if (!name || !ic || !gender || !age || !edu_level) {
+    if (!name || !ic || !gender || !age || !edu_level || !contingentId) {
       return NextResponse.json(
-        { error: 'Missing required fields. Name, IC, gender, age, and education level are required.' },
+        { error: 'Missing required fields. Name, IC, gender, age, education level, and contingent are required.' },
         { status: 400 }
       );
     }
@@ -85,9 +85,10 @@ export async function POST(request: NextRequest) {
         edu_level,
         class_name: class_name || null,
         hashcode,
-        userId: Number(user.id),
-        contingentId: contingentId ? Number(contingentId) : null,
-        updatedAt: new Date()
+        contingentId: Number(contingentId),
+        updatedAt: new Date(),
+        updatedBy: user.name || 'System',
+        status: 'ACTIVE'
       }
     });
     
