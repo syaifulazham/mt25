@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = 'force-dynamic';
 import { initializeDatabase } from "@/lib/init-db";
 
 // This route will be called during application startup to initialize the database

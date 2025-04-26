@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = 'force-dynamic';
 import { parse } from "papaparse";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";

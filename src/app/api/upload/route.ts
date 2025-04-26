@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = 'force-dynamic';
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { getCurrentUser } from "@/lib/session";
