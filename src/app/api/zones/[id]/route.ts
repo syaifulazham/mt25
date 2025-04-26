@@ -31,9 +31,9 @@ export async function GET(
     const zone = await prisma.zone.findUnique({
       where: { id },
       include: {
-        states: true,
+        state: true,
         _count: {
-          select: { states: true }
+          select: { state: true }
         }
       }
     });
@@ -148,7 +148,7 @@ export async function DELETE(
       where: { id },
       include: {
         _count: {
-          select: { states: true }
+          select: { state: true }
         }
       }
     });
@@ -158,7 +158,7 @@ export async function DELETE(
     }
 
     // Check if zone has related states
-    if (existingZone._count.states > 0) {
+    if (existingZone._count.state > 0) {
       return NextResponse.json(
         { error: "Cannot delete zone with related states. Remove the states first." },
         { status: 400 }
