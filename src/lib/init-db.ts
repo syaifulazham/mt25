@@ -28,6 +28,7 @@ export async function initializeDatabase() {
           password: hashedPassword,
           role: 'ADMIN',
           isActive: true,
+          updatedAt: new Date(), // Add required field
         },
       });
       
