@@ -41,13 +41,6 @@ export async function GET(
             id: true,
             name: true
           }
-        },
-        contest: {
-          select: {
-            id: true,
-            name: true,
-            contestType: true
-          }
         }
       }
     });
@@ -176,13 +169,6 @@ export async function PUT(
           select: {
             id: true,
             name: true
-          }
-        },
-        contest: {
-          select: {
-            id: true,
-            name: true,
-            contestType: true
           }
         }
       }
