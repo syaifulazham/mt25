@@ -22,17 +22,30 @@ export default async function ContestantPage({ params }: { params: { id: string 
     return notFound();
   }
   
-  // Fetch contestant details
-  const contestant = await prisma.contestant.findUnique({
+  // Get contingents managed by the current user
+  const userContingents = await prisma.contingentManager.findMany({
+    where: {
+      participantId: Number(user?.id)
+    },
+    select: {
+      contingentId: true
+    }
+  });
+
+  const contingentIds = userContingents.map(cm => cm.contingentId);
+
+  // Fetch contestant details ensuring it belongs to one of the user's contingents
+  const contestant = await prisma.contestant.findFirst({
     where: {
       id,
-      userId: Number(user?.id) // Ensure the contestant belongs to the current user
+      contingentId: {
+        in: contingentIds.length > 0 ? contingentIds : [-1] // Use -1 if no contingents (will find nothing)
+      }
     },
     include: {
       contingent: {
         include: {
-          school: true,
-          contest: true
+          school: true
         }
       }
     }
@@ -158,10 +171,7 @@ export default async function ContestantPage({ params }: { params: { id: string 
                   <div>
                     <p className="font-medium">{contestant.contingent.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      School: {contestant.contingent.school.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Contest: {contestant.contingent.contest.name}
+                      School: {contestant.contingent.school?.name || 'Not assigned'}
                     </p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
