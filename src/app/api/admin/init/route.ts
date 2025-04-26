@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, user_role } from '@prisma/client';
 import { hashPassword } from "@/lib/auth";
 
 const prisma = new PrismaClient();
@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     // Check if any admin users exist
     const adminCount = await prisma.user.count({
       where: {
-        role: Role.ADMIN,
+        role: user_role.ADMIN,
       },
     });
 
@@ -59,8 +59,9 @@ export async function POST(request: Request) {
         email: adminCredentials.email,
         username: adminCredentials.username,
         password: hashedPassword,
-        role: Role.ADMIN,
+        role: user_role.ADMIN,
         isActive: true,
+        updatedAt: new Date(), // Add required updatedAt field
       },
     });
     
