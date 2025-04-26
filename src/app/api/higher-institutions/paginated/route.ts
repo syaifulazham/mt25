@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * pageSize;
 
     // Build where conditions
-    let whereConditions: Prisma.HigherInstitutionWhereInput = {};
+    let whereConditions: Prisma.higherinstitutionWhereInput = {};
     
     // Add filters if provided
     if (stateId && stateId !== "all") {
@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
 
     if (!search) {
       // For non-search queries, use Prisma's standard functionality
-      totalCount = await prisma.higherInstitution.count({
+      totalCount = await prisma.higherinstitution.count({
         where: whereConditions,
       });
 
-      institutions = await prisma.higherInstitution.findMany({
+      institutions = await prisma.higherinstitution.findMany({
         where: whereConditions,
         include: {
           state: true,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       
       // Get total count with search
       const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM HigherInstitution
+        SELECT COUNT(*) as count FROM higherinstitution
         WHERE (name LIKE ${searchCondition} OR code LIKE ${searchCondition} 
         OR city LIKE ${searchCondition})
         ${stateId && stateId !== "all" ? Prisma.sql`AND stateId = ${parseInt(stateId)}` : Prisma.sql``}
@@ -66,8 +66,8 @@ export async function GET(request: NextRequest) {
       // Get higher institutions with search
       const institutionResults = await prisma.$queryRaw<any[]>`
         SELECT h.*, s.id as state_id, s.name as state_name
-        FROM HigherInstitution h
-        LEFT JOIN State s ON h.stateId = s.id
+        FROM higherinstitution h
+        LEFT JOIN state s ON h.stateId = s.id
         WHERE (h.name LIKE ${searchCondition} OR h.code LIKE ${searchCondition} 
         OR h.city LIKE ${searchCondition})
         ${stateId && stateId !== "all" ? Prisma.sql`AND h.stateId = ${parseInt(stateId)}` : Prisma.sql``}
