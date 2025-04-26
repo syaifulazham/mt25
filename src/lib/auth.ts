@@ -1,4 +1,4 @@
-import { PrismaClient, User, Role } from '@prisma/client';
+import { PrismaClient, user, user_role } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import * as jose from 'jose';
 import { cookies } from 'next/headers';
@@ -9,8 +9,8 @@ const prisma = new PrismaClient();
 export type AuthUser = {
   id: number;
   name: string;
-  email: string;
-  role: Role;
+  email: string; // Both user and user_participant have required email fields
+  role: user_role;
   username?: string | null;
 };
 
@@ -119,10 +119,11 @@ export async function loginWithCredentials(credentials: LoginCredentials): Promi
     });
 
     // Create auth user object
+    // Email is required in the schema but TypeScript needs a non-null assertion
     const authUser: AuthUser = {
       id: user.id,
-      name: user.name,
-      email: user.email,
+      name: user.name || '',
+      email: user.email!, // Non-null assertion since email is required in the schema
       role: user.role,
       username: user.username,
     };
@@ -167,8 +168,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     return {
       id: user.id,
-      name: user.name,
-      email: user.email,
+      name: user.name || '',
+      email: user.email!, // Non-null assertion since email is required in the schema
       role: user.role,
       username: user.username,
     };
@@ -179,7 +180,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 }
 
 // Check if user has required role
-export function hasRequiredRole(user: AuthUser | null | any, requiredRoles: Role[] | string[]): boolean {
+export function hasRequiredRole(user: AuthUser | null | any, requiredRoles: user_role[] | string[]): boolean {
   if (!user) {
     return false;
   }
@@ -202,7 +203,8 @@ export async function createInitialAdmin(): Promise<void> {
         email: 'admin@techlympics.my',
         username: 'admin',
         password: defaultPassword,
-        role: Role.ADMIN,
+        role: user_role.ADMIN,
+        updatedAt: new Date(),
       },
     });
     
