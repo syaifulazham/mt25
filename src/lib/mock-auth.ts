@@ -1,6 +1,6 @@
 'use client';
 
-import { Role } from '@prisma/client';
+import { user_role } from '@prisma/client';
 import * as jose from 'jose';
 
 // Constants
@@ -13,7 +13,7 @@ const MOCK_USER = {
   id: 1,
   name: 'Development User',
   email: 'dev@techlympics.com',
-  role: 'ADMIN' as Role,
+  role: 'ADMIN' as user_role,
   username: 'devuser'
 };
 
