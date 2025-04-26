@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * pageSize;
 
     // Build where conditions
-    let whereConditions: Prisma.SchoolWhereInput = {};
+    let whereConditions: Prisma.schoolWhereInput = {};
     
     // Add filters for stateId, level, category, and ppd if provided
     if (stateId && stateId !== "all") {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       
       // Get total count with search
       const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM School
+        SELECT COUNT(*) as count FROM school
         WHERE (name LIKE ${searchCondition} OR code LIKE ${searchCondition} 
         OR ppd LIKE ${searchCondition} OR city LIKE ${searchCondition})
         ${stateId && stateId !== "all" ? Prisma.sql`AND stateId = ${parseInt(stateId)}` : Prisma.sql``}
@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
       // Get schools with search
       const schoolResults = await prisma.$queryRaw<any[]>`
         SELECT s.*, st.id as state_id, st.name as state_name
-        FROM School s
-        LEFT JOIN State st ON s.stateId = st.id
+        FROM school s
+        LEFT JOIN state st ON s.stateId = st.id
         WHERE (s.name LIKE ${searchCondition} OR s.code LIKE ${searchCondition} 
         OR s.ppd LIKE ${searchCondition} OR s.city LIKE ${searchCondition})
         ${stateId && stateId !== "all" ? Prisma.sql`AND s.stateId = ${parseInt(stateId)}` : Prisma.sql``}
