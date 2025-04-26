@@ -26,7 +26,7 @@ async function main() {
         email: 'testparticipant@example.com',
         username: 'testparticipant',
         password: hashedPassword,
-        role: 'PARTICIPANT',
+        role: 'PARTICIPANTS_MANAGER',
         isActive: true,
         updatedAt: new Date(),
       },
