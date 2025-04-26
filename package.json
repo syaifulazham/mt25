@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "NEXT_PUBLIC_API_URL=https://techlympics.my next build",
+    "build:production": "NEXT_PUBLIC_API_URL=https://techlympics.my NODE_ENV=production next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint --no-cache",
     "postinstall": "prisma generate",
     "seed": "ts-node prisma/seed.ts"
   },
