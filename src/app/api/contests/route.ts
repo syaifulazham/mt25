@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
         _count: {
           select: {
             submission: true,
-            contingent: true
+            contestants: true
           }
         },
         targetgroup: true,
