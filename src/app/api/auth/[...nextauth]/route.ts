@@ -207,5 +207,4 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || "8Li3veTh1515MySeCr3t", // Match the secret used in mock-auth.ts
 };
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+export default NextAuth(authOptions);
