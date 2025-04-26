@@ -93,7 +93,8 @@ export async function PATCH(
 
     // Users can update their own profile (except role), but only ADMIN can update other profiles or change roles
     const isUpdatingSelf = currentUser.id === userId;
-    const isAdmin = currentUser.role === "ADMIN";
+    // Use safe property checking for role as participant users don't have this property
+    const isAdmin = currentUser && 'role' in currentUser && currentUser.role === "ADMIN";
 
     if (!isUpdatingSelf && !isAdmin) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
