@@ -25,10 +25,7 @@ export async function GET(request: NextRequest) {
     // Get all contestants for this user or their contingent
     const userContingents = await prisma.contingent.findMany({
       where: {
-        OR: [
-          { userId },
-          { participantId: userId }
-        ]
+        participantId: userId
       },
       select: {
         id: true
@@ -40,11 +37,9 @@ export async function GET(request: NextRequest) {
     // Get all contestants for this user's contingents
     const contestants = await prisma.contestant.findMany({
       where: {
-        OR: [
-          { userId },
-          { participantId: userId },
-          { contingentId: { in: contingentIds.length > 0 ? contingentIds : [-1] } }
-        ]
+        contingentId: {
+          in: contingentIds.length > 0 ? contingentIds : [-1]
+        }
       },
       select: {
         id: true,
