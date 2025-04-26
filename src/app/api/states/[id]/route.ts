@@ -33,8 +33,8 @@ export async function GET(
       where: { id },
       include: {
         zone: true,
-        schools: true,
-        higherInstitutions: true,
+        school: true,
+        higherinstitution: true,
       }
     });
 
@@ -165,8 +165,8 @@ export async function DELETE(
       include: {
         _count: {
           select: { 
-            schools: true,
-            higherInstitutions: true
+            school: true,
+            higherinstitution: true
           }
         }
       }
@@ -177,7 +177,7 @@ export async function DELETE(
     }
 
     // Check if state has related schools or higher institutions
-    if (existingState._count.schools > 0 || existingState._count.higherInstitutions > 0) {
+    if (existingState._count.school > 0 || existingState._count.higherinstitution > 0) {
       return NextResponse.json(
         { error: "Cannot delete state with related schools or higher institutions. Remove them first." },
         { status: 400 }
