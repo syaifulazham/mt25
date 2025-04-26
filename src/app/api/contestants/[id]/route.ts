@@ -28,8 +28,27 @@ export async function GET(
       return NextResponse.json({ error: 'Contestant not found' }, { status: 404 });
     }
     
-    // Check if the contestant belongs to the current user
-    if (contestant.userId !== Number(user.id) && user.role !== 'ADMIN') {
+    // Check if the contestant belongs to the current user through contingent relationship
+    // Use safe property checks to handle different user types
+    const isParticipant = user && 'isParticipant' in user && user.isParticipant === true;
+    const role = isParticipant ? 'PARTICIPANTS_ADMIN' : (user && 'role' in user ? user.role : '');
+    const isAdmin = role === 'ADMIN';
+    
+    // If user is participant, check if they manage the contingent this contestant belongs to
+    let hasAccess = false;
+    if (isParticipant && contestant.contingentId) {
+      // Check if current participant manages this contingent
+      const contingentManager = await prisma.contingentManager.findFirst({
+        where: {
+          participantId: Number(user.id),
+          contingentId: contestant.contingentId
+        }
+      });
+      
+      hasAccess = !!contingentManager;
+    }
+    
+    if (!hasAccess && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     
@@ -67,7 +86,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'Contestant not found' }, { status: 404 });
     }
     
-    if (existingContestant.userId !== Number(user.id) && user.role !== 'ADMIN') {
+    // Check if user has access to this contestant through contingent management
+    // Use safe property checks to handle different user types
+    const isParticipant = user && 'isParticipant' in user && user.isParticipant === true;
+    const role = isParticipant ? 'PARTICIPANTS_ADMIN' : (user && 'role' in user ? user.role : '');
+    const isAdmin = role === 'ADMIN';
+    
+    // If user is participant, check if they manage the contingent this contestant belongs to
+    let hasAccess = false;
+    if (isParticipant && existingContestant.contingentId) {
+      // Check if current participant manages this contingent
+      const contingentManager = await prisma.contingentManager.findFirst({
+        where: {
+          participantId: Number(user.id),
+          contingentId: existingContestant.contingentId
+        }
+      });
+      
+      hasAccess = !!contingentManager;
+    }
+    
+    if (!hasAccess && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     
@@ -134,7 +173,27 @@ export async function DELETE(
       return NextResponse.json({ error: 'Contestant not found' }, { status: 404 });
     }
     
-    if (existingContestant.userId !== Number(user.id) && user.role !== 'ADMIN') {
+    // Check if user has access to this contestant through contingent management
+    // Use safe property checks to handle different user types
+    const isParticipant = user && 'isParticipant' in user && user.isParticipant === true;
+    const role = isParticipant ? 'PARTICIPANTS_ADMIN' : (user && 'role' in user ? user.role : '');
+    const isAdmin = role === 'ADMIN';
+    
+    // If user is participant, check if they manage the contingent this contestant belongs to
+    let hasAccess = false;
+    if (isParticipant && existingContestant.contingentId) {
+      // Check if current participant manages this contingent
+      const contingentManager = await prisma.contingentManager.findFirst({
+        where: {
+          participantId: Number(user.id),
+          contingentId: existingContestant.contingentId
+        }
+      });
+      
+      hasAccess = !!contingentManager;
+    }
+    
+    if (!hasAccess && !isAdmin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
     
