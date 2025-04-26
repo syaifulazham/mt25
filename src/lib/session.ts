@@ -16,8 +16,17 @@ interface GetUserOptions {
  * @param options Options for getting the current user
  * @returns The current user or null if not authenticated
  */
+// Mark this module as dynamic to prevent static rendering issues
+export const dynamic = 'force-dynamic';
+
 export async function getCurrentUser(options: GetUserOptions = { redirectToLogin: true }) {
   try {
+    // Check if we're in a build/static context where headers aren't available
+    if (typeof window === 'undefined' && process.env.NEXT_PHASE === 'build') {
+      console.log("Skipping auth check during build phase");
+      return null;
+    }
+    
     const session = await getServerSession(authOptions);
     console.log("Session from getServerSession:", session);
 

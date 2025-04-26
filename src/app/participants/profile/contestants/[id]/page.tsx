@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   description: 'View contestant details',
 };
 
+// Mark this page as dynamic to prevent static rendering errors with headers
+export const dynamic = 'force-dynamic';
+
 export default async function ContestantPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   const id = Number(params.id);
@@ -25,7 +28,7 @@ export default async function ContestantPage({ params }: { params: { id: string 
   // Get contingents managed by the current user
   const userContingents = await prisma.contingentManager.findMany({
     where: {
-      participantId: Number(user?.id)
+      participantId: user ? Number(user.id) : -1
     },
     select: {
       contingentId: true
