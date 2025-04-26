@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { user_role } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/auth-options";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import React from "react";

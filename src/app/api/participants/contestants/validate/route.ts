@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { parse } from 'csv-parse/sync';
 import { validateContestantRecord } from '@/lib/utils/contestant-validation';
