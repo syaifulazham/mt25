@@ -35,7 +35,7 @@ export async function GET(
     }
 
     // Get higher institution from database
-    const higherInstitution = await prisma.higherInstitution.findUnique({
+    const higherInstitution = await prisma.higherinstitution.findUnique({
       where: { id },
       include: {
         state: {
@@ -83,7 +83,7 @@ export async function PATCH(
     }
 
     // Check if higher institution exists
-    const existingHigherInstitution = await prisma.higherInstitution.findUnique({
+    const existingHigherInstitution = await prisma.higherinstitution.findUnique({
       where: { id },
     });
 
@@ -115,7 +115,7 @@ export async function PATCH(
     }
 
     // Update higher institution in database
-    const updatedHigherInstitution = await prisma.higherInstitution.update({
+    const updatedHigherInstitution = await prisma.higherinstitution.update({
       where: { id },
       data: {
         name: validationResult.data.name,
@@ -174,7 +174,7 @@ export async function DELETE(
     }
 
     // Check if higher institution exists
-    const existingHigherInstitution = await prisma.higherInstitution.findUnique({
+    const existingHigherInstitution = await prisma.higherinstitution.findUnique({
       where: { id },
     });
 
@@ -183,7 +183,7 @@ export async function DELETE(
     }
 
     // Delete higher institution from database
-    await prisma.higherInstitution.delete({
+    await prisma.higherinstitution.delete({
       where: { id },
     });
 
