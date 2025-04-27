@@ -45,6 +45,7 @@ declare module "next-auth/jwt" {
 }
 
 export const authOptions: NextAuthOptions = {
+
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -151,11 +152,24 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  // Use JWT for session handling with extended expiration
   session: {
-    // Important: use JWT strategy for sessions to ensure they work in production
     strategy: "jwt",
-    // Extend session max age to 30 days
     maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  
+  // Enhanced cookie settings for better cross-domain support
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax", 
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // Don't set specific domain to allow the browser to use the current domain
+      },
+    },
   },
   callbacks: {
     async signIn({ user, account, profile }) {

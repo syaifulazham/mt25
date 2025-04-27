@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { LoginForm } from '../../components/login-form';
-import { handleLoginSubmit } from '../../components/auth-utils';
 import { LoginFormValues } from '../../types';
+import { debugSignIn, performAuthRedirect } from '../../components/session-debug-helper';
 
 export default function OrganizerLoginClient() {
   const router = useRouter();
@@ -27,22 +27,26 @@ export default function OrganizerLoginClient() {
     setError('');
     
     try {
-      const result = await handleLoginSubmit({
-        ...values,
+      console.log('[ORGANIZER LOGIN] Starting authentication, callbackUrl:', callbackUrl);
+      
+      // Use the enhanced debug sign-in function
+      const result = await debugSignIn('credentials', {
+        redirect: false,
+        username: values.username,
+        password: values.password,
         callbackUrl: callbackUrl as string,
       });
       
-      if (!result.success) {
-        setError(result.message);
+      if (result?.error) {
+        console.error('[ORGANIZER LOGIN] Authentication error:', result.error);
+        setError(result.error || 'Login failed. Please check your credentials.');
         setIsLoading(false);
-      } else if (result.redirect) {
+      } else if (result?.url) {
         // Successful login
-        console.log('Login successful, redirecting to:', result.redirect);
+        console.log('[ORGANIZER LOGIN] Authentication successful, redirecting to:', result.url);
         
-        // Add a small delay before redirecting to ensure session is properly set
-        setTimeout(() => {
-          window.location.href = result.redirect || '/organizer/dashboard';
-        }, 500);
+        // Use enhanced redirect with diagnostics
+        performAuthRedirect(result.url);
       }
     } catch (e) {
       setError('An unexpected error occurred. Please try again.');
