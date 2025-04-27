@@ -116,10 +116,33 @@ export default async function OrganizerLayout({
       redirectToLogin: false
     });
     
-    // If no user, let middleware handle the redirect
+    // Log for debugging in production
+    console.log("Organizer layout - user check:", !!user);
+    
+    // If no user, show a fallback with login link instead of returning null
     if (!user) {
-      console.log("No user found, middleware will handle redirect");
-      return null;
+      console.log("No user found, showing fallback login link");
+      // Use environment-specific login path
+      const loginPath = process.env.NODE_ENV === 'production'
+        ? "/auth/login"
+        : "/organizer/auth/login";
+        
+      return (
+        <div className="flex min-h-screen">
+          <main className="flex-1 bg-background flex items-center justify-center">
+            <div className="text-center p-8 max-w-md mx-auto bg-white rounded-lg shadow-md">
+              <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
+              <p className="mb-6">You need to log in to access the organizer portal.</p>
+              <a 
+                href={loginPath}
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Go to Login
+              </a>
+            </div>
+          </main>
+        </div>
+      );
     }
     
     // Check if user has organizer role
@@ -154,16 +177,27 @@ export default async function OrganizerLayout({
       </div>
     );
   } catch (error) {
-    // Handle JWT decryption errors gracefully
     console.error("Error in organizer layout:", error);
     
-    // Clear any problematic cookies
-    const cookiesToClear = ['next-auth.session-token', 'next-auth.csrf-token', 'next-auth.callback-url', 'techlympics-auth'];
-    const cookieString = cookiesToClear.map(name => `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`).join('; ');
-    
-    // We can't directly set cookies in a server component, but we can add this to the response headers
-    // This will be handled in middleware or on the next request
-    
-    return redirect("/organizer/auth/login?message=Session+expired+or+invalid");
+    // Show error UI instead of returning null
+    return (
+      <div className="flex min-h-screen">
+        <main className="flex-1 bg-background flex items-center justify-center">
+          <div className="text-center p-8 max-w-md mx-auto bg-white rounded-lg shadow-md border-red-500 border-2">
+            <h1 className="text-2xl font-bold mb-4 text-red-600">Something went wrong</h1>
+            <p className="mb-6">An error occurred while loading the organizer portal.</p>
+            <p className="text-sm text-gray-600 mb-4">
+              Error details: {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
+            <a 
+              href="/"
+              className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Go to Home
+            </a>
+          </div>
+        </main>
+      </div>
+    );
   }
 }

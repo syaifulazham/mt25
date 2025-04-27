@@ -2,6 +2,11 @@ import { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { redirect } from "next/navigation";
+
+// Mark this page as dynamic since it uses session
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -15,7 +20,12 @@ export default async function DashboardPage() {
   
   // If not authenticated, redirect to login
   if (!session || !session.user) {
-    redirect("/organizer/auth/login?redirect=/organizer/dashboard");
+    // Use environment-specific login path
+    const loginPath = process.env.NODE_ENV === 'production'
+      ? "/auth/login"
+      : "/organizer/auth/login";
+    
+    redirect(`${loginPath}?redirect=/organizer/dashboard`);
   }
 
   // Get user from session
