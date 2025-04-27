@@ -9,12 +9,31 @@ import { LoginFormValues, AuthResult } from '../types';
  */
 export async function handleLoginSubmit(values: LoginFormValues): Promise<AuthResult> {
   try {
+    console.log('Login attempt with:', { 
+      username: values.username,
+      callbackUrl: values.callbackUrl 
+    });
+
+    // Force callbackUrl to be absolute if it's not already
+    let callbackUrl = values.callbackUrl;
+    if (callbackUrl && !callbackUrl.startsWith('http')) {
+      // In browser context, we can use window.location to build absolute URL
+      if (typeof window !== 'undefined') {
+        const origin = window.location.origin;
+        callbackUrl = `${origin}${callbackUrl.startsWith('/') ? '' : '/'}${callbackUrl}`;
+      }
+    }
+
+    console.log('Using callbackUrl:', callbackUrl);
+
     const result = await signIn('credentials', {
       redirect: false,
       username: values.username,
       password: values.password,
-      callbackUrl: values.callbackUrl,
+      callbackUrl: callbackUrl,
     });
+
+    console.log('Sign in result:', result);
 
     if (result?.error) {
       return {
@@ -28,7 +47,7 @@ export async function handleLoginSubmit(values: LoginFormValues): Promise<AuthRe
     return {
       success: true,
       message: 'Login successful',
-      redirect: result?.url || values.callbackUrl,
+      redirect: result?.url || callbackUrl || '/organizer/dashboard',
     };
   } catch (error) {
     console.error('Login error:', error);

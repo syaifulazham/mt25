@@ -20,8 +20,8 @@ export default async function DashboardPage() {
   
   // If not authenticated, redirect to login
   if (!session || !session.user) {
-    // Always use the organizer login path
-    const loginPath = "/organizer/auth/login";
+    // Use the new unified organizer login path
+    const loginPath = "/auth/organizer/login";
     
     redirect(`${loginPath}?redirect=/organizer/dashboard`);
   }

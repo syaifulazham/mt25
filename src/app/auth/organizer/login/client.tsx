@@ -14,9 +14,13 @@ export default function OrganizerLoginClient() {
   
   // Get error message and callback URL from query params
   const errorMessage = searchParams?.get('error') || searchParams?.get('message') || '';
+  
+  // Ensure we have a valid callback URL - default to dashboard if not specified
   const callbackUrl = searchParams?.get('callbackUrl') || 
                       searchParams?.get('redirect') || 
                       '/organizer/dashboard';
+                      
+  console.log('Initial callback URL:', callbackUrl);
   
   const handleSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
@@ -33,8 +37,12 @@ export default function OrganizerLoginClient() {
         setIsLoading(false);
       } else if (result.redirect) {
         // Successful login
-        router.push(result.redirect);
-        router.refresh();
+        console.log('Login successful, redirecting to:', result.redirect);
+        
+        // Add a small delay before redirecting to ensure session is properly set
+        setTimeout(() => {
+          window.location.href = result.redirect || '/organizer/dashboard';
+        }, 500);
       }
     } catch (e) {
       setError('An unexpected error occurred. Please try again.');

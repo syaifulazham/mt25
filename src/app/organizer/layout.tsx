@@ -104,7 +104,7 @@ async function AuthenticatedContent({
     // If no user, redirect to login
     if (!user) {
       console.log("No user found, redirecting to login");
-      const loginPath = "/organizer/auth/login";
+      const loginPath = "/auth/organizer/login";
       return redirect(`${loginPath}?redirect=${encodeURIComponent(currentPath)}`);
     }
     
@@ -112,7 +112,7 @@ async function AuthenticatedContent({
     const role = (user as any).role;
     if (!role || !["ADMIN", "OPERATOR", "VIEWER"].includes(role)) {
       console.log("User does not have organizer role, redirecting to login");
-      const loginPath = "/organizer/auth/login";
+      const loginPath = "/auth/organizer/login";
       return redirect(`${loginPath}?message=You+do+not+have+permission+to+access+the+organizer+portal`);
     }
     
