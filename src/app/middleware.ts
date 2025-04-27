@@ -18,7 +18,12 @@ export async function middleware(request: NextRequest) {
   
   if (isParticipantRoute && !isAuthRoute && !token) {
     // Redirect to login if no token and trying to access protected participant route
-    return NextResponse.redirect(new URL('/participants/auth/login', request.url));
+    // Check production vs development environment to handle URL correctly
+    const loginUrl = process.env.NODE_ENV === 'production' 
+      ? '/auth/login'
+      : '/participants/auth/login';
+    
+    return NextResponse.redirect(new URL(loginUrl, request.url));
   }
   
   return NextResponse.next();

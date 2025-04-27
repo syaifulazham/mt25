@@ -135,7 +135,15 @@ export async function getSessionUser(options: GetSessionUserOptions = { redirect
       
       // Handle redirection if requested
       if (options.redirectToLogin) {
-        const loginPath = options.loginPath || '/participants/auth/login';
+        // Use environment-specific login paths
+        let loginPath = options.loginPath;
+        
+        if (!loginPath) {
+          loginPath = process.env.NODE_ENV === 'production' 
+            ? '/auth/login'
+            : '/participants/auth/login';
+        }
+        
         redirect(loginPath);
       }
       
