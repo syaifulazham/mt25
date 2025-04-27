@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth-options";
 import prisma from "@/lib/prisma";
 
+// Explicitly mark this route as dynamic to fix the build error
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Get the server session
