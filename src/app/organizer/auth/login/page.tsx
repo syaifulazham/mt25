@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import SimpleLoginForm from "./simple-login";
+import StaticLogin from "../static-login";
 
 // Force all rendering options to be dynamic
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100">
-      <SimpleLoginForm />
+      <StaticLogin />
     </div>
   );
 }
