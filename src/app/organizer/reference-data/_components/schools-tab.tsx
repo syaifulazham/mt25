@@ -335,19 +335,38 @@ export function SchoolsTab() {
     }
   };
 
+  // Handle file upload with improved error handling
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Check file size and type
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Only CSV files are allowed');
+      return;
+    }
+    
+    // Limit file size to 2MB to prevent issues in production
+    const maxSizeMB = 2;
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    
+    if (file.size > maxSizeBytes) {
+      toast.error(`File size exceeds ${maxSizeMB}MB limit. Please reduce the file size or split into smaller files.`);
+      return;
+    }
 
     setIsUploading(true);
     setUploadProgress(0);
     setUploadResults(null);
 
-    // Create a FormData object to send the file
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
+      // Create a FormData object to send the file
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      // Add a timestamp to prevent caching
+      formData.append("timestamp", Date.now().toString());
+
       // Simulate progress updates
       const progressInterval = setInterval(() => {
         setUploadProgress((prev) => {
@@ -356,13 +375,38 @@ export function SchoolsTab() {
         });
       }, 200);
 
-      // Upload the file
-      const results = await schoolApi.uploadSchoolsCsv(formData);
-
+      // Use fetch directly with better error handling instead of the API client
+      const response = await fetch('/api/schools/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // Don't set Content-Type - browser will set it with proper boundary
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       clearInterval(progressInterval);
+      
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // Handle HTML response (common cause of "Unexpected token '<'")
+        const text = await response.text();
+        console.error('Non-JSON response:', text.substring(0, 200));
+        throw new Error(`Server returned HTML instead of JSON. The file may be too large or the server timed out.`);
+      }
+      
+      const results = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(results.error || `Upload failed with status ${response.status}`);
+      }
+
       setUploadProgress(100);
       setUploadResults(results);
-
+      
       // Refresh the schools list
       const schoolsData = await schoolApi.getSchoolsPaginated({
         page: 1,
