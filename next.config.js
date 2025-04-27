@@ -3,15 +3,16 @@ const nextConfig = {
   // Use standalone output for better production deployment
   output: 'standalone',
   
-  // Disable static optimization entirely to prevent build-time errors
-  // with headers, cookies, and other dynamic server features
-  staticPageGenerationTimeout: 0,
+  // Completely disable static generation
+  // This is the most important part to fix the headers() error
+  staticGeneration: false,
   
   // Explicitly disable static optimization
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
     disableOptimizedLoading: true,
-    forceStatic: false
+    serverComponents: true,
+    forceStatic: false,
   },
   
   // Skip type checking during build to speed up build time
@@ -28,10 +29,30 @@ const nextConfig = {
   rewrites: async () => {
     return [
       {
-        source: '/api/:path*',
-        destination: '/api/:path*',
+        source: '/:path*',
+        destination: '/:path*',
       }
     ];
+  },
+  
+  // Add runtime configuration to prevent caching
+  headers: async () => {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, max-age=0',
+          },
+        ],
+      },
+    ];
+  },
+  
+  // Force runtime environment for all pages
+  env: {
+    NEXT_RUNTIME: 'nodejs',
   }
 };
 
