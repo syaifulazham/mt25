@@ -9,6 +9,11 @@ import React from "react";
 import { getSessionUser } from "@/lib/session";
 import { PrismaClient } from "@prisma/client";
 
+// Force all rendering options to be dynamic
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // Initialize Prisma client
 const prisma = new PrismaClient();
 
