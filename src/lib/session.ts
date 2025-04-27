@@ -143,12 +143,12 @@ export async function getSessionUser(options: GetSessionUserOptions = { redirect
           const headersList = headers();
           const currentPath = headersList.get("x-pathname") || "";
           
-          // Route to the correct section login page
+          // Route to the correct section login page using the new unified auth paths
           if (currentPath.startsWith('/organizer')) {
-            loginPath = '/organizer/auth/login';
+            loginPath = '/auth/organizer/login';
           } else {
             // Default to participants login
-            loginPath = '/participants/auth/login';
+            loginPath = '/auth/participants/login';
           }
         }
         
