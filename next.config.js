@@ -3,16 +3,12 @@ const nextConfig = {
   // Use standalone output for better production deployment
   output: 'standalone',
   
-  // Completely disable static generation
-  // This is the most important part to fix the headers() error
-  staticGeneration: false,
-  
-  // Explicitly disable static optimization
+  // Supported experimental options for Next.js 14.1.0
   experimental: {
+    // Support for external packages in server components
     serverComponentsExternalPackages: ['@prisma/client'],
+    // Disable optimized loading for compatibility
     disableOptimizedLoading: true,
-    serverComponents: true,
-    forceStatic: false,
   },
   
   // Skip type checking during build to speed up build time
@@ -48,11 +44,6 @@ const nextConfig = {
         ],
       },
     ];
-  },
-  
-  // Force runtime environment for all pages
-  env: {
-    NEXT_RUNTIME: 'nodejs',
   }
 };
 
