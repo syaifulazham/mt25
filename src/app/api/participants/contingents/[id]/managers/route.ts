@@ -37,7 +37,13 @@ export async function GET(
     
     // Get all managers for this contingent
     const managers = await prisma.contingentManager.findMany({
-      where: { contingentId },
+      where: { 
+        contingentId,
+        // We need to include a valid filter for participantId as it's required by Prisma
+        participantId: {
+          not: 0 // This will match any non-zero participantId (all valid IDs)
+        }
+      },
       include: {
         participant: {
           select: {
