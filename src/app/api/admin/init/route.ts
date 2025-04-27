@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { PrismaClient, user_role } from '@prisma/client';
 import { hashPassword } from "@/lib/auth";
 
+// Mark this route as dynamic since it uses server-only features
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 const prisma = new PrismaClient();
 
 // This route will create an initial admin user if none exists
@@ -91,3 +96,4 @@ export async function POST(request: Request) {
     await prisma.$disconnect();
   }
 }
+
