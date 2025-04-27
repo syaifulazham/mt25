@@ -10,13 +10,13 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET
   });
   
-  // Skip middleware for auth routes to prevent redirect loops
-  if (request.nextUrl.pathname.includes('/auth/')) {
-    return NextResponse.next();
-  }
-  
-  // Don't redirect if we're already on a login page
-  if (request.nextUrl.pathname.endsWith('/login')) {
+  // Skip middleware for auth routes and login pages to prevent redirect loops
+  // Be very explicit about auth path patterns to ensure they're always bypassed
+  if (request.nextUrl.pathname.includes('/auth/') || 
+      request.nextUrl.pathname.endsWith('/login') ||
+      request.nextUrl.pathname.includes('/api/auth/')) {
+    // Log for debugging
+    console.log('Middleware: skipping auth route', request.nextUrl.pathname);
     return NextResponse.next();
   }
   

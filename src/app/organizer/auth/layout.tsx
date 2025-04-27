@@ -1,20 +1,22 @@
-import { Metadata } from "next";
+'use client';
 
-export const metadata: Metadata = {
-  title: "Authentication | Techlympics 2025",
-  description: "Authentication for the Techlympics 2025 Organizer Portal",
-};
+import { SessionProvider } from 'next-auth/react';
+
+// Mark this layout as dynamic to ensure fresh auth state
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Wrap children in SessionProvider to enable client-side auth
   return (
-    <div className="flex min-h-screen flex-col">
-      <main className="flex-1 bg-background">
+    <SessionProvider>
+      <div className="min-h-screen">
         {children}
-      </main>
-    </div>
+      </div>
+    </SessionProvider>
   );
 }

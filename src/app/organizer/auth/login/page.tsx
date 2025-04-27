@@ -1,31 +1,16 @@
-import { Metadata } from "next";
-import LoginPageClient from "./_components/login-page-client";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/auth-options";
-import { redirect } from "next/navigation";
+// Simple login page wrapper that uses a client component for the actual login functionality
+import LoginClient from './client';
 
-export const metadata: Metadata = {
+export const metadata = {
   title: "Login | Organizer Portal",
   description: "Login to the Techlympics 2025 Organizer Portal",
 };
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: { redirect?: string; message?: string };
-}) {
-  try {
-    // Check if user is already logged in
-    const session = await getServerSession(authOptions);
-    
-    // If already authenticated, redirect to dashboard
-    if (session?.user) {
-      redirect(searchParams.redirect || "/organizer/dashboard");
-    }
-  } catch (error) {
-    // If there's an error with the session, we'll just show the login page
-    console.error("Session error:", error);
-  }
-  
-  return <LoginPageClient />;
+// Mark this page as dynamic to ensure it's always fresh
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
+export default function LoginPage() {
+  // Just render the client component
+  return <LoginClient />;
 }

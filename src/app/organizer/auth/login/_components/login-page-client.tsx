@@ -2,12 +2,35 @@
 
 import Link from "next/link";
 import { SessionProvider } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import LoginForm from "../login-form";
 
 export default function LoginPageClient() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const errorMessage = searchParams.get("message");
+  const redirectPath = searchParams.get("redirect");
+  
+  // Handle already authenticated users on the client side instead of server
+  useEffect(() => {
+    // Check storage for session
+    const checkSession = async () => {
+      try {
+        // Try to fetch session status from client storage
+        const localSession = localStorage.getItem('next-auth.session-token');
+        if (localSession) {
+          // Redirect to dashboard or specified redirect path if session exists
+          router.push(redirectPath || '/organizer/dashboard');
+        }
+      } catch (e) {
+        console.log('Session check error:', e);
+        // Continue showing login form if error
+      }
+    };
+    
+    checkSession();
+  }, [router, redirectPath]);
 
   return (
     <SessionProvider>

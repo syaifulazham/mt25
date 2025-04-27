@@ -201,9 +201,10 @@ export const authOptions: NextAuthOptions = {
     }
   },
   pages: {
-    // Use different login paths based on environment
-    signIn: process.env.NODE_ENV === 'production' ? "/auth/login" : "/participants/auth/login",
-    error: process.env.NODE_ENV === 'production' ? "/auth/login" : "/participants/auth/login",
+    // Always use section-specific login paths to prevent redirect confusion
+    signIn: "/participants/auth/login",
+    error: "/participants/auth/login",
+    // The middleware will handle redirecting to the correct section login page
   },
   debug: process.env.NEXTAUTH_DEBUG === 'true',
   secret: process.env.NEXTAUTH_SECRET || "8Li3veTh1515MySeCr3t", // Match the secret used in mock-auth.ts
