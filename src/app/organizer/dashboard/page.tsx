@@ -20,10 +20,8 @@ export default async function DashboardPage() {
   
   // If not authenticated, redirect to login
   if (!session || !session.user) {
-    // Use environment-specific login path
-    const loginPath = process.env.NODE_ENV === 'production'
-      ? "/auth/login"
-      : "/organizer/auth/login";
+    // Always use the organizer login path
+    const loginPath = "/organizer/auth/login";
     
     redirect(`${loginPath}?redirect=/organizer/dashboard`);
   }

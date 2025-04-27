@@ -20,18 +20,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
   
-  // Determine the right login path based on route and environment
+  // Determine the right login path based on route
   let loginUrl;
   if (request.nextUrl.pathname.startsWith('/participants')) {
     // Participant routes
-    loginUrl = process.env.NODE_ENV === 'production' 
-      ? '/auth/login'
-      : '/participants/auth/login';
+    loginUrl = '/participants/auth/login';
   } else if (request.nextUrl.pathname.startsWith('/organizer')) {
-    // Organizer routes
-    loginUrl = process.env.NODE_ENV === 'production'
-      ? '/auth/login'
-      : '/organizer/auth/login';
+    // Organizer routes - always use the dedicated login page
+    loginUrl = '/organizer/auth/login';
   } else {
     // Default routes - don't redirect
     return NextResponse.next();

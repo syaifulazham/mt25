@@ -68,10 +68,8 @@ export default async function OrganizerLayout({
   const headersList = headers();
   const pathname = headersList.get("x-pathname") || "";
   
-  // Skip authentication for auth routes - match environment-specific paths
-  const authPathPattern = process.env.NODE_ENV === 'production'
-    ? "/auth/"
-    : "/organizer/auth/";
+  // Skip authentication for auth routes
+  const authPathPattern = "/organizer/auth/";
     
   if (pathname.includes(authPathPattern)) {
     return (
@@ -122,10 +120,8 @@ export default async function OrganizerLayout({
     // If no user, show a fallback with login link instead of returning null
     if (!user) {
       console.log("No user found, showing fallback login link");
-      // Use environment-specific login path
-      const loginPath = process.env.NODE_ENV === 'production'
-        ? "/auth/login"
-        : "/organizer/auth/login";
+      // Always use the organizer login path
+      const loginPath = "/organizer/auth/login";
         
       return (
         <div className="flex min-h-screen">
@@ -149,10 +145,8 @@ export default async function OrganizerLayout({
     const role = (user as any).role;
     if (!role || !["ADMIN", "OPERATOR", "VIEWER"].includes(role)) {
       console.log("User does not have organizer role, redirecting to login");
-      // Use environment-specific login path
-      const loginPath = process.env.NODE_ENV === 'production'
-        ? "/auth/login"
-        : "/organizer/auth/login";
+      // Always use the organizer login path
+      const loginPath = "/organizer/auth/login";
       return redirect(`${loginPath}?message=You+do+not+have+permission+to+access+the+organizer+portal`);
     }
     
