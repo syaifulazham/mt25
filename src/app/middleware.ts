@@ -9,27 +9,53 @@ export async function middleware(request: NextRequest) {
     req: request,
     secret: process.env.NEXTAUTH_SECRET
   });
-
-  // Check if this is a participant route
-  const isParticipantRoute = request.nextUrl.pathname.startsWith('/participants');
   
-  // Exclude auth routes from redirection
-  const isAuthRoute = request.nextUrl.pathname.includes('/auth/');
+  // Skip middleware for auth routes to prevent redirect loops
+  if (request.nextUrl.pathname.includes('/auth/')) {
+    return NextResponse.next();
+  }
   
-  if (isParticipantRoute && !isAuthRoute && !token) {
-    // Redirect to login if no token and trying to access protected participant route
-    // Check production vs development environment to handle URL correctly
-    const loginUrl = process.env.NODE_ENV === 'production' 
+  // Don't redirect if we're already on a login page
+  if (request.nextUrl.pathname.endsWith('/login')) {
+    return NextResponse.next();
+  }
+  
+  // Determine the right login path based on route and environment
+  let loginUrl;
+  if (request.nextUrl.pathname.startsWith('/participants')) {
+    // Participant routes
+    loginUrl = process.env.NODE_ENV === 'production' 
       ? '/auth/login'
       : '/participants/auth/login';
-    
+  } else if (request.nextUrl.pathname.startsWith('/organizer')) {
+    // Organizer routes
+    loginUrl = process.env.NODE_ENV === 'production'
+      ? '/auth/login'
+      : '/organizer/auth/login';
+  } else {
+    // Default routes - don't redirect
+    return NextResponse.next();
+  }
+  
+  // Only redirect if we have a protected route and no token
+  if (!token) {
     return NextResponse.redirect(new URL(loginUrl, request.url));
   }
   
   return NextResponse.next();
 }
 
-// Only run middleware on participant routes except for auth routes
+// Run middleware on all app routes
 export const config = {
-  matcher: ['/participants/:path*']
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public (public files)
+     * - api (API routes)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public|api).*)',
+  ],
 };

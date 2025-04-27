@@ -23,8 +23,8 @@ async function initializeSystem() {
     if (userCount === 0) {
       console.log('No users found in database. Creating initial admin user...');
       
-      // Call the system initialization API
-      const response = await fetch('http://localhost:3000/api/system/init', {
+      // Call the system initialization API using relative URL that works in both environments
+      const response = await fetch('/api/system/init', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -68,8 +68,12 @@ export default async function OrganizerLayout({
   const headersList = headers();
   const pathname = headersList.get("x-pathname") || "";
   
-  // Skip authentication for auth routes
-  if (pathname.includes("/organizer/auth/")) {
+  // Skip authentication for auth routes - match environment-specific paths
+  const authPathPattern = process.env.NODE_ENV === 'production'
+    ? "/auth/"
+    : "/organizer/auth/";
+    
+  if (pathname.includes(authPathPattern)) {
     return (
       <div className="flex min-h-screen">
         <main className="flex-1 bg-background">
@@ -122,7 +126,11 @@ export default async function OrganizerLayout({
     const role = (user as any).role;
     if (!role || !["ADMIN", "OPERATOR", "VIEWER"].includes(role)) {
       console.log("User does not have organizer role, redirecting to login");
-      return redirect("/organizer/auth/login?message=You+do+not+have+permission+to+access+the+organizer+portal");
+      // Use environment-specific login path
+      const loginPath = process.env.NODE_ENV === 'production'
+        ? "/auth/login"
+        : "/organizer/auth/login";
+      return redirect(`${loginPath}?message=You+do+not+have+permission+to+access+the+organizer+portal`);
     }
     
     // Convert user to the format expected by DashboardNav
