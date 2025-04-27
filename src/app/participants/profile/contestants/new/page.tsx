@@ -2,6 +2,12 @@ import { Metadata } from 'next';
 import { getCurrentUser } from '@/lib/session';
 import prisma from '@/lib/prisma';
 import ContestantForm from '@/app/participants/_components/contestant-form';
+import { redirect } from 'next/navigation';
+
+// Mark this page as dynamic since it uses getCurrentUser() which uses headers()
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'Add New Contestant | Techlympics 2025',
@@ -11,10 +17,15 @@ export const metadata: Metadata = {
 export default async function NewContestantPage() {
   const user = await getCurrentUser();
   
+  // Redirect if not authenticated
+  if (!user) {
+    redirect('/login');
+  }
+  
   // Fetch contingents managed by the current user to allow assigning the contestant to a team
   const managedContingents = await prisma.contingentManager.findMany({
     where: {
-      participantId: Number(user?.id)
+      participantId: Number(user.id) // Now safe since we check user exists
     },
     select: {
       contingentId: true
