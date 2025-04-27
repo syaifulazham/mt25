@@ -56,8 +56,15 @@ export async function uploadCsvInChunks(
   const allRecords = parseResult.data;
   
   // Step 2: Validate basic CSV structure
-  if (allRecords.length === 0) {
-    throw new Error('CSV file contains no data');
+  console.log('CSV parsing complete. Found records:', allRecords.length, 'First record:', allRecords[0]);
+  
+  if (!allRecords || allRecords.length === 0) {
+    throw new Error('CSV file contains no data or could not be parsed correctly');
+  }
+  
+  // Check if we have valid object records with expected fields (not empty arrays)
+  if (allRecords.length > 0 && typeof allRecords[0] !== 'object') {
+    throw new Error('CSV file format is incorrect. Please ensure it has headers and proper comma separation.');
   }
   
   // Create chunks of records
@@ -162,23 +169,58 @@ export async function uploadCsvInChunks(
  */
 function parseCSV(file: File, onProgress?: (progress: number) => void): Promise<any> {
   return new Promise((resolve, reject) => {
-    parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => header.toLowerCase().trim(),
-      complete: (results) => resolve(results),
-      error: (error) => reject(error),
-      // Unfortunately, PapaParse doesn't provide reliable progress tracking with typings
-      // So we'll just update progress at fixed intervals
-      step: (results, parser) => {
-        if (onProgress) {
-          // Use an approximation since we don't have direct access to bytes read
-          // The typings in PapaParse don't specify the data type properly
-          const dataLength = Array.isArray(results.data) ? results.data.length : 0;
-          const approxProgress = Math.min(95, Math.floor((dataLength / (file.size / 100)) * 20));
-          onProgress(approxProgress);
-        }
+    // Try to detect file encoding to avoid parsing issues
+    const reader = new FileReader();
+    
+    reader.onload = () => {
+      // Check if file seems to be a valid CSV
+      const textSample = reader.result?.toString().slice(0, 1000) || '';
+      if (!textSample.includes(',')) {
+        return reject(new Error('File does not appear to be a valid CSV. No commas detected.'));
       }
-    });
+      
+      // Logging to help with debugging
+      console.log('CSV sample:', textSample.slice(0, 100));
+      
+      // Proceed with parsing
+      parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.toLowerCase().trim(),
+        complete: (results) => {
+          console.log('CSV parsing complete:', results.data.length, 'rows,', 
+                    results.errors.length, 'errors, Fields:', 
+                    results.meta.fields?.join(', '));
+          resolve(results);
+        },
+        error: (error) => {
+          console.error('CSV parsing error:', error);
+          reject(error);
+        },
+        // Unfortunately, PapaParse doesn't provide reliable progress tracking with typings
+        // So we'll just update progress at fixed intervals
+        step: (results, parser) => {
+          if (onProgress) {
+            // Use an approximation since we don't have direct access to bytes read
+            // The typings in PapaParse don't specify the data type properly
+            const dataLength = Array.isArray(results.data) ? results.data.length : 0;
+            const approxProgress = Math.min(95, Math.floor((dataLength / (file.size / 100)) * 20));
+            onProgress(approxProgress);
+          }
+        },
+        download: false,
+        delimiter: '',  // Auto-detect delimiter
+        comments: false,
+        fastMode: false,
+      });
+    };
+    
+    reader.onerror = () => {
+      reject(new Error('Error reading the CSV file'));
+    };
+    
+    // Read a portion of the file for validation
+    const blob = file.slice(0, 8192);  // First 8KB should be enough for header detection
+    reader.readAsText(blob);
   });
 }

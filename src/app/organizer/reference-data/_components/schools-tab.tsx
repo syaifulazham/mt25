@@ -351,16 +351,38 @@ export function SchoolsTab() {
     setUploadProgress(0);
     setUploadResults(null);
     
+    // First, do a basic validation by checking file contents
+    try {
+      // Read first few bytes to check if it's actually a CSV file
+      const firstChunk = await file.slice(0, 1024).text();
+      if (!firstChunk.includes(',')) {
+        throw new Error('File does not appear to be a valid CSV. No commas detected.');
+      }
+      
+      // Try to detect headers
+      const firstLine = firstChunk.split('\n')[0];
+      if (!firstLine || firstLine.trim().length === 0) {
+        throw new Error('CSV file appears to be empty.');
+      }
+      
+      console.log('CSV validation - Headers detected:', firstLine);
+    } catch (error: any) {
+      toast.error(error.message || 'Invalid CSV file format');
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+    
     // Show different toast based on file size
     const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-    if (file.size > 1024 * 1024) { // If larger than 1MB
-      toast.info(
-        <div className="flex items-center gap-2">
-          <FileText size={18} />
-          <span>Processing {fileSizeMB}MB CSV file in chunks. This may take a few minutes.</span>
-        </div>
-      );
-    }
+    const toastId = toast.loading(
+      <div className="flex items-center gap-2">
+        <FileText size={18} />
+        <span>Processing {fileSizeMB}MB CSV file in chunks. This may take a few minutes.</span>
+      </div>
+    );
 
     try {
       // Use the chunked uploader for all CSV files
@@ -375,9 +397,22 @@ export function SchoolsTab() {
           if (phase === 'parsing') {
             // During parsing, go from 0-40%
             setUploadProgress(Math.floor(progress * 0.4));
+            toast.loading(
+              <div className="flex items-center gap-2">
+                <span>Parsing CSV file: {progress}% complete</span>
+              </div>,
+              { id: toastId }
+            );
           } else {
             // During uploading, go from 40-100%
-            setUploadProgress(40 + Math.floor(progress * 0.6));
+            const uploadProgress = 40 + Math.floor(progress * 0.6);
+            setUploadProgress(uploadProgress);
+            toast.loading(
+              <div className="flex items-center gap-2">
+                <span>Uploading records: {progress}% complete</span>
+              </div>,
+              { id: toastId }
+            );
           }
         }
       );
@@ -394,6 +429,8 @@ export function SchoolsTab() {
       setTotalPages(schoolsData.totalPages);
       setTotalCount(schoolsData.totalCount);
 
+      // Dismiss the loading toast and show success
+      toast.dismiss(toastId);
       toast.success(
         <div className="flex flex-col gap-1">
           <div>CSV upload completed successfully</div>
@@ -410,6 +447,8 @@ export function SchoolsTab() {
       }
     } catch (error: any) {
       console.error("Error uploading CSV:", error);
+      // Dismiss the loading toast and show error
+      toast.dismiss(toastId);
       toast.error(error.message || "Failed to upload CSV file");
       setUploadProgress(0);
     } finally {
