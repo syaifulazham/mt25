@@ -139,9 +139,17 @@ export async function getSessionUser(options: GetSessionUserOptions = { redirect
         let loginPath = options.loginPath;
         
         if (!loginPath) {
-          loginPath = process.env.NODE_ENV === 'production' 
-            ? '/auth/login'
-            : '/participants/auth/login';
+          // Get path from headers to determine which section we're in
+          const headersList = headers();
+          const currentPath = headersList.get("x-pathname") || "";
+          
+          // Route to the correct section login page
+          if (currentPath.startsWith('/organizer')) {
+            loginPath = '/organizer/auth/login';
+          } else {
+            // Default to participants login
+            loginPath = '/participants/auth/login';
+          }
         }
         
         redirect(loginPath);
