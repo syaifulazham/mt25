@@ -4,6 +4,11 @@ import { getCurrentUser } from '@/lib/session';
 import { hasRequiredRole } from '@/lib/auth';
 import { z } from 'zod';
 
+// Mark this route as dynamic since it uses getCurrentUser() which uses headers()
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 /**
  * GET /api/events/[id]
  * Get a specific event by ID
