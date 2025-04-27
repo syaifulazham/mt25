@@ -30,9 +30,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { schoolApi, stateApi } from "@/lib/api-client";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, FileText } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { uploadCsvInChunks } from "./csv-chunk-uploader";
 
 const schoolLevels = ["Primary", "Secondary"];
 const schoolCategories = ["Public", "Private", "International"];
@@ -335,74 +336,51 @@ export function SchoolsTab() {
     }
   };
 
-  // Handle file upload with improved error handling
+  // Handle file upload with chunked processing for large files
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // Check file size and type
+    // Check file type
     if (!file.name.endsWith('.csv')) {
       toast.error('Only CSV files are allowed');
-      return;
-    }
-    
-    // Limit file size to 2MB to prevent issues in production
-    const maxSizeMB = 2;
-    const maxSizeBytes = maxSizeMB * 1024 * 1024;
-    
-    if (file.size > maxSizeBytes) {
-      toast.error(`File size exceeds ${maxSizeMB}MB limit. Please reduce the file size or split into smaller files.`);
       return;
     }
 
     setIsUploading(true);
     setUploadProgress(0);
     setUploadResults(null);
+    
+    // Show different toast based on file size
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    if (file.size > 1024 * 1024) { // If larger than 1MB
+      toast.info(
+        <div className="flex items-center gap-2">
+          <FileText size={18} />
+          <span>Processing {fileSizeMB}MB CSV file in chunks. This may take a few minutes.</span>
+        </div>
+      );
+    }
 
     try {
-      // Create a FormData object to send the file
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      // Add a timestamp to prevent caching
-      formData.append("timestamp", Date.now().toString());
-
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          const newProgress = prev + 5;
-          return newProgress >= 90 ? 90 : newProgress;
-        });
-      }, 200);
-
-      // Use fetch directly with better error handling instead of the API client
-      const response = await fetch('/api/schools/upload', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          // Don't set Content-Type - browser will set it with proper boundary
-          'X-Requested-With': 'XMLHttpRequest',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+      // Use the chunked uploader for all CSV files
+      // For small files, this will use just one chunk
+      // For large files, it will split into multiple chunks
+      const results = await uploadCsvInChunks(
+        file,
+        '/api/schools/upload/chunks',
+        250, // 250 records per chunk
+        (progress, total, phase) => {
+          // Update progress based on current phase
+          if (phase === 'parsing') {
+            // During parsing, go from 0-40%
+            setUploadProgress(Math.floor(progress * 0.4));
+          } else {
+            // During uploading, go from 40-100%
+            setUploadProgress(40 + Math.floor(progress * 0.6));
+          }
         }
-      });
-      
-      clearInterval(progressInterval);
-      
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        // Handle HTML response (common cause of "Unexpected token '<'")
-        const text = await response.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
-        throw new Error(`Server returned HTML instead of JSON. The file may be too large or the server timed out.`);
-      }
-      
-      const results = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(results.error || `Upload failed with status ${response.status}`);
-      }
+      );
 
       setUploadProgress(100);
       setUploadResults(results);
@@ -416,7 +394,20 @@ export function SchoolsTab() {
       setTotalPages(schoolsData.totalPages);
       setTotalCount(schoolsData.totalCount);
 
-      toast.success(`CSV upload completed: ${results.created} created, ${results.updated} updated`);
+      toast.success(
+        <div className="flex flex-col gap-1">
+          <div>CSV upload completed successfully</div>
+          <div className="text-sm text-muted-foreground">
+            {results.created} created, {results.updated} updated, {results.skipped} skipped
+            {results.errors.length > 0 ? `, ${results.errors.length} errors` : ''}
+          </div>
+        </div>
+      );
+      
+      // If there were errors, show them in the results section
+      if (results.errors.length > 0) {
+        console.warn('CSV upload had errors:', results.errors);
+      }
     } catch (error: any) {
       console.error("Error uploading CSV:", error);
       toast.error(error.message || "Failed to upload CSV file");
