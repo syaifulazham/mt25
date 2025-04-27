@@ -348,20 +348,27 @@ export async function POST(request: NextRequest) {
     const contingentData: any = {
       name,
       description,
-      participantId: validationResult.data.participantId, // Set the participant as a member
+      // Use proper relation syntax instead of direct ID
+      participant: {
+        connect: { id: validationResult.data.participantId }
+      },
       managedByParticipant: true, // Mark as managed by a participant user
       createdAt: new Date(),
-      updatedAt: new Date(),
-      contestId // Use the existing or newly created contest ID
+      updatedAt: new Date()
+      // Remove contest relation - not in the Prisma model
     };
     
     // We no longer need to add userId to contingentData as it's now handled through contingentManager
     
-    // Add the correct institution ID based on type
+    // Add the correct institution ID based on type using relation syntax
     if (institutionType === "SCHOOL") {
-      contingentData.schoolId = institutionId;
+      contingentData.school = {
+        connect: { id: institutionId }
+      };
     } else {
-      contingentData.higherInstId = institutionId;
+      contingentData.higherInstitution = {
+        connect: { id: institutionId }
+      };
     }
     
     // Create the contingent first
@@ -374,11 +381,15 @@ export async function POST(request: NextRequest) {
     // If participant is managing, add them directly as a manager
     if (validationResult.data.managedByParticipant) {
       try {
-        // Create the contingent manager relationship with the participant ID directly
+        // Create the contingent manager relationship using relation syntax
         await prisma.contingentManager.create({
           data: {
-            participantId: validationResult.data.participantId,
-            contingentId: newContingent.id,
+            participant: {
+              connect: { id: validationResult.data.participantId }
+            },
+            contingent: {
+              connect: { id: newContingent.id }
+            },
             isOwner: true,
             createdAt: new Date(),
             updatedAt: new Date()
@@ -407,11 +418,15 @@ export async function POST(request: NextRequest) {
           });
           
           if (participant) {
-            // If it's a valid participant ID, add them directly
+            // If it's a valid participant ID, add them using relation syntax
             await prisma.contingentManager.create({
               data: {
-                participantId: managerId,
-                contingentId: newContingent.id,
+                participant: {
+                  connect: { id: managerId }
+                },
+                contingent: {
+                  connect: { id: newContingent.id }
+                },
                 isOwner: false,
                 createdAt: new Date(),
                 updatedAt: new Date()
