@@ -8,16 +8,13 @@ export const metadata: Metadata = {
   description: 'Add a new contestant to your profile',
 };
 
-// Mark this page as dynamic to prevent static rendering errors with headers
-export const dynamic = 'force-dynamic';
-
 export default async function NewContestantPage() {
   const user = await getCurrentUser();
   
   // Fetch contingents managed by the current user to allow assigning the contestant to a team
   const managedContingents = await prisma.contingentManager.findMany({
     where: {
-      participantId: user ? Number(user.id) : -1
+      participantId: Number(user?.id)
     },
     select: {
       contingentId: true

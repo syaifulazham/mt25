@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient, user_role } from '@prisma/client';
 import { hashPassword } from "@/lib/auth";
-export const dynamic = 'force-dynamic';
 
 const prisma = new PrismaClient();
 
