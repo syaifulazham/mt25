@@ -1,6 +1,11 @@
 import { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/session';
+
+// Mark this layout as dynamic since it uses session which uses headers()
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {

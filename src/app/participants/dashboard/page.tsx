@@ -1,6 +1,11 @@
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/session";
+
+// Mark this page as dynamic since it uses session which uses headers()
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
