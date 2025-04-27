@@ -95,32 +95,8 @@ async function AuthenticatedContent({
   currentPath: string 
 }) {
   try {
-    // Only enable authentication bypass in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log("AUTH BYPASS ENABLED: Skipping authentication checks");
-      
-      // Create a mock admin user for the dashboard
-      const mockAdminUser = {
-        id: 999, // Must be a number to match AuthUser interface
-        name: "Development User",
-        email: "dev@example.com",
-        role: "ADMIN" as user_role, // Properly typed
-        username: "admin"
-      };
-      
-      // Use mock user for development
-      const dashboardUser = mockAdminUser;
-      return (
-        <div className="flex min-h-screen">
-          <DashboardNav user={dashboardUser} />
-          <main className="flex-1 bg-background">
-            {children}
-          </main>
-        </div>
-      );
-    }
     
-    // PRODUCTION MODE: Normal authentication
+    // Authenticate user
     const user = await getSessionUser({ 
       redirectToLogin: false
     });
