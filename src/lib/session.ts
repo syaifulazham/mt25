@@ -1,7 +1,13 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
+import { cookies, headers } from "next/headers";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
+
+// Export dynamic directive to prevent static generation issues
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 /**
  * Options for getting the current user

@@ -3,6 +3,11 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
 
+// Mark this route as dynamic since it uses getCurrentUser() which uses headers()
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // GET /api/announcements/[id] - Get a specific announcement
 export async function GET(
   request: NextRequest,

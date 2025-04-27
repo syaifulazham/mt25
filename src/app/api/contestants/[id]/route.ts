@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/session';
 
+// Mark this route as dynamic since it uses getCurrentUser() which uses headers()
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // GET /api/contestants/[id] - Get a specific contestant
 export async function GET(
   request: NextRequest,
