@@ -95,20 +95,32 @@ async function AuthenticatedContent({
   currentPath: string 
 }) {
   try {
-    // AUTHENTICATION BYPASS: For development/testing only
-    console.log("AUTH BYPASS ENABLED: Skipping authentication checks");
+    // Only enable authentication bypass in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log("AUTH BYPASS ENABLED: Skipping authentication checks");
+      
+      // Create a mock admin user for the dashboard
+      const mockAdminUser = {
+        id: 999, // Must be a number to match AuthUser interface
+        name: "Development User",
+        email: "dev@example.com",
+        role: "ADMIN" as user_role, // Properly typed
+        username: "admin"
+      };
+      
+      // Use mock user for development
+      const dashboardUser = mockAdminUser;
+      return (
+        <div className="flex min-h-screen">
+          <DashboardNav user={dashboardUser} />
+          <main className="flex-1 bg-background">
+            {children}
+          </main>
+        </div>
+      );
+    }
     
-    // Create a mock admin user for the dashboard
-    const mockAdminUser = {
-      id: 999, // Must be a number to match AuthUser interface
-      name: "Development User",
-      email: "dev@example.com",
-      role: "ADMIN" as user_role, // Properly typed
-      username: "admin"
-    };
-    
-    // Note: In a real environment, we would check authentication:
-    /*
+    // PRODUCTION MODE: Normal authentication
     const user = await getSessionUser({ 
       redirectToLogin: false
     });
@@ -127,10 +139,15 @@ async function AuthenticatedContent({
       const loginPath = "/organizer/auth/login";
       return redirect(`${loginPath}?message=You+do+not+have+permission+to+access+the+organizer+portal`);
     }
-    */
     
-    // Use our mock admin user for the dashboard
-    const dashboardUser = mockAdminUser;
+    // User is authenticated and has correct role
+    const dashboardUser = {
+      id: user.id,
+      name: user.name || "",
+      email: user.email || "",
+      role: (user as any).role as user_role,
+      username: user.username || null
+    };
     
     return (
       <div className="flex min-h-screen">

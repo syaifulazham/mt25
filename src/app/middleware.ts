@@ -23,11 +23,11 @@ export async function middleware(request: NextRequest) {
   // Determine the right login path based on route
   let loginUrl;
   if (request.nextUrl.pathname.startsWith('/participants')) {
-    // Participant routes
-    loginUrl = '/participants/auth/login';
+    // Participant routes - use the new unified auth path
+    loginUrl = '/auth/participants/login';
   } else if (request.nextUrl.pathname.startsWith('/organizer')) {
-    // Organizer routes - always use the dedicated login page
-    loginUrl = '/organizer/auth/login';
+    // Organizer routes - use the new unified auth path
+    loginUrl = '/auth/organizer/login';
   } else {
     // Default routes - don't redirect
     return NextResponse.next();

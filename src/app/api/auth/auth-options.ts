@@ -201,9 +201,9 @@ export const authOptions: NextAuthOptions = {
     }
   },
   pages: {
-    // Always use section-specific login paths to prevent redirect confusion
-    signIn: "/participants/auth/login",
-    error: "/participants/auth/login",
+    // Use the new unified auth paths
+    signIn: "/auth/participants/login",
+    error: "/auth/participants/login",
     // The middleware will handle redirecting to the correct section login page
   },
   debug: process.env.NEXTAUTH_DEBUG === 'true',
