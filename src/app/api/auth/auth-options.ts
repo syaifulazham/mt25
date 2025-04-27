@@ -15,6 +15,8 @@ declare module "next-auth" {
     role?: string;
     username?: string | null;
     isParticipant?: boolean;
+    authenticated?: boolean;
+    tokenExpiry?: number;
   }
 
   interface Session {
@@ -26,6 +28,8 @@ declare module "next-auth" {
       role?: string;
       username?: string | null;
       isParticipant?: boolean;
+      authenticated?: boolean;
+      tokenExpiry?: number;
     };
   }
 }
@@ -36,6 +40,7 @@ declare module "next-auth/jwt" {
     role?: string;
     username?: string | null;
     isParticipant?: boolean;
+    exp?: number;
   }
 }
 
@@ -146,6 +151,12 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  session: {
+    // Important: use JWT strategy for sessions to ensure they work in production
+    strategy: "jwt",
+    // Extend session max age to 30 days
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === 'google') {
@@ -193,10 +204,17 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.role = token.role;
-      session.user.username = token.username;
-      session.user.isParticipant = token.isParticipant;
+      if (token) {
+        // Make sure we copy all token data to the session
+        session.user.id = token.id;
+        session.user.role = token.role;
+        session.user.username = token.username;
+        session.user.isParticipant = token.isParticipant;
+        
+        // Add debug token for easier troubleshooting
+        session.user.authenticated = true;
+        session.user.tokenExpiry = token.exp;
+      }
       return session;
     }
   },
