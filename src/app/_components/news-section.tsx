@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarDays, Clock, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
+export const dynamic = 'force-dynamic';
 
 // News type definition
 type News = {

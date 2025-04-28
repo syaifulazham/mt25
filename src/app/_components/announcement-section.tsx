@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CalendarDays, MapPin, Trophy, Users, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
+export const dynamic = 'force-dynamic';
 
 // Announcement type definition
 type Announcement = {
