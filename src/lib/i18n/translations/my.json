@@ -1,0 +1,30 @@
+{
+  "nav.about": "Tentang",
+  "nav.features": "Ciri-ciri",
+  "nav.events": "Acara",
+  "nav.contact": "Hubungi",
+  "nav.login": "Log Masuk",
+  "nav.register": "Daftar",
+  
+  "hero.title": "Techlympics 2025",
+  "hero.subtitle": "Di Mana Inovasi Bertemu Pertandingan",
+  "hero.description": "Sertai pertandingan teknologi utama untuk sekolah-sekolah Malaysia! Tunjukkan kemahiran pengaturcaraan, robotik, AI, dan teknologi kreatif anda untuk memenangi hadiah menarik.",
+  "hero.cta.register": "Daftar Sekarang",
+  "hero.cta.learnMore": "Ketahui Lebih Lanjut",
+  
+  "announcements.title": "Pengumuman",
+  "announcements.viewAll": "Lihat Semua",
+  
+  "themes.title": "Tema Pertandingan",
+  "themes.description": "Terokai kategori pertandingan kami untuk Techlympics 2025",
+  
+  "news.title": "Berita Terkini",
+  "news.readMore": "Baca Selanjutnya",
+  "news.viewAll": "Lihat Semua Artikel",
+  
+  "footer.rights": "Hak Cipta Terpelihara",
+  "footer.techlympics": "Techlympics 2025",
+  
+  "language.english": "English",
+  "language.malay": "Bahasa Melayu"
+}

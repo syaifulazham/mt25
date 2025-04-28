@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CalendarDays, MapPin, Trophy, Users, ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
 export const dynamic = 'force-dynamic';
 
 // Announcement type definition
@@ -31,6 +32,7 @@ const iconMap: Record<string, JSX.Element> = {
 };
 
 export default function AnnouncementSection() {
+  const { t } = useLanguage();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

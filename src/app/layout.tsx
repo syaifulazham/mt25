@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from 'sonner';
 import DevAuthProvider from "@/components/dev/auth-provider";
 import AuthSessionProvider from "@/providers/session-provider";
+import { LanguageProvider } from "@/lib/i18n/language-context";
 
 //
 
@@ -25,9 +26,11 @@ export default function RootLayout({
       >
         <Toaster position="top-right" />
         <AuthSessionProvider>
-          <DevAuthProvider>
-            {children}
-          </DevAuthProvider>
+          <LanguageProvider>
+            <DevAuthProvider>
+              {children}
+            </DevAuthProvider>
+          </LanguageProvider>
         </AuthSessionProvider>
       </body>
     </html>

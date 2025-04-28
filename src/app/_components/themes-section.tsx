@@ -1,35 +1,88 @@
+"use client";
+
 import Image from "next/image";
-import prisma from "@/lib/prisma";
+import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
 export const dynamic = 'force-dynamic';
 
 // Theme type definition
 type Theme = {
-  id: number;
+  id: string | number;
   name: string;
-  color: string | null;
-  logoPath: string | null;
   description: string | null;
+  iconUrl?: string;
+  logoPath?: string | null;
+  color?: string | null;
+  isActive?: boolean;
 };
+
+// Placeholder themes (will be replaced with real data fetched client-side)
+const placeholderThemes: Theme[] = [
+  {
+    id: '1',
+    name: 'Robotics',
+    description: 'Build and program robots to solve real-world challenges',
+    iconUrl: '/icons/robotics.png',
+    isActive: true
+  },
+  {
+    id: '2',
+    name: 'Coding',
+    description: 'Develop applications and solve complex programming problems',
+    iconUrl: '/icons/coding.png',
+    isActive: true
+  },
+  {
+    id: '3',
+    name: 'AI & Machine Learning',
+    description: 'Create intelligent systems that learn and adapt',
+    iconUrl: '/icons/ai.png',
+    isActive: true
+  }
+];
 
 async function getThemes() {
   try {
-    // Fetch themes directly from the database since this is a public page
-    const themes = await prisma.theme.findMany({
-      orderBy: { name: "asc" },
-    });
-    return themes;
+    // Use the public themes endpoint (no auth required)
+    const response = await fetch('/api/public/themes');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error("Error fetching themes:", error);
     return [];
   }
 }
 
-export default async function ThemesSection() {
-  const themes = await getThemes();
+export default function ThemesSection() {
+  const { t } = useLanguage();
+  const [themes, setThemes] = useState<Theme[]>(placeholderThemes);
+  
+  // Fetch themes on component mount
+  useEffect(() => {
+    async function fetchThemes() {
+      try {
+        const data = await getThemes();
+        setThemes(data);
+      } catch (error) {
+        console.error('Error fetching themes:', error);
+      }
+    }
+    
+    fetchThemes();
+  }, []);
 
   return (
     <section className="py-16 bg-black bg-opacity-20">
       <div className="container mx-auto px-6">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-white mb-4">{t('themes.title')}</h2>
+          <p className="text-gray-400 max-w-2xl mx-auto">
+            {t('themes.description')}
+          </p>
+        </div>
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
             Techlympics 2025 Competition Themes

@@ -1,0 +1,30 @@
+{
+  "nav.about": "About",
+  "nav.features": "Features",
+  "nav.events": "Events",
+  "nav.contact": "Contact",
+  "nav.login": "Login",
+  "nav.register": "Register",
+  
+  "hero.title": "Techlympics 2025",
+  "hero.subtitle": "Where Innovation Meets Competition",
+  "hero.description": "Join the premier technology competition for Malaysian schools! Showcase your coding, robotics, AI, and creative tech skills to win amazing prizes.",
+  "hero.cta.register": "Register Now",
+  "hero.cta.learnMore": "Learn More",
+  
+  "announcements.title": "Announcements",
+  "announcements.viewAll": "View All",
+  
+  "themes.title": "Competition Themes",
+  "themes.description": "Explore our competition categories for Techlympics 2025",
+  
+  "news.title": "Latest News",
+  "news.readMore": "Read More",
+  "news.viewAll": "View All Articles",
+  
+  "footer.rights": "All Rights Reserved",
+  "footer.techlympics": "Techlympics 2025",
+  
+  "language.english": "English",
+  "language.malay": "Bahasa Melayu"
+}
