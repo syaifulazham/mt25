@@ -46,13 +46,99 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract chunk data
-    const { records, chunkNumber, totalChunks, isLastChunk } = payload;
+    let { records, headers, chunkNumber, totalChunks, isLastChunk } = payload;
+    
+    // Log received headers for debugging
+    console.log(`Received headers: ${headers ? JSON.stringify(headers) : 'none'}`);
+    
+    // Validate headers if provided
+    if (headers && Array.isArray(headers)) {
+      console.log(`Using ${headers.length} headers from client: ${headers.join(', ')}`);
+    }
+    
+    // Log sample records for debugging
+    if (records && records.length > 0) {
+      console.log('Sample record (first row):', JSON.stringify(records[0]));
+      
+      // Check for required fields in first record
+      const sampleRecord = records[0];
+      const requiredFields = ['code', 'name', 'level', 'category', 'state'];
+      const missingFields = requiredFields.filter(field => !sampleRecord[field]);
+      
+      if (missingFields.length > 0) {
+        console.warn(`Missing required fields in sample record: ${missingFields.join(', ')}`);
+        console.log('Available fields:', Object.keys(sampleRecord).join(', '));
+        
+        // Try to normalize/standardize fields in all records
+        console.log('Attempting to standardize field names in records...');
+        const normalizedRecords = records.map((record: any) => {
+          const normalizedRecord = { ...record };
+          
+          // Common field mappings
+          const fieldMappings = {
+            'code': ['kod', 'school_code', 'schoolcode', 'id', 'schoolid'],
+            'name': ['nama', 'school_name', 'schoolname'],
+            'level': ['tahap', 'school_level', 'schoollevel'],
+            'category': ['kategori', 'jenis', 'type', 'school_category'],
+            'state': ['negeri', 'state_name']
+          };
+          
+          // Apply mappings
+          for (const [standardField, alternateFields] of Object.entries(fieldMappings)) {
+            // Only map if the standard field is missing
+            if (!normalizedRecord[standardField]) {
+              // Try each alternate field
+              for (const altField of alternateFields) {
+                // Check if any key in the record matches this alternate field (case insensitive)
+                const matchingKey = Object.keys(record).find(
+                  key => key.toLowerCase() === altField.toLowerCase()
+                );
+                
+                if (matchingKey && record[matchingKey]) {
+                  normalizedRecord[standardField] = record[matchingKey];
+                  console.log(`Mapped '${matchingKey}' to '${standardField}'`);
+                  break;
+                }
+              }
+            }
+          }
+          
+          return normalizedRecord;
+        });
+        
+        // Use the normalized records
+        records = normalizedRecords;
+      }
+    }
     
     console.log(`Processing chunk ${chunkNumber}/${totalChunks} with ${records.length} records`);
 
     // Get all states for mapping
     const states = await prisma.state.findMany();
-    const stateMap = new Map(states.map((state) => [state.name.toLowerCase(), state.id]));
+    
+    // Create a more flexible state map with multiple possible formats
+    const stateMap = new Map();
+    
+    // Log all available states for debugging
+    console.log('Available states in database:', states.map(s => s.name).join(', '));
+    
+    // Add each state to the map with multiple formats
+    states.forEach(state => {
+      const stateName = state.name.toLowerCase().trim();
+      stateMap.set(stateName, state.id); // Regular format
+      stateMap.set(stateName.replace(/\s+/g, ''), state.id); // No spaces
+      stateMap.set(stateName.replace(/\W/g, ''), state.id);  // Alphanumeric only
+      
+      // Handle common abbreviations and alternate names
+      // Add known Malaysian state abbreviations/alternates if needed
+      if (stateName === 'wilayah persekutuan') {
+        stateMap.set('wp', state.id);
+        stateMap.set('kuala lumpur', state.id);
+        stateMap.set('putrajaya', state.id);
+      }
+      if (stateName === 'pulau pinang') stateMap.set('penang', state.id);
+      // Add any other known aliases here
+    });
 
     // Process each row
     const results = {
@@ -74,28 +160,59 @@ export async function POST(request: NextRequest) {
           
           try {
             // Validate required fields
-            if (!row.code || !row.name || !row.level || !row.category || !row.state) {
+            // Check for required fields with detailed error reporting
+            const missingFields = [];
+            if (!row.code) missingFields.push('code');
+            if (!row.name) missingFields.push('name');
+            if (!row.level) missingFields.push('level');
+            if (!row.category) missingFields.push('category');
+            if (!row.state) missingFields.push('state');
+            
+            if (missingFields.length > 0) {
               results.skipped++;
               results.errors.push({
                 row: rowIndex,
                 code: row.code || "unknown",
-                error: "Missing required fields",
+                error: `Missing required fields: ${missingFields.join(', ')}. Available fields: ${Object.keys(row).join(', ')}`,
               });
               return;
             }
 
-            // Find state ID
+            // Find state ID - try multiple formats for more forgiving matching
             const stateName = row.state.trim().toLowerCase();
-            const stateId = stateMap.get(stateName);
+            let stateId = stateMap.get(stateName);
+            
+            // If not found, try alternative formats
+            if (!stateId) {
+              // Try without spaces
+              stateId = stateMap.get(stateName.replace(/\s+/g, ''));
+            }
+            
+            if (!stateId) {
+              // Try alphanumeric only
+              stateId = stateMap.get(stateName.replace(/\W/g, ''));
+            }
+            
+            // Log the problematic state name for diagnostics
+            if (!stateId) {
+              console.log(`State not found: '${row.state}' (normalized: '${stateName}')`);
+            }
 
             if (!stateId) {
-              results.skipped++;
-              results.errors.push({
-                row: rowIndex,
-                code: row.code,
-                error: `State '${row.state}' not found`,
-              });
-              return;
+              // Try fallback - use first state if this is just for testing
+              // COMMENT THIS OUT IN PRODUCTION if you don't want fallback
+              if (states.length > 0 && process.env.NODE_ENV !== 'production') {
+                console.warn(`Using fallback state ID for '${row.state}'. THIS SHOULD NOT BE USED IN PRODUCTION.`);
+                stateId = states[0].id;
+              } else {
+                results.skipped++;
+                results.errors.push({
+                  row: rowIndex,
+                  code: row.code,
+                  error: `State '${row.state}' not found. Available states: ${states.map(s => s.name).join(', ')}`,
+                });
+                return;
+              }
             }
 
             // Parse latitude and longitude if provided

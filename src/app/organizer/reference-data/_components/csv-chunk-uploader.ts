@@ -48,29 +48,38 @@ export async function uploadCsvInChunks(
     onProgress?.(progress, 100, 'parsing');
   });
   
-  if (parseResult.errors.length > 0 && parseResult.errors[0].row !== 0) {
+  // Log detailed parsing results for debugging
+  console.log('Parsed records:', parseResult.data.length, 
+            'Errors:', parseResult.errors.length,
+            'Fields:', parseResult.meta.fields);
+            
+  if (parseResult.data.length === 0) {
+    throw new Error('CSV file contains no valid data records');
+  }
+            
+  if (parseResult.errors.length > 0) {
     throw new Error(`CSV parsing error: ${parseResult.errors[0].message}`);
   }
   
-  // Get the records from the parse result
-  const allRecords = parseResult.data;
-  
-  // Step 2: Validate basic CSV structure
-  console.log('CSV parsing complete. Found records:', allRecords.length, 'First record:', allRecords[0]);
-  
-  if (!allRecords || allRecords.length === 0) {
-    throw new Error('CSV file contains no data or could not be parsed correctly');
+  // Step 3: Split records into chunks and upload each chunk
+  // Define fallback headers if none detected
+  if (!parseResult.meta.fields || parseResult.meta.fields.length === 0) {
+    console.warn('CSV headers could not be detected automatically - using fallback headers');
+    // Provide standard school fields as fallback headers
+    parseResult.meta.fields = ['code', 'name', 'level', 'category', 'state', 'ppd', 'address', 'city', 'postcode', 'latitude', 'longitude'];
   }
   
-  // Check if we have valid object records with expected fields (not empty arrays)
-  if (allRecords.length > 0 && typeof allRecords[0] !== 'object') {
-    throw new Error('CSV file format is incorrect. Please ensure it has headers and proper comma separation.');
-  }
+  // Store the headers for each chunk
+  const headers = parseResult.meta.fields;
+  console.log('Using headers for chunks:', headers);
   
-  // Create chunks of records
-  const chunks: any[][] = [];
-  for (let i = 0; i < allRecords.length; i += chunkSize) {
-    chunks.push(allRecords.slice(i, i + chunkSize));
+  const chunkCount = Math.ceil(parseResult.data.length / chunkSize);
+  const chunks = [];
+  
+  for (let i = 0; i < chunkCount; i++) {
+    const start = i * chunkSize;
+    const end = Math.min(start + chunkSize, parseResult.data.length);
+    chunks.push(parseResult.data.slice(start, end));
   }
   
   console.log(`CSV split into ${chunks.length} chunks of ~${chunkSize} records each`);
@@ -81,7 +90,7 @@ export async function uploadCsvInChunks(
   
   // Initialize aggregated results
   const aggregatedResult: ChunkUploadResult = {
-    total: allRecords.length,  // Set total to the number of records processed
+    total: parseResult.data.length,  // Set total to the number of records processed
     created: 0,
     updated: 0,
     skipped: 0,
@@ -99,9 +108,10 @@ export async function uploadCsvInChunks(
         // Create a JSON payload for this chunk
         const chunkData = {
           records: chunk,
+          headers: headers, // Include headers with each chunk
+          chunkNumber: index + 1,
           totalChunks: chunks.length,
-          chunkNumber: chunkNumber,
-          isLastChunk: chunkNumber === chunks.length
+          isLastChunk: index === chunks.length - 1
         };
         
         // Upload the chunk
@@ -165,62 +175,158 @@ export async function uploadCsvInChunks(
 }
 
 /**
- * Parse a CSV file using PapaParse
+ * Parse a CSV file using PapaParse with enhanced format detection
  */
 function parseCSV(file: File, onProgress?: (progress: number) => void): Promise<any> {
   return new Promise((resolve, reject) => {
-    // Try to detect file encoding to avoid parsing issues
+    // Try to detect file encoding and format
     const reader = new FileReader();
     
     reader.onload = () => {
-      // Check if file seems to be a valid CSV
-      const textSample = reader.result?.toString().slice(0, 1000) || '';
-      if (!textSample.includes(',')) {
-        return reject(new Error('File does not appear to be a valid CSV. No commas detected.'));
+      // Get a sample of the file content
+      const textSample = reader.result?.toString() || '';
+      
+      // Check for UTF-8 BOM (Byte Order Mark) which can interfere with parsing
+      const hasBOM = textSample.charCodeAt(0) === 0xFEFF;
+      if (hasBOM) {
+        console.log('Detected UTF-8 BOM character at the start of file');
       }
       
-      // Logging to help with debugging
-      console.log('CSV sample:', textSample.slice(0, 100));
+      // Get a clean sample without BOM if present
+      const cleanSample = hasBOM ? textSample.slice(1) : textSample;
+      const lines = cleanSample.split(/\r?\n/).filter(line => line.trim().length > 0);
       
-      // Proceed with parsing
+      if (lines.length === 0) {
+        return reject(new Error('File appears to be empty or contains no data rows.'));
+      }
+      
+      // Log the first few lines for debugging
+      console.log('First lines of CSV:');
+      lines.slice(0, 3).forEach((line, i) => console.log(`Line ${i}: ${line}`));
+      console.log('Detected line endings:', textSample.includes('\r\n') ? 'CRLF' : 'LF');
+      
+      // Try to detect the delimiter by checking common options
+      const potentialDelimiters = [',', ';', '\t', '|'];
+      let mostLikelyDelimiter = ',';
+      let maxFields = 0;
+      
+      potentialDelimiters.forEach(delimiter => {
+        const fieldCount = lines[0].split(delimiter).length;
+        console.log(`Testing delimiter '${delimiter}' - fields: ${fieldCount}`);
+        if (fieldCount > maxFields) {
+          maxFields = fieldCount;
+          mostLikelyDelimiter = delimiter;
+        }
+      });
+      
+      // Get list of potential headers from the first row
+      const potentialHeaders = lines[0].split(mostLikelyDelimiter).map(h => h.trim());
+      console.log(`Potential headers (${potentialHeaders.length}):`, potentialHeaders.join(', '));
+      console.log(`Selected delimiter: '${mostLikelyDelimiter}' with ${maxFields} fields`);
+      
+      // Try parsing with multiple configurations 
       parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        transformHeader: (header) => header.toLowerCase().trim(),
-        complete: (results) => {
-          console.log('CSV parsing complete:', results.data.length, 'rows,', 
-                    results.errors.length, 'errors, Fields:', 
-                    results.meta.fields?.join(', '));
+        header: true, 
+        dynamicTyping: false, 
+        skipEmptyLines: 'greedy', 
+        transformHeader: (header: string) => {
+          // Better header normalization - strip quotes and whitespace
+          let normalized = header.trim();
+          
+          // Remove quotes if present
+          if ((normalized.startsWith('"') && normalized.endsWith('"')) ||
+              (normalized.startsWith('\'') && normalized.endsWith('\'')))
+          {
+            normalized = normalized.slice(1, -1).trim();
+          }
+          
+          normalized = normalized.toLowerCase();
+          console.log(`Header mapping: '${header}' -> '${normalized}'`);
+          return normalized;
+        },
+        delimiter: mostLikelyDelimiter,
+        complete: (results: any) => {
+          // Even if no field headers are detected, try to work with the data
+          if (!results.meta.fields || results.meta.fields.length === 0) {
+            // First try - maybe the file doesn't have headers but has data
+            if (results.data && results.data.length > 0) {
+              console.log('No headers detected, but data found. Creating default column names.');
+              
+              // Create default column names based on first row's structure
+              const sampleRow = results.data[0];
+              const columnCount = Object.keys(sampleRow).length || 1;
+              
+              // Generate numeric column names
+              results.meta.fields = [];
+              for (let i = 0; i < columnCount; i++) {
+                results.meta.fields.push(`column${i+1}`);
+              }
+              
+              console.log('Created default column names:', results.meta.fields);
+              
+              // Continue with these column names
+              return resolve(results);
+            }
+            
+            // Real error - no headers and no data
+            return reject(new Error('CSV file appears to be empty or has an invalid format.'));
+          }
+          
+          if (results.data.length === 0) {
+            return reject(new Error('CSV file contains no data rows after parsing.'));
+          }
+          
+          // Identify rows with data vs empty rows
+          const nonEmptyRows = results.data.filter((row: any) => {
+            return Object.values(row).some(val => val !== null && val !== undefined && String(val).trim() !== '');
+          });
+          
+          if (nonEmptyRows.length === 0) {
+            return reject(new Error('All rows appear to be empty after parsing.'));
+          }
+          
+          console.log('CSV parsing complete:', 
+                    `${results.data.length} total rows,`,
+                    `${nonEmptyRows.length} non-empty rows,`, 
+                    `${results.errors.length} errors,`,
+                    'Fields:', results.meta.fields?.join(', '));
+                    
+          // Log a data sample to help with debugging
+          if (results.data.length > 0) {
+            console.log('First row sample:', JSON.stringify(results.data[0]));
+          }
+          
           resolve(results);
         },
         error: (error) => {
           console.error('CSV parsing error:', error);
           reject(error);
         },
-        // Unfortunately, PapaParse doesn't provide reliable progress tracking with typings
-        // So we'll just update progress at fixed intervals
-        step: (results, parser) => {
+        // Progress tracking
+        step: (results: any, parser: any) => {
           if (onProgress) {
-            // Use an approximation since we don't have direct access to bytes read
-            // The typings in PapaParse don't specify the data type properly
             const dataLength = Array.isArray(results.data) ? results.data.length : 0;
             const approxProgress = Math.min(95, Math.floor((dataLength / (file.size / 100)) * 20));
             onProgress(approxProgress);
           }
         },
         download: false,
-        delimiter: '',  // Auto-detect delimiter
         comments: false,
-        fastMode: false,
+        fastMode: false
       });
     };
     
     reader.onerror = () => {
-      reject(new Error('Error reading the CSV file'));
+      reject(new Error('Error reading the CSV file: ' + reader.error?.message));
     };
     
-    // Read a portion of the file for validation
-    const blob = file.slice(0, 8192);  // First 8KB should be enough for header detection
-    reader.readAsText(blob);
+    // Read with UTF-8 encoding first
+    try {
+      reader.readAsText(file, 'UTF-8');
+    } catch (err: any) {
+      // If that fails, try with a different encoding
+      console.error('Error with UTF-8 encoding, trying ISO-8859-1', err);
+      reader.readAsText(file, 'ISO-8859-1');
+    }
   });
 }

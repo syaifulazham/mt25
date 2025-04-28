@@ -30,10 +30,29 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { schoolApi, stateApi } from "@/lib/api-client";
-import { Loader2, Upload, FileText } from "lucide-react";
+import { Loader2, Upload, FileText, Info } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CsvPreviewDialog } from "./csv-preview-dialog";
 import { uploadCsvInChunks } from "./csv-chunk-uploader";
+import { parseCsv, normalizeCsvData } from "./csv-parser";
+
+// Type definitions for improved TypeScript support
+type PreviewData = {
+  headers: string[];
+  data: any[];
+  rawCsv: string;
+  parseErrors: any[];
+  isStandardFormat?: boolean;
+};
+
+type UploadResults = {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: any[];
+  total: number;
+};
 
 const schoolLevels = ["Primary", "Secondary"];
 const schoolCategories = ["Public", "Private", "International"];
@@ -44,6 +63,17 @@ export function SchoolsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // CSV Preview state
+  const [showPreview, setShowPreview] = useState(false);
+  const [selectedCsvFile, setSelectedCsvFile] = useState<File | null>(null);
+  const [previewData, setPreviewData] = useState<PreviewData | null>(null);
+  
+  // Upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadResults, setUploadResults] = useState<UploadResults | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -90,17 +120,7 @@ export function SchoolsTab() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [schoolToDelete, setSchoolToDelete] = useState<number | null>(null);
 
-  // CSV upload state
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadResults, setUploadResults] = useState<{
-    total: number;
-    created: number;
-    updated: number;
-    skipped: number;
-    errors: { row: number; code: string; error: string }[];
-  } | null>(null);
+  // Previous CSV upload state declarations have been moved above
 
   // Fetch schools and states
   useEffect(() => {
@@ -336,84 +356,312 @@ export function SchoolsTab() {
     }
   };
 
-  // Handle file upload with chunked processing for large files
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // Check file type
-    if (!file.name.endsWith('.csv')) {
-      toast.error('Only CSV files are allowed');
-      return;
+  // Show CSV preview before processing
+  const showCsvPreview = async (file: File) => {
+    try {
+      // Read and parse the CSV file
+      const text = await file.text();
+      const result = parseCsv(text);
+      const { data, meta, errors } = result;
+      
+      // Check if this is the standardized format CSV from /data/school.csv
+      const isStandardFormat = 
+        meta.fields && 
+        meta.fields[0] === 'name' && 
+        meta.fields.includes('code') &&
+        meta.fields.includes('level') &&
+        meta.fields.includes('category') &&
+        meta.fields.includes('state');
+      
+      if (isStandardFormat) {
+        console.log('Detected standard format CSV from data/school.csv');
+      }
+      
+      // Show preview dialog
+      setPreviewData({
+        headers: meta.fields || [],
+        data: data.slice(0, 100),
+        rawCsv: text,
+        parseErrors: errors,
+        isStandardFormat: isStandardFormat
+      });
+      setShowPreview(true);
+    } catch (error: any) {
+      toast.error(`Error parsing CSV: ${error.message}`);
     }
-
+  };
+  
+  // Show error report details for failed records
+  const showErrorReport = (errors: any[]) => {
+    // Group errors by type
+    interface ErrorGroup {
+      count: number;
+      examples: string[];
+    }
+    
+    const errorTypes: Record<string, ErrorGroup> = {};
+    errors.forEach(err => {
+      const message = err.error || err.message || 'Unknown error';
+      if (!errorTypes[message]) {
+        errorTypes[message] = { count: 0, examples: [] };
+      }
+      errorTypes[message].count++;
+      if (errorTypes[message].examples.length < 3) {
+        errorTypes[message].examples.push(err.code || err.row || 'Unknown');
+      }
+    });
+    
+    // Sort errors by count
+    const sortedErrors = Object.entries(errorTypes)
+      .sort(([, a], [, b]) => b.count - a.count);
+    
+    // Format a report
+    return (
+      <div className="text-sm">
+        <p className="font-medium mb-2">Error Summary:</p>
+        <div className="max-h-[200px] overflow-auto">
+          {sortedErrors.map(([error, data], i) => (
+            <div key={i} className="mb-2 pb-2 border-b">
+              <p className="font-medium text-red-600">{error}</p>
+              <p>{data.count} occurrences</p>
+              <p className="text-xs">Examples: {data.examples.join(', ')}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  
+  // Process CSV file after preview confirmation
+  const processCsvFile = async () => {
+    if (!selectedCsvFile) return;
+    
     setIsUploading(true);
     setUploadProgress(0);
-    setUploadResults(null);
-    
-    // First, do a basic validation by checking file contents
-    try {
-      // Read first few bytes to check if it's actually a CSV file
-      const firstChunk = await file.slice(0, 1024).text();
-      if (!firstChunk.includes(',')) {
-        throw new Error('File does not appear to be a valid CSV. No commas detected.');
-      }
-      
-      // Try to detect headers
-      const firstLine = firstChunk.split('\n')[0];
-      if (!firstLine || firstLine.trim().length === 0) {
-        throw new Error('CSV file appears to be empty.');
-      }
-      
-      console.log('CSV validation - Headers detected:', firstLine);
-    } catch (error: any) {
-      toast.error(error.message || 'Invalid CSV file format');
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      return;
-    }
     
     // Show different toast based on file size
-    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    const fileSizeMB = (selectedCsvFile.size / (1024 * 1024)).toFixed(2);
     const toastId = toast.loading(
       <div className="flex items-center gap-2">
         <FileText size={18} />
         <span>Processing {fileSizeMB}MB CSV file in chunks. This may take a few minutes.</span>
       </div>
     );
-
+    
     try {
-      // Use the chunked uploader for all CSV files
-      // For small files, this will use just one chunk
-      // For large files, it will split into multiple chunks
-      const results = await uploadCsvInChunks(
-        file,
-        '/api/schools/upload/chunks',
+      // Last resort manual parsing function in case standard parsing fails
+      const manualParseCsv = async (file: File) => {
+        console.log('Using manual CSV parsing method');
+        
+        // Read the file as text
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+        
+        if (lines.length === 0) {
+          throw new Error('CSV file appears to be empty');
+        }
+        
+        // Special handling for the standard school.csv format with known column order
+        // This is the format from /data/school.csv
+        if (file.name === 'school.csv' || 
+            (lines[0].includes('"name"') && lines[0].includes('"ppd"') && 
+             lines[0].includes('"level"') && lines[0].includes('"category"') && 
+             lines[0].includes('"code"'))) {
+          console.log('Detected standard school.csv format, applying special mapping');
+          
+          // For this format, we know the exact column structure
+          // "name","ppd","level","category","code","address","postcode","city","state","longitude","latitude"
+          const standardHeaders = ['name', 'ppd', 'level', 'category', 'code', 'address', 'postcode', 'city', 'state', 'longitude', 'latitude'];
+          
+          // Create normalized data with exact field mapping
+          const data = [];
+          for (let i = 1; i < lines.length; i++) {
+            if (lines[i].trim().length === 0) continue;
+            
+            // Parse CSV properly with quote handling
+            const cleanLine = lines[i].replace(/,,/g, ',"",'); // Handle empty fields
+            const values = [];
+            let inQuote = false;
+            let currentValue = '';
+            
+            for (let j = 0; j < cleanLine.length; j++) {
+              const char = cleanLine[j];
+              if (char === '"') {
+                inQuote = !inQuote;
+              } else if (char === ',' && !inQuote) {
+                values.push(currentValue.trim());
+                currentValue = '';
+              } else {
+                currentValue += char;
+              }
+            }
+            values.push(currentValue.trim()); // Add the last value
+            
+            // Map to required fields for the API
+            const row: any = {};
+            for (let j = 0; j < standardHeaders.length && j < values.length; j++) {
+              const fieldName = standardHeaders[j];
+              // Clean the value and remove quotes if present
+              let value = values[j].replace(/^"|"$/g, '').trim();
+              row[fieldName] = value;
+            }
+            
+            data.push(row);
+          }
+          
+          console.log(`Parsed ${data.length} rows from standard school.csv format`);
+          console.log('Sample row:', data.length > 0 ? JSON.stringify(data[0]) : 'No data');
+          
+          return { data, headers: ['code', 'name', 'level', 'category', 'state', 'ppd', 'address', 'city', 'postcode', 'longitude', 'latitude'] };
+        }
+        
+        // Detect the delimiter by testing which one gives more fields
+        const delimiters = [',', ';', '\t', '|'];
+        let bestDelimiter = ',';
+        let maxFields = 0;
+        
+        for (const delimiter of delimiters) {
+          const fieldCount = lines[0].split(delimiter).length;
+          if (fieldCount > maxFields) {
+            maxFields = fieldCount;
+            bestDelimiter = delimiter;
+          }
+        }
+        
+        console.log(`Using delimiter: '${bestDelimiter}' (${maxFields} fields detected)`);
+        
+        // Create a mapping for standard field names to possible variations
+        const headerMap = {
+          'code': ['kod', 'code', 'school code', 'kod sekolah', 'id', 'school id', 'schoolcode'],
+          'name': ['name', 'nama', 'school name', 'nama sekolah', 'school', 'schoolname'],
+          'level': ['level', 'tahap', 'school level', 'tahap sekolah', 'jenis', 'schoollevel'],
+          'category': ['category', 'kategori', 'jenis', 'type', 'school category', 'schoolcategory'],
+          'state': ['state', 'negeri', 'neg', 'state name', 'nama negeri']
+        };
+        
+        // Extract original headers and create mappings
+        const originalHeaders = lines[0].split(bestDelimiter).map(h => h.trim());
+        const headerMappings: Record<number, string> = {};
+        
+        // Map headers to standard field names
+        originalHeaders.forEach((header, index) => {
+          const headerText = header.toLowerCase();
+          
+          // Check each standard field for potential matches
+          for (const [standardField, variations] of Object.entries(headerMap)) {
+            if (variations.includes(headerText) || 
+                variations.some(v => headerText.includes(v))) {
+              headerMappings[index] = standardField;
+              console.log(`Mapped header '${header}' to standard field '${standardField}'`);
+              break;
+            }
+          }
+        });
+        
+        console.log('Header mappings:', headerMappings);
+        
+        // Check for missing required fields
+        const requiredFields = ['code', 'name', 'level', 'category', 'state'];
+        const mappedFields = Object.values(headerMappings);
+        const missingFields = requiredFields.filter(field => !mappedFields.includes(field));
+        
+        if (missingFields.length > 0) {
+          console.warn(`Missing required fields: ${missingFields.join(', ')}`);
+          console.log('Available headers:', originalHeaders.join(', '));
+          
+          // For debugging only - optionally assign default columns if certain patterns are detected
+          if (originalHeaders.length >= 5 && missingFields.length <= 2) {
+            console.log('Attempting to guess mappings for missing fields...');
+            // This is a simplistic approach - you might want to improve this
+            const unmappedColumns = originalHeaders.map((_, i) => i)
+              .filter(i => !Object.prototype.hasOwnProperty.call(headerMappings, i));
+            
+            missingFields.forEach((field, i) => {
+              if (i < unmappedColumns.length) {
+                headerMappings[unmappedColumns[i]] = field;
+                console.log(`Assigned ${field} to column ${unmappedColumns[i]} (${originalHeaders[unmappedColumns[i]]})`);
+              }
+            });
+          }
+        }
+        
+        // Process data rows
+        const data = [];
+        for (let i = 1; i < lines.length; i++) {
+          if (lines[i].trim().length === 0) continue;
+          
+          const values = lines[i].split(bestDelimiter);
+          const row: any = {};
+          
+          // Initialize required fields 
+          requiredFields.forEach(field => {
+            row[field] = '';
+          });
+          
+          // Map values using our header mappings
+          for (let j = 0; j < originalHeaders.length; j++) {
+            if (j >= values.length) continue; // Skip if row doesn't have enough values
+            
+            const standardField = headerMappings[j];
+            const value = values[j] ? values[j].trim() : '';
+            
+            if (standardField) {
+              // For mapped fields, store in the standard field name
+              if (standardField === 'state' && value) {
+                // Normalize state names
+                row[standardField] = value.toLowerCase()
+                  .replace(/\bwp\b/i, 'wilayah persekutuan')
+                  .replace(/\bk\.?l\b/i, 'kuala lumpur')
+                  .replace(/\bp\.?pinang\b/i, 'pulau pinang');
+              } else {
+                row[standardField] = value;
+              }
+            } else {
+              // For unmapped fields, store with original header
+              row[originalHeaders[j].toLowerCase()] = value;
+            }
+          }
+          
+          // Only add rows that have at least basic data
+          if (row.code || row.name) {
+            data.push(row);
+          }
+        }
+        
+        console.log(`Manually parsed ${data.length} rows with mappings:`, headerMappings);
+        console.log('Sample parsed row:', data.length > 0 ? JSON.stringify(data[0]) : 'No data');
+        
+        // Return both the data and the field mappings for the API
+        return { 
+          data, 
+          headers: requiredFields
+        };
+      };
+      
+      // First try standard CSV parsing method
+      let results;
+      try {
+        // Use the standard chunked uploader
+        results = await uploadCsvInChunks(
+          selectedCsvFile,
+          '/api/schools/upload/chunks',
         250, // 250 records per chunk
         (progress, total, phase) => {
           // Update progress based on current phase
           if (phase === 'parsing') {
             // During parsing, go from 0-40%
             setUploadProgress(Math.floor(progress * 0.4));
-            toast.loading(
-              <div className="flex items-center gap-2">
-                <span>Parsing CSV file: {progress}% complete</span>
-              </div>,
-              { id: toastId }
-            );
           } else {
             // During uploading, go from 40-100%
             const uploadProgress = 40 + Math.floor(progress * 0.6);
             setUploadProgress(uploadProgress);
-            toast.loading(
-              <div className="flex items-center gap-2">
-                <span>Uploading records: {progress}% complete</span>
-              </div>,
-              { id: toastId }
-            );
           }
+          toast.loading(
+            <div className="flex items-center gap-2">
+              <span>{phase === 'parsing' ? 'Parsing CSV file' : 'Uploading records'}: {progress}% complete</span>
+            </div>,
+            { id: toastId }
+          );
         }
       );
 
@@ -425,6 +673,7 @@ export function SchoolsTab() {
         page: 1,
         pageSize: pageSize,
       });
+      
       setSchools(schoolsData.data);
       setTotalPages(schoolsData.totalPages);
       setTotalCount(schoolsData.totalCount);
@@ -440,23 +689,176 @@ export function SchoolsTab() {
           </div>
         </div>
       );
-      
-      // If there were errors, show them in the results section
-      if (results.errors.length > 0) {
-        console.warn('CSV upload had errors:', results.errors);
+      } catch (parseError) {
+        // If standard parsing failed, try manual parsing instead
+        console.warn('Standard CSV parsing failed, trying manual method:', parseError);
+        
+        toast.loading(
+          <div className="flex items-center gap-2">
+            <span>Standard parsing failed. Trying alternative method...</span>
+          </div>,
+          { id: toastId }
+        );
+        
+        try {
+          // Parse the CSV manually
+          const { data, headers } = await manualParseCsv(selectedCsvFile);
+          
+          // Process in batches of 50
+          const batchSize = 50;
+          let created = 0, updated = 0, skipped = 0;
+          const errors = [];
+          
+          // Upload in chunks
+          for (let i = 0; i < data.length; i += batchSize) {
+            const chunk = data.slice(i, i + batchSize);
+            const progress = Math.floor((i / data.length) * 100);
+            
+            setUploadProgress(progress);
+            toast.loading(
+              <div className="flex items-center gap-2">
+                <span>Manual upload: {progress}% complete</span>
+              </div>,
+              { id: toastId }
+            );
+            
+            try {
+              const response = await fetch('/api/schools/upload/chunks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  records: chunk,
+                  headers: headers,
+                  chunkNumber: Math.floor(i / batchSize) + 1,
+                  totalChunks: Math.ceil(data.length / batchSize),
+                  isLastChunk: i + batchSize >= data.length
+                })
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+              }
+              
+              const result = await response.json();
+              created += result.created || 0;
+              updated += result.updated || 0;
+              skipped += result.skipped || 0;
+              
+              if (result.errors && result.errors.length > 0) {
+                errors.push(...result.errors);
+              }
+            } catch (chunkError: any) {
+              console.error('Error uploading chunk:', chunkError);
+              errors.push({ message: chunkError.message });
+            }
+          }
+          
+          // Refresh the schools list
+          const schoolsData = await schoolApi.getSchoolsPaginated({
+            page: 1,
+            pageSize: pageSize,
+          });
+          
+          setSchools(schoolsData.data);
+          setTotalPages(schoolsData.totalPages);
+          setTotalCount(schoolsData.totalCount);
+          
+          // Show appropriate message based on results
+          toast.dismiss(toastId);
+          
+          // If no records were created or updated, but we have errors, show error message
+          if (created === 0 && updated === 0 && errors.length > 0) {
+            // Group errors by type to show a summary
+            const errorTypes: Record<string, number> = {};
+            errors.slice(0, 100).forEach(err => {
+              const message = err.error || err.message || 'Unknown error';
+              errorTypes[message] = (errorTypes[message] || 0) + 1;
+            });
+            
+            // Get the most common error types
+            const commonErrors = Object.entries(errorTypes)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3);
+            
+            // Show error details
+            setUploadResults({
+              created, updated, skipped,
+              errors: errors,
+              total: data.length
+            });
+            
+            toast.error(
+              <div className="flex flex-col gap-1">
+                <div>CSV upload completed with errors</div>
+                <div className="text-sm text-muted-foreground">
+                  {skipped} rows skipped, {errors.length} errors
+                </div>
+                <div className="text-xs text-red-600 mt-1">
+                  Common errors:
+                  <ul className="list-disc pl-4 mt-1">
+                    {commonErrors.map(([error, count], i) => (
+                      <li key={i}>{error} ({count} occurrences)</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            );
+            
+            // Show error dialog with more details
+            // You could add a more detailed error dialog here if needed
+          } else {
+            toast.success(
+              <div className="flex flex-col gap-1">
+                <div>CSV upload completed successfully (manual method)</div>
+                <div className="text-sm text-muted-foreground">
+                  {created} created, {updated} updated, {skipped} skipped
+                  {errors.length > 0 ? `, ${errors.length} errors` : ''}
+                </div>
+              </div>
+            );
+          }
+        } catch (manualError: any) {
+          console.error('Manual CSV parsing also failed:', manualError);
+          toast.dismiss(toastId);
+          toast.error(manualError.message || 'Failed to parse CSV file using both methods');
+          setUploadProgress(0);
+        }
       }
     } catch (error: any) {
-      console.error("Error uploading CSV:", error);
-      // Dismiss the loading toast and show error
-      toast.dismiss(toastId);
-      toast.error(error.message || "Failed to upload CSV file");
-      setUploadProgress(0);
+      console.error('Error loading CSV:', error);
+      setShowPreview(false);
+      toast.error(`Failed to load CSV: ${error.message}`);
     } finally {
       setIsUploading(false);
       // Reset the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    }
+  };
+
+  // Handle initial file selection
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Check file type
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Only CSV files are allowed');
+      return;
+    }
+
+    // Store the file and show the preview dialog
+    setSelectedCsvFile(file);
+    // Start loading preview using the existing showCsvPreview function
+    showCsvPreview(file);
+  };
+  
+  const handleUploadConfirmation = (confirmed: boolean) => {
+    setShowPreview(false);
+    
+    if (confirmed && selectedCsvFile) {
+      processCsvFile();
     }
   };
 
@@ -505,6 +907,13 @@ export function SchoolsTab() {
             <Upload className="mr-2 h-4 w-4" />
             Upload CSV
           </Button>
+          {/* CSV Preview Dialog */}
+          <CsvPreviewDialog
+            isOpen={showPreview}
+            file={selectedCsvFile}
+            onClose={() => setShowPreview(false)}
+            onConfirm={() => handleUploadConfirmation(true)}
+          />
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button>Add School</Button>
