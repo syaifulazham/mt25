@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import OpenAI from "openai";
-import { getToken } from "next-auth/jwt";
+
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
 
 // Define types for the generated questions
 interface GeneratedQuestion {
@@ -24,13 +28,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
     }
     
-    // Check if the user is an organizer based on the role from the NextAuth session
-    const token = await getToken({ req: request });
-    console.log("Token for auth check:", token);
-    
-    // Organizers should have a role that is NOT 'PARTICIPANTS_MANAGER'
-    // Participant users have isParticipant set to true
-    if (!token || token.isParticipant === true) {
+    // Verify that this is an organizer account - we need to check based on user type
+    // The user from getCurrentUser() is either user_participant or user (organizer)
+    if ('role' in user) {
+      // This is an organizer user
+      if (!['ADMIN', 'OPERATOR', 'VIEWER'].includes(user.role)) {
+        return NextResponse.json({ error: "Unauthorized - Insufficient privileges" }, { status: 403 });
+      }
+    } else {
+      // This is a participant user - not allowed to access
       return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 
@@ -43,6 +49,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Set default language to English if not specified
+    const language = data.language || 'english';
 
     // Initialize OpenAI client
     const openai = new OpenAI({
@@ -58,11 +67,20 @@ export async function POST(request: NextRequest) {
     let specificTopics = data.specific_topics ? `Focus on these specific topics: ${data.specific_topics}.` : '';
     let includeImages = data.with_images ? "Include a brief description for an appropriate image where relevant." : '';
     
+    // Add language instruction
+    let languageInstruction = '';
+    if (language === 'malay') {
+      languageInstruction = "Generate all questions and answers in Bahasa Melayu. Pastikan semua soalan dan jawapan ditulis dalam Bahasa Melayu yang standard dan gramatis.";
+    } else {
+      languageInstruction = "Generate all questions and answers in English.";
+    }
+    
     // Create a structured prompt that will help OpenAI format the response correctly
     const systemPrompt = `You are an expert educational content creator specializing in creating high-quality quiz questions.
     Your task is to generate ${data.count} ${data.difficulty} level questions about ${data.knowledge_field} for ${data.target_group} students.
     ${specificTopics}
     ${includeImages}
+    ${languageInstruction}
     
     Your response MUST be a valid JSON object with the following structure:
     {
@@ -93,7 +111,7 @@ export async function POST(request: NextRequest) {
       model: "gpt-3.5-turbo-16k", // More widely available model with good context length
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Generate ${data.count} ${data.difficulty} ${data.answer_type} questions about ${data.knowledge_field} for ${data.target_group} education level. Respond with ONLY a valid JSON object following the format in my instructions.` }
+        { role: "user", content: `Generate ${data.count} ${data.difficulty} ${data.answer_type} questions about ${data.knowledge_field} for ${data.target_group} education level in ${language === 'malay' ? 'Bahasa Melayu' : 'English'}. Respond with ONLY a valid JSON object following the format in my instructions.` }
       ],
       temperature: 0.7,
       max_tokens: 3000
@@ -347,13 +365,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
     }
     
-    // Check if the user is an organizer based on the role from the NextAuth session
-    const token = await getToken({ req: request });
-    console.log("Token for auth check (GET):", token);
-    
-    // Organizers should have a role that is NOT 'PARTICIPANTS_MANAGER'
-    // Participant users have isParticipant set to true
-    if (!token || token.isParticipant === true) {
+    // Verify that this is an organizer account - we need to check based on user type
+    if ('role' in user) {
+      // This is an organizer user
+      if (!['ADMIN', 'OPERATOR', 'VIEWER'].includes(user.role)) {
+        return NextResponse.json({ error: "Unauthorized - Insufficient privileges" }, { status: 403 });
+      }
+    } else {
+      // This is a participant user - not allowed to access
       return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 

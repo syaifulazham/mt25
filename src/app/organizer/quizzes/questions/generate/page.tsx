@@ -55,6 +55,12 @@ const difficultyLevels = [
   { value: "hard", label: "Hard" },
 ];
 
+// Language options
+const languageOptions = [
+  { value: "english", label: "English" },
+  { value: "malay", label: "Bahasa Melayu" },
+];
+
 // Mock generated questions for demo
 const mockGeneratedQuestions = [
   {
@@ -135,6 +141,7 @@ export default function GenerateQuestionsPage() {
     answer_type: "single_selection",
     number_of_questions: 3,
     difficulty: "medium",
+    language: "english", // Default to English
     with_images: false,
     specific_topics: "",
   });
@@ -167,6 +174,7 @@ export default function GenerateQuestionsPage() {
           answer_type: formState.answer_type,
           count: formState.number_of_questions,
           difficulty: formState.difficulty,
+          language: formState.language,
           with_images: formState.with_images,
           specific_topics: formState.specific_topics,
         }),
@@ -326,6 +334,25 @@ export default function GenerateQuestionsPage() {
                   {answerTypes.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="language">Language</Label>
+              <Select
+                value={formState.language}
+                onValueChange={(value) => handleInputChange("language", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {languageOptions.map((lang) => (
+                    <SelectItem key={lang.value} value={lang.value}>
+                      {lang.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
