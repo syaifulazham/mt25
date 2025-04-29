@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // GET /api/organizer/target-groups
 export async function GET(request: NextRequest) {
   try {
@@ -23,10 +28,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all target groups, ordered by sort_order
-    const targetGroups = await prisma.target_group.findMany({
+    // Fetch all target groups, ordered by id
+    const targetGroups = await prisma.targetgroup.findMany({
       orderBy: {
-        sort_order: 'asc'
+        id: 'asc'
       }
     });
 

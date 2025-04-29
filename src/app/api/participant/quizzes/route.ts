@@ -3,6 +3,11 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { getToken } from "next-auth/jwt";
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // GET /api/participant/quizzes
 // Get all published quizzes available for contestants
 export async function GET(request: NextRequest) {
