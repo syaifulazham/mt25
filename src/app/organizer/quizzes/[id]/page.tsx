@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -47,64 +47,68 @@ type QuizQuestion = Question & {
   points: number;
 };
 
-// Mock quiz data
-const mockQuiz = {
-  id: 1,
-  quiz_name: "Science Knowledge Quiz",
-  description: "Test your understanding of basic scientific concepts",
-  target_group: "SECONDARY",
-  time_limit: 30,
-  status: "created",
-  publishedAt: null,
-  createdAt: new Date("2025-04-28"),
-  updatedAt: new Date("2025-04-28"),
-  createdBy: 1,
-  creatorName: "Admin User",
-  totalQuestions: 2,
-  totalPoints: 3,
+// Interface for Quiz with correct types
+type Quiz = {
+  id: number;
+  quiz_name: string;
+  description: string | null;
+  target_group: string;
+  time_limit: number | null;
+  status: string;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  creatorName: string;
+  totalQuestions: number;
+  totalPoints: number;
+  questions?: QuizQuestion[];
 };
-
-// Mock data for questions already assigned to the quiz
-const mockAssignedQuestions: QuizQuestion[] = [
-  {
-    id: 2,
-    target_group: "SECONDARY",
-    knowledge_field: "physics",
-    question: "What is the formula for calculating force?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "F = ma" },
-      { option: "B", answer: "F = mg" },
-      { option: "C", answer: "F = mv²/r" },
-      { option: "D", answer: "F = mc²" }
-    ],
-    answer_correct: "A",
-    order: 1,
-    points: 1,
-  },
-  {
-    id: 4,
-    target_group: "SECONDARY",
-    knowledge_field: "chemistry",
-    question: "Which of the following is a noble gas?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "Hydrogen" },
-      { option: "B", answer: "Oxygen" },
-      { option: "C", answer: "Neon" },
-      { option: "D", answer: "Nitrogen" }
-    ],
-    answer_correct: "C",
-    order: 2,
-    points: 2,
-  },
-];
 
 export default function QuizDetailPage({ params }: { params: { id: string } }) {
   const quizId = parseInt(params.id);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [assignedQuestions, setAssignedQuestions] = useState<QuizQuestion[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch quiz data
+  useEffect(() => {
+    const fetchQuizData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch quiz details
+        const quizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+        if (!quizResponse.ok) {
+          throw new Error('Failed to load quiz details');
+        }
+        const quizData = await quizResponse.json();
+        setQuiz(quizData);
+        
+        // Fetch questions for this quiz
+        const questionsResponse = await fetch(`/api/organizer/quizzes/${quizId}/questions`);
+        if (!questionsResponse.ok) {
+          throw new Error('Failed to load quiz questions');
+        }
+        const questionsData = await questionsResponse.json();
+        setAssignedQuestions(questionsData);
+      } catch (error) {
+        console.error('Error loading quiz data:', error);
+        setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (quizId) {
+      fetchQuizData();
+    }
+  }, [quizId]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -148,39 +152,71 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
   };
 
   const publishQuiz = async () => {
-    setIsLoading(true);
-    
+    setActionLoading(true);
+
     try {
-      // Here we would send the request to publish the quiz
-      // const response = await fetch(`/api/organizer/quizzes/${quizId}/publish`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   }
-      // });
-      
-      // For demo purposes, we'll just simulate an API call
-      setTimeout(() => {
-        toast.success("Quiz published successfully!");
-        setIsLoading(false);
-        setIsPublishDialogOpen(false);
-        // Refresh the page to show updated status
-        window.location.reload();
-      }, 1500);
-      
+      // Send the request to publish the quiz
+      const response = await fetch(`/api/organizer/quizzes/${quizId}/publish`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to publish quiz');
+      }
+
+      toast.success("Quiz published successfully!");
+      setIsPublishDialogOpen(false);
+
+      // Refresh quiz data
+      const updatedQuizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+      if (updatedQuizResponse.ok) {
+        const updatedQuizData = await updatedQuizResponse.json();
+        setQuiz(updatedQuizData);
+      }
     } catch (error) {
       console.error("Error publishing quiz:", error);
-      toast.error("Failed to publish quiz. Please try again.");
-      setIsLoading(false);
+      toast.error(error instanceof Error ? error.message : "Failed to publish quiz");
+    } finally {
+      setActionLoading(false);
     }
   };
 
+  // Show loading or error states
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 flex flex-col items-center justify-center h-64">
+        <div className="flex items-center space-x-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+          <p>Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !quiz) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="bg-red-50 border border-red-200 p-4 rounded-md">
+          <h2 className="text-lg font-semibold text-red-800">Error Loading Quiz</h2>
+          <p className="text-red-700">{error || 'Quiz not found'}</p>
+          <Button variant="outline" size="sm" className="mt-4" asChild>
+            <Link href="/organizer/quizzes">
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Back to Quizzes
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto py-6 space-y-8">
+    <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
         <PageHeader 
-          title={mockQuiz.quiz_name} 
-          description={mockQuiz.description || "No description provided"}
+          title={quiz.quiz_name}
+          description={`Quiz for ${quiz.target_group}`}
         />
         <div className="flex gap-2">
           <Button variant="outline" size="sm" asChild>
@@ -210,43 +246,43 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Target Group</p>
-                      <p className="font-medium">{mockQuiz.target_group}</p>
+                      <p className="font-medium">{quiz.target_group}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Status</p>
-                      <div>{getStatusBadge(mockQuiz.status)}</div>
+                      <div>{getStatusBadge(quiz.status)}</div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Time Limit</p>
                       <p className="font-medium flex items-center">
                         <Clock className="w-4 h-4 mr-1 text-gray-400" />
-                        {mockQuiz.time_limit ? `${mockQuiz.time_limit} minutes` : "No time limit"}
+                        {quiz.time_limit ? `${quiz.time_limit} minutes` : "No time limit"}
                       </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Created On</p>
                       <p className="font-medium flex items-center">
                         <Calendar className="w-4 h-4 mr-1 text-gray-400" />
-                        {format(mockQuiz.createdAt, "MMMM d, yyyy")}
+                        {format(new Date(quiz.createdAt), "MMMM d, yyyy")}
                       </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Questions</p>
-                      <p className="font-medium">{mockQuiz.totalQuestions} questions</p>
+                      <p className="font-medium">{assignedQuestions.length} questions</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Total Points</p>
-                      <p className="font-medium">{mockQuiz.totalPoints} points</p>
+                      <p className="font-medium">{assignedQuestions.reduce((sum, q) => sum + q.points, 0)} points</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Created By</p>
-                      <p className="font-medium">{mockQuiz.creatorName}</p>
+                      <p className="font-medium">{quiz.creatorName}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-gray-500">Published Date</p>
                       <p className="font-medium">
-                        {mockQuiz.publishedAt 
-                          ? format(mockQuiz.publishedAt, "MMMM d, yyyy") 
+                        {quiz.publishedAt 
+                          ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") 
                           : "Not published yet"}
                       </p>
                     </div>
@@ -263,7 +299,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                     <Dialog open={isPublishDialogOpen} onOpenChange={setIsPublishDialogOpen}>
                       <DialogTrigger asChild>
                         <Button 
-                          disabled={mockQuiz.status !== 'created' || mockQuiz.totalQuestions === 0}
+                          disabled={quiz.status !== 'created' || assignedQuestions.length === 0}
                         >
                           Publish Quiz
                         </Button>
@@ -288,16 +324,16 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                           <div className="mt-4 space-y-3">
                             <div className="flex justify-between">
                               <span>Quiz Name:</span>
-                              <span className="font-medium">{mockQuiz.quiz_name}</span>
+                              <span className="font-medium">{quiz.quiz_name}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Questions:</span>
-                              <span className="font-medium">{mockQuiz.totalQuestions} questions</span>
+                              <span className="font-medium">{assignedQuestions.length} questions</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Time Limit:</span>
                               <span className="font-medium">
-                                {mockQuiz.time_limit ? `${mockQuiz.time_limit} minutes` : "No time limit"}
+                                {quiz.time_limit ? `${quiz.time_limit} minutes` : "No time limit"}
                               </span>
                             </div>
                           </div>
@@ -306,8 +342,8 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                           <Button variant="outline" onClick={() => setIsPublishDialogOpen(false)}>
                             Cancel
                           </Button>
-                          <Button onClick={publishQuiz} disabled={isLoading}>
-                            {isLoading ? "Publishing..." : "Publish Quiz"}
+                          <Button onClick={publishQuiz} disabled={actionLoading}>
+                            {actionLoading ? "Publishing..." : "Publish Quiz"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -323,7 +359,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   <div>
                     <CardTitle>Quiz Questions</CardTitle>
                     <CardDescription>
-                      {mockAssignedQuestions.length} questions • {mockAssignedQuestions.reduce((sum, q) => sum + q.points, 0)} total points
+                      {assignedQuestions.length} questions • {assignedQuestions.reduce((sum, q) => sum + q.points, 0)} total points
                     </CardDescription>
                   </div>
                   <Button variant="outline" asChild>
@@ -334,7 +370,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  {mockAssignedQuestions.length === 0 ? (
+                  {assignedQuestions.length === 0 ? (
                     <div className="text-center py-12 border rounded-md bg-gray-50">
                       <h3 className="text-lg font-medium mb-2">No questions assigned</h3>
                       <p className="text-gray-500 mb-4">
@@ -354,12 +390,11 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                             <TableHead className="w-[60px]">Order</TableHead>
                             <TableHead>Question</TableHead>
                             <TableHead>Type</TableHead>
-                            <TableHead>Field</TableHead>
                             <TableHead className="text-right">Points</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {mockAssignedQuestions.map((question) => (
+                          {assignedQuestions.map((question) => (
                             <TableRow key={question.id}>
                               <TableCell className="font-medium text-center">{question.order}</TableCell>
                               <TableCell>
@@ -372,9 +407,6 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                                 <Badge className={getTypeBadgeColor(question.answer_type)}>
                                   {getTypeLabel(question.answer_type)}
                                 </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="capitalize">{question.knowledge_field}</div>
                               </TableCell>
                               <TableCell className="text-right font-medium">
                                 {question.points} point{question.points !== 1 ? 's' : ''}
@@ -400,26 +432,26 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                 <CardContent>
                   <div className="max-w-2xl mx-auto border rounded-lg overflow-hidden">
                     <div className="bg-primary/10 p-4 border-b">
-                      <h2 className="text-xl font-bold">{mockQuiz.quiz_name}</h2>
-                      {mockQuiz.description && <p className="text-sm mt-1">{mockQuiz.description}</p>}
+                      <h2 className="text-xl font-bold">{quiz.quiz_name}</h2>
+                      {quiz.description && <p className="text-sm mt-1">{quiz.description}</p>}
                       
                       <div className="flex items-center gap-2 mt-3">
                         <div className="bg-white rounded-full px-3 py-1 text-sm flex items-center">
                           <Clock className="w-3.5 h-3.5 mr-1" />
-                          {mockQuiz.time_limit ? `${mockQuiz.time_limit} min` : "No limit"}
+                          {quiz.time_limit ? `${quiz.time_limit} min` : "No limit"}
                         </div>
                         <div className="bg-white rounded-full px-3 py-1 text-sm flex items-center">
                           <List className="w-3.5 h-3.5 mr-1" />
-                          {mockQuiz.totalQuestions} questions
+                          {assignedQuestions.length} questions
                         </div>
                         <div className="bg-white rounded-full px-3 py-1 text-sm flex items-center">
                           <Check className="w-3.5 h-3.5 mr-1" />
-                          {mockQuiz.totalPoints} points
+                          {assignedQuestions.reduce((sum, q) => sum + q.points, 0)} points
                         </div>
                       </div>
                     </div>
                     
-                    {mockAssignedQuestions.length === 0 ? (
+                    {assignedQuestions.length === 0 ? (
                       <div className="p-8 text-center text-gray-500">
                         <p>No questions have been added to this quiz yet.</p>
                       </div>
@@ -428,16 +460,16 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                         <div className="p-6 border-b">
                           <div className="flex items-center justify-between mb-3">
                             <div>
-                              <span className="text-sm text-gray-500">Question 1 of {mockAssignedQuestions.length}</span>
+                              <span className="text-sm text-gray-500">Question 1 of {assignedQuestions.length}</span>
                               <h3 className="text-lg font-medium">
-                                {mockAssignedQuestions[0].question}
+                                {assignedQuestions[0].question}
                               </h3>
                             </div>
-                            <Badge>{mockAssignedQuestions[0].points} pt{mockAssignedQuestions[0].points !== 1 ? 's' : ''}</Badge>
+                            <Badge>{assignedQuestions[0].points} pt{assignedQuestions[0].points !== 1 ? 's' : ''}</Badge>
                           </div>
                           
                           <div className="space-y-2 mt-4">
-                            {mockAssignedQuestions[0].answer_options.map((option) => (
+                            {assignedQuestions[0].answer_options.map((option) => (
                               <div 
                                 key={option.option} 
                                 className="flex items-center gap-3 p-3 border rounded-md hover:bg-gray-50 cursor-pointer"
@@ -453,7 +485,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                         
                         <div className="p-4 flex justify-between items-center bg-gray-50">
                           <Button variant="outline" disabled>Previous</Button>
-                          <span className="text-sm text-gray-500">Question 1 of {mockAssignedQuestions.length}</span>
+                          <span className="text-sm text-gray-500">Question 1 of {assignedQuestions.length}</span>
                           <Button>Next Question</Button>
                         </div>
                       </>
@@ -482,21 +514,21 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="text-xl font-semibold">
-                    {getStatusBadge(mockQuiz.status)}
+                    {getStatusBadge(quiz.status)}
                   </div>
                 </div>
                 
                 <div className="space-y-3 pt-2">
-                  {mockQuiz.status === 'created' && (
+                  {quiz.status === 'created' && (
                     <>
                       <div className="flex items-start gap-2 text-sm">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
                         <div>Quiz created successfully</div>
                       </div>
-                      {mockQuiz.totalQuestions > 0 ? (
+                      {assignedQuestions.length > 0 ? (
                         <div className="flex items-start gap-2 text-sm">
                           <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                          <div>Questions added ({mockQuiz.totalQuestions})</div>
+                          <div>Questions added ({assignedQuestions.length})</div>
                         </div>
                       ) : (
                         <div className="flex items-start gap-2 text-sm">
@@ -511,7 +543,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                     </>
                   )}
                   
-                  {mockQuiz.status === 'published' && (
+                  {quiz.status === 'published' && (
                     <>
                       <div className="flex items-start gap-2 text-sm">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
@@ -519,11 +551,11 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                       </div>
                       <div className="flex items-start gap-2 text-sm">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <div>Questions added ({mockQuiz.totalQuestions})</div>
+                        <div>Questions added ({assignedQuestions.length})</div>
                       </div>
                       <div className="flex items-start gap-2 text-sm">
                         <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                        <div>Published on {mockQuiz.publishedAt ? format(mockQuiz.publishedAt, "MMMM d, yyyy") : "N/A"}</div>
+                        <div>Published on {quiz.publishedAt ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") : 'N/A'}</div>
                       </div>
                     </>
                   )}
@@ -531,16 +563,16 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
               </div>
             </CardContent>
             <CardFooter className="border-t pt-6 flex flex-col gap-2">
-              {mockQuiz.status === 'created' && (
+              {quiz.status === 'created' && (
                 <>
                   <Button 
                     className="w-full" 
-                    disabled={mockQuiz.totalQuestions === 0}
+                    disabled={assignedQuestions.length === 0}
                     onClick={() => setIsPublishDialogOpen(true)}
                   >
                     Publish Quiz
                   </Button>
-                  {mockQuiz.totalQuestions === 0 && (
+                  {assignedQuestions.length === 0 && (
                     <p className="text-xs text-amber-600 text-center">
                       Add at least one question before publishing
                     </p>
@@ -548,7 +580,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                 </>
               )}
               
-              {mockQuiz.status === 'published' && (
+              {quiz.status === 'published' && (
                 <Button variant="outline" className="w-full bg-red-50 hover:bg-red-100 text-red-600 border-red-200">
                   Retract Quiz
                 </Button>
@@ -579,7 +611,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   Preview Quiz
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full justify-start" disabled={mockQuiz.status !== 'published'}>
+              <Button variant="outline" className="w-full justify-start" disabled={quiz.status !== 'published'}>
                 <Check className="w-4 h-4 mr-2" />
                 View Results
               </Button>
