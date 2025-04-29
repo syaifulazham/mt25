@@ -1,0 +1,68 @@
+// Update to Prisma schema to include quiz management models
+// This will be appended to the existing schema
+
+model question_bank {
+  id                Int                @id @default(autoincrement())
+  target_group      String             // Age or school level targeted
+  knowledge_field   String             // E.g., general science, robotics, AI, physics, math, etc.
+  question          String             @db.Text
+  question_image    String?            // URL to image if exists
+  answer_type       String             // single_selection, multiple_selection, binary
+  answer_options    Json               // JSON array of option objects
+  answer_correct    String             // Correct option(s) like "A" or "A,C" for multiple
+  createdBy         Int                // User ID of creator
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
+  creator           user               @relation(fields: [createdBy], references: [id])
+  quiz_questions    quiz_question[]    // Questions can be used in multiple quizzes
+  
+  @@index([createdBy])
+  @@index([knowledge_field])
+  @@index([target_group])
+}
+
+model quiz {
+  id                Int                @id @default(autoincrement())
+  target_group      String             // Age or school level targeted
+  quiz_name         String
+  description       String?            @db.Text
+  time_limit        Int?               // Time limit in minutes, null for no limit
+  publishedAt       DateTime?          // When quiz was published
+  status            String             // created, published, retracted, ended
+  createdBy         Int                // User ID of creator
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
+  creator           user               @relation(fields: [createdBy], references: [id])
+  quiz_questions    quiz_question[]    // Questions assigned to this quiz
+  
+  @@index([createdBy])
+  @@index([status])
+  @@index([target_group])
+}
+
+model quiz_question {
+  id                Int                @id @default(autoincrement())
+  quizId            Int
+  questionId        Int
+  order             Int                // Order of question in the quiz
+  points            Int                @default(1) // Points for this question
+  
+  // Relations
+  quiz              quiz               @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question          question_bank      @relation(fields: [questionId], references: [id])
+  
+  @@unique([quizId, questionId])      // A question can only be assigned once to a quiz
+  @@index([quizId])
+  @@index([questionId])
+}
+
+// Add these to user model relations (assuming it's not there)
+// user {
+//   ...existing fields
+//   question_banks    question_bank[]
+//   quizzes           quiz[]
+// }

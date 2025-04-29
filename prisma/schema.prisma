@@ -57,6 +57,7 @@ model contest {
   result            result[]
   submission        submission[]
   targetgroup       targetgroup[]         @relation("contesttotargetgroup")
+  quizzes           quiz[]               // Added relation to quizzes for QUIZ contest type
 
   @@index([judgingTemplateId], map: "Contest_judgingTemplateId_fkey")
   @@index([themeId], map: "Contest_themeId_fkey")
@@ -106,6 +107,7 @@ model contestant {
   contingent  contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
   submissions submission[]
   contests    contestParticipation[] // Direct relation to contests through participation table
+  quiz_attempts quiz_attempt[]      // Added relation to quiz attempts
   
   @@index([contingentId])
 }
@@ -331,22 +333,21 @@ model state {
 }
 
 model submission {
-  id          Int               @id @default(autoincrement())
-  userId      Int?
+  id          Int             @id @default(autoincrement())
   contestId   Int
-  fileUrl     String?
+  userId      Int?
+  submittedAt DateTime        @default(now())
   status      submission_status @default(PENDING)
-  description String?
-  submittedAt DateTime          @default(now())
-  title       String
   judging     judging[]
+  metadata    Json?
   result      result[]
-  contest     contest           @relation(fields: [contestId], references: [id], map: "Submission_contestId_fkey")
-  user        user?             @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
+  contest     contest         @relation(fields: [contestId], references: [id], map: "Submission_contestId_fkey")
+  user        user?           @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
   participantId Int?
-  participant user_participant? @relation(fields: [participantId], references: [id])
+  contestant   contestant?    @relation(fields: [contestantId], references: [id])
   contestantId Int?
-  contestant  contestant?       @relation(fields: [contestantId], references: [id], onDelete: SetNull)
+  participant  user_participant? @relation(fields: [participantId], references: [id])
+  quiz_attempts quiz_attempt[] // Added for quiz contest submissions, onDelete: SetNull)
 
   @@index([contestId], map: "Submission_contestId_fkey")
   @@index([userId], map: "Submission_userId_fkey")
@@ -355,14 +356,14 @@ model submission {
 }
 
 model targetgroup {
-  id          Int       @id @default(autoincrement())
-  code        String    @unique(map: "TargetGroup_code_key")
-  name        String
-  ageGroup    String
-  schoolLevel String
-  maxAge      Int       @default(0)
-  minAge      Int       @default(0)
-  contest     contest[] @relation("contesttotargetgroup")
+  id              Int             @id @default(autoincrement())
+  code            String          @unique(map: "TargetGroup_code_key") 
+  name            String
+  ageGroup        String
+  schoolLevel     String
+  maxAge          Int             @default(0)
+  minAge          Int             @default(0)
+  contest         contest[]       @relation("contesttotargetgroup")
 }
 
 model theme {
@@ -418,9 +419,7 @@ model user_participant {
   submissions  submission[]
   contingentRequests contingentRequest[]
   managedContingents contingentManager[] // Added relation to managed contingents
-  
-  @@index([schoolId])
-  @@index([higherInstId])
+  quizzes quiz[]
 }
 
 model zone {
@@ -495,6 +494,103 @@ enum scope_area {
   ZONE
   STATE
   OPEN
+}
+
+// target_group model removed to avoid schema conflicts with existing targetgroup model
+
+model question_bank {
+  id                Int                @id @default(autoincrement())
+  target_group      String             // Target group name (e.g. PRIMARY, SECONDARY, HIGHER)
+  knowledge_field   String             // E.g., general science, robotics, AI, physics, math, etc.
+  question          String             @db.Text
+  question_image    String?            // URL to image if exists
+  answer_type       String             // single_selection, multiple_selection, binary
+  answer_options    Json               // JSON array of option objects
+  answer_correct    String             // Correct option(s) like "A" or "A,C" for multiple
+  createdBy         String?            // Username or email of creator (optional string instead of foreign key)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
+  quiz_questions    quiz_question[]    // Questions can be used in multiple quizzes
+  
+  @@index([knowledge_field])
+  @@index([target_group]) // Keep index for performance
+}
+
+model quiz {
+  id                Int                @id @default(autoincrement())
+  target_group      String              // Target group name (e.g. PRIMARY, SECONDARY, HIGHER)
+  quiz_name         String              // Name/title of the quiz
+  description       String?            @db.Text
+  time_limit        Int?               // Time limit in minutes, null for no limit
+  publishedAt       DateTime?          // When quiz was published
+  status            String             // created, published, retracted, ended
+  createdBy         Int                // User ID of creator
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  contestId         Int?               // Optional reference to contest if this quiz is part of a contest
+  
+  // Relations
+  creator           user_participant   @relation(fields: [createdBy], references: [id])
+  contest           contest?           @relation(fields: [contestId], references: [id])
+  quiz_questions    quiz_question[]    // Questions assigned to this quiz
+  quiz_attempts     quiz_attempt[]
+  
+  @@index([createdBy])
+  @@index([status])
+  @@index([target_group]) // Keep index for performance
+}
+
+model quiz_question {
+  id                Int                @id @default(autoincrement())
+  quizId            Int
+  questionId        Int
+  order             Int                // Order of question in the quiz
+  points            Int                @default(1) // Points for this question
+  
+  // Relations
+  quiz              quiz               @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question          question_bank      @relation(fields: [questionId], references: [id])
+  
+  @@unique([quizId, questionId])      // A question can only be assigned once to a quiz
+  @@index([quizId])
+  @@index([questionId])
+}
+
+model quiz_attempt {
+  id                Int                @id @default(autoincrement())
+  quizId            Int
+  contestantId      Int                // Changed from participantId to contestantId
+  status            String             // started, completed, abandoned
+  score             Int?               // Total score earned
+  start_time        DateTime
+  end_time          DateTime?
+  time_taken        Int?               // Time taken in seconds
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  submissionId      Int?               // Reference to submission record if this attempt is part of a contest
+  
+  quiz              quiz               @relation(fields: [quizId], references: [id])
+  contestant        contestant         @relation(fields: [contestantId], references: [id])
+  submission        submission?        @relation(fields: [submissionId], references: [id])
+  answers           quiz_answer[]
+
+  @@index([contestantId])
+  @@index([quizId])
+  @@index([submissionId])
+}
+
+model quiz_answer {
+  id                Int                @id @default(autoincrement())
+  attemptId         Int
+  questionId        Int                // ID of the quiz_question
+  selected_options  Json               // Array of selected option codes
+  is_correct        Boolean
+  points_earned     Int
+  createdAt         DateTime           @default(now())
+  
+  attempt           quiz_attempt       @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 }
 
 model contingentRequest {

@@ -1,0 +1,32 @@
+{
+  "nav.about": "Tungkol",
+  "nav.features": "Mga Katangian",
+  "nav.events": "Mga Kaganapan",
+  "nav.contact": "Makipag-ugnay",
+  "nav.login": "Mag-login",
+  "nav.register": "Magrehistro",
+  
+  "hero.title": "Techlympics 2025",
+  "hero.subtitle": "Kung Saan Nagtatagpo ang Inobasyon at Kompetisyon",
+  "hero.description": "Sumali sa nangungunang paligsahan sa teknolohiya para sa mga paaralan sa Malaysia! Ipakita ang iyong mga kasanayan sa coding, robotics, AI, at creative tech para manalo ng mga kahanga-hangang premyo.",
+  "hero.cta.register": "Magrehistro Ngayon",
+  "hero.cta.learnMore": "Alamin Pa",
+  
+  "announcements.title": "Mga Anunsyo",
+  "announcements.viewAll": "Tingnan Lahat",
+  
+  "themes.title": "Mga Tema ng Kompetisyon",
+  "themes.description": "Tuklasin ang aming mga kategorya ng kompetisyon para sa Techlympics 2025",
+  
+  "news.title": "Pinakabagong Balita",
+  "news.readMore": "Magbasa Pa",
+  "news.viewAll": "Tingnan Lahat ng Mga Artikulo",
+  
+  "footer.rights": "Lahat ng Karapatan ay Nakalaan",
+  "footer.techlympics": "Techlympics 2025",
+  
+  "language.english": "English",
+  "language.malay": "Bahasa Melayu",
+  "language.mandarin": "中文",
+  "language.filipino": "Filipino"
+}

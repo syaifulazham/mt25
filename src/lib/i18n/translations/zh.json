@@ -1,0 +1,32 @@
+{
+  "nav.about": "关于",
+  "nav.features": "特点",
+  "nav.events": "活动",
+  "nav.contact": "联系",
+  "nav.login": "登录",
+  "nav.register": "注册",
+  
+  "hero.title": "科技奥林匹克 2025",
+  "hero.subtitle": "创新与竞争的交汇处",
+  "hero.description": "加入马来西亚学校的顶级科技竞赛！展示您的编程、机器人、人工智能和创意科技技能，赢取丰厚奖品。",
+  "hero.cta.register": "立即注册",
+  "hero.cta.learnMore": "了解更多",
+  
+  "announcements.title": "公告",
+  "announcements.viewAll": "查看全部",
+  
+  "themes.title": "竞赛主题",
+  "themes.description": "探索科技奥林匹克 2025 的竞赛类别",
+  
+  "news.title": "最新消息",
+  "news.readMore": "阅读更多",
+  "news.viewAll": "查看所有文章",
+  
+  "footer.rights": "版权所有",
+  "footer.techlympics": "科技奥林匹克 2025",
+  
+  "language.english": "English",
+  "language.malay": "Bahasa Melayu",
+  "language.mandarin": "中文",
+  "language.filipino": "Filipino"
+}

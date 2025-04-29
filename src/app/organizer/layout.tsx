@@ -3,6 +3,7 @@ import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { user_role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { getBaseUrl } from "@/lib/url-utils";
 import React from "react";
 import { getSessionUser } from "@/lib/session";
 import { getEmergencyAuthUser } from "@/lib/auth-debug";
@@ -22,8 +23,9 @@ async function initializeSystem() {
     if (userCount === 0) {
       console.log('No users found in database. Creating initial admin user...');
       
-      // Call the system initialization API using relative URL that works in both environments
-      const response = await fetch('/api/system/init', {
+      // Call the system initialization API using absolute URL constructed from headers
+      const baseUrl = getBaseUrl();
+      const response = await fetch(`${baseUrl}/api/system/init`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -245,8 +245,9 @@ export function ContestForm({ initialData }: ContestFormProps) {
         toast.success("Contest created successfully");
       }
       
-      // Redirect back to contests list
-      router.push('/organizer/contests');
+      // For both create and edit operations, force a full page reload
+      // This ensures the contests table is completely refreshed with the latest data
+      window.location.href = '/organizer/contests';
     } catch (error) {
       console.error('Error saving contest:', error);
       toast.error("Failed to save contest");

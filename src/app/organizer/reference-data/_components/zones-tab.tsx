@@ -147,7 +147,6 @@ export function ZonesTab() {
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>States</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -163,7 +162,6 @@ export function ZonesTab() {
                   <TableRow key={zone.id}>
                     <TableCell>{zone.id}</TableCell>
                     <TableCell>{zone.name}</TableCell>
-                    <TableCell>{zone._count?.states || 0}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
