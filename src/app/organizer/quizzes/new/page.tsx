@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,14 +20,39 @@ import Link from "next/link";
 import { ChevronLeft, Clock, Save } from "lucide-react";
 import { toast } from "sonner";
 
-// Target group options
-const targetGroups = [
+// Default target group options (used as fallback)
+const defaultTargetGroups = [
   { value: "PRIMARY", label: "Primary School" },
   { value: "SECONDARY", label: "Secondary School" },
   { value: "HIGHER", label: "Higher Education" },
 ];
 
 export default function CreateQuizPage() {
+  // State for target groups (fetched from API)
+  const [targetGroups, setTargetGroups] = useState(defaultTargetGroups);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch target groups from API
+  useEffect(() => {
+    const fetchTargetGroups = async () => {
+      try {
+        const response = await fetch('/api/organizer/targetgroups');
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setTargetGroups(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching target groups:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchTargetGroups();
+  }, []);
+
   const [formState, setFormState] = useState({
     quiz_name: "",
     description: "",
@@ -70,26 +95,25 @@ export default function CreateQuizPage() {
     };
     
     try {
-      // Here we would send the data to the server
-      // const response = await fetch('/api/organizer/quizzes', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify(quizData),
-      // });
+      // Send the quiz data to the API
+      const response = await fetch('/api/organizer/quizzes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(quizData),
+      });
       
-      // if (!response.ok) {
-      //   throw new Error('Failed to create quiz');
-      // }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create quiz');
+      }
       
-      // Mock successful submission
-      setTimeout(() => {
-        toast.success("Quiz created successfully!");
-        setIsSubmitting(false);
-        // Redirect to assign questions page after successful creation
-        window.location.href = "/organizer/quizzes/1/questions"; // In a real app, this would use the new quiz ID
-      }, 1000);
+      const newQuiz = await response.json();
+      toast.success("Quiz created successfully!");
+      
+      // Redirect to quizzes page with full page reload
+      window.location.href = "/organizer/quizzes";
       
     } catch (error) {
       console.error("Error creating quiz:", error);

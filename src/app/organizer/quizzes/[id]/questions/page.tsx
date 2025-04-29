@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -63,129 +63,90 @@ type QuizQuestion = Question & {
   points: number;
 };
 
-// Mock quiz data
-const mockQuiz = {
-  id: 1,
-  quiz_name: "Science Knowledge Quiz",
-  description: "Test your understanding of basic scientific concepts",
-  target_group: "SECONDARY",
-  time_limit: 30,
-  status: "created",
-  publishedAt: null,
-  createdAt: new Date("2025-04-28"),
-  updatedAt: new Date("2025-04-28"),
+// Interface for Quiz
+type Quiz = {
+  id: number;
+  quiz_name: string;
+  description: string | null;
+  target_group: string;
+  time_limit: number | null;
+  status: string;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  totalQuestions: number;
+  totalPoints: number;
 };
-
-// Mock data for questions in the question bank
-const mockQuestionBank: Question[] = [
-  {
-    id: 1,
-    target_group: "SECONDARY",
-    knowledge_field: "general science",
-    question: "Which of the following is NOT a state of matter?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "Solid" },
-      { option: "B", answer: "Liquid" },
-      { option: "C", answer: "Gas" },
-      { option: "D", answer: "Energy" }
-    ],
-    answer_correct: "D",
-  },
-  {
-    id: 2,
-    target_group: "SECONDARY",
-    knowledge_field: "physics",
-    question: "What is the formula for calculating force?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "F = ma" },
-      { option: "B", answer: "F = mg" },
-      { option: "C", answer: "F = mv²/r" },
-      { option: "D", answer: "F = mc²" }
-    ],
-    answer_correct: "A",
-  },
-  {
-    id: 3,
-    target_group: "SECONDARY",
-    knowledge_field: "robotics",
-    question: "Which of the following sensors would be most appropriate for a line-following robot?",
-    question_image: "/images/line-following-robot.jpg",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "Ultrasonic sensor" },
-      { option: "B", answer: "IR reflectance sensor" },
-      { option: "C", answer: "Temperature sensor" },
-      { option: "D", answer: "Microphone" }
-    ],
-    answer_correct: "B",
-  },
-  {
-    id: 4,
-    target_group: "SECONDARY",
-    knowledge_field: "chemistry",
-    question: "Which of the following is a noble gas?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "Hydrogen" },
-      { option: "B", answer: "Oxygen" },
-      { option: "C", answer: "Neon" },
-      { option: "D", answer: "Nitrogen" }
-    ],
-    answer_correct: "C",
-  },
-  {
-    id: 5,
-    target_group: "SECONDARY",
-    knowledge_field: "biology",
-    question: "Which organelle is responsible for photosynthesis in plant cells?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "Mitochondria" },
-      { option: "B", answer: "Nucleus" },
-      { option: "C", answer: "Chloroplast" },
-      { option: "D", answer: "Ribosome" }
-    ],
-    answer_correct: "C",
-  },
-];
-
-// Mock data for questions already assigned to the quiz
-const mockAssignedQuestions: QuizQuestion[] = [
-  {
-    ...mockQuestionBank[1],
-    order: 1,
-    points: 1,
-  },
-  {
-    ...mockQuestionBank[3],
-    order: 2,
-    points: 2,
-  },
-];
 
 export default function QuizQuestionsPage({ params }: { params: { id: string } }) {
   const quizId = parseInt(params.id);
-  const [assignedQuestions, setAssignedQuestions] = useState<QuizQuestion[]>(mockAssignedQuestions);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [assignedQuestions, setAssignedQuestions] = useState<QuizQuestion[]>([]);
+  const [questionBank, setQuestionBank] = useState<Question[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState<number[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Load quiz details and assigned questions
+  useEffect(() => {
+    const fetchQuizData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch quiz details
+        const quizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+        if (!quizResponse.ok) {
+          throw new Error('Failed to load quiz details');
+        }
+        const quizData = await quizResponse.json();
+        setQuiz(quizData);
+        
+        // Fetch assigned questions
+        const questionsResponse = await fetch(`/api/organizer/quizzes/${quizId}/questions`);
+        if (!questionsResponse.ok) {
+          throw new Error('Failed to load quiz questions');
+        }
+        const questionsData = await questionsResponse.json();
+        setAssignedQuestions(questionsData);
+        
+        // Fetch question bank
+        const questionBankResponse = await fetch('/api/organizer/questions');
+        if (!questionBankResponse.ok) {
+          throw new Error('Failed to load question bank');
+        }
+        const questionBankData = await questionBankResponse.json();
+        setQuestionBank(questionBankData);
+      } catch (error) {
+        console.error('Error loading quiz data:', error);
+        setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (quizId) {
+      fetchQuizData();
+    }
+  }, [quizId]);
+  
   // Filter question bank questions, excluding ones already assigned
   const filterQuestionBank = (questions: Question[]) => {
     const assignedIds = assignedQuestions.map(q => q.id);
     
     return questions.filter(q => 
       !assignedIds.includes(q.id) && // Not already assigned
-      q.target_group === mockQuiz.target_group && // Matches quiz target group
+      quiz && q.target_group === quiz.target_group && // Matches quiz target group
       (q.question.toLowerCase().includes(searchTerm.toLowerCase()) || // Matches search
        q.knowledge_field.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
 
-  const availableQuestions = filterQuestionBank(mockQuestionBank);
+  const availableQuestions = filterQuestionBank(questionBank);
 
   const toggleQuestionSelection = (id: number) => {
     setSelectedQuestions(prev => 
@@ -277,28 +238,30 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
     setIsSaving(true);
     
     try {
-      // Here we would send the assigned questions to the API
-      // const response = await fetch(`/api/organizer/quizzes/${quizId}/questions`, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     questions: assignedQuestions.map(q => ({
-      //       questionId: q.id,
-      //       order: q.order,
-      //       points: q.points
-      //     }))
-      //   }),
-      // });
+      // Send the assigned questions to the API
+      const response = await fetch(`/api/organizer/quizzes/${quizId}/questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          questions: assignedQuestions.map(q => ({
+            questionId: q.id,
+            order: q.order,
+            points: q.points
+          }))
+        }),
+      });
       
-      // For demo purposes, we'll just simulate an API call
-      setTimeout(() => {
-        toast.success(`Updated quiz questions successfully!`);
-        setIsSaving(false);
-        // Redirect to quiz details page after saving
-        window.location.href = `/organizer/quizzes/${quizId}`;
-      }, 1500);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save quiz questions');
+      }
+      
+      toast.success(`Updated quiz questions successfully!`);
+      
+      // Redirect to quizzes list page after saving
+      window.location.href = `/organizer/quizzes`;
       
     } catch (error) {
       console.error("Error saving quiz questions:", error);
@@ -337,7 +300,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
     <div className="container mx-auto py-6 space-y-8">
       <div className="flex items-center justify-between">
         <PageHeader 
-          title={`Manage Quiz Questions: ${mockQuiz.quiz_name}`} 
+          title={`Manage Quiz Questions: ${quiz?.quiz_name || 'Loading...'}`} 
           description="Add and organize questions for this quiz"
         />
         <div className="flex gap-2">

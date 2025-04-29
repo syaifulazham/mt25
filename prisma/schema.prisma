@@ -419,7 +419,6 @@ model user_participant {
   submissions  submission[]
   contingentRequests contingentRequest[]
   managedContingents contingentManager[] // Added relation to managed contingents
-  quizzes quiz[]
 }
 
 model zone {
@@ -526,18 +525,16 @@ model quiz {
   time_limit        Int?               // Time limit in minutes, null for no limit
   publishedAt       DateTime?          // When quiz was published
   status            String             // created, published, retracted, ended
-  createdBy         Int                // User ID of creator
+  createdBy         String?            // Creator name or email (string instead of foreign key)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   contestId         Int?               // Optional reference to contest if this quiz is part of a contest
   
   // Relations
-  creator           user_participant   @relation(fields: [createdBy], references: [id])
   contest           contest?           @relation(fields: [contestId], references: [id])
   quiz_questions    quiz_question[]    // Questions assigned to this quiz
   quiz_attempts     quiz_attempt[]
   
-  @@index([createdBy])
   @@index([status])
   @@index([target_group]) // Keep index for performance
 }

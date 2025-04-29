@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,102 +40,85 @@ type Question = {
   order: number;
 };
 
-// Mock quiz data
-const mockQuiz = {
-  id: 1,
-  quiz_name: "Science Knowledge Quiz",
-  description: "Test your understanding of basic scientific concepts",
-  target_group: "SECONDARY",
-  time_limit: 30,
-  status: "created",
-  totalQuestions: 5,
-  totalPoints: 8
+// Types for quiz and questions
+type Quiz = {
+  id: number;
+  quiz_name: string;
+  description: string | null;
+  target_group: string;
+  time_limit: number | null;
+  status: string;
+  publishedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string | null;
+  creatorName: string;
+  totalQuestions: number;
+  totalPoints: number;
+  questions?: QuizQuestion[];
 };
 
-// Mock questions data
-const mockQuestions: Question[] = [
-  {
-    id: 1,
-    question: "What is the formula for calculating force?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "F = ma" },
-      { option: "B", answer: "F = mg" },
-      { option: "C", answer: "F = mv²/r" },
-      { option: "D", answer: "F = mc²" }
-    ],
-    answer_correct: "A",
-    points: 1,
-    order: 1
-  },
-  {
-    id: 2,
-    question: "Which of the following is a noble gas?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "Hydrogen" },
-      { option: "B", answer: "Oxygen" },
-      { option: "C", answer: "Neon" },
-      { option: "D", answer: "Nitrogen" }
-    ],
-    answer_correct: "C",
-    points: 2,
-    order: 2
-  },
-  {
-    id: 3,
-    question: "Identify the primary colors of light:",
-    answer_type: "multiple_selection",
-    answer_options: [
-      { option: "A", answer: "Red" },
-      { option: "B", answer: "Yellow" },
-      { option: "C", answer: "Blue" },
-      { option: "D", answer: "Green" }
-    ],
-    answer_correct: "A,C,D",
-    points: 3,
-    order: 3
-  },
-  {
-    id: 4,
-    question: "Is water a compound?",
-    answer_type: "binary",
-    answer_options: [
-      { option: "A", answer: "Yes" },
-      { option: "B", answer: "No" }
-    ],
-    answer_correct: "A",
-    points: 1,
-    order: 4
-  },
-  {
-    id: 5,
-    question: "What is the chemical formula for water?",
-    answer_type: "single_selection",
-    answer_options: [
-      { option: "A", answer: "H₂O" },
-      { option: "B", answer: "CO₂" },
-      { option: "C", answer: "NaCl" },
-      { option: "D", answer: "C₆H₁₂O₆" }
-    ],
-    answer_correct: "A",
-    points: 1,
-    order: 5
-  }
-];
+type QuizQuestion = Question & {
+  questionId: number;
+  quizId: number;
+};
 
 export default function QuizPreviewPage({ params }: { params: { id: string } }) {
   const quizId = parseInt(params.id);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string[]>>({});
   const [showAnswers, setShowAnswers] = useState(false);
-  const [timer, setTimer] = useState(mockQuiz.time_limit * 60);
+  const [timer, setTimer] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   
-  const currentQuestion = mockQuestions[currentQuestionIndex];
-  const totalQuestions = mockQuestions.length;
+  // Fetch quiz data
+  useEffect(() => {
+    const fetchQuizData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch quiz details
+        const quizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+        if (!quizResponse.ok) {
+          throw new Error('Failed to load quiz details');
+        }
+        const quizData = await quizResponse.json();
+        setQuiz(quizData);
+        
+        // Set timer based on quiz time limit
+        if (quizData.time_limit) {
+          setTimer(quizData.time_limit * 60);
+        }
+        
+        // Fetch questions for this quiz
+        const questionsResponse = await fetch(`/api/organizer/quizzes/${quizId}/questions`);
+        if (!questionsResponse.ok) {
+          throw new Error('Failed to load quiz questions');
+        }
+        const questionsData = await questionsResponse.json();
+        setQuestions(questionsData);
+      } catch (error) {
+        console.error('Error loading quiz data:', error);
+        setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (quizId) {
+      fetchQuizData();
+    }
+  }, [quizId]);
+  
+  const currentQuestion = questions.length > 0 ? questions[currentQuestionIndex] : null;
+  const totalQuestions = questions.length;
   
   // Format timer as MM:SS
   const formatTime = (seconds: number) => {
@@ -151,7 +134,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
   
   // Handle option selection
   const handleOptionSelect = (option: string) => {
-    if (quizCompleted) return;
+    if (quizCompleted || !currentQuestion) return;
     
     if (currentQuestion.answer_type === "multiple_selection") {
       // For multiple selection, toggle the selected option
@@ -180,7 +163,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
   
   // Check if option is selected
   const isOptionSelected = (option: string) => {
-    return (selectedAnswers[currentQuestion.id] || []).includes(option);
+    return (selectedAnswers[currentQuestion?.id || 0] || []).includes(option);
   };
   
   // Navigate to previous question
@@ -199,7 +182,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
   
   // Check if answer is correct
   const isAnswerCorrect = (questionId: number) => {
-    const question = mockQuestions.find(q => q.id === questionId);
+    const question = questions.find(q => q.id === questionId);
     if (!question) return false;
     
     const userAnswers = selectedAnswers[questionId] || [];
@@ -213,7 +196,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
   
   // Calculate total score
   const calculateScore = () => {
-    return mockQuestions.reduce((total, question) => {
+    return questions.reduce((total, question) => {
       return total + (isAnswerCorrect(question.id) ? question.points : 0);
     }, 0);
   };
@@ -226,12 +209,41 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
     toast.success("Quiz completed! View your results below.");
   };
 
+  // Show loading or error states
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 flex flex-col items-center justify-center h-64">
+        <div className="flex items-center space-x-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+          <p>Loading quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !quiz) {
+    return (
+      <div className="container mx-auto py-6">
+        <div className="bg-red-50 border border-red-200 p-4 rounded-md">
+          <h2 className="text-lg font-semibold text-red-800">Error Loading Quiz</h2>
+          <p className="text-red-700">{error || 'Quiz not found'}</p>
+          <Button variant="outline" size="sm" className="mt-4" asChild>
+            <Link href="/organizer/quizzes">
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Back to Quizzes
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between">
         <PageHeader 
-          title="Quiz Preview" 
-          description="View the quiz exactly as participants will see it"
+          title={`Preview: ${quiz.quiz_name}`} 
+          description="Review the questions and answers before publishing"
         >
           <TooltipProvider>
             <Tooltip>
@@ -278,10 +290,10 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
             <div className="space-y-2">
               <h4 className="font-medium">Quiz Information:</h4>
               <ul className="text-sm space-y-1">
-                <li><span className="font-medium">Name:</span> {mockQuiz.quiz_name}</li>
-                <li><span className="font-medium">Questions:</span> {mockQuiz.totalQuestions}</li>
-                <li><span className="font-medium">Total Points:</span> {mockQuiz.totalPoints}</li>
-                <li><span className="font-medium">Time Limit:</span> {mockQuiz.time_limit} minutes</li>
+                <li><span className="font-medium">Name:</span> {quiz.quiz_name}</li>
+                <li><span className="font-medium">Questions:</span> {totalQuestions}</li>
+                <li><span className="font-medium">Total Points:</span> {questions.reduce((sum, q) => sum + q.points, 0)}</li>
+                <li><span className="font-medium">Time Limit:</span> {quiz.time_limit} minutes</li>
               </ul>
             </div>
           </div>
@@ -298,8 +310,8 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
             <CardHeader className="border-b bg-primary/5">
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle>{mockQuiz.quiz_name}</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{mockQuiz.description}</p>
+                  <CardTitle>{quiz.quiz_name}</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">{quiz.description}</p>
                 </div>
                 <div className="flex items-center space-x-2">
                   {!isTimerRunning ? (
@@ -333,13 +345,13 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                         Question {currentQuestionIndex + 1} of {totalQuestions}
                       </div>
                       <Badge variant="outline">
-                        {currentQuestion.points} point{currentQuestion.points !== 1 ? 's' : ''}
+                        {currentQuestion?.points} point{currentQuestion?.points !== 1 ? 's' : ''}
                       </Badge>
                     </div>
                     
-                    <h3 className="text-xl font-medium">{currentQuestion.question}</h3>
+                    <h3 className="text-xl font-medium">{currentQuestion?.question}</h3>
                     
-                    {currentQuestion.question_image && (
+                    {currentQuestion?.question_image && (
                       <div className="my-4 bg-gray-100 p-4 rounded-md flex items-center justify-center">
                         <div className="text-sm text-gray-500">
                           [Image would be displayed here]
@@ -348,14 +360,14 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                     )}
                     
                     <div className="text-sm mt-2 text-primary/70">
-                      {currentQuestion.answer_type === "multiple_selection" 
+                      {currentQuestion?.answer_type === "multiple_selection" 
                         ? "Select all that apply" 
                         : "Select one option"}
                     </div>
                   </div>
                   
                   <div className="space-y-3 mt-4">
-                    {currentQuestion.answer_options.map((option) => (
+                    {currentQuestion?.answer_options.map((option) => (
                       <div 
                         key={option.option}
                         className={`
@@ -433,7 +445,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                   <div>
                     <h3 className="font-medium text-green-800">Quiz Completed!</h3>
                     <p className="text-sm text-green-700">
-                      You've completed the {mockQuiz.quiz_name}
+                      You've completed the {quiz.quiz_name}
                     </p>
                   </div>
                 </div>
@@ -442,17 +454,17 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                   <div className="bg-slate-50 p-4 rounded-lg flex flex-col items-center justify-center">
                     <div className="text-sm text-slate-500 mb-1">Your Score</div>
                     <div className="text-3xl font-bold text-primary">
-                      {calculateScore()}/{mockQuiz.totalPoints}
+                      {calculateScore()}/{questions.reduce((sum, q) => sum + q.points, 0)}
                     </div>
                     <div className="text-sm text-slate-500 mt-1">
-                      {Math.round((calculateScore() / mockQuiz.totalPoints) * 100)}%
+                      {Math.round((calculateScore() / questions.reduce((sum, q) => sum + q.points, 0)) * 100)}%
                     </div>
                   </div>
                   
                   <div className="bg-slate-50 p-4 rounded-lg flex flex-col items-center justify-center">
                     <div className="text-sm text-slate-500 mb-1">Questions</div>
                     <div className="text-3xl font-bold text-primary">
-                      {mockQuestions.filter(q => isAnswerCorrect(q.id)).length}/{totalQuestions}
+                      {questions.filter(q => isAnswerCorrect(q.id)).length}/{totalQuestions}
                     </div>
                     <div className="text-sm text-slate-500 mt-1">
                       Correct Answers
@@ -462,10 +474,10 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                   <div className="bg-slate-50 p-4 rounded-lg flex flex-col items-center justify-center">
                     <div className="text-sm text-slate-500 mb-1">Time Used</div>
                     <div className="text-3xl font-bold text-primary">
-                      {formatTime((mockQuiz.time_limit * 60) - timer)}
+                      {formatTime((quiz.time_limit || 1) * 60 - timer)}
                     </div>
                     <div className="text-sm text-slate-500 mt-1">
-                      of {mockQuiz.time_limit} minutes
+                      of {quiz.time_limit} minutes
                     </div>
                   </div>
                 </div>
@@ -475,7 +487,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                 <div className="space-y-6">
                   <h3 className="font-medium text-lg">Answer Review</h3>
                   
-                  {mockQuestions.map((question, index) => {
+                  {questions.map((question, index) => {
                     const userAnswers = selectedAnswers[question.id] || [];
                     const correctAnswers = question.answer_correct.split(',');
                     const isCorrect = isAnswerCorrect(question.id);
@@ -548,7 +560,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                 setShowAnswers(false);
                 setSelectedAnswers({});
                 setCurrentQuestionIndex(0);
-                setTimer(mockQuiz.time_limit * 60);
+                setTimer((quiz?.time_limit || 30) * 60);
               }}>
                 Restart Preview
               </Button>

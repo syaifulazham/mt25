@@ -7,8 +7,13 @@ import { getCurrentUser } from "@/lib/session";
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+    
+    // Check if user is an organizer (not a participant)
+    if ((user as any).isParticipant === true) {
+      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -36,12 +41,6 @@ export async function GET(request: NextRequest) {
     const quizzes = await prisma.quiz.findMany({
       where: Object.keys(filters).length > 0 ? filters : undefined,
       include: {
-        creator: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
         quiz_questions: {
           select: {
             id: true,
@@ -65,8 +64,8 @@ export async function GET(request: NextRequest) {
       publishedAt: quiz.publishedAt,
       createdAt: quiz.createdAt,
       updatedAt: quiz.updatedAt,
-      createdBy: quiz.createdBy,
-      creatorName: quiz.creator.name,
+      createdBy: quiz.createdBy || 'Unknown',
+      creatorName: quiz.createdBy || 'Unknown', // Use createdBy string directly
       totalQuestions: quiz.quiz_questions.length,
       totalPoints: quiz.quiz_questions.reduce((sum, q) => sum + q.points, 0)
     }));
@@ -83,8 +82,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+    
+    // Check if user is an organizer (not a participant)
+    if ((user as any).isParticipant === true) {
+      return NextResponse.json({ error: "Unauthorized - Only organizers can create quizzes" }, { status: 403 });
     }
 
     const data = await request.json();
@@ -97,21 +101,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the quiz
-    const quiz = await prisma.quiz.create({
-      data: {
-        quiz_name: data.quiz_name,
-        description: data.description,
-        target_group: data.target_group,
-        time_limit: data.time_limit ? parseInt(data.time_limit) : null,
-        status: "created", // Default status is "created"
-        createdBy: user.id
-      }
+    // Log the request data
+    console.log('[API] Creating quiz with data:', {
+      quizName: data.quiz_name,
+      targetGroup: data.target_group,
+      userId: user.id,
+      userName: user.name || user.email,
     });
+    
+    try {
+      // Get creator info to store as string
+      const creatorInfo = user.name || user.email || 'Admin user';
+      
+      // Create the quiz with createdBy as string
+      const quiz = await prisma.quiz.create({
+        data: {
+          quiz_name: data.quiz_name,
+          description: data.description || '',
+          target_group: data.target_group,
+          time_limit: data.time_limit ? parseInt(data.time_limit) : null,
+          status: "created", // Default status is "created"
+          createdBy: creatorInfo  // Use name/email as string instead of ID
+        }
+      });
+      
+      console.log(`[API] Created quiz with ID ${quiz.id}, name: ${quiz.quiz_name}`);
+      
+      // If there are questions to add, handle them here
+      if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+        // Process questions here if needed
+      }
 
-    return NextResponse.json(quiz, { status: 201 });
+      return NextResponse.json(quiz, { status: 201 });
+    } catch (error) {
+      console.error("[API] Error in quiz creation:", error);
+      return NextResponse.json({ error: `Error saving quiz: ${error}` }, { status: 500 });
+    }
   } catch (error) {
-    console.error("[API] Error creating quiz:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("[API] Error in main try block:", error);
+    return NextResponse.json({ error: `Error processing request: ${error}` }, { status: 500 });
   }
 }

@@ -10,8 +10,13 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+    
+    // Check if user is an organizer (not a participant)
+    if ((user as any).isParticipant === true) {
+      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 
     const quizId = parseInt(params.id);
@@ -22,12 +27,6 @@ export async function GET(
     const quiz = await prisma.quiz.findUnique({
       where: { id: quizId },
       include: {
-        creator: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
         quiz_questions: {
           include: {
             question: true,
@@ -49,13 +48,13 @@ export async function GET(
       quiz_name: quiz.quiz_name,
       description: quiz.description,
       target_group: quiz.target_group,
+      createdBy: quiz.createdBy,
       time_limit: quiz.time_limit,
       status: quiz.status,
       publishedAt: quiz.publishedAt,
       createdAt: quiz.createdAt,
       updatedAt: quiz.updatedAt,
-      createdBy: quiz.createdBy,
-      creatorName: quiz.creator.name,
+      creatorName: quiz.createdBy || 'Quiz Administrator',
       totalQuestions: quiz.quiz_questions.length,
       totalPoints: quiz.quiz_questions.reduce((sum, q) => sum + q.points, 0),
       questions: quiz.quiz_questions.map((qq) => ({
@@ -87,8 +86,13 @@ export async function PUT(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+    
+    // Check if user is an organizer (not a participant)
+    if ((user as any).isParticipant === true) {
+      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 
     const quizId = parseInt(params.id);
@@ -150,8 +154,13 @@ export async function DELETE(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+    
+    // Check if user is an organizer (not a participant)
+    if ((user as any).isParticipant === true) {
+      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 
     const quizId = parseInt(params.id);

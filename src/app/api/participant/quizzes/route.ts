@@ -54,12 +54,6 @@ export async function GET(request: NextRequest) {
         }
       },
       include: {
-        creator: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
         quiz_questions: {
           select: {
             id: true,
@@ -83,19 +77,34 @@ export async function GET(request: NextRequest) {
     const completedQuizIds = new Set(quizAttempts.map(attempt => attempt.quizId));
 
     // Transform the data for the client
-    const transformedQuizzes = quizzes.map(quiz => ({
-      id: quiz.id,
-      quiz_name: quiz.quiz_name,
-      description: quiz.description,
-      target_group: quiz.target_group,
-      time_limit: quiz.time_limit,
-      status: quiz.status,
-      publishedAt: quiz.publishedAt,
-      totalQuestions: quiz.quiz_questions.length,
-      totalPoints: quiz.quiz_questions.reduce((sum, q) => sum + q.points, 0),
-      creatorName: quiz.creator.name,
-      completed: completedQuizIds.has(quiz.id)
-    }));
+    const transformedQuizzes = quizzes.map(quiz => {
+      // Use type assertion to address TypeScript issue with included relations
+      const quizWithRelations = quiz as unknown as {
+        id: number;
+        quiz_name: string;
+        description: string | null;
+        target_group: string;
+        time_limit: number | null;
+        status: string;
+        publishedAt: Date | null;
+        createdBy: string | null;
+        quiz_questions: { id: number; points: number }[];
+      };
+      
+      return {
+        id: quiz.id,
+        quiz_name: quiz.quiz_name,
+        description: quiz.description,
+        target_group: quiz.target_group,
+        time_limit: quiz.time_limit,
+        status: quiz.status,
+        publishedAt: quiz.publishedAt,
+        totalQuestions: quizWithRelations.quiz_questions.length,
+        totalPoints: quizWithRelations.quiz_questions.reduce((sum, q) => sum + q.points, 0),
+        creatorName: quiz.createdBy || 'Quiz Administrator',
+        completed: completedQuizIds.has(quiz.id)
+      };
+    });
 
     return NextResponse.json(transformedQuizzes);
   } catch (error) {
