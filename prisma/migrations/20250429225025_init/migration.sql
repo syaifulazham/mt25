@@ -319,13 +319,11 @@ CREATE TABLE `state` (
 -- CreateTable
 CREATE TABLE `submission` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `userId` INTEGER NULL,
     `contestId` INTEGER NOT NULL,
-    `fileUrl` VARCHAR(191) NULL,
-    `status` ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
-    `description` VARCHAR(191) NULL,
+    `userId` INTEGER NULL,
     `submittedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `title` VARCHAR(191) NOT NULL,
+    `status` ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
+    `metadata` JSON NULL,
     `participantId` INTEGER NULL,
     `contestantId` INTEGER NULL,
 
@@ -402,8 +400,6 @@ CREATE TABLE `user_participant` (
 
     UNIQUE INDEX `user_participant_email_key`(`email`),
     UNIQUE INDEX `user_participant_username_key`(`username`),
-    INDEX `user_participant_schoolId_idx`(`schoolId`),
-    INDEX `user_participant_higherInstId_idx`(`higherInstId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -413,6 +409,91 @@ CREATE TABLE `zone` (
     `name` VARCHAR(191) NOT NULL,
 
     UNIQUE INDEX `Zone_name_key`(`name`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `question_bank` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `target_group` VARCHAR(191) NOT NULL,
+    `knowledge_field` VARCHAR(191) NOT NULL,
+    `question` TEXT NOT NULL,
+    `question_image` VARCHAR(191) NULL,
+    `answer_type` VARCHAR(191) NOT NULL,
+    `answer_options` JSON NOT NULL,
+    `answer_correct` VARCHAR(191) NOT NULL,
+    `createdBy` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `question_bank_knowledge_field_idx`(`knowledge_field`),
+    INDEX `question_bank_target_group_idx`(`target_group`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `quiz` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `target_group` VARCHAR(191) NOT NULL,
+    `quiz_name` VARCHAR(191) NOT NULL,
+    `description` TEXT NULL,
+    `time_limit` INTEGER NULL,
+    `publishedAt` DATETIME(3) NULL,
+    `status` VARCHAR(191) NOT NULL,
+    `createdBy` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `contestId` INTEGER NULL,
+
+    INDEX `quiz_status_idx`(`status`),
+    INDEX `quiz_target_group_idx`(`target_group`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `quiz_question` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `quizId` INTEGER NOT NULL,
+    `questionId` INTEGER NOT NULL,
+    `order` INTEGER NOT NULL,
+    `points` INTEGER NOT NULL DEFAULT 1,
+
+    INDEX `quiz_question_quizId_idx`(`quizId`),
+    INDEX `quiz_question_questionId_idx`(`questionId`),
+    UNIQUE INDEX `quiz_question_quizId_questionId_key`(`quizId`, `questionId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `quiz_attempt` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `quizId` INTEGER NOT NULL,
+    `contestantId` INTEGER NOT NULL,
+    `status` VARCHAR(191) NOT NULL,
+    `score` INTEGER NULL,
+    `start_time` DATETIME(3) NOT NULL,
+    `end_time` DATETIME(3) NULL,
+    `time_taken` INTEGER NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `submissionId` INTEGER NULL,
+
+    INDEX `quiz_attempt_contestantId_idx`(`contestantId`),
+    INDEX `quiz_attempt_quizId_idx`(`quizId`),
+    INDEX `quiz_attempt_submissionId_idx`(`submissionId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `quiz_answer` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `attemptId` INTEGER NOT NULL,
+    `questionId` INTEGER NOT NULL,
+    `selected_options` JSON NOT NULL,
+    `is_correct` BOOLEAN NOT NULL,
+    `points_earned` INTEGER NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -550,16 +631,37 @@ ALTER TABLE `submission` ADD CONSTRAINT `Submission_contestId_fkey` FOREIGN KEY 
 ALTER TABLE `submission` ADD CONSTRAINT `Submission_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `user`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `submission` ADD CONSTRAINT `submission_participantId_fkey` FOREIGN KEY (`participantId`) REFERENCES `user_participant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `submission` ADD CONSTRAINT `submission_contestantId_fkey` FOREIGN KEY (`contestantId`) REFERENCES `contestant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `submission` ADD CONSTRAINT `submission_contestantId_fkey` FOREIGN KEY (`contestantId`) REFERENCES `contestant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `submission` ADD CONSTRAINT `submission_participantId_fkey` FOREIGN KEY (`participantId`) REFERENCES `user_participant`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `user_participant` ADD CONSTRAINT `user_participant_schoolId_fkey` FOREIGN KEY (`schoolId`) REFERENCES `school`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `user_participant` ADD CONSTRAINT `user_participant_higherInstId_fkey` FOREIGN KEY (`higherInstId`) REFERENCES `higherinstitution`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz` ADD CONSTRAINT `quiz_contestId_fkey` FOREIGN KEY (`contestId`) REFERENCES `contest`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz_question` ADD CONSTRAINT `quiz_question_quizId_fkey` FOREIGN KEY (`quizId`) REFERENCES `quiz`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz_question` ADD CONSTRAINT `quiz_question_questionId_fkey` FOREIGN KEY (`questionId`) REFERENCES `question_bank`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz_attempt` ADD CONSTRAINT `quiz_attempt_quizId_fkey` FOREIGN KEY (`quizId`) REFERENCES `quiz`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz_attempt` ADD CONSTRAINT `quiz_attempt_contestantId_fkey` FOREIGN KEY (`contestantId`) REFERENCES `contestant`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz_attempt` ADD CONSTRAINT `quiz_attempt_submissionId_fkey` FOREIGN KEY (`submissionId`) REFERENCES `submission`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `quiz_answer` ADD CONSTRAINT `quiz_answer_attemptId_fkey` FOREIGN KEY (`attemptId`) REFERENCES `quiz_attempt`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `contingentRequest` ADD CONSTRAINT `contingentRequest_contingentId_fkey` FOREIGN KEY (`contingentId`) REFERENCES `contingent`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
