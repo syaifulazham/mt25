@@ -87,8 +87,54 @@ export async function PATCH(
       return NextResponse.json({ error: "Contestant not found" }, { status: 404 });
     }
     
-    // Skip complex authorization checks - anyone with a valid session can update contestants
-    // In a production environment, you might want to add role-based checks here
+    // Find the current participant
+    const participant = await prisma.user_participant.findUnique({
+      where: { email: session.user?.email! }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if participant is a manager of this contingent or belongs to the same contingent
+    const isManager = await prisma.contingentManager.findFirst({
+      where: {
+        participantId: participant.id,
+        contingentId: contestant.contingentId
+      }
+    });
+    
+    // If not a direct manager, check if the participant belongs to the same contingent
+    let hasAccess = isManager !== null;
+    
+    if (!hasAccess) {
+      // Check if participant is part of this contingent
+      const participantContingent = await prisma.contingent.findFirst({
+        where: {
+          OR: [
+            // Check if participant created this contingent (legacy relationship)
+            { participantId: participant.id },
+            // Check all contingents this participant is part of through the manager relation
+            {
+              managers: {
+                some: {
+                  participantId: participant.id
+                }
+              }
+            }
+          ]
+        }
+      });
+      
+      hasAccess = participantContingent?.id === contestant.contingentId;
+    }
+    
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "You don't have permission to update contestants in this contingent" },
+        { status: 403 }
+      );
+    }
     
     // Get update data from request body
     const body = await request.json();
@@ -106,7 +152,7 @@ export async function PATCH(
     
     // Check if IC number is already used by another contestant
     if (body.ic && body.ic !== contestant.ic) {
-      const existingContestant = await prisma.contestant.findUnique({
+      const existingContestant = await prisma.contestant.findFirst({
         where: { ic: body.ic }
       });
       
@@ -184,8 +230,54 @@ export async function DELETE(
       return NextResponse.json({ error: "Contestant not found" }, { status: 404 });
     }
     
-    // Skip complex authorization checks - anyone with a valid session can delete contestants
-    // In a production environment, you might want to add role-based checks here
+    // Find the current participant
+    const participant = await prisma.user_participant.findUnique({
+      where: { email: session.user?.email! }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if participant is a manager of this contingent or belongs to the same contingent
+    const isManager = await prisma.contingentManager.findFirst({
+      where: {
+        participantId: participant.id,
+        contingentId: contestant.contingentId
+      }
+    });
+    
+    // If not a direct manager, check if the participant belongs to the same contingent
+    let hasAccess = isManager !== null;
+    
+    if (!hasAccess) {
+      // Check if participant is part of this contingent
+      const participantContingent = await prisma.contingent.findFirst({
+        where: {
+          OR: [
+            // Check if participant created this contingent (legacy relationship)
+            { participantId: participant.id },
+            // Check all contingents this participant is part of through the manager relation
+            {
+              managers: {
+                some: {
+                  participantId: participant.id
+                }
+              }
+            }
+          ]
+        }
+      });
+      
+      hasAccess = participantContingent?.id === contestant.contingentId;
+    }
+    
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "You don't have permission to delete contestants in this contingent" },
+        { status: 403 }
+      );
+    }
     
     // Delete the contestant
     await prisma.contestant.delete({

@@ -78,6 +78,9 @@ interface Team {
   members: TeamMember[];
   maxMembers: number;
   isOwner: boolean;
+  isManager: boolean;
+  minAge?: number;  // Min age from the contest
+  maxAge?: number;  // Max age from the contest
   createdAt: string;
   updatedAt: string;
 }
@@ -88,6 +91,7 @@ interface Contestant {
   icNumber: string;
   email?: string;
   gender?: string;
+  age?: number;
   educationLevel?: string;
   status: string;
   inTeam: boolean;
@@ -129,6 +133,13 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         }
         
         const teamData = await teamResponse.json();
+        // Log full team data for debugging permission issues
+        console.log('Team data received:', {
+          id: teamData.id,
+          name: teamData.name,
+          isOwner: teamData.isOwner,
+          isManager: teamData.isManager,
+        });
         setTeam(teamData);
         
         // Fetch available contestants
@@ -145,17 +156,27 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         
         const contestantsData = await contestantsResponse.json();
         
+        // Handle both response formats (array or paginated object)
+        const contestantsArray = Array.isArray(contestantsData) 
+          ? contestantsData 
+          : contestantsData.data || [];
+        
         // Mark contestants who are already in a team
-        const enhancedContestants = contestantsData.map((contestant: Contestant) => ({
+        const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
           ...contestant,
           inTeam: teamData.members.some((member: TeamMember) => member.contestantId === contestant.id)
         }));
         
         setContestants(enhancedContestants);
         setFilteredContestants(enhancedContestants);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching data:", error);
-        toast.error("Failed to load data");
+        // Show more specific error message
+        if (error.message) {
+          toast.error(`Failed to load data: ${error.message}`);
+        } else {
+          toast.error("Failed to load data");
+        }
       } finally {
         setIsLoading(false);
       }
@@ -164,9 +185,9 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     fetchData();
   }, [session, params.id]);
   
-  // Filter contestants based on search term and education level
+  // Filter contestants based on search term, education level, and age criteria
   useEffect(() => {
-    if (!contestants.length) return;
+    if (!contestants.length || !team) return;
     
     let filtered = [...contestants];
     
@@ -174,7 +195,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     if (searchTerm) {
       filtered = filtered.filter(contestant => 
         contestant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contestant.icNumber.includes(searchTerm) ||
+        (contestant.icNumber && contestant.icNumber.includes(searchTerm)) ||
         (contestant.email && contestant.email.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
@@ -186,8 +207,28 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       );
     }
     
+    // Apply age criteria filter based on contest requirements
+    // Safely destructure with default values
+    const minAge = team?.minAge;
+    const maxAge = team?.maxAge;
+    
+    if (minAge || maxAge) {
+      filtered = filtered.filter(contestant => {
+        // Skip filtering if contestant doesn't have age
+        if (contestant.age === undefined || contestant.age === null) return true;
+        
+        // Check minimum age requirement
+        if (minAge !== undefined && minAge !== null && contestant.age < minAge) return false;
+        
+        // Check maximum age requirement
+        if (maxAge !== undefined && maxAge !== null && contestant.age > maxAge) return false;
+        
+        return true;
+      });
+    }
+    
     setFilteredContestants(filtered);
-  }, [searchTerm, educationFilter, contestants]);
+  }, [searchTerm, educationFilter, contestants, team]);
   
   // Handle adding a contestant to the team
   const handleAddMember = async (contestantId: number) => {
@@ -346,13 +387,13 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             </Button>
           </CardContent>
         </Card>
-      ) : !team.isOwner ? (
+      ) : !(team.isOwner === true || team.isManager === true) ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-medium">Permission Denied</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              You don't have permission to manage members for this team. Only the team owner can add or remove members.
+              You don't have permission to manage members for this team. Only team owners and contingent managers can add or remove members.
             </p>
             <Button asChild>
               <Link href={`/participants/teams/${params.id}`}>
@@ -442,19 +483,35 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             <CardHeader className="pb-2">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <CardTitle>Add Members</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Add Team Members</CardTitle>
                   <CardDescription>
-                    Select contestants to add to your team
+                    Select contestants to add to this team
+                    {team && (team.minAge || team.maxAge) && (
+                      <>
+                        <br />
+                        <span className="text-xs text-amber-600 mt-1 inline-block">
+                          <AlertCircle className="h-3 w-3 inline mr-1" />
+                          Age restrictions: 
+                          {team.minAge !== undefined && team.maxAge !== undefined ? (
+                            `${team.minAge} to ${team.maxAge} years old`
+                          ) : team.minAge !== undefined ? (
+                            `Minimum ${team.minAge} years old`
+                          ) : team.maxAge !== undefined ? (
+                            `Maximum ${team.maxAge} years old`
+                          ) : ''
+                          }
+                        </span>
+                      </>
+                    )}
                   </CardDescription>
                 </div>
-                
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <div className="relative w-full sm:w-auto">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="search"
                       placeholder="Search contestants..."
-                      className="pl-8 w-full sm:w-[250px]"
+                      className="pl-8 w-[200px] md:w-[260px]"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />

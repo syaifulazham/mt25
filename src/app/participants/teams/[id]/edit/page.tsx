@@ -58,8 +58,13 @@ interface Team {
   description?: string;
   status: string;
   contestId: number;
+  contestName: string;
   contingentId: number;
+  contingentName: string;
+  institutionName?: string;
+  institutionType?: string;
   isOwner: boolean;
+  isManager: boolean;
 }
 
 export default function EditTeamPage({ params }: { params: { id: string } }) {
@@ -191,13 +196,13 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
             </Button>
           </CardContent>
         </Card>
-      ) : !team.isOwner ? (
+      ) : !team.isManager ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Info className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-medium">Permission Denied</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              You don't have permission to edit this team. Only the team owner can make changes.
+              You don't have permission to edit this team. Only team managers can make changes.
             </p>
             <Button asChild>
               <Link href={`/participants/teams/${params.id}`}>

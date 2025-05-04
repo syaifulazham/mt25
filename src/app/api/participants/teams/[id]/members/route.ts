@@ -44,6 +44,15 @@ export async function POST(
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       include: {
+        contingent: {
+          include: {
+            managers: {
+              include: {
+                participant: true
+              }
+            }
+          }
+        },
         managers: {
           include: {
             participant: true
@@ -57,13 +66,26 @@ export async function POST(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
     
-    // Check if current user is a manager of this team
-    // Use email to match the participants since we don't have direct access to participant ID in the session
-    const isManager = team.managers.some(manager => 
+    // Get current user's participant record based on email
+    const participant = await prisma.user_participant.findFirst({
+      where: { email: session.user?.email || '' }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if current user is a manager of this team directly
+    const isTeamManager = team.managers.some(manager => 
       manager.participant.email === session.user?.email
     );
     
-    if (!isManager) {
+    // Or check if current user is a manager of the team's contingent
+    const isContingentManager = team.contingent.managers.some(manager => 
+      manager.participant.email === session.user?.email
+    );
+    
+    if (!isTeamManager && !isContingentManager) {
       return NextResponse.json(
         { error: "You do not have permission to add members to this team" },
         { status: 403 }
@@ -174,15 +196,20 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid team ID" }, { status: 400 });
     }
     
-    // Get the query parameters
-    const searchParams = request.nextUrl.searchParams;
-    const teamMemberIdParam = searchParams.get("teamMemberId");
+    // Get the team member ID from the request body
+    const json = await request.json();
     
-    if (!teamMemberIdParam) {
-      return NextResponse.json({ error: "Team Member ID is required" }, { status: 400 });
+    // Validate the request body
+    const validationResult = removeMemberSchema.safeParse(json);
+    
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: "Invalid request data", details: validationResult.error.format() },
+        { status: 400 }
+      );
     }
     
-    const teamMemberId = parseInt(teamMemberIdParam);
+    const { teamMemberId } = validationResult.data;
     
     if (isNaN(teamMemberId)) {
       return NextResponse.json({ error: "Invalid Team Member ID" }, { status: 400 });
@@ -192,6 +219,15 @@ export async function DELETE(
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       include: {
+        contingent: {
+          include: {
+            managers: {
+              include: {
+                participant: true
+              }
+            }
+          }
+        },
         managers: {
           include: {
             participant: true
@@ -204,13 +240,26 @@ export async function DELETE(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
     
-    // Check if current user is a manager of this team
-    // Use email to match the participants since we don't have direct access to participant ID in the session
-    const isManager = team.managers.some(manager => 
+    // Get current user's participant record based on email
+    const participant = await prisma.user_participant.findFirst({
+      where: { email: session.user?.email || '' }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if current user is a manager of this team directly
+    const isTeamManager = team.managers.some(manager => 
       manager.participant.email === session.user?.email
     );
     
-    if (!isManager) {
+    // Or check if current user is a manager of the team's contingent
+    const isContingentManager = team.contingent.managers.some(manager => 
+      manager.participant.email === session.user?.email
+    );
+    
+    if (!isTeamManager && !isContingentManager) {
       return NextResponse.json(
         { error: "You do not have permission to remove members from this team" },
         { status: 403 }

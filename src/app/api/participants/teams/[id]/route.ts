@@ -42,7 +42,9 @@ export async function GET(
             code: true,
             contestType: true,
             startDate: true,
-            endDate: true
+            endDate: true,
+            minAge: true,
+            maxAge: true
           }
         },
         contingent: {
@@ -57,6 +59,11 @@ export async function GET(
             higherInstitution: {
               select: {
                 name: true
+              }
+            },
+            managers: {
+              include: {
+                participant: true
               }
             }
           }
@@ -98,6 +105,30 @@ export async function GET(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
     
+    // Get current user's participant record based on email
+    const participant = await prisma.user_participant.findFirst({
+      where: { email: session.user?.email || '' }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if current user is a manager of this team directly
+    const isTeamManager = team.managers.some(manager => 
+      manager.participant.email === session.user?.email
+    );
+    
+    // Check if current user is a manager of the team's contingent
+    const isContingentManager = team.contingent.managers.some(manager => 
+      manager.participant.email === session.user?.email
+    );
+    
+    // Determine isOwner status
+    const isOwner = team.managers.some(manager => 
+      manager.participant.email === session.user?.email && manager.isOwner
+    );
+    
     // Format the team for the response
     const formattedTeam = {
       id: team.id,
@@ -106,26 +137,29 @@ export async function GET(
       description: team.description,
       status: team.status,
       maxMembers: team.maxMembers,
-      contest: team.contest,
-      contingent: {
-        id: team.contingent.id,
-        name: team.contingent.name,
-        institution: team.contingent.school 
-          ? team.contingent.school.name 
-          : team.contingent.higherInstitution?.name || "Unknown"
-      },
+      contestId: team.contestId,
+      contestName: team.contest.name,
+      minAge: team.contest?.minAge ?? undefined,
+      maxAge: team.contest?.maxAge ?? undefined,
+      contingentId: team.contingentId,
+      contingentName: team.contingent.name,
+      institutionName: team.contingent.school 
+        ? team.contingent.school.name 
+        : team.contingent.higherInstitution?.name || "Unknown",
+      institutionType: team.contingent.school ? "school" : "higherInstitution",
       members: team.members.map(member => ({
         id: member.id,
-        contestant: member.contestant,
-        role: member.role,
-        joinedAt: member.joinedAt
+        contestantId: member.contestantId,
+        contestantName: member.contestant.name,
+        status: member.contestant.status,
+        joinDate: member.joinedAt,
+        icNumber: member.contestant.ic,
+        email: member.contestant.email,
+        gender: member.contestant.gender,
+        educationLevel: member.contestant.edu_level
       })),
-      managers: team.managers.map(manager => ({
-        id: manager.id,
-        participant: manager.participant,
-        isOwner: manager.isOwner,
-        createdAt: manager.createdAt
-      })),
+      isOwner: isOwner,
+      isManager: isTeamManager || isContingentManager,
       createdAt: team.createdAt,
       updatedAt: team.updatedAt
     };
@@ -158,13 +192,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid team ID" }, { status: 400 });
     }
     
-    // Get the team to verify its existence and check if the current user is a manager
+    // Get the team with its contingent and check if the current user is a manager of the contingent
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       include: {
-        managers: {
+        contingent: {
           include: {
-            participant: true
+            managers: {
+              include: {
+                participant: true
+              }
+            }
           }
         }
       }
@@ -174,15 +212,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
     
-    // Check if current user is a manager of this team
-    // Use email to match the participants since we don't have direct access to participant ID in the session
-    const isManager = team.managers.some(manager => 
+    // Get the current participant user by email
+    const currentParticipant = await prisma.user_participant.findUnique({
+      where: { email: session.user?.email || '' }
+    });
+    
+    if (!currentParticipant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if current user is a manager of the team's contingent
+    const isContingentManager = team.contingent.managers.some(manager => 
       manager.participant.email === session.user?.email
     );
     
-    if (!isManager) {
+    if (!isContingentManager) {
       return NextResponse.json(
-        { error: "You do not have permission to update this team" },
+        { error: "You do not have permission to update this team. Only managers of this team's contingent can make changes." },
         { status: 403 }
       );
     }
@@ -213,11 +259,11 @@ export async function PATCH(
     });
     
     return NextResponse.json(updatedTeam);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating team:", error);
     
     // Handle unique constraint violations
-    if (error.code === 'P2002') {
+    if (error?.code === 'P2002') {
       return NextResponse.json(
         { error: "A team with this name already exists" },
         { status: 409 }
@@ -249,10 +295,19 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid team ID" }, { status: 400 });
     }
     
-    // Get the team to verify its existence and check if the current user is the owner
+    // Get the team with its contingent to verify its existence and check permissions
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       include: {
+        contingent: {
+          include: {
+            managers: {
+              include: {
+                participant: true
+              }
+            }
+          }
+        },
         managers: {
           where: {
             isOwner: true
@@ -268,8 +323,28 @@ export async function DELETE(
       return NextResponse.json({ error: "Team not found" }, { status: 404 });
     }
     
+    // Get the current participant user by email
+    const currentParticipant = await prisma.user_participant.findUnique({
+      where: { email: session.user?.email || '' }
+    });
+    
+    if (!currentParticipant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if current user is a manager of the team's contingent
+    const isContingentManager = team.contingent.managers.some(manager => 
+      manager.participant.email === session.user?.email
+    );
+    
+    if (!isContingentManager) {
+      return NextResponse.json(
+        { error: "You do not have permission to manage this team. Only managers of this team's contingent can access it." },
+        { status: 403 }
+      );
+    }
+    
     // Check if current user is the owner of this team
-    // Use email to match the participants since we don't have direct access to participant ID in the session
     const isOwner = team.managers.some(manager => 
       manager.isOwner && manager.participant.email === session.user?.email
     );

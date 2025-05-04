@@ -304,7 +304,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if IC number is already registered
-    const existingContestant = await prisma.contestant.findUnique({
+    const existingContestant = await prisma.contestant.findFirst({
       where: { ic: body.ic }
     });
     
@@ -341,7 +341,8 @@ export async function POST(request: NextRequest) {
       class_grade: classGrade, // Keep as string to match schema
       hashcode,
       contingentId: contingentId,
-      updatedBy: participant.name || session.user.name || session.user.email, // Record who created this
+      updatedById: participant.id, // Use participant ID as the updater ID
+      createdById: participant.id, // Also set creator ID
       status: "ACTIVE"
     };
     
@@ -371,19 +372,18 @@ export async function POST(request: NextRequest) {
         
         try {
           // Use Prisma's queryRaw to execute a direct SQL query
-          // Use updatedBy instead of userId to record who created this contestant
-          const updatedByName = participant.name || session.user.name || session.user.email;
+          // Use participant ID for updatedById and createdById
           await prisma.$queryRaw`
             INSERT INTO contestant 
-            (name, ic, gender, age, edu_level, class_name, class_grade, hashcode, contingentId, updatedBy, createdAt, updatedAt) 
+            (name, ic, gender, age, edu_level, class_name, class_grade, hashcode, contingentId, updatedById, createdById, createdAt, updatedAt) 
             VALUES 
             (${body.name}, ${body.ic}, ${body.gender}, ${parseInt(body.age)}, 
              ${body.edu_level}, ${formattedClassName}, ${classGrade}, 
-             ${hashcode}, ${contingentId}, ${updatedByName}, NOW(), NOW())
+             ${hashcode}, ${contingentId}, ${participant.id}, ${participant.id}, NOW(), NOW())
           `;
           
           // Fetch the created contestant
-          const createdContestant = await prisma.contestant.findUnique({
+          const createdContestant = await prisma.contestant.findFirst({
             where: { ic: body.ic }
           });
           

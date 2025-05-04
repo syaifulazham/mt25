@@ -291,53 +291,40 @@ export default function TeamsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Open menu</span>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="outline" size="sm" asChild title="View Team Details">
+                            <Link href={`/participants/teams/${team.id}`}>
+                              <EyeIcon className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          
+                          <Button variant="outline" size="sm" asChild title="Edit Team">
+                            <Link href={`/participants/teams/${team.id}/edit`}>
+                              <Edit className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          
+                          <Button variant="outline" size="sm" asChild title="Manage Team Members">
+                            <Link href={`/participants/teams/${team.id}/members`}>
+                              <Users className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                          
+                          {team.isOwner && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 hover:bg-red-100 hover:text-red-700" 
+                              title="Delete Team"
+                              onClick={() => {
+                                setTeamToDelete(team);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            
-                            <DropdownMenuItem asChild>
-                              <Link href={`/participants/teams/${team.id}`}>
-                                <EyeIcon className="mr-2 h-4 w-4" />
-                                View Details
-                              </Link>
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem asChild>
-                              <Link href={`/participants/teams/${team.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit Team
-                              </Link>
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuItem asChild>
-                              <Link href={`/participants/teams/${team.id}/members`}>
-                                <Users className="mr-2 h-4 w-4" />
-                                Manage Members
-                              </Link>
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator />
-                            
-                            {team.isOwner && (
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => {
-                                  setTeamToDelete(team);
-                                  setDeleteDialogOpen(true);
-                                }}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete Team
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
