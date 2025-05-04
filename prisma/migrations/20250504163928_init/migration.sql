@@ -35,6 +35,7 @@ CREATE TABLE `contest` (
     `contestType` ENUM('QUIZ', 'CODING', 'STRUCTURE_BUILDING', 'FASTEST_COMPLETION', 'POSTER_PRESENTATION', 'SCIENCE_PROJECT', 'ENGINEERING_DESIGN', 'ANALYSIS_CHALLENGE') NOT NULL,
     `method` ENUM('ONLINE', 'PHYSICAL') NOT NULL,
     `judgingMethod` ENUM('AI', 'JURY', 'POINT_SCORE', 'TIME_COMPLETION') NOT NULL,
+    `participation_mode` ENUM('INDIVIDUAL', 'TEAM') NOT NULL DEFAULT 'INDIVIDUAL',
     `startDate` DATETIME(3) NOT NULL,
     `endDate` DATETIME(3) NOT NULL,
     `accessibility` BOOLEAN NOT NULL DEFAULT false,
@@ -75,24 +76,24 @@ CREATE TABLE `contingent` (
 CREATE TABLE `contestant` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(191) NOT NULL,
-    `ic` VARCHAR(191) NOT NULL,
+    `ic` VARCHAR(191) NULL,
     `email` VARCHAR(191) NULL,
     `phoneNumber` VARCHAR(191) NULL,
     `gender` VARCHAR(191) NOT NULL,
-    `age` INTEGER NOT NULL,
+    `birthdate` DATETIME(3) NULL,
+    `age` INTEGER NULL,
     `edu_level` VARCHAR(191) NOT NULL,
-    `class_name` VARCHAR(191) NULL,
     `class_grade` VARCHAR(191) NULL,
-    `hashcode` VARCHAR(191) NOT NULL,
+    `class_name` VARCHAR(191) NULL,
+    `hashcode` VARCHAR(191) NULL,
+    `status` VARCHAR(191) NOT NULL DEFAULT 'ACTIVE',
     `contingentId` INTEGER NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
-    `updatedBy` VARCHAR(191) NULL,
-    `status` VARCHAR(191) NOT NULL DEFAULT 'ACTIVE',
+    `createdById` INTEGER NULL,
+    `updatedById` INTEGER NULL,
 
-    UNIQUE INDEX `contestant_ic_key`(`ic`),
     UNIQUE INDEX `contestant_hashcode_key`(`hashcode`),
-    INDEX `contestant_contingentId_idx`(`contingentId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -383,7 +384,7 @@ CREATE TABLE `user` (
 -- CreateTable
 CREATE TABLE `user_participant` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `name` VARCHAR(191) NULL,
+    `name` VARCHAR(191) NOT NULL,
     `email` VARCHAR(191) NOT NULL,
     `password` VARCHAR(191) NULL,
     `username` VARCHAR(191) NOT NULL,
@@ -541,6 +542,54 @@ CREATE TABLE `video` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `team` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(191) NOT NULL,
+    `hashcode` VARCHAR(191) NOT NULL,
+    `description` TEXT NULL,
+    `contestId` INTEGER NOT NULL,
+    `contingentId` INTEGER NOT NULL,
+    `status` VARCHAR(191) NOT NULL DEFAULT 'ACTIVE',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `maxMembers` INTEGER NOT NULL DEFAULT 4,
+
+    UNIQUE INDEX `team_hashcode_key`(`hashcode`),
+    INDEX `team_contestId_idx`(`contestId`),
+    INDEX `team_contingentId_idx`(`contingentId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `teamManager` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `teamId` INTEGER NOT NULL,
+    `participantId` INTEGER NOT NULL,
+    `isOwner` BOOLEAN NOT NULL DEFAULT true,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `teamManager_teamId_idx`(`teamId`),
+    INDEX `teamManager_participantId_idx`(`participantId`),
+    UNIQUE INDEX `teamManager_teamId_participantId_key`(`teamId`, `participantId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `teamMember` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `teamId` INTEGER NOT NULL,
+    `contestantId` INTEGER NOT NULL,
+    `role` VARCHAR(191) NULL,
+    `joinedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `teamMember_teamId_idx`(`teamId`),
+    INDEX `teamMember_contestantId_idx`(`contestantId`),
+    UNIQUE INDEX `teamMember_teamId_contestantId_key`(`teamId`, `contestantId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `_contesttotargetgroup` (
     `A` INTEGER NOT NULL,
     `B` INTEGER NOT NULL,
@@ -674,6 +723,24 @@ ALTER TABLE `contingentManager` ADD CONSTRAINT `contingentManager_participantId_
 
 -- AddForeignKey
 ALTER TABLE `contingentManager` ADD CONSTRAINT `contingentManager_contingentId_fkey` FOREIGN KEY (`contingentId`) REFERENCES `contingent`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `team` ADD CONSTRAINT `team_contestId_fkey` FOREIGN KEY (`contestId`) REFERENCES `contest`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `team` ADD CONSTRAINT `team_contingentId_fkey` FOREIGN KEY (`contingentId`) REFERENCES `contingent`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `teamManager` ADD CONSTRAINT `teamManager_teamId_fkey` FOREIGN KEY (`teamId`) REFERENCES `team`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `teamManager` ADD CONSTRAINT `teamManager_participantId_fkey` FOREIGN KEY (`participantId`) REFERENCES `user_participant`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `teamMember` ADD CONSTRAINT `teamMember_teamId_fkey` FOREIGN KEY (`teamId`) REFERENCES `team`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `teamMember` ADD CONSTRAINT `teamMember_contestantId_fkey` FOREIGN KEY (`contestantId`) REFERENCES `contestant`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `_contesttotargetgroup` ADD CONSTRAINT `_contesttotargetgroup_A_fkey` FOREIGN KEY (`A`) REFERENCES `contest`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
