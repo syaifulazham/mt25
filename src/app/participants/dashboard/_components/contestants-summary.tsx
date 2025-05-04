@@ -150,15 +150,15 @@ export default function ContestantsSummary({ userId }: ContestantsSummaryProps) 
   };
 
   return (
-    <Card className="h-full gradient-card-green">
+    <Card className="h-full gradient-card-green flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg md:text-xl">My Contestants</CardTitle>
         <CardDescription>
           Manage your registered contestants
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="flex flex-col flex-grow">
+        <div className="space-y-4 flex-grow">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
             <span className="font-medium">Total Contestants: {stats.total}</span>
@@ -183,7 +183,7 @@ export default function ContestantsSummary({ userId }: ContestantsSummaryProps) 
           </div>
         </div>
         
-        <div className="mt-4">
+        <div className="mt-auto pt-4">
           <Button asChild className="w-full">
             <Link href="/participants/contestants">View All Contestants</Link>
           </Button>

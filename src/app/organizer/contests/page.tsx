@@ -50,6 +50,15 @@ function getContestTypeDisplay(contestType: string) {
   return displayMap[contestType] || contestType;
 }
 
+// Helper function to get participation mode badge
+function getParticipationModeBadge(participationMode: string) {
+  if (participationMode === 'TEAM') {
+    return <Badge className="bg-purple-500">Team</Badge>;
+  } else {
+    return <Badge className="bg-orange-500">Individual</Badge>;
+  }
+}
+
 export default async function ContestsPage() {
   const user = await getCurrentUser();
   
@@ -132,6 +141,13 @@ export default async function ContestsPage() {
                 <option value="completed">Completed</option>
               </select>
             </div>
+            <div className="w-[200px]">
+              <select className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                <option value="">All Participation Modes</option>
+                <option value="INDIVIDUAL">Individual</option>
+                <option value="TEAM">Team</option>
+              </select>
+            </div>
             <Button variant="outline" className="flex items-center gap-2">
               <FilterIcon className="h-4 w-4" />
               Apply Filters
@@ -154,6 +170,7 @@ export default async function ContestsPage() {
                 <TableHead>Code</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Participation</TableHead>
                 <TableHead>Theme</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -164,6 +181,7 @@ export default async function ContestsPage() {
                   <TableCell className="font-medium">{contest.code || `CNT-${contest.id}`}</TableCell>
                   <TableCell>{contest.name}</TableCell>
                   <TableCell>{getContestTypeDisplay(contest.contestType)}</TableCell>
+                  <TableCell>{getParticipationModeBadge(contest.participation_mode || 'INDIVIDUAL')}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {contest.theme?.logoPath && (

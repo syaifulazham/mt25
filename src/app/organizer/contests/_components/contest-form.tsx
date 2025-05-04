@@ -65,6 +65,7 @@ const contestFormSchema = z.object({
     message: "Please select at least one target group.",
   }),
   themeId: z.number().nullable().optional(),
+  participation_mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
 
 // Define the form values type
@@ -83,6 +84,7 @@ const defaultValues: Partial<ContestFormValues> = {
   accessibility: false,
   targetGroupIds: [],
   themeId: null,
+  participation_mode: "INDIVIDUAL",
 };
 
 interface ContestFormProps {
@@ -185,6 +187,7 @@ export function ContestForm({ initialData }: ContestFormProps) {
       accessibility: initialData.accessibility || false,
       targetGroupIds: initialData.targetgroup ? initialData.targetgroup.map((tg: any) => tg.id) : [],
       themeId: initialData.themeId || null,
+      participation_mode: initialData.participation_mode || "INDIVIDUAL",
     };
   };
 
@@ -443,6 +446,43 @@ export function ContestForm({ initialData }: ContestFormProps) {
                 )}
               />
             </div>
+
+            {/* Participation Mode */}
+            <FormField
+              control={form.control}
+              name="participation_mode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Participation Mode</FormLabel>
+                  <div className="mt-2">
+                    <div className="flex items-center space-x-2">
+                      <div className="grid grid-cols-2 gap-2 rounded-md border p-1">
+                        <Button
+                          type="button"
+                          variant={field.value === "INDIVIDUAL" ? "default" : "outline"}
+                          className={`px-3 ${field.value === "INDIVIDUAL" ? "bg-primary text-primary-foreground" : ""}`}
+                          onClick={() => field.onChange("INDIVIDUAL")}
+                        >
+                          Individual
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={field.value === "TEAM" ? "default" : "outline"}
+                          className={`px-3 ${field.value === "TEAM" ? "bg-primary text-primary-foreground" : ""}`}
+                          onClick={() => field.onChange("TEAM")}
+                        >
+                          Team
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <FormDescription>
+                    Select whether contestants will participate individually or in teams.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Contest Dates */}

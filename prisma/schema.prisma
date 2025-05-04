@@ -39,6 +39,7 @@ model contest {
   contestType       contest_contestType
   method            contest_method
   judgingMethod     contest_judgingMethod
+  participation_mode contest_participationMode @default(INDIVIDUAL)
   startDate         DateTime
   endDate           DateTime
   accessibility     Boolean              @default(false)
@@ -58,6 +59,7 @@ model contest {
   submission        submission[]
   targetgroup       targetgroup[]         @relation("contesttotargetgroup")
   quizzes           quiz[]               // Added relation to quizzes for QUIZ contest type
+  teams             team[]               // Teams participating in this contest
 
   @@index([judgingTemplateId], map: "Contest_judgingTemplateId_fkey")
   @@index([themeId], map: "Contest_themeId_fkey")
@@ -75,6 +77,7 @@ model contingent {
   school      school?   @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
   higherInstitution higherinstitution? @relation(fields: [higherInstId], references: [id])
   contestants contestant[]
+  teams       team[]
   participantId Int?
   participant user_participant? @relation(fields: [participantId], references: [id])
   requests    contingentRequest[]
@@ -87,32 +90,33 @@ model contingent {
 }
 
 model contestant {
-  id          Int      @id @default(autoincrement())
-  name        String
-  ic          String   @unique
-  email       String?
-  phoneNumber String?
-  gender      String
-  age         Int
-  edu_level   String   // sekolah rendah, sekolah menengah, belia
-  class_name  String?
-  class_grade String?
-  hashcode    String   @unique
-  contingentId Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  updatedBy   String?  // Name of the participant who last updated this record
-  status      String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
-  
-  contingent  contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
-  submissions submission[]
-  contests    contestParticipation[] // Direct relation to contests through participation table
-  quiz_attempts quiz_attempt[]      // Added relation to quiz attempts
-  
-  @@index([contingentId])
+  id            Int      @id @default(autoincrement())
+  name          String
+  ic            String?
+  email         String?
+  phoneNumber   String?
+  gender        String
+  birthdate     DateTime?
+  age           Int?
+  edu_level     String
+  class_grade   String?
+  class_name    String?
+  hashcode      String?   @unique
+  status        String   @default("ACTIVE")
+  contingentId  Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdById   Int?
+  updatedById   Int?
+
+  // Relations
+  contingent    contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  quizAttempts  quiz_attempt[]
+  teamMembers   teamMember[]
+  submissions   submission[]
+  contests      contestParticipation[]
 }
 
-// Join table for many-to-many relationship between contestants and contests
 model contestParticipation {
   id           Int       @id @default(autoincrement())
   contestId    Int
@@ -366,6 +370,8 @@ model targetgroup {
   contest         contest[]       @relation("contesttotargetgroup")
 }
 
+
+
 model theme {
   id          Int       @id @default(autoincrement())
   name        String    @unique(map: "Theme_name_key")
@@ -396,8 +402,8 @@ model user {
 }
 
 model user_participant {
-  id           Int            @id @default(autoincrement())
-  name         String?
+  id           Int      @id @default(autoincrement())
+  name         String
   email        String         @unique
   password     String?
   username     String         @unique
@@ -419,6 +425,7 @@ model user_participant {
   submissions  submission[]
   contingentRequests contingentRequest[]
   managedContingents contingentManager[] // Added relation to managed contingents
+  teamManagers teamManager[] // Relation to teams managed by this participant
 }
 
 model zone {
@@ -486,6 +493,11 @@ enum contest_judgingMethod {
   JURY
   POINT_SCORE
   TIME_COMPLETION
+}
+
+enum contest_participationMode {
+  INDIVIDUAL
+  TEAM
 }
 
 enum scope_area {
@@ -631,4 +643,62 @@ model video {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   isActive         Boolean  @default(true)
+}
+
+// Team model for contest participation
+model team {
+  id            Int       @id @default(autoincrement())
+  name          String
+  hashcode      String    @unique // Unique code for team identification
+  description   String?   @db.Text
+  contestId     Int       // Required contest association
+  contingentId  Int       // Required contingent association
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  maxMembers    Int       @default(4) // Maximum number of contestants in the team
+  
+  // Relations
+  contest       contest   @relation(fields: [contestId], references: [id])
+  contingent    contingent @relation(fields: [contingentId], references: [id])
+  members       teamMember[]
+  managers      teamManager[]
+  
+  @@index([contestId])
+  @@index([contingentId])
+}
+
+// Team manager model (initially limited to 1 manager per team)
+model teamManager {
+  id            Int       @id @default(autoincrement())
+  teamId        Int
+  participantId Int
+  isOwner       Boolean   @default(true) // Indicates primary manager/owner
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  team          team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  participant   user_participant @relation(fields: [participantId], references: [id])
+  
+  @@unique([teamId, participantId]) // Prevent duplicate manager entries
+  @@index([teamId])
+  @@index([participantId])
+}
+
+// Team member model for tracking contestants in teams
+model teamMember {
+  id            Int       @id @default(autoincrement())
+  teamId        Int
+  contestantId  Int
+  role          String?   // Optional role within team
+  joinedAt      DateTime  @default(now())
+  
+  // Relations
+  team          team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  contestant    contestant @relation(fields: [contestantId], references: [id])
+  
+  @@unique([teamId, contestantId]) // Prevent duplicate member entries
+  @@index([teamId])
+  @@index([contestantId])
 }

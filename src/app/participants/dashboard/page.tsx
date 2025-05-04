@@ -12,6 +12,7 @@ import Link from "next/link";
 import ContingentSummary from "./_components/contingent-summary";
 import ProfileSummary from "./_components/profile-summary";
 import ContestantsSummary from "./_components/contestants-summary";
+import TeamsSummary from "./_components/teams-summary";
 import PendingRequestsAlert from "./_components/pending-requests-alert";
 import VideoGallery from "./_components/video-gallery";
 import prisma from "@/lib/prisma";
@@ -96,6 +97,9 @@ export default async function DashboardPage() {
         
         {/* Contestants Summary component */}
         <ContestantsSummary userId={Number(user.id)} />
+        
+        {/* Teams Summary component */}
+        <TeamsSummary participantId={Number(user.id)} />
       </div>
       
       {/* Video Gallery */}

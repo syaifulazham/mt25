@@ -265,7 +265,7 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
   const institutionIcon = contingent.school ? <School className="h-4 w-4" /> : <Building className="h-4 w-4" />;
 
   return (
-    <Card className="h-full gradient-card-purple">
+    <Card className="h-full gradient-card-purple flex flex-col">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <CardTitle className="text-lg md:text-xl">My Contingent</CardTitle>
@@ -281,8 +281,8 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
             : "You are a member of this contingent"}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
+      <CardContent className="flex flex-col flex-grow">
+        <div className="space-y-3 flex-grow">
           <div>
             <h3 className="font-medium text-base">{contingent.name}</h3>
             <p className="text-sm text-muted-foreground">{contingent.description || "No description provided"}</p>
@@ -307,7 +307,7 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
           )}
         </div>
         
-        <div className="mt-4">
+        <div className="mt-auto pt-4">
           <Button asChild className="w-full">
             <Link href="/participants/contingents">Manage Contingent</Link>
           </Button>

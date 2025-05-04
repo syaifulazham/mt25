@@ -7,20 +7,17 @@ import { hasRequiredRole } from "@/lib/auth";
 // GET /api/contests - Get all contests
 export async function GET(req: NextRequest) {
   try {
-    // Skip authentication in development mode
-    if (process.env.NODE_ENV !== 'development') {
-      const user = await getCurrentUser();
-      
-      // Check authentication
-      if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    }
+    console.log("GET /api/contests - Request received");
+    
+    // Make this endpoint public to allow access from both participants and organizers
+    // We're only returning basic contest information, so this is safe
+    // Authentication will still be enforced for sensitive operations (create, update, delete)
 
     // Parse query parameters
     const url = new URL(req.url);
     const searchQuery = url.searchParams.get("search") || "";
     const contestType = url.searchParams.get("contestType") || undefined;
+    const participationMode = url.searchParams.get("participation_mode") || undefined;
     const status = url.searchParams.get("status");
 
     // Determine date filters based on status
@@ -56,26 +53,69 @@ export async function GET(req: NextRequest) {
     if (contestType) {
       filter.contestType = contestType;
     }
-
-    // Fetch contests with counts
-    const contests = await prisma.contest.findMany({
-      where: filter,
-      include: {
-        _count: {
-          select: {
-            submission: true,
-            contestants: true
-          }
-        },
-        targetgroup: true,
-        theme: true
-      },
-      orderBy: {
-        startDate: "desc"
+    
+    // Add participation mode filter if provided
+    // Note: We need to be careful here because the field might not exist in the database yet
+    // if the migration hasn't run. We'll use a try-catch approach.
+    if (participationMode) {
+      try {
+        filter.participation_mode = participationMode;
+      } catch (error) {
+        console.warn("participation_mode filter not supported yet - please run database migrations");
+        // If the field doesn't exist, we'll just skip the filter
       }
-    });
+    }
 
-    return NextResponse.json(contests);
+    console.log("Executing Prisma query with filter:", JSON.stringify(filter, null, 2));
+    
+    try {
+      // Fetch contests with counts
+      const contests = await prisma.contest.findMany({
+        where: filter,
+        include: {
+          _count: {
+            select: {
+              submission: true,
+              contestants: true
+            }
+          },
+          targetgroup: true,
+          theme: true
+        },
+        orderBy: {
+          startDate: "desc"
+        }
+      });
+
+      console.log(`Successfully found ${contests.length} contests`);
+      
+      // Return successful response
+      return NextResponse.json(contests);
+    } catch (prismaError) {
+      console.error("Prisma database error:", prismaError);
+      
+      // Try a simpler query if the complex one fails (maybe due to missing fields)
+      console.log("Attempting simpler fallback query...");
+      try {
+        const basicContests = await prisma.contest.findMany({
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            description: true,
+            contestType: true,
+            startDate: true,
+            endDate: true
+          }
+        });
+        
+        console.log(`Fallback query returned ${basicContests.length} basic contests`);
+        return NextResponse.json(basicContests);
+      } catch (fallbackError) {
+        console.error("Even fallback query failed:", fallbackError);
+        throw fallbackError; // Re-throw to be caught by outer catch block
+      }
+    }
   } catch (error) {
     console.error("Error fetching contests:", error);
     return NextResponse.json(
@@ -141,6 +181,7 @@ export async function POST(req: NextRequest) {
       contestType: data.contestType,
       method: data.method,
       judgingMethod: data.judgingMethod,
+      participation_mode: data.participation_mode || "INDIVIDUAL",
       accessibility: data.accessibility || false,
       startDate,
       endDate

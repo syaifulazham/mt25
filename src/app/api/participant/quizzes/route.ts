@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { getToken } from "next-auth/jwt";
+import { findContestantByHashcode } from "@/lib/contestant-hashcode";
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -19,18 +20,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Contestant hashcode is required" }, { status: 400 });
     }
     
-    // Verify contestant exists
-    const contestant = await prisma.contestant.findUnique({
-      where: { hashcode: contestantHashcode },
-      include: {
-        contingent: true,
-        contests: {
-          include: {
-            contest: true
-          }
-        }
-      }
-    });
+    // Verify contestant exists using our hashcode utility
+    const contestant = await findContestantByHashcode(contestantHashcode);
     
     if (!contestant) {
       return NextResponse.json({ error: "Invalid contestant credentials" }, { status: 401 });

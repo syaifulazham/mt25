@@ -164,6 +164,7 @@ async function updateContest(
       contestType: data.contestType,
       method: data.method,
       judgingMethod: data.judgingMethod,
+      participation_mode: data.participation_mode,
       accessibility: data.accessibility
     };
 

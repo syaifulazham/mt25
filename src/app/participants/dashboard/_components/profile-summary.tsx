@@ -68,15 +68,15 @@ export default function ProfileSummary({ user }: ProfileSummaryProps) {
   const profileCompletion = calculateProfileCompletion();
   
   return (
-    <Card className="h-full gradient-card-blue">
+    <Card className="h-full gradient-card-blue flex flex-col">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg md:text-xl">My Profile</CardTitle>
         <CardDescription>
           Your personal information
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col space-y-4">
+      <CardContent className="flex-grow flex flex-col">
+        <div className="flex flex-col space-y-4 flex-grow">
           <div className="flex items-center space-x-4">
             <Avatar className="h-12 w-12">
               <AvatarImage src={user.image || ""} alt={user.name || "User"} />
@@ -148,8 +148,10 @@ export default function ProfileSummary({ user }: ProfileSummaryProps) {
               ></div>
             </div>
           </div>
-          
-          <Button asChild className="w-full mt-2">
+        </div>
+        
+        <div className="mt-auto pt-4">
+          <Button asChild className="w-full">
             <Link href="/participants/profile">Edit Profile</Link>
           </Button>
         </div>
