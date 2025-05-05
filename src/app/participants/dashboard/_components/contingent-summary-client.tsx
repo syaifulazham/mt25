@@ -84,14 +84,7 @@ export default function ContingentSummaryClient({
               </div>
             )}
             
-            {contingent.institution && (
-              <div className="flex justify-between items-center py-1 border-b">
-                <span className="text-muted-foreground">{t('contingent.institution')}:</span>
-                <span className="font-medium truncate max-w-[150px]" title={contingent.institution.name}>
-                  {contingent.institution.name}
-                </span>
-              </div>
-            )}
+            
             
             <div className="flex justify-between items-center py-1 border-b">
               <span className="text-muted-foreground flex items-center gap-1.5">
