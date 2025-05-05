@@ -21,6 +21,12 @@ const ParticipantSidebar = dynamicImport(
   { ssr: false }
 );
 
+// Import the language selector component dynamically
+const LanguageSelector = dynamicImport(
+  () => import('@/components/language-selector').then(mod => ({ default: mod.LanguageSelector })),
+  { ssr: false }
+);
+
 interface ParticipantLayoutProps {
   children: ReactNode;
 }
@@ -90,13 +96,23 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
                   </a>
                   <div className="border-t border-blue-700 my-4"></div>
                   {user ? (
-                    <a href="/api/auth/signout" className="text-lg font-medium mx-4 px-4 py-2 rounded-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 transition-all text-center">
-                      Sign Out
-                    </a>
+                    <>
+                      <div className="flex items-center justify-center mx-4 my-2">
+                        <LanguageSelector variant="full" className="w-full justify-center" />
+                      </div>
+                      <a href="/api/auth/signout" className="text-lg font-medium mx-4 px-4 py-2 rounded-full bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 transition-all text-center">
+                        Sign Out
+                      </a>
+                    </>
                   ) : (
-                    <a href="/participants/auth/login" className="text-lg font-medium mx-4 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all text-center">
-                      Sign In
-                    </a>
+                    <>
+                      <div className="flex items-center justify-center mx-4 my-2">
+                        <LanguageSelector variant="full" className="w-full justify-center" />
+                      </div>
+                      <a href="/participants/auth/login" className="text-lg font-medium mx-4 px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all text-center">
+                        Sign In
+                      </a>
+                    </>
                   )}
                 </nav>
               </SheetContent>
@@ -105,6 +121,7 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
           
           {/* Desktop user menu */}
           <div className="hidden lg:flex items-center space-x-4">
+            <LanguageSelector variant="full" className="text-white" />
             <div className="flex items-center gap-2">
               <span className="text-sm text-white">
                 {user?.name || user?.username || 'Guest'}

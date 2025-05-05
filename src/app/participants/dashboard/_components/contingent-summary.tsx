@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import ContingentSummaryClient from "./contingent-summary-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -185,134 +186,35 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
     };
   }, [participantId]); // Only depend on participantId to prevent unnecessary rerenders
 
-  if (isLoading) {
-    return (
-      <Card className="h-full">
-        <CardHeader className="pb-2">
-          <Skeleton className="h-6 w-[180px]" />
-          <Skeleton className="h-4 w-[250px] mt-2" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-10 w-full mt-4" />
-          </div>
-        </CardContent>
-      </Card>
-    );
+  // Process data for the client component
+  let clientContingent = null;
+  let noContingentYet = false;
+  
+  // Process the contingent data if it exists
+  if (contingents.length > 0) {
+    const contingent = contingents[0]; // Get the first contingent (most relevant one)
+    
+    clientContingent = {
+      id: contingent.id,
+      name: contingent.name,
+      isManager: contingent.isManager,
+      membersCount: contingent.memberCount,
+      institution: contingent.school || contingent.higherInstitution ? {
+        name: contingent.school?.name || contingent.higherInstitution?.name || '',
+        type: contingent.school ? 'school' : 'higher'
+      } : undefined
+    };
+  } else {
+    noContingentYet = true;
   }
-
-  if (error) {
-    return (
-      <Card className="h-full gradient-card-red">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 accent-icon" />
-            Error Loading Contingent
-          </CardTitle>
-          <CardDescription>
-            {error}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild className="w-full">
-            <Link href="/participants/contingents">Manage Contingents</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (contingents.length === 0) {
-    return (
-      <Card className="h-full gradient-card-purple">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg md:text-xl">My Contingent</CardTitle>
-          <CardDescription>
-            You haven't joined a contingent yet
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Join or create a contingent to participate in Techlympics competitions
-          </p>
-          <div className="space-y-2">
-            <Button 
-              asChild 
-              className="w-full"
-            >
-              <Link href="/participants/contingents">Create or Join Contingent</Link>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full" 
-              onClick={refreshContingentData}
-            >
-              Refresh Contingent Data
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Get the first contingent (most relevant one)
-  const contingent = contingents[0];
-  const institutionName = contingent.school?.name || contingent.higherInstitution?.name || "Unknown Institution";
-  const institutionState = contingent.school?.state?.name || contingent.higherInstitution?.state?.name || "Unknown State";
-  const institutionType = contingent.school ? "School" : "Higher Institution";
-  const institutionIcon = contingent.school ? <School className="h-4 w-4" /> : <Building className="h-4 w-4" />;
-
+  
+  // Use our client component with the processed data
   return (
-    <Card className="h-full gradient-card-purple flex flex-col">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-lg md:text-xl">My Contingent</CardTitle>
-          {contingent.status === "PENDING" && (
-            <Badge variant="secondary">Pending Approval</Badge>
-          )}
-        </div>
-        <CardDescription>
-          {contingent.isManager 
-            ? contingent.isOwner 
-              ? "You are the primary manager of this contingent" 
-              : "You are a co-manager of this contingent"
-            : "You are a member of this contingent"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col flex-grow">
-        <div className="space-y-3 flex-grow">
-          <div>
-            <h3 className="font-medium text-base">{contingent.name}</h3>
-            <p className="text-sm text-muted-foreground">{contingent.description || "No description provided"}</p>
-          </div>
-          
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="accent-icon">{institutionIcon}</span>
-            <span>{institutionName}</span>
-            <span className="text-xs px-2 py-0.5 bg-muted rounded-full">{institutionType}</span>
-          </div>
-          
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users className="h-4 w-4 accent-icon" />
-            <span>{contingent.memberCount} member{contingent.memberCount !== 1 ? 's' : ''}</span>
-          </div>
-          
-          {contingent.managerCount && contingent.managerCount > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>{contingent.managerCount} manager{contingent.managerCount !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="mt-auto pt-4">
-          <Button asChild className="w-full">
-            <Link href="/participants/contingents">Manage Contingent</Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <ContingentSummaryClient 
+      contingent={clientContingent} 
+      isLoading={isLoading} 
+      error={error}
+      noContingentYet={noContingentYet}
+    />
   );
 }

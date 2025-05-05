@@ -32,15 +32,20 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [translations, setTranslations] = useState<Record<string, string>>({});
   
   // Load saved language preference from cookies on initial render
+  // This runs only once on component mount
   useEffect(() => {
     try {
       // Try to get language from cookie
       const savedLang = getCookie('language') as Language;
       if (savedLang && (savedLang === 'en' || savedLang === 'my' || savedLang === 'zh' || savedLang === 'fil')) {
+        // If we have a valid cookie, just use it without setting a new cookie
         setLanguageState(savedLang);
+        console.log(`Loaded language from cookie: ${savedLang}`);
       } else {
         // If no cookie set yet, use Malay as default and set cookie
+        // This is the only place we set the cookie during initialization
         setCookie('language', 'my');
+        console.log('No language cookie found, setting default to Malay');
       }
     } catch (e) {
       // Ignore cookie errors
@@ -49,6 +54,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, []);
   
   // Load translations when language changes
+  // This runs whenever language state changes
   useEffect(() => {
     const loadTranslations = async () => {
       try {
@@ -62,8 +68,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     
     loadTranslations();
     
-    // Save to cookie when language changes
-    setCookie('language', language);
+    // DO NOT set cookie here - we only want to set it when setLanguage is called explicitly
+    // This prevents the cookie from being updated on page load/reload
   }, [language]);
   
   // Function to set language

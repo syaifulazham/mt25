@@ -16,6 +16,7 @@ import TeamsSummary from "./_components/teams-summary";
 import PendingRequestsAlert from "./_components/pending-requests-alert";
 import VideoGallery from "./_components/video-gallery";
 import prisma from "@/lib/prisma";
+import DashboardClient from "./_components/dashboard-client";
 
 // Import gradient card styles
 import "@/styles/gradient-cards.css";
@@ -76,43 +77,7 @@ export default async function DashboardPage() {
     console.error("Error fetching participant details:", error);
   }
   
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.username}</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Manage your profile, teams, and contest participations from your dashboard.
-        </p>
-      </div>
-      
-      {/* Pending Requests Alert - only shows if there are pending requests */}
-      <PendingRequestsAlert userId={Number(user.id)} participantId={Number(user.id)} />
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-        {/* Profile Summary component */}
-        <ProfileSummary user={userDetails} />
-        
-        {/* Contingent Summary component - now works directly with participant ID */}
-        <ContingentSummary participantId={Number(user.id)} />
-        
-        {/* Contestants Summary component */}
-        <ContestantsSummary userId={Number(user.id)} />
-        
-        {/* Teams Summary component */}
-        <TeamsSummary participantId={Number(user.id)} />
-      </div>
-      
-      {/* Video Gallery */}
-      <VideoGallery />
-      
-      <div className="fixed bottom-4 right-4 md:hidden">
-        <Button size="icon" className="rounded-full h-12 w-12 shadow-lg" asChild>
-          <Link href="/participants/profile">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span className="sr-only">Profile</span>
-          </Link>
-        </Button>
-      </div>
-    </div>
-  );
+  // Pass the user data to the client component
+  return <DashboardClient user={user} userDetails={userDetails} />;
+
 }
