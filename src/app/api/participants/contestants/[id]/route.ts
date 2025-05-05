@@ -174,6 +174,9 @@ export async function PATCH(
     if (body.age) updateData.age = parseInt(body.age);
     if (body.edu_level) updateData.edu_level = body.edu_level;
     if (body.class_name !== undefined) updateData.class_name = body.class_name;
+    if (body.class_grade !== undefined) updateData.class_grade = body.class_grade;
+    if (body.email !== undefined) updateData.email = body.email || null;
+    if (body.phoneNumber !== undefined) updateData.phoneNumber = body.phoneNumber || null;
     if (body.contingentId !== undefined) {
       updateData.contingentId = body.contingentId ? parseInt(body.contingentId) : null;
     }
