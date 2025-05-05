@@ -173,6 +173,102 @@ export default function TeamsPage() {
     }
   };
   
+  // Get contest theme color scheme
+  const getContestColorScheme = (contestId: number) => {
+    // This is a simple implementation - we could fetch actual theme colors from an API
+    // but for now we'll use a deterministic algorithm based on contestId
+    const themeMap: Record<number, { bg: string, border: string, hover: string, text: string }> = {
+      1: { 
+        bg: 'bg-blue-50 dark:bg-blue-900/20', 
+        border: 'border-blue-200 dark:border-blue-800', 
+        hover: 'hover:border-blue-300 dark:hover:border-blue-700',
+        text: 'text-blue-800 dark:text-blue-300'
+      },
+      2: { 
+        bg: 'bg-purple-50 dark:bg-purple-900/20', 
+        border: 'border-purple-200 dark:border-purple-800', 
+        hover: 'hover:border-purple-300 dark:hover:border-purple-700',
+        text: 'text-purple-800 dark:text-purple-300'
+      },
+      3: { 
+        bg: 'bg-green-50 dark:bg-green-900/20', 
+        border: 'border-green-200 dark:border-green-800', 
+        hover: 'hover:border-green-300 dark:hover:border-green-700', 
+        text: 'text-green-800 dark:text-green-300'
+      },
+      4: { 
+        bg: 'bg-red-50 dark:bg-red-900/20', 
+        border: 'border-red-200 dark:border-red-800', 
+        hover: 'hover:border-red-300 dark:hover:border-red-700', 
+        text: 'text-red-800 dark:text-red-300'
+      },
+      5: { 
+        bg: 'bg-amber-50 dark:bg-amber-900/20', 
+        border: 'border-amber-200 dark:border-amber-800', 
+        hover: 'hover:border-amber-300 dark:hover:border-amber-700', 
+        text: 'text-amber-800 dark:text-amber-300'
+      },
+      6: { 
+        bg: 'bg-cyan-50 dark:bg-cyan-900/20', 
+        border: 'border-cyan-200 dark:border-cyan-800', 
+        hover: 'hover:border-cyan-300 dark:hover:border-cyan-700', 
+        text: 'text-cyan-800 dark:text-cyan-300'
+      },
+      7: { 
+        bg: 'bg-pink-50 dark:bg-pink-900/20', 
+        border: 'border-pink-200 dark:border-pink-800', 
+        hover: 'hover:border-pink-300 dark:hover:border-pink-700', 
+        text: 'text-pink-800 dark:text-pink-300'
+      },
+      8: { 
+        bg: 'bg-indigo-50 dark:bg-indigo-900/20', 
+        border: 'border-indigo-200 dark:border-indigo-800', 
+        hover: 'hover:border-indigo-300 dark:hover:border-indigo-700', 
+        text: 'text-indigo-800 dark:text-indigo-300'
+      },
+      9: { 
+        bg: 'bg-orange-50 dark:bg-orange-900/20', 
+        border: 'border-orange-200 dark:border-orange-800', 
+        hover: 'hover:border-orange-300 dark:hover:border-orange-700', 
+        text: 'text-orange-800 dark:text-orange-300'
+      },
+      10: { 
+        bg: 'bg-teal-50 dark:bg-teal-900/20', 
+        border: 'border-teal-200 dark:border-teal-800', 
+        hover: 'hover:border-teal-300 dark:hover:border-teal-700', 
+        text: 'text-teal-800 dark:text-teal-300'
+      },
+    };
+    
+    // If contestId is in our map, use that, otherwise use a hash function to pick a color
+    if (themeMap[contestId]) {
+      return themeMap[contestId];
+    } else {
+      // Simple hash function to get a number between 1-10
+      const hash = contestId % 10 || 10;
+      return themeMap[hash];
+    }
+  };
+  
+  // Group teams by contest
+  const groupTeamsByContest = (teams: Team[]) => {
+    const grouped: Record<string, Team[]> = {};
+    
+    teams.forEach(team => {
+      const contestId = team.contestId.toString();
+      if (!grouped[contestId]) {
+        grouped[contestId] = [];
+      }
+      grouped[contestId].push(team);
+    });
+    
+    return Object.entries(grouped).map(([contestId, teams]) => ({
+      contestId: parseInt(contestId),
+      contestName: teams[0].contestName,
+      teams
+    }));
+  };
+  
   if (status === "unauthenticated") {
     router.push('/participants/auth/login');
     return null;
@@ -209,131 +305,146 @@ export default function TeamsPage() {
         </div>
       </div>
       
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Team Management</CardTitle>
-          <CardDescription>
-            View, edit, and manage your Techlympics competition teams
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          ) : filteredTeams.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Trophy className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium">No teams found</h3>
-              <p className="text-muted-foreground mb-6 max-w-md">
-                {teams.length === 0
-                  ? "You haven't created any teams yet. Create your first team to participate in Techlympics competitions."
-                  : "No teams match your search criteria. Try a different search term."}
-              </p>
-              {teams.length === 0 && (
-                <Button asChild>
-                  <Link href="/participants/teams/new">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Your First Team
-                  </Link>
-                </Button>
-              )}
-            </div>
-          ) : (
-            <ScrollArea className="h-[500px] rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Team Name</TableHead>
-                    <TableHead>Contest</TableHead>
-                    <TableHead>Members</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTeams.map((team) => (
-                    <TableRow key={team.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col">
-                          <span>{team.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {team.hashcode}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span>{team.contestName}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {team.contingentName}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="flex gap-1 items-center w-fit">
-                          <Users className="h-3 w-3" />
-                          {team.memberCount} / {team.maxMembers}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
+      {isLoading ? (
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      ) : filteredTeams.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Trophy className="h-12 w-12 text-muted-foreground/50 mb-4" />
+            <h3 className="text-lg font-medium">No teams found</h3>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              {teams.length === 0
+                ? "You haven't created any teams yet. Create your first team to participate in Techlympics competitions."
+                : "No teams match your search criteria. Try a different search term."}
+            </p>
+            {teams.length === 0 && (
+              <Button asChild>
+                <Link href="/participants/teams/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Your First Team
+                </Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {groupTeamsByContest(filteredTeams).map((contestGroup) => (
+            <div key={contestGroup.contestId} className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-5 w-5" />
+                <h2 className="text-xl font-semibold">{contestGroup.contestName}</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {contestGroup.teams.map((team) => {
+                  const colorScheme = getContestColorScheme(team.contestId);
+                  return (
+                    <div
+                      key={team.id}
+                      className={`relative group overflow-hidden rounded-lg border ${colorScheme.border} ${colorScheme.bg} ${colorScheme.hover} transition-all duration-200 shadow-sm hover:shadow-md`}
+                    >
+                      {/* Status indicator */}
+                      <div className="absolute top-2 right-2">
                         <Badge className={getStatusColor(team.status)}>
                           {team.status}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span>{formatDate(team.createdAt)}</span>
+                      </div>
+                      
+                      {/* Card content */}
+                      <div className="p-6">
+                        <div className="mb-4">
+                          <h3 className={`text-lg font-bold ${colorScheme.text}`}>{team.name}</h3>
+                          <p className="text-xs text-muted-foreground">{team.hashcode}</p>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        
+                        <div className="space-y-3">
+                          {/* Contest info */}
+                          <div className="flex items-start gap-2">
+                            <Trophy className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <div>
+                              <div className="text-sm font-medium">{team.contestName}</div>
+                              <div className="text-xs text-muted-foreground">{team.contingentName}</div>
+                            </div>
+                          </div>
+                          
+                          {/* Members count */}
+                          <div className="flex items-start gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <div>
+                              <div className="text-sm">
+                                <span className="font-medium">{team.memberCount}</span> of <span className="font-medium">{team.maxMembers}</span> members
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Creation date */}
+                          <div className="flex items-start gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <div className="text-sm">
+                              Created {formatDate(team.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Actions */}
+                        <div className="mt-6 flex gap-2 justify-end">
                           <Button variant="outline" size="sm" asChild title="View Team Details">
                             <Link href={`/participants/teams/${team.id}`}>
-                              <EyeIcon className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                          
-                          <Button variant="outline" size="sm" asChild title="Edit Team">
-                            <Link href={`/participants/teams/${team.id}/edit`}>
-                              <Edit className="h-4 w-4" />
+                              <EyeIcon className="h-4 w-4 mr-1" />
+                              View
                             </Link>
                           </Button>
                           
                           <Button variant="outline" size="sm" asChild title="Manage Team Members">
                             <Link href={`/participants/teams/${team.id}/members`}>
-                              <Users className="h-4 w-4" />
+                              <Users className="h-4 w-4 mr-1" />
+                              Members
                             </Link>
                           </Button>
                           
-                          {team.isOwner && (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="text-red-600 hover:bg-red-100 hover:text-red-700" 
-                              title="Delete Team"
-                              onClick={() => {
-                                setTeamToDelete(team);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/participants/teams/${team.id}/edit`}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Team
+                                </Link>
+                              </DropdownMenuItem>
+                              
+                              {team.isOwner && (
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:bg-red-50 focus:text-red-700"
+                                  onClick={() => {
+                                    setTeamToDelete(team);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Team
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          )}
-        </CardContent>
-      </Card>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       
       {/* Delete confirmation dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

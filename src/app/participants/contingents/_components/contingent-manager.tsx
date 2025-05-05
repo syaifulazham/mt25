@@ -638,15 +638,12 @@ export default function ContingentManager({ userId }: ContingentManagerProps) {
                         }}
                       >
                         <div className="flex justify-between items-start">
-                          <div className="font-medium">{contingent.name}</div>
+                          <div className="font-medium">{contingent.school?.name || contingent.higherInstitution?.name}</div>
                           {contingent.isManager && (
                             <Badge variant="outline">
                               {contingent.isOwner ? 'Primary Manager' : 'Co-Manager'}
                             </Badge>
                           )}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {contingent.school ? 'School' : 'Higher Institution'}: {contingent.school?.name || contingent.higherInstitution?.name}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 flex justify-between">
                           <span>{contingent.memberCount} members</span>
@@ -672,7 +669,7 @@ export default function ContingentManager({ userId }: ContingentManagerProps) {
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle>{selectedContingent.name}</CardTitle>
+                        <CardTitle>{selectedContingent.school?.name || selectedContingent.higherInstitution?.name}</CardTitle>
                         <CardDescription>
                           {selectedContingent.description || 'No description provided'}
                         </CardDescription>
@@ -683,15 +680,6 @@ export default function ContingentManager({ userId }: ContingentManagerProps) {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Institution</h3>
-                      <p>{selectedContingent.school?.name || selectedContingent.higherInstitution?.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedContingent.school ? 'School' : 'Higher Institution'} | 
-                        {selectedContingent.school?.state?.name || selectedContingent.higherInstitution?.state?.name}
-                      </p>
-                    </div>
-                    
                     {/* Manage Contestants Button */}
                     {selectedContingent.isManager && selectedContingent.status === 'ACTIVE' && (
                       <div className="mt-2">

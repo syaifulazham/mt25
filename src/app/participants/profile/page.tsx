@@ -4,13 +4,13 @@ import { getCurrentUser } from '@/lib/session';
 import prisma from '@/lib/prisma';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Badge } from '@/components/ui/badge';
 import { PlusCircle, User, Users, Award } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'My Profile | Techlympics 2025',
-  description: 'Manage your profile and contestants',
+  description: 'Manage your personal information',
 };
 
 // Define a combined user type to handle both regular users and participants
@@ -37,47 +37,18 @@ export default async function ProfilePage() {
   // Cast the user to our combined type
   const user = await getCurrentUser() as unknown as CombinedUser;
   
-  // Fetch contingents for the current user
-  const userContingents = await prisma.contingent.findMany({
-    where: {
-      participantId: user?.id,
-    },
-    select: {
-      id: true,
-    },
-  });
-  
-  // Get contingent IDs managed by this user
-  const contingentIds = userContingents.map(c => c.id);
-  
-  // Fetch contestants for the contingents managed by the current user
-  const contestants = await prisma.contestant.findMany({
-    where: {
-      contingentId: {
-        in: contingentIds.length > 0 ? contingentIds : [-1], // Use -1 as a fallback if no contingents found
-      },
-    },
-    include: {
-      contingent: true,
-    },
-  });
+  // No longer need to fetch contingent and contestant data since we removed the contestants tab
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">My Profile</h1>
         <p className="text-sm md:text-base text-muted-foreground">
-          Manage your personal information and contestants
+          Manage your personal information
         </p>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
-          <TabsTrigger value="profile">Personal Info</TabsTrigger>
-          <TabsTrigger value="contestants">My Contestants</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="profile" className="space-y-4">
+      <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg md:text-xl">Personal Information</CardTitle>
@@ -142,57 +113,7 @@ export default async function ProfilePage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="contestants" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle className="text-lg md:text-xl">My Contestants</CardTitle>
-                <CardDescription>
-                  Manage your registered contestants
-                </CardDescription>
-              </div>
-              <Button size="sm" className="w-full sm:w-auto">
-                <Link href="/participants/contestants/new">Add Contestant</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {contestants.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">You haven't registered any contestants yet.</p>
-                  <Button asChild>
-                    <Link href="/participants/contestants/new">Register Contestant</Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {contestants.map((contestant) => (
-                    <div key={contestant.id} className="p-4 border rounded-lg">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <div>
-                          <h3 className="font-medium">{contestant.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {contestant.contingent?.name || 'No contingent'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/participants/contestants/${contestant.id}`}>View</Link>
-                          </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/participants/contestants/${contestant.id}/edit`}>Edit</Link>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
       
       <div className="fixed bottom-4 right-4 md:hidden">
         <Button size="icon" className="rounded-full h-12 w-12 shadow-lg" asChild>

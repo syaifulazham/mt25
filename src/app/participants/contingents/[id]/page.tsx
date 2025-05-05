@@ -149,10 +149,7 @@ export default function ContingentDetailPage() {
         <div className="p-6">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-2xl font-bold">{contingent.name}</h1>
-              <p className="text-gray-600 mt-1">
-                {contingent.school?.name || contingent.higherInstitution?.name || 'No institution specified'}
-              </p>
+              <h1 className="text-2xl font-bold">{contingent.school?.name || contingent.higherInstitution?.name || 'No institution specified'}</h1>
             </div>
             
             <div>
@@ -212,7 +209,7 @@ export default function ContingentDetailPage() {
       {/* Contestant Manager Component */}
       <ContestantManager 
         contingentId={parseInt(contingentId)} 
-        contingentName={contingent.name}
+        contingentName={contingent.school?.name || contingent.higherInstitution?.name || ''}
         isManager={isManager}
       />
     </div>
