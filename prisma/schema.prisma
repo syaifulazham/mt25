@@ -426,6 +426,7 @@ model user_participant {
   contingentRequests contingentRequest[]
   managedContingents contingentManager[] // Added relation to managed contingents
   teamManagers teamManager[] // Relation to teams managed by this participant
+  createdManagers manager[] // Relation to independent managers created by this participant
 }
 
 model zone {
@@ -663,6 +664,7 @@ model team {
   contingent    contingent @relation(fields: [contingentId], references: [id])
   members       teamMember[]
   managers      teamManager[]
+  independentManagers manager[]
   
   @@index([contestId])
   @@index([contingentId])
@@ -701,4 +703,25 @@ model teamMember {
   @@unique([teamId, contestantId]) // Prevent duplicate member entries
   @@index([teamId])
   @@index([contestantId])
+}
+
+// Independent manager model (not tied to user or user_participant)
+model manager {
+  id            Int       @id @default(autoincrement())
+  name          String
+  ic            String    // Malaysian IC number
+  email         String?   // Optional email address
+  phoneNumber   String?   // Optional phone number
+  hashcode      String    @unique // Unique identifier code
+  teamId        Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     Int       // ID of the user_participant who created this manager
+  
+  // Relations
+  team          team?     @relation(fields: [teamId], references: [id])
+  creator       user_participant @relation(fields: [createdBy], references: [id])
+  
+  @@index([teamId])
+  @@index([createdBy])
 }
