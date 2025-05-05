@@ -6,6 +6,26 @@ import { Badge } from "@/components/ui/badge";
 import { Building, Users } from "lucide-react";
 import Link from "next/link";
 
+// Function to normalize image URLs for both development and production environments
+function normalizeImageUrl(url: string): string {
+  if (!url) return '';
+  
+  // If it's already an absolute URL (starts with http:// or https://), return as is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // If it's already a proper relative URL (starts with /), just return it
+  // In both development and production, Next.js will resolve this correctly
+  // as it will be relative to the domain root
+  if (url.startsWith('/')) {
+    return url;
+  }
+  
+  // If it doesn't start with /, add it (this shouldn't happen, but just in case)
+  return `/${url}`;
+}
+
 interface ContingentSummaryClientProps {
   contingent: {
     id: number;
@@ -50,9 +70,22 @@ export default function ContingentSummaryClient({
         <div className="h-8 w-8 bg-muted rounded-md flex items-center justify-center overflow-hidden">
           {contingent?.logoUrl ? (
             <img 
-              src={contingent.logoUrl} 
+              src={normalizeImageUrl(contingent.logoUrl)} 
               alt={contingent.name} 
               className="h-full w-full object-cover"
+              onError={(e) => {
+                console.error(`Failed to load image: ${contingent.logoUrl}`);
+                // Replace with building icon on error
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement?.classList.add('flex');
+                e.currentTarget.parentElement?.classList.add('items-center');
+                e.currentTarget.parentElement?.classList.add('justify-center');
+                const building = document.createElement('div');
+                // Add the building icon
+                building.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-muted-foreground"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg>';
+                e.currentTarget.parentElement?.appendChild(building.firstChild!);
+              }}
+              crossOrigin="anonymous"
             />
           ) : (
             <Building className="h-4 w-4 text-muted-foreground" />
