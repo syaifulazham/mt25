@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/session";
 import { redirect } from "next/navigation";
-import ContingentManager from "./_components/contingent-manager";
+import ContingentManagerClient from "./_components/contingent-manager-client";
+import { Suspense } from "react";
+import { Loader2 } from "lucide-react";
 
 export default async function ContingentsPage() {
   // Get the current user
@@ -14,13 +16,19 @@ export default async function ContingentsPage() {
   return (
     <div className="container py-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Manage Your Contingent</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Contingent Management</h1>
         <p className="text-muted-foreground">
-          Select your school or higher institution to create or join a contingent
+          Create, join, or manage your contingent for Techlympics 2025
         </p>
       </div>
       
-      <ContingentManager userId={(user as any).id} />
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }>
+        <ContingentManagerClient userId={(user as any).id} />
+      </Suspense>
     </div>
   );
 }

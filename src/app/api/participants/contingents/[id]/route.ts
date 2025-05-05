@@ -153,6 +153,8 @@ export async function PUT(
     // Only update fields that are provided
     if (body.name) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
+    if (body.short_name !== undefined) updateData.short_name = body.short_name;
+    if (body.logoUrl !== undefined) updateData.logoUrl = body.logoUrl;
     
     // Update the contingent
     const updatedContingent = await prisma.contingent.update({

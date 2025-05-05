@@ -77,6 +77,7 @@
   "contingent.none": "无",
   "contingent.error_loading": "加载代表团数据错误",
   "contingent.name": "名称",
+  "contingent.short_name": "简称",
   "contingent.institution": "机构",
   "contingent.members": "成员",
   "contingent.manage": "管理代表团",
@@ -113,5 +114,13 @@
   "requests.rejected": "已拒绝",
   
   "common.loading": "加载中...",
-  "common.error": "错误"
+  "common.error": "错误",
+  
+  "sidebar.explorer": "浏览器",
+  "sidebar.dashboard": "控制面板",
+  "sidebar.profile": "个人资料",
+  "sidebar.contingent": "代表团",
+  "sidebar.contestants": "参与者",
+  "sidebar.managers": "管理员",
+  "sidebar.teams": "团队"
 }

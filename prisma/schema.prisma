@@ -69,6 +69,8 @@ model contest {
 model contingent {
   id          Int      @id @default(autoincrement())
   name        String
+  short_name   String?  // Added short name field
+  logoUrl     String?  // Added logo URL field
   schoolId    Int?
   higherInstId Int?
   createdAt   DateTime @default(now())

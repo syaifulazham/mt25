@@ -77,6 +77,7 @@
   "contingent.none": "Wala",
   "contingent.error_loading": "Error sa pag-load ng data ng kontingente",
   "contingent.name": "Pangalan",
+  "contingent.short_name": "Maikling Pangalan",
   "contingent.institution": "Institusyon",
   "contingent.members": "Mga Miyembro",
   "contingent.manage": "Pamahalaan ang Kontingente",
@@ -113,5 +114,13 @@
   "requests.rejected": "Tinanggihan",
   
   "common.loading": "Naglo-load...",
-  "common.error": "Error"
+  "common.error": "Error",
+  
+  "sidebar.explorer": "Explorer",
+  "sidebar.dashboard": "Dashboard",
+  "sidebar.profile": "Profile",
+  "sidebar.contingent": "Kontingente",
+  "sidebar.contestants": "Mga Kalahok",
+  "sidebar.managers": "Mga Tagapamahala",
+  "sidebar.teams": "Mga Koponan"
 }

@@ -18,6 +18,8 @@ interface Contingent {
   id: number;
   name: string;
   description: string;
+  short_name?: string;
+  logoUrl?: string;
   school: {
     name: string;
     state: {
@@ -197,6 +199,8 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
     clientContingent = {
       id: contingent.id,
       name: contingent.name,
+      short_name: contingent.short_name,
+      logoUrl: contingent.logoUrl,
       isManager: contingent.isManager,
       membersCount: contingent.memberCount,
       institution: contingent.school || contingent.higherInstitution ? {

@@ -77,6 +77,7 @@
   "contingent.none": "None",
   "contingent.error_loading": "Error loading contingent data",
   "contingent.name": "Name",
+  "contingent.short_name": "Short Name",
   "contingent.institution": "Institution",
   "contingent.members": "Members",
   "contingent.manage": "Manage Contingent",
@@ -113,5 +114,13 @@
   "requests.rejected": "Rejected",
   
   "common.loading": "Loading...",
-  "common.error": "Error"
+  "common.error": "Error",
+  
+  "sidebar.explorer": "Explorer",
+  "sidebar.dashboard": "Dashboard",
+  "sidebar.profile": "Profile",
+  "sidebar.contingent": "Contingent",
+  "sidebar.contestants": "Participants",
+  "sidebar.managers": "Managers",
+  "sidebar.teams": "Teams"
 }

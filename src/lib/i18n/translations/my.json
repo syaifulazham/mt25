@@ -77,6 +77,7 @@
   "contingent.none": "Tiada",
   "contingent.error_loading": "Ralat memuatkan data kontingen",
   "contingent.name": "Nama",
+  "contingent.short_name": "Nama Pendek",
   "contingent.institution": "Institusi",
   "contingent.members": "Ahli-ahli",
   "contingent.manage": "Urus Kontingen",
@@ -113,5 +114,13 @@
   "requests.rejected": "Ditolak",
   
   "common.loading": "Memuatkan...",
-  "common.error": "Ralat"
+  "common.error": "Ralat",
+  
+  "sidebar.explorer": "Penjelajah",
+  "sidebar.dashboard": "Papan Pemuka",
+  "sidebar.profile": "Profil",
+  "sidebar.contingent": "Kontingen",
+  "sidebar.contestants": "Peserta",
+  "sidebar.managers": "Pengurus",
+  "sidebar.teams": "Pasukan"
 }

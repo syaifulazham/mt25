@@ -10,6 +10,8 @@ interface ContingentSummaryClientProps {
   contingent: {
     id: number;
     name: string;
+    short_name?: string;
+    logoUrl?: string;
     isManager: boolean;
     membersCount: number;
     institution?: {
@@ -45,8 +47,16 @@ export default function ContingentSummaryClient({
             </Badge>
           )}
         </div>
-        <div className="h-8 w-8 bg-muted rounded-md flex items-center justify-center">
-          <Building className="h-4 w-4 text-muted-foreground" />
+        <div className="h-8 w-8 bg-muted rounded-md flex items-center justify-center overflow-hidden">
+          {contingent?.logoUrl ? (
+            <img 
+              src={contingent.logoUrl} 
+              alt={contingent.name} 
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Building className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-4 pt-3">
@@ -64,6 +74,15 @@ export default function ContingentSummaryClient({
                 {contingent.name}
               </span>
             </div>
+            
+            {contingent.short_name && (
+              <div className="flex justify-between items-center py-1 border-b">
+                <span className="text-muted-foreground">{t('contingent.short_name') || 'Short Name'}:</span>
+                <span className="font-medium truncate max-w-[150px]" title={contingent.short_name}>
+                  {contingent.short_name}
+                </span>
+              </div>
+            )}
             
             {contingent.institution && (
               <div className="flex justify-between items-center py-1 border-b">
