@@ -98,34 +98,11 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error("Database error when fetching contingents:", err);
-      // Continue to fallback
     }
 
-    // Fallback contingent for development/testing
-    const demoContingent = {
-      id: 1,
-      name: "My School Contingent",
-      short_name: "MSC",
-      logoUrl: "",
-      description: "A contingent for my school",
-      school: { 
-        id: 1, 
-        name: "Demo School",
-        code: "DS001",
-        level: "Secondary",
-        category: "Government",
-        state: { name: "Kuala Lumpur" } 
-      },
-      higherInstitution: null,
-      isManager: true,
-      isOwner: true,
-      managedByParticipant: true,
-      status: "ACTIVE",
-      memberCount: 0,
-      managerCount: 1
-    };
-
-    return NextResponse.json([demoContingent]);
+    // No contingents found - return empty array to trigger creation form
+    console.log("No contingents found for participant", participantId);
+    return NextResponse.json([]);
   } catch (error) {
     console.error("Error fetching contingents:", error);
     return NextResponse.json(

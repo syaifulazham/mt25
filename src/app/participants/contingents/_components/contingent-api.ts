@@ -102,6 +102,28 @@ const contingentApi = {
   },
 
   // Request to join a contingent
+  async requestToJoinContingent(data: { participantId: number, institutionType: string, institutionId: number }) {
+    try {
+      const response = await fetch('/api/participants/contingent-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to request joining contingent');
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Error requesting to join contingent:', error);
+      throw error;
+    }
+  },
+  
   // Upload contingent logo
   async uploadLogo(contingentId: number, file: File): Promise<string> {
     const formData = new FormData();
