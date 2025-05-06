@@ -65,6 +65,26 @@ const contingentApi = {
       data.managerIds = [];
     }
     
+    // Transform the data to match the API's expected format
+    // The API expects schoolId or higherInstId, not institutionId and institutionType
+    const transformedData: any = {
+      name: data.name,
+      description: data.description,
+      participantId: data.participantId,
+      managedByParticipant: data.managedByParticipant,
+      managerIds: data.managerIds,
+      short_name: data.short_name
+    };
+    
+    // Map institutionType and institutionId to the correct field
+    if (data.institutionType === 'SCHOOL') {
+      transformedData.schoolId = data.institutionId;
+    } else if (data.institutionType === 'HIGHER_INSTITUTION') {
+      transformedData.higherInstId = data.institutionId;
+    }
+    
+    console.log('Transformed data for API:', transformedData);
+    
     // Add a retry mechanism for contingent creation
     let retries = 3;
     let response;
@@ -77,7 +97,7 @@ const contingentApi = {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(data),
+          body: JSON.stringify(transformedData),
         });
         
         responseData = await response.json();
