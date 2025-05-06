@@ -30,6 +30,8 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   const [contingentName, setContingentName] = useState("");
   const [contingentDescription, setContingentDescription] = useState("");
   const [showSearchDialog, setShowSearchDialog] = useState(false);
+  const [existingContingent, setExistingContingent] = useState<boolean>(false);
+  const [checkingExistingContingent, setCheckingExistingContingent] = useState<boolean>(false);
 
   // Handle search
   const handleSearch = async () => {
@@ -56,12 +58,43 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
     }
   };
 
+  // Check if a contingent already exists for the institution
+  const checkExistingContingent = async (institution: School | HigherInstitution, type: "school" | "higher") => {
+    try {
+      setCheckingExistingContingent(true);
+      const institutionId = institution.id;
+      const institutionType = type === "school" ? "SCHOOL" : "HIGHER_INSTITUTION";
+      
+      // Use the API to check if a contingent exists
+      const response = await fetch(
+        `/api/participants/contingents/check?institutionType=${institutionType}&institutionId=${institutionId}`,
+        { cache: 'no-store' }
+      );
+      
+      if (!response.ok) {
+        throw new Error("Failed to check existing contingent");
+      }
+      
+      const data = await response.json();
+      setExistingContingent(data.exists);
+    } catch (error) {
+      console.error("Error checking existing contingent:", error);
+      // Default to false if error
+      setExistingContingent(false);
+    } finally {
+      setCheckingExistingContingent(false);
+    }
+  };
+
   // Handle institution selection
-  const handleSelectInstitution = (institution: School | HigherInstitution) => {
+  const handleSelectInstitution = async (institution: School | HigherInstitution) => {
     setSelectedInstitution(institution);
     setShowSearchDialog(false);
     // Generate a default contingent name
     setContingentName(`${institution.name} Contingent`);
+    
+    // Check if a contingent already exists for this institution
+    await checkExistingContingent(institution, institutionType);
   };
 
   // Handle contingent creation
@@ -242,21 +275,44 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
         )}
       </CardContent>
       {selectedInstitution && (
-        <CardFooter className="flex justify-between">
-          <Button variant="outline" onClick={() => setSelectedInstitution(null)}>
-            Clear Selection
-          </Button>
-          <div className="space-x-2">
-            <Button variant="outline" onClick={handleJoinContingent} disabled={isLoading}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : "Request to Join Existing"}
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="flex justify-between w-full">
+            <Button variant="outline" onClick={() => setSelectedInstitution(null)}>
+              Clear Selection
             </Button>
-            <Button onClick={handleCreateContingent} disabled={isLoading}>
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : "Create New Contingent"}
-            </Button>
+            
+            <div className="space-x-2">
+              {checkingExistingContingent ? (
+                <Button disabled>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Checking...
+                </Button>
+              ) : existingContingent ? (
+                <div className="text-right space-y-2">
+                  <div className="text-sm text-amber-500 font-medium">
+                    A contingent already exists for this institution
+                  </div>
+                  <Button onClick={handleJoinContingent} disabled={isLoading} className="w-full">
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : "Request to Join Existing Contingent"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-x-2">
+                  <Button variant="outline" onClick={handleJoinContingent} disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : "Request to Join Existing"}
+                  </Button>
+                  <Button onClick={handleCreateContingent} disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : "Create New Contingent"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </CardFooter>
       )}
