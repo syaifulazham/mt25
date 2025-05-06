@@ -45,7 +45,7 @@ export default function NewContestantPage() {
     ic: "",
     email: "",
     phoneNumber: "",
-    gender: "Lelaki",
+    gender: "MALE",
     age: "",
     edu_level: "sekolah rendah",
     class_name: "",
@@ -146,7 +146,58 @@ export default function NewContestantPage() {
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Special handling for IC number
+    if (name === 'ic') {
+      // Remove non-numeric characters
+      const numericValue = value.replace(/\D/g, '');
+      
+      // Update the IC field with cleaned value
+      setFormData(prev => ({ ...prev, [name]: numericValue }));
+      
+      // If we have 12 digits, auto-populate other fields
+      if (numericValue.length === 12) {
+        // Extract year, month, and day from IC
+        const yearPrefix = parseInt(numericValue.substring(0, 2)) <= 25 ? '20' : '19';
+        const yearOfBirth = parseInt(yearPrefix + numericValue.substring(0, 2));
+        
+        // Calculate age based on birth year (current year is 2025)
+        const currentYear = 2025;
+        const age = currentYear - yearOfBirth;
+        
+        // Determine gender based on last digit
+        const lastDigit = parseInt(numericValue.charAt(11));
+        const gender = lastDigit % 2 === 1 ? 'MALE' : 'FEMALE';
+        
+        // Determine education level based on age
+        let eduLevel = 'belia';
+        if (age >= 7 && age <= 12) {
+          eduLevel = 'sekolah rendah';
+        } else if (age >= 13 && age <= 17) {
+          eduLevel = 'sekolah menengah';
+        }
+        
+        // Determine class grade based on age
+        let classGrade = '';
+        if (age >= 7 && age <= 12) {
+          classGrade = (age - 6).toString(); // Primary: ages 7-12 map to grades 1-6
+        } else if (age >= 13 && age <= 17) {
+          classGrade = (age - 12).toString(); // Secondary: ages 13-17 map to grades 1-5
+        }
+        
+        // Update form with auto-calculated values
+        setFormData(prev => ({
+          ...prev,
+          age: age.toString(),
+          gender,
+          edu_level: eduLevel,
+          class_grade: classGrade
+        }));
+      }
+    } else {
+      // Standard handling for other fields
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
   
   // Handle select changes
@@ -305,6 +356,12 @@ export default function NewContestantPage() {
                     onChange={handleInputChange}
                     required
                   />
+                  {formData.ic.length > 0 && formData.ic.length !== 12 && (
+                    <p className="text-sm text-destructive mt-1">IC must contain exactly 12 digits</p>
+                  )}
+                  {formData.ic.length === 12 && (
+                    <p className="text-sm text-muted-foreground mt-1">Age, gender, and education level have been auto-filled based on IC</p>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -342,8 +399,8 @@ export default function NewContestantPage() {
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MALE">Lelaki</SelectItem>
-                    <SelectItem value="FEMALE">Perempuan</SelectItem>
+                    <SelectItem value="MALE">MALE</SelectItem>
+                    <SelectItem value="FEMALE">FEMALE</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

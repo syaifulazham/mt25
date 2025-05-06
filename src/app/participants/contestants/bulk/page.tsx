@@ -34,6 +34,7 @@ interface ValidatedRecord {
   isValid: boolean;
   validatedData: any;
   errors: Record<string, string>;
+  derivedValues?: Record<string, any>;
 }
 
 interface ValidationResult {
@@ -121,6 +122,30 @@ export default function BulkUploadPage() {
       }
 
       const data = await response.json();
+      
+      // Process each record with our client-side validation logic to apply auto-filling
+      if (data && data.records && Array.isArray(data.records)) {
+        // For each record, apply our IC-based auto-filling logic
+        const processedRecords = data.records.map((record: ValidatedRecord) => {
+          const validation = validateRecord(record.validatedData);
+          return {
+            ...record,
+            validatedData: validation.updatedData,
+            isValid: validation.isValid,
+            errors: validation.errors
+          };
+        });
+        
+        // Update validation result with processed records
+        const validCount = processedRecords.filter((r: ValidatedRecord) => r.isValid).length;
+        data.records = processedRecords;
+        data.validRecords = validCount;
+        data.invalidRecords = processedRecords.length - validCount;
+        
+        // Show notification about auto-filling
+        toast.info('IC numbers have been used to auto-fill missing information where possible');
+      }
+      
       setValidationResult(data);
       setActiveStep('verify');
     } catch (error) {
@@ -218,11 +243,72 @@ export default function BulkUploadPage() {
     }
   };
 
-  // Helper function to get cell background color based on validation
+  // Helper function to check if a field's value matches what would be expected based on IC
+  const checkIcBasedFieldMatch = (record: ValidatedRecord, field: string) => {
+    const data = record.validatedData;
+    const cleanedIC = data.ic?.replace(/\D/g, '');
+    
+    // If IC is not valid or field has an error, don't check for IC-based match
+    if (!cleanedIC || cleanedIC.length !== 12 || record.errors[field]) {
+      return true; // Consider it a match if we can't determine
+    }
+    
+    // Calculate expected values based on IC
+    const yearPrefix = parseInt(cleanedIC.substring(0, 2)) <= 25 ? '20' : '19';
+    const yearOfBirth = parseInt(yearPrefix + cleanedIC.substring(0, 2));
+    const currentYear = 2025;
+    const calculatedAge = currentYear - yearOfBirth;
+    const lastDigit = parseInt(cleanedIC.charAt(11));
+    const calculatedGender = lastDigit % 2 === 1 ? 'MALE' : 'FEMALE';
+    
+    // Calculate expected education level
+    let calculatedEduLevel = 'belia';
+    if (calculatedAge >= 7 && calculatedAge <= 12) {
+      calculatedEduLevel = 'sekolah rendah';
+    } else if (calculatedAge >= 13 && calculatedAge <= 17) {
+      calculatedEduLevel = 'sekolah menengah';
+    }
+    
+    // Calculate expected class grade
+    let calculatedClassGrade = '';
+    if (calculatedAge >= 7 && calculatedAge <= 12) {
+      calculatedClassGrade = (calculatedAge - 6).toString();
+    } else if (calculatedAge >= 13 && calculatedAge <= 17) {
+      calculatedClassGrade = (calculatedAge - 12).toString();
+    }
+    
+    // Check if current value matches expected value
+    switch (field) {
+      case 'gender':
+        return data.gender === calculatedGender;
+      case 'age':
+        return data.age === calculatedAge.toString() || data.age === calculatedAge;
+      case 'edu_level':
+        return data.edu_level === calculatedEduLevel;
+      case 'class_grade':
+        return data.class_grade === calculatedClassGrade;
+      default:
+        return true;
+    }
+  };
+  
+  // Helper function to get cell background color based on validation and IC rules
   const getCellBackground = (record: ValidatedRecord, field: string) => {
+    // If field has validation error, show red background
     if (record.errors[field]) {
       return 'bg-red-100 dark:bg-red-900/20';
     }
+    
+    // If field value doesn't match IC-based expectation, show yellow background
+    if (record.derivedValues && field in record.derivedValues) {
+      const derivedValue = record.derivedValues[field];
+      const currentValue = record.validatedData[field];
+      
+      if (derivedValue && derivedValue.toString() !== currentValue?.toString()) {
+        return 'bg-amber-100 dark:bg-amber-900/20';
+      }
+    }
+    
     return '';
   };
   
@@ -263,6 +349,7 @@ export default function BulkUploadPage() {
     const validation = validateRecord(updatedRecords[rowIndex].validatedData);
     updatedRecords[rowIndex].isValid = validation.isValid;
     updatedRecords[rowIndex].errors = validation.errors;
+    updatedRecords[rowIndex].validatedData = validation.updatedData;
     
     // Update the validation result
     const validCount = updatedRecords.filter(r => r.isValid).length;
@@ -277,49 +364,149 @@ export default function BulkUploadPage() {
     setEditingRowIndex(null);
   };
   
+
   // Validate a single record
-  const validateRecord = (record: any) => {
+  const validateRecord = (record: Record<string, any>) => {
     const errors: Record<string, string> = {};
+    let updatedRecord = { ...record };
     
     // Validate name
-    if (!record.name?.trim()) {
+    if (!updatedRecord.name?.trim()) {
       errors.name = 'Name is required';
     }
     
-    // Validate IC number
-    const cleanedIC = record.ic?.replace(/\D/g, '');
+    // Validate and process IC number
+    const cleanedIC = updatedRecord.ic?.replace(/\D/g, '');
+    updatedRecord.ic = cleanedIC; // Always update to cleaned version
+    
     if (!cleanedIC || cleanedIC.length !== 12) {
       errors.ic = 'IC must be exactly 12 digits';
+    } else {
+      // IC is valid, auto-populate other fields based on IC logic
+      
+      // 1. Extract year, month, and day from IC
+      const yearPrefix = parseInt(cleanedIC.substring(0, 2)) <= 25 ? '20' : '19';
+      const yearOfBirth = parseInt(yearPrefix + cleanedIC.substring(0, 2));
+      
+      // 2. Calculate age based on birth year (current year is 2025)
+      const currentYear = 2025;
+      const calculatedAge = currentYear - yearOfBirth;
+      
+      // 3. Determine gender based on last digit
+      const lastDigit = parseInt(cleanedIC.charAt(11));
+      const calculatedGender = lastDigit % 2 === 1 ? 'MALE' : 'FEMALE';
+      
+      // 4. Determine education level based on age
+      let calculatedEduLevel = 'belia';
+      if (calculatedAge >= 7 && calculatedAge <= 12) {
+        calculatedEduLevel = 'sekolah rendah';
+      } else if (calculatedAge >= 13 && calculatedAge <= 17) {
+        calculatedEduLevel = 'sekolah menengah';
+      }
+      
+      // 5. Determine class grade based on age
+      let calculatedClassGrade = '';
+      if (calculatedAge >= 7 && calculatedAge <= 12) {
+        calculatedClassGrade = (calculatedAge - 6).toString(); // Primary: ages 7-12 map to grades 1-6
+      } else if (calculatedAge >= 13 && calculatedAge <= 17) {
+        calculatedClassGrade = (calculatedAge - 12).toString(); // Secondary: ages 13-17 map to grades 1-5
+      }
+      
+      // Apply calculated values if the original values are empty or invalid
+      
+      // Update gender if invalid or empty
+      if (!updatedRecord.gender || !['MALE', 'FEMALE'].includes(updatedRecord.gender)) {
+        updatedRecord.gender = calculatedGender;
+      }
+      
+      // Update age if invalid or empty
+      const parsedAge = parseInt(updatedRecord.age);
+      if (isNaN(parsedAge) || parsedAge <= 0) {
+        updatedRecord.age = calculatedAge.toString();
+      }
+      
+      // Update education level if invalid or empty
+      const validEduLevels = ['sekolah rendah', 'sekolah menengah', 'belia'];
+      if (!updatedRecord.edu_level || !validEduLevels.includes(updatedRecord.edu_level.toLowerCase())) {
+        updatedRecord.edu_level = calculatedEduLevel;
+      }
+      
+      // Update class grade if empty or invalid
+      const validGrades = ['1', '2', '3', '4', '5', '6', 'PPKI'];
+      if (!updatedRecord.class_grade || !validGrades.includes(updatedRecord.class_grade)) {
+        updatedRecord.class_grade = calculatedClassGrade;
+      }
     }
     
+    // Re-validate fields after auto-population
+    
     // Validate gender
-    if (!['MALE', 'FEMALE'].includes(record.gender)) {
+    if (!['MALE', 'FEMALE'].includes(updatedRecord.gender)) {
       errors.gender = 'Gender must be MALE or FEMALE';
     }
     
     // Validate age
-    const age = parseInt(record.age);
+    const age = parseInt(updatedRecord.age);
     if (isNaN(age) || age <= 0) {
       errors.age = 'Age must be a positive number';
     }
     
+    // Store the derived values for highlighting purposes
+    // Calculate expected values based on IC
+    let derivedValues: Record<string, any> = {};
+    
+    if (cleanedIC && cleanedIC.length === 12) {
+      const yearPrefix = parseInt(cleanedIC.substring(0, 2)) <= 25 ? '20' : '19';
+      const yearOfBirth = parseInt(yearPrefix + cleanedIC.substring(0, 2));
+      const currentYear = 2025;
+      const calculatedAge = currentYear - yearOfBirth;
+      const lastDigit = parseInt(cleanedIC.charAt(11));
+      const calculatedGender = lastDigit % 2 === 1 ? 'MALE' : 'FEMALE';
+      
+      // Calculate expected education level
+      let calculatedEduLevel = 'belia';
+      if (calculatedAge >= 7 && calculatedAge <= 12) {
+        calculatedEduLevel = 'sekolah rendah';
+      } else if (calculatedAge >= 13 && calculatedAge <= 17) {
+        calculatedEduLevel = 'sekolah menengah';
+      }
+      
+      // Calculate expected class grade
+      let calculatedClassGrade = '';
+      if (calculatedAge >= 7 && calculatedAge <= 12) {
+        calculatedClassGrade = (calculatedAge - 6).toString();
+      } else if (calculatedAge >= 13 && calculatedAge <= 17) {
+        calculatedClassGrade = (calculatedAge - 12).toString();
+      }
+      
+      derivedValues = {
+        gender: calculatedGender,
+        age: calculatedAge.toString(),
+        edu_level: calculatedEduLevel,
+        class_grade: calculatedClassGrade,
+        ic: cleanedIC
+      };
+    }
+    
     // Validate education level
     const validEduLevels = ['sekolah rendah', 'sekolah menengah', 'belia'];
-    if (!record.edu_level || !validEduLevels.includes(record.edu_level.toLowerCase())) {
+    if (!updatedRecord.edu_level || !validEduLevels.includes(updatedRecord.edu_level.toLowerCase())) {
       errors.edu_level = 'Education level must be one of: sekolah rendah, sekolah menengah, belia';
     }
     
     // Validate class grade
-    if (record.class_grade) {
+    if (updatedRecord.class_grade) {
       const validGrades = ['1', '2', '3', '4', '5', '6', 'PPKI'];
-      if (!validGrades.includes(record.class_grade)) {
+      if (!validGrades.includes(updatedRecord.class_grade)) {
         errors.class_grade = 'Grade must be 1, 2, 3, 4, 5, 6, or PPKI';
       }
     }
     
     return {
       isValid: Object.keys(errors).length === 0,
-      errors
+      errors,
+      updatedData: updatedRecord,
+      derivedValues
     };
   };
 
