@@ -9,6 +9,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { default as dynamicImport } from 'next/dynamic';
+import Image from 'next/image';
 
 // Mark this layout as dynamic since it uses session which uses headers()
 export const dynamic = 'force-dynamic';
@@ -57,8 +58,19 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
       <header className="sticky top-0 z-50 border-b bg-gradient-to-r from-blue-900 via-indigo-900 to-purple-900 text-white">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
-            <a href="/participants" className="flex items-center space-x-2">
-              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">TECHLYMPICS 2025</span>
+            <a href="/participants" className="flex items-center gap-3">
+              <Image 
+                src="/images/mt-logo-white.png" 
+                alt="Techlympics 2025 Logo" 
+                width={180} 
+                height={40} 
+                className="h-10 w-auto" 
+                priority 
+              />
+              <div className="flex flex-col">
+                <span className="text-xs font-medium text-white leading-none">MALAYSIA</span>
+                <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">TECHLYMPICS 2025</span>
+              </div>
               <span className="rounded-md bg-gradient-to-r from-blue-500 to-indigo-600 px-2 py-1 text-xs text-white hidden sm:inline-block">
                 Participant
               </span>

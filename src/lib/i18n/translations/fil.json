@@ -1,6 +1,7 @@
 {
   "nav.about": "Tungkol",
   "nav.features": "Mga Katangian",
+  "nav.partners": "Mga Kasosyo",
   "nav.events": "Mga Kaganapan",
   "nav.contact": "Makipag-ugnay",
   "nav.login": "Mag-login",
@@ -13,16 +14,21 @@
   "hero.cta.learnMore": "Alamin Pa",
   
   "announcements.title": "Mga Anunsyo",
+  "announcements.latest": "Pinakabagong Mga Anunsyo",
   "announcements.viewAll": "Tingnan Lahat",
   
   "themes.title": "Mga Tema ng Kompetisyon",
   "themes.description": "Tuklasin ang aming mga kategorya ng kompetisyon para sa Techlympics 2025",
   
-  "news.title": "Pinakabagong Balita",
+  "news.title": "Balita",
+  "news.latest": "Pinakabagong Balita",
   "news.readMore": "Magbasa Pa",
   "news.viewAll": "Tingnan Lahat ng Mga Artikulo",
   
-  "footer.rights": "Lahat ng Karapatan ay Nakalaan",
+  "partners.title": "Mga Pangunahing Kasosyo",
+  "partners.description": "Ang aming mahahalagang kasosyo na tumutulong na magkaroon ng Techlympics 2025",
+  
+  "footer.rights": "Nakalaan Ang Lahat ng Karapatan",
   "footer.techlympics": "Techlympics 2025",
   
   "language.english": "English",

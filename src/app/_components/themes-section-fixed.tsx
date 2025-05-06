@@ -138,14 +138,19 @@ export default function ThemesSection() {
   return (
     <section className="py-16 bg-black bg-opacity-20">
       <div className="container mx-auto px-6">
-       
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-white mb-4">{t('themes.title')}</h2>
+          <p className="text-gray-400 max-w-2xl mx-auto">
+            {t('themes.description')}
+          </p>
+        </div>
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
-          {t('themes.title')}
+            Techlympics 2025 Competition Themes
           </span>
         </h2>
         <p className="text-center text-gray-300 mb-12 max-w-3xl mx-auto">
-          {t('themes.description')}
+          Explore our exciting competition themes for Techlympics 2025. Each theme represents a unique technological domain where participants can showcase their skills and innovation.
         </p>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -271,10 +276,16 @@ export default function ThemesSection() {
                       </span>
                     </div>
                     <p className="text-gray-300 text-sm mb-3 line-clamp-2">{contest.description}</p>
-                    <div className="flex items-center">
+                    <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-400">
                         {contest.participation_mode === "INDIVIDUAL" ? "Individual" : "Team"} participation
                       </span>
+                      <Link 
+                        href={`/participants/contests/${contest.id}`}
+                        className="text-sm px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 transition-colors"
+                      >
+                        View Details
+                      </Link>
                     </div>
                   </div>
                 ))}

@@ -1,6 +1,7 @@
 {
   "nav.about": "Tentang",
   "nav.features": "Ciri-ciri",
+  "nav.partners": "Rakan Kongsi",
   "nav.events": "Acara",
   "nav.contact": "Hubungi",
   "nav.login": "Log Masuk",
@@ -13,15 +14,20 @@
   "hero.cta.learnMore": "Ketahui Lebih Lanjut",
   
   "announcements.title": "Pengumuman",
+  "announcements.latest": "Pengumuman Terkini",
   "announcements.viewAll": "Lihat Semua",
   
   "themes.title": "Tema Pertandingan",
   "themes.description": "Terokai kategori pertandingan kami untuk Techlympics 2025",
   
-  "news.title": "Berita Terkini",
+  "news.title": "Berita",
+  "news.latest": "Berita Terkini",
   "news.readMore": "Baca Selanjutnya",
   "news.viewAll": "Lihat Semua Artikel",
   
+  "partners.title": "Rakan Kongsi Utama",
+  "partners.description": "Rakan kongsi kami yang bernilai membantu menjadikan Techlympics 2025 mungkin",
+
   "footer.rights": "Hak Cipta Terpelihara",
   "footer.techlympics": "Techlympics 2025",
   

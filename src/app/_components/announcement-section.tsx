@@ -92,7 +92,7 @@ export default function AnnouncementSection() {
         <div className="container mx-auto px-6">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-500">
-              Latest Announcements
+              {t('announcements.latest')}
             </span>
           </h2>
           <p className="text-center text-gray-300 mb-12 max-w-3xl mx-auto">
@@ -128,7 +128,7 @@ export default function AnnouncementSection() {
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-500">
-              Latest Announcements
+              {t('announcements.latest')}
             </span>
           </h2>
           <p className="text-gray-300 mt-8">No announcements available at this time. Check back soon!</p>
@@ -142,7 +142,7 @@ export default function AnnouncementSection() {
       <div className="container mx-auto px-6">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-green-400 via-blue-500 to-purple-500">
-            Latest Announcements
+            {t('announcements.latest')}
           </span>
         </h2>
         <p className="text-center text-gray-300 mb-12 max-w-3xl mx-auto">

@@ -6,6 +6,7 @@ import MTLogo from "@/lib/images/techlympics-white.png"
 import ThemesSection from "./_components/themes-section";
 import AnnouncementSection from "./_components/announcement-section";
 import NewsSection from "./_components/news-section";
+import PartnersSection from "./_components/partners-section";
 import { useLanguage } from "@/lib/i18n/language-context";
 import { LanguageSwitcher } from "@/lib/i18n/language-switcher";
 
@@ -16,14 +17,27 @@ export default function Home() {
       {/* Navigation */}
       <nav className="container mx-auto px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between flex-wrap">
-          <div className="flex items-center">
-            <span className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">TECHLYMPICS 2025</span>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center">
+              <Image 
+                src="/images/mt-logo-white.png" 
+                alt="Techlympics 2025 Logo" 
+                width={180} 
+                height={40} 
+                className="h-10 w-auto" 
+                priority 
+              />
+            </Link>
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-white leading-none">MALAYSIA</span>
+              <span className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">TECHLYMPICS 2025</span>
+            </div>
           </div>
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex space-x-8">
             <Link href="#about" className="hover:text-yellow-400 transition-colors">{t('nav.about')}</Link>
-            <Link href="#features" className="hover:text-yellow-400 transition-colors">{t('nav.features')}</Link>
+            <Link href="#partners" className="hover:text-yellow-400 transition-colors">{t('nav.partners') || 'Partners'}</Link>
             <Link href="#events" className="hover:text-yellow-400 transition-colors">{t('nav.events')}</Link>
             <Link href="#contact" className="hover:text-yellow-400 transition-colors">{t('nav.contact')}</Link>
           </div>
@@ -54,11 +68,13 @@ export default function Home() {
       <section className="container mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-24 flex flex-col md:flex-row items-center gap-8">
         <div className="md:w-1/2 mb-12 md:mb-0">
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
-              {t('hero.title')}
-            </span>
-            <br />
-            <span className="text-2xl sm:text-3xl md:text-4xl">{t('hero.subtitle')}</span>
+            <div className="flex flex-col items-start">
+              <span className="text-xs sm:text-sm md:text-base text-white tracking-wider font-medium mb-1">MALAYSIA</span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
+                {t('hero.title')}
+              </span>
+            </div>
+            <span className="text-2xl sm:text-3xl md:text-4xl block mt-2">{t('hero.subtitle')}</span>
           </h1>
           <p className="text-base sm:text-lg mb-6 sm:mb-8 max-w-xl">
             {t('hero.description')}
@@ -96,111 +112,8 @@ export default function Home() {
       {/* News Section */}
       <NewsSection />
 
-      {/* Features Section */}
-      <section className="py-12 sm:py-16 md:py-20 bg-gray-900">
-        <div className="container mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-8 sm:mb-12">
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
-              Key Features
-            </span>
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
-            {/* Administrator Panel */}
-            <div className="bg-gradient-to-br from-gray-900 to-indigo-900 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Administrator Panel</h3>
-              <p className="text-gray-300 mb-4">Comprehensive management tools for organizers with user, contest, and event management capabilities.</p>
-              <ul className="text-sm text-gray-400 space-y-2">
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  User & Reference Data Management
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Contest & Quiz Configuration
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Event Scheduling & Reporting
-                </li>
-              </ul>
-            </div>
-
-            {/* Participant Platform */}
-            <div className="bg-gradient-to-br from-gray-900 to-indigo-900 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-              <div className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-red-500 rounded-full flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Participant Platform</h3>
-              <p className="text-gray-300 mb-4">Seamless registration and participation experience for teams and individuals.</p>
-              <ul className="text-sm text-gray-400 space-y-2">
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Team/Contingent Management
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Participant & Manager Registration
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  State-Level Participation
-                </li>
-              </ul>
-            </div>
-
-            {/* Participant Microsite */}
-            <div className="bg-gradient-to-br from-gray-900 to-indigo-900 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-1">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold mb-2">Participant Microsite</h3>
-              <p className="text-gray-300 mb-4">Personal showcase for participants to display their achievements and work.</p>
-              <ul className="text-sm text-gray-400 space-y-2">
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Public Profile & Portfolio
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Moodle Integration
-                </li>
-                <li className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Certificate Downloads
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Partners Section */}
+      <PartnersSection />
 
       {/* Call to Action */}
       <section className="py-12 sm:py-16 bg-gradient-to-r from-blue-900 to-indigo-900">
@@ -248,14 +161,11 @@ export default function Home() {
             </div>
             <div>
               <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Contact</h3>
-              <p className="text-gray-400 mb-1 sm:mb-2 text-sm sm:text-base">Email: info@techlympics2025.my</p>
+              <p className="text-gray-400 mb-1 sm:mb-2 text-sm sm:text-base">Email: info@techlympics.my</p>
               <p className="text-gray-400 text-sm sm:text-base">Phone: +60 3 1234 5678</p>
               <div className="flex space-x-4 mt-3 sm:mt-4">
                 <Link href="#" className="text-gray-400 hover:text-white transition-colors">
                   <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M22.675 0h-21.35c-.732 0-1.325.593-1.325 1.325v21.351c0 .731.593 1.324 1.325 1.324h11.495v-9.294h-3.128v-3.622h3.128v-2.671c0-3.1 1.893-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.795.715-1.795 1.763v2.313h3.587l-.467 3.622h-3.12v9.293h6.116c.73 0 1.323-.593 1.323-1.325v-21.35c0-.732-.593-1.325-1.325-1.325z"/></svg>
-                </Link>
-                <Link href="#" className="text-gray-400 hover:text-white transition-colors">
-                  <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg>
                 </Link>
                 <Link href="#" className="text-gray-400 hover:text-white transition-colors">
                   <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>
@@ -267,7 +177,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-gray-800 mt-6 sm:mt-8 pt-6 sm:pt-8 text-center text-gray-400 text-sm sm:text-base">
-            <p>&copy; 2025 Techlympics. All Rights Reserved.</p>
+            <p>&copy; 2025 Malaysia Techlympics. All Rights Reserved.</p>
           </div>
         </div>
       </footer>
