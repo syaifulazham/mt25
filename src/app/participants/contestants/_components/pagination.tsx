@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
@@ -15,6 +16,7 @@ export default function Pagination({
   totalPages, 
   onPageChange 
 }: PaginationProps) {
+  const { t } = useLanguage(); // Initialize language context
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pageNumbers = [];
@@ -72,7 +74,7 @@ export default function Pagination({
   return (
     <div className="flex items-center justify-between">
       <div className="text-sm text-muted-foreground">
-        Page {currentPage} of {totalPages}
+        {t('pagination.page')} {currentPage} {t('pagination.of')} {totalPages}
       </div>
       
       <div className="flex items-center space-x-2">
@@ -81,7 +83,7 @@ export default function Pagination({
           size="icon"
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
-          title="First Page"
+          title={t('pagination.first_page')}
         >
           <ChevronsLeft className="h-4 w-4" />
         </Button>
@@ -91,7 +93,7 @@ export default function Pagination({
           size="icon"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          title="Previous Page"
+          title={t('pagination.previous_page')}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -117,7 +119,7 @@ export default function Pagination({
           size="icon"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          title="Next Page"
+          title={t('pagination.next_page')}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -127,7 +129,7 @@ export default function Pagination({
           size="icon"
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
-          title="Last Page"
+          title={t('pagination.last_page')}
         >
           <ChevronsRight className="h-4 w-4" />
         </Button>

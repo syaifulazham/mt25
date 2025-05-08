@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from "@/lib/i18n/language-context";
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ interface ValidationResult {
 }
 
 export default function BulkUploadPage() {
+  const { t } = useLanguage(); // Initialize language context
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -82,7 +84,7 @@ export default function BulkUploadPage() {
 
   const validateFile = async () => {
     if (!file) {
-      toast.error('Please select a file to validate');
+      toast.error(t('contestant.bulk.error_no_file'));
       return;
     }
 
@@ -116,7 +118,7 @@ export default function BulkUploadPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        toast.error(errorData.error || 'Validation failed');
+        toast.error(errorData.error || t('contestant.bulk.error_validation'));
         setIsUploading(false);
         return;
       }
@@ -143,14 +145,14 @@ export default function BulkUploadPage() {
         data.invalidRecords = processedRecords.length - validCount;
         
         // Show notification about auto-filling
-        toast.info('IC numbers have been used to auto-fill missing information where possible');
+        toast.info(t('contestant.bulk.ic_autofill'));
       }
       
       setValidationResult(data);
       setActiveStep('verify');
     } catch (error) {
       console.error('Error validating file:', error);
-      toast.error('Error validating file. Please try again.');
+      toast.error(t('contestant.bulk.error_validating'));
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -171,7 +173,7 @@ export default function BulkUploadPage() {
       invalidRecords: 0
     });
     
-    toast.success("Invalid rows removed");
+    toast.success(t('contestant.bulk.rows_removed'));
   };
   
   const resetUpload = () => {
@@ -184,7 +186,7 @@ export default function BulkUploadPage() {
 
   const handleUpload = async () => {
     if (!validationResult || validationResult.validRecords === 0) {
-      toast.error('No valid records to upload');
+      toast.error(t('contestant.bulk.error_no_valid_records'));
       return;
     }
 
@@ -226,7 +228,7 @@ export default function BulkUploadPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        toast.error(errorData.error || 'Upload failed');
+        toast.error(errorData.error || t('contestant.bulk.error_upload'));
         setIsUploading(false);
         return;
       }
@@ -234,10 +236,10 @@ export default function BulkUploadPage() {
       const data = await response.json();
       setUploadResult(data);
       setActiveStep('confirm');
-      toast.success(`Successfully uploaded ${data.success} contestants`);
+      toast.success(t('contestant.bulk.success_upload').replace('{count}', data.success.toString()));
     } catch (error) {
       console.error('Error uploading data:', error);
-      toast.error('Error uploading data. Please try again.');
+      toast.error(t('contestant.bulk.error_uploading'));
     } finally {
       setIsUploading(false);
     }
@@ -372,7 +374,7 @@ export default function BulkUploadPage() {
     
     // Validate name
     if (!updatedRecord.name?.trim()) {
-      errors.name = 'Name is required';
+      errors.name = t('contestant.bulk.error_name_required');
     }
     
     // Validate and process IC number
@@ -380,7 +382,7 @@ export default function BulkUploadPage() {
     updatedRecord.ic = cleanedIC; // Always update to cleaned version
     
     if (!cleanedIC || cleanedIC.length !== 12) {
-      errors.ic = 'IC must be exactly 12 digits';
+      errors.ic = t('contestant.bulk.error_ic_format');
     } else {
       // IC is valid, auto-populate other fields based on IC logic
       
@@ -442,13 +444,13 @@ export default function BulkUploadPage() {
     
     // Validate gender
     if (!['MALE', 'FEMALE'].includes(updatedRecord.gender)) {
-      errors.gender = 'Gender must be MALE or FEMALE';
+      errors.gender = t('contestant.bulk.error_gender_format');
     }
     
     // Validate age
     const age = parseInt(updatedRecord.age);
     if (isNaN(age) || age <= 0) {
-      errors.age = 'Age must be a positive number';
+      errors.age = t('contestant.bulk.error_age_format');
     }
     
     // Store the derived values for highlighting purposes
@@ -491,14 +493,14 @@ export default function BulkUploadPage() {
     // Validate education level
     const validEduLevels = ['sekolah rendah', 'sekolah menengah', 'belia'];
     if (!updatedRecord.edu_level || !validEduLevels.includes(updatedRecord.edu_level.toLowerCase())) {
-      errors.edu_level = 'Education level must be one of: sekolah rendah, sekolah menengah, belia';
+      errors.edu_level = t('contestant.bulk.error_edu_level_format');
     }
     
     // Validate class grade
     if (updatedRecord.class_grade) {
       const validGrades = ['1', '2', '3', '4', '5', '6', 'PPKI'];
       if (!validGrades.includes(updatedRecord.class_grade)) {
-        errors.class_grade = 'Grade must be 1, 2, 3, 4, 5, 6, or PPKI';
+        errors.class_grade = t('contestant.bulk.error_grade_format');
       }
     }
     
@@ -517,15 +519,15 @@ export default function BulkUploadPage() {
         return (
           <Card>
             <CardHeader>
-              <CardTitle>Upload Contestants</CardTitle>
+              <CardTitle>{t('contestant.bulk.title')}</CardTitle>
               <CardDescription>
-                Upload a CSV file containing contestant information. You can download a template below.
+                {t('contestant.bulk.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid w-full items-center gap-4">
                 <div className="flex flex-col space-y-1.5">
-                  <Label>Upload CSV File</Label>
+                  <Label>{t('contestant.bulk.upload_csv')}</Label>
                   <div 
                     {...getRootProps()} 
                     className={`border-2 border-dashed rounded-md p-10 text-center cursor-pointer transition-colors
@@ -539,18 +541,18 @@ export default function BulkUploadPage() {
                       <Upload className={`h-12 w-12 ${file ? 'text-primary' : 'text-muted-foreground'}`} />
                       {file ? (
                         <div className="flex flex-col items-center">
-                          <p className="text-base font-medium">File ready for validation</p>
+                          <p className="text-base font-medium">{t('contestant.bulk.file_ready')}</p>
                           <p className="text-sm text-muted-foreground flex items-center mt-1">
                             <FileText className="h-4 w-4 mr-1" />
                             {file.name} ({Math.round(file.size / 1024)} KB)
                           </p>
                         </div>
                       ) : isDragActive ? (
-                        <p className="text-base">Drop the CSV file here...</p>
+                        <p className="text-base">{t('contestant.bulk.drop_here')}</p>
                       ) : (
                         <div className="text-center">
-                          <p className="text-base font-medium">Drag & drop a CSV file here</p>
-                          <p className="text-sm text-muted-foreground mt-1">or click to browse files</p>
+                          <p className="text-base font-medium">{t('contestant.bulk.drag_drop')}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{t('contestant.bulk.or_click')}</p>
                         </div>
                       )}
                     </div>
@@ -559,11 +561,11 @@ export default function BulkUploadPage() {
                 
                 <div className="flex justify-between items-center">
                   <p className="text-sm text-muted-foreground">
-                    Make sure your CSV file follows the required format
+                    {t('contestant.bulk.csv_format')}
                   </p>
                   <Button variant="outline" size="sm" asChild>
                     <a href="/templates/contestants-template.csv" download>
-                      <Download className="h-4 w-4 mr-2" /> Download Template
+                      <Download className="h-4 w-4 mr-2" /> {t('contestant.bulk.download_template')}
                     </a>
                   </Button>
                 </div>
@@ -571,7 +573,7 @@ export default function BulkUploadPage() {
 
               {isUploading && (
                 <div className="space-y-2 mt-4">
-                  <Label>Validating...</Label>
+                  <Label>{t('contestant.bulk.validating')}</Label>
                   <Progress value={uploadProgress} className="h-2" />
                 </div>
               )}
@@ -579,14 +581,14 @@ export default function BulkUploadPage() {
             <CardFooter className="flex justify-between">
               <Button variant="outline" asChild>
                 <Link href="/participants/contestants">
-                  <ArrowLeft className="h-4 w-4 mr-2" /> Back to Contestants
+                  <ArrowLeft className="h-4 w-4 mr-2" /> {t('contestant.bulk.back_to_contestants')}
                 </Link>
               </Button>
               <Button 
                 onClick={validateFile} 
                 disabled={!file || isUploading}
               >
-                Validate File <ArrowRight className="ml-2 h-4 w-4" />
+                {t('contestant.bulk.validate_file')} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardFooter>
           </Card>
@@ -596,17 +598,17 @@ export default function BulkUploadPage() {
         return validationResult ? (
           <Card>
             <CardHeader>
-              <CardTitle>Validation Results</CardTitle>
+              <CardTitle>{t('contestant.bulk.validation_results')}</CardTitle>
               <CardDescription>
-                {validationResult.validRecords} of {validationResult.totalRecords} records are valid.
-                Review the data below before uploading.
+                {validationResult.validRecords} {t('contestant.bulk.of')} {validationResult.totalRecords} {t('contestant.bulk.records_are_valid')}.
+                {t('contestant.bulk.review_data')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Badge variant={validationResult.invalidRecords > 0 ? "destructive" : "default"}>
-                    {validationResult.invalidRecords} issues
+                    {validationResult.invalidRecords} {t('contestant.bulk.issues')}
                   </Badge>
                   {validationResult.invalidRecords > 0 && (
                     <Button 
@@ -615,13 +617,13 @@ export default function BulkUploadPage() {
                       onClick={removeInvalidRows}
                       className="text-xs"
                     >
-                      <X className="h-3 w-3 mr-1" /> Remove Invalid Rows
+                      <X className="h-3 w-3 mr-1" /> {t('contestant.bulk.remove_invalid')}
                     </Button>
                   )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    Click on a row to edit contestant details
+                    {t('contestant.bulk.click_to_edit')}
                   </p>
                 </div>
               </div>
@@ -630,15 +632,15 @@ export default function BulkUploadPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px]">Row</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>IC Number</TableHead>
-                      <TableHead>Gender</TableHead>
-                      <TableHead>Age</TableHead>
-                      <TableHead>Education Level</TableHead>
-                      <TableHead>Class Name</TableHead>
-                      <TableHead>Class Grade</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="w-[50px]">{t('contestant.bulk.row')}</TableHead>
+                      <TableHead>{t('contestant.bulk.name')}</TableHead>
+                      <TableHead>{t('contestant.bulk.ic_number')}</TableHead>
+                      <TableHead>{t('contestant.bulk.gender')}</TableHead>
+                      <TableHead>{t('contestant.bulk.age')}</TableHead>
+                      <TableHead>{t('contestant.bulk.education_level')}</TableHead>
+                      <TableHead>{t('contestant.bulk.class_name')}</TableHead>
+                      <TableHead>{t('contestant.bulk.class_grade')}</TableHead>
+                      <TableHead>{t('contestant.bulk.status')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -789,11 +791,11 @@ export default function BulkUploadPage() {
                             ) : (
                               record.isValid ? (
                                 <Badge variant="outline" className="bg-green-500/10 text-green-600">
-                                  <Check className="h-3 w-3 mr-1" /> Valid
+                                  <Check className="h-3 w-3 mr-1" /> {t('contestant.bulk.valid')}
                                 </Badge>
                               ) : (
                                 <Badge variant="outline" className="bg-red-500/10 text-red-600">
-                                  <X className="h-3 w-3 mr-1" /> Invalid
+                                  <X className="h-3 w-3 mr-1" /> {t('contestant.bulk.invalid')}
                                 </Badge>
                               )
                             )}
@@ -807,20 +809,20 @@ export default function BulkUploadPage() {
               
               {isUploading && (
                 <div className="space-y-2 mt-4">
-                  <Label>Uploading...</Label>
+                  <Label>{t('contestant.bulk.uploading')}</Label>
                   <Progress value={uploadProgress} className="h-2" />
                 </div>
               )}
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={() => setActiveStep('upload')}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back
+                <ArrowLeft className="h-4 w-4 mr-2" /> {t('contestant.bulk.back')}
               </Button>
               <Button 
                 onClick={handleUpload} 
                 disabled={!validationResult || validationResult.validRecords === 0 || isUploading}
               >
-                Upload {validationResult.validRecords} Records <ArrowRight className="ml-2 h-4 w-4" />
+                {t('contestant.bulk.upload')} {validationResult.validRecords} {t('contestant.bulk.records')} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardFooter>
           </Card>
@@ -830,31 +832,31 @@ export default function BulkUploadPage() {
         return uploadResult ? (
           <Card>
             <CardHeader>
-              <CardTitle>Upload Complete</CardTitle>
+              <CardTitle>{t('contestant.bulk.upload_complete')}</CardTitle>
               <CardDescription>
-                Your contestants have been successfully uploaded.
+                {t('contestant.bulk.upload_success')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <Alert variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
                   <CheckCircle className="h-4 w-4" />
-                  <AlertTitle>Success</AlertTitle>
+                  <AlertTitle>{t('contestant.bulk.success_title')}</AlertTitle>
                   <AlertDescription>
-                    Successfully uploaded {uploadResult.success} contestants.
+                    {t('contestant.bulk.success_description')} {uploadResult.success} {t('contestant.bulk.contestants')}.
                   </AlertDescription>
                 </Alert>
                 
                 {uploadResult.errors.length > 0 && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Errors</AlertTitle>
+                    <AlertTitle>{t('contestant.bulk.errors_title')}</AlertTitle>
                     <AlertDescription>
-                      {uploadResult.errors.length} records could not be uploaded.
+                      {uploadResult.errors.length} {t('contestant.bulk.records_not_uploaded')}
                       <ul className="mt-2 list-disc pl-5 space-y-1">
                         {uploadResult.errors.map((error, index) => (
                           <li key={index} className="text-sm">
-                            Row {error.row}: {error.message}
+                            {t('contestant.bulk.row')} {error.row}: {error.message}
                           </li>
                         ))}
                       </ul>
@@ -865,11 +867,11 @@ export default function BulkUploadPage() {
             </CardContent>
             <CardFooter className="flex justify-between">
               <Button variant="outline" onClick={resetUpload}>
-                Upload Another File
+                {t('contestant.bulk.upload_another')}
               </Button>
               <Button asChild>
                 <Link href="/participants/contestants">
-                  View All Contestants <ArrowRight className="ml-2 h-4 w-4" />
+                  {t('contestant.bulk.view_all')} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </CardFooter>
@@ -882,15 +884,15 @@ export default function BulkUploadPage() {
     <div className="container mx-auto py-6 space-y-6">
       <div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-          <Link href="/participants" className="hover:text-foreground transition-colors">Participants</Link>
+          <Link href="/participants" className="hover:text-foreground transition-colors">{t('navigation.participants')}</Link>
           <span>/</span>
-          <Link href="/participants/contestants" className="hover:text-foreground transition-colors">Contestants</Link>
+          <Link href="/participants/contestants" className="hover:text-foreground transition-colors">{t('navigation.contestants')}</Link>
           <span>/</span>
-          <span className="text-foreground">Bulk Upload</span>
+          <span className="text-foreground">{t('contestant.bulk.breadcrumb')}</span>
         </div>
         
         <div className="flex justify-between items-center mt-2">
-          <h1 className="text-3xl font-bold tracking-tight">Bulk Upload Contestants</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('contestant.bulk.page_title')}</h1>
         </div>
       </div>
       
@@ -899,13 +901,13 @@ export default function BulkUploadPage() {
           <Tabs defaultValue={activeStep} className="w-full" value={activeStep}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="upload" disabled={activeStep !== 'upload'}>
-                1. Upload File
+                1. {t('contestant.bulk.step_upload')}
               </TabsTrigger>
               <TabsTrigger value="verify" disabled={activeStep !== 'verify'}>
-                2. Verify Data
+                2. {t('contestant.bulk.step_verify')}
               </TabsTrigger>
               <TabsTrigger value="confirm" disabled={activeStep !== 'confirm'}>
-                3. Confirmation
+                3. {t('contestant.bulk.step_confirm')}
               </TabsTrigger>
             </TabsList>
             <div className="mt-6">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -42,6 +43,7 @@ export default function AssignContestsModal({
   contestantName,
   onSuccess 
 }: AssignContestsModalProps) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -57,7 +59,7 @@ export default function AssignContestsModal({
       
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to fetch eligible contests");
+        throw new Error(data.error || t('contestant.contests.error_fetch'));
       }
       
       const data = await response.json();
@@ -74,8 +76,8 @@ export default function AssignContestsModal({
     } catch (error) {
       console.error("Error fetching eligible contests:", error);
       toast({
-        title: "Error",
-        description: (error as Error).message || "Failed to fetch eligible contests",
+        title: t('contestant.contests.error_title'),
+        description: (error as Error).message || t('contestant.contests.error_fetch'),
         variant: "destructive",
       });
     } finally {
@@ -117,12 +119,12 @@ export default function AssignContestsModal({
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to assign contests");
+        throw new Error(data.error || t('contestant.contests.error_assign'));
       }
       
       toast({
-        title: "Success!",
-        description: `Updated contest assignments for ${contestantName}.`,
+        title: t('contestant.contests.success_title'),
+        description: `${t('contestant.contests.success_description')} ${contestantName}`,
         variant: "default",
       });
       
@@ -134,8 +136,8 @@ export default function AssignContestsModal({
     } catch (error) {
       console.error("Error assigning contests:", error);
       toast({
-        title: "Error",
-        description: (error as Error).message || "Failed to assign contests",
+        title: t('contestant.contests.error_title'),
+        description: (error as Error).message || t('contestant.contests.error_assign'),
         variant: "destructive",
       });
     } finally {
@@ -152,15 +154,15 @@ export default function AssignContestsModal({
         onClick={() => handleOpenChange(true)}
       >
         <Award className="mr-1 h-3 w-3" />
-        Assign Contests
+        {t('contestant.contests.assign_button')}
       </Button>
       
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Assign Contests for {contestantName}</DialogTitle>
+            <DialogTitle>{t('contestant.contests.title')} {contestantName}</DialogTitle>
             <DialogDescription>
-              Select contests to assign to this contestant based on age eligibility.
+              {t('contestant.contests.description')}
             </DialogDescription>
           </DialogHeader>
           
@@ -173,13 +175,13 @@ export default function AssignContestsModal({
               <>
                 {contestant && (
                   <div className="mb-4">
-                    <p className="text-sm font-medium">Contestant Age: {contestant.age} years</p>
+                    <p className="text-sm font-medium">{t('contestant.contests.contestant_age')}: {contestant.age}</p>
                   </div>
                 )}
                 
                 {eligibleContests.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-4">
-                    No eligible contests found for this contestant.
+                    {t('contestant.contests.no_eligible_contests')}
                   </p>
                 ) : (
                   <ScrollArea className="h-[300px] pr-4">
@@ -202,7 +204,7 @@ export default function AssignContestsModal({
                               {contest.name}
                               {contest.isAssigned && (
                                 <Badge variant="outline" className="ml-2 bg-green-100 text-green-800 border-green-200">
-                                  Already Assigned
+                                  {t('contestant.contests.already_assigned')}
                                 </Badge>
                               )}
                             </label>
@@ -213,10 +215,10 @@ export default function AssignContestsModal({
                             )}
                             {(contest.minAge || contest.maxAge) && (
                               <p className="text-xs text-muted-foreground mt-1">
-                                Age Range: 
-                                {contest.minAge ? ` ${contest.minAge}` : ' Any'} 
-                                {' to '} 
-                                {contest.maxAge ? `${contest.maxAge}` : 'Any'}
+                                {t('contestant.contests.age_range')}: 
+                                {contest.minAge ? ` ${contest.minAge}` : t('contestant.contests.any')} 
+                                {t('contestant.contests.to')} 
+                                {contest.maxAge ? `${contest.maxAge}` : t('contestant.contests.any')}
                               </p>
                             )}
                           </div>
@@ -235,7 +237,7 @@ export default function AssignContestsModal({
               onClick={() => setIsOpen(false)}
               disabled={isLoading}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleSave}
@@ -245,10 +247,10 @@ export default function AssignContestsModal({
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {t('contestant.contests.saving')}
                 </>
               ) : (
-                "Save Assignments"
+                t('contestant.contests.save_assignments')
               )}
             </Button>
           </DialogFooter>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -14,6 +15,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Award, Loader2 } from "lucide-react";
 
 export default function BulkAssignContests() {
+  const { t } = useLanguage(); // Initialize language context
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
@@ -37,23 +39,23 @@ export default function BulkAssignContests() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to assign contests");
+        throw new Error(data.error || t('contestant.contest.error_assign'));
       }
       
       setResult(data);
       
       if (data.success) {
         toast({
-          title: "Success!",
-          description: `Created ${data.assignmentsCreated} contest assignments.`,
+          title: t('contestant.contest.success_title'),
+          description: `${t('contestant.contest.success_description')} ${data.assignmentsCreated}`,
           variant: "default",
         });
       }
     } catch (error) {
-      console.error("Error assigning contests:", error);
+      console.error(t('contestant.contest.error_assigning'), error);
       toast({
-        title: "Error",
-        description: (error as Error).message || "Failed to assign contests",
+        title: t('contestant.contest.error_title'),
+        description: (error as Error).message || t('contestant.contest.error_assign'),
         variant: "destructive",
       });
     } finally {
@@ -69,38 +71,38 @@ export default function BulkAssignContests() {
         onClick={() => setIsOpen(true)}
       >
         <Award className="mr-2 h-4 w-4" />
-        Bulk Assign Contests
+        {t('contestant.contest.bulk_assign')}
       </Button>
       
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Bulk Assign Contests</DialogTitle>
+            <DialogTitle>{t('contestant.contest.bulk_assign')}</DialogTitle>
             <DialogDescription>
-              This will automatically assign all eligible contestants to contests based on their age criteria.
+              {t('contestant.contest.bulk_assign_description')}
             </DialogDescription>
           </DialogHeader>
           
           <div className="py-4">
             <p className="text-sm text-muted-foreground mb-2">
-              This action will:
+              {t('contestant.contest.action_will')}:
             </p>
             <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-              <li>Find all contestants in your managed contingents</li>
-              <li>Match each contestant with eligible contests based on age</li>
-              <li>Create contest participation records for each eligible match</li>
-              <li>Skip contestants already assigned to contests</li>
+              <li>{t('contestant.contest.action_find')}</li>
+              <li>{t('contestant.contest.action_match')}</li>
+              <li>{t('contestant.contest.action_create')}</li>
+              <li>{t('contestant.contest.action_skip')}</li>
             </ul>
             
             {result && (
               <div className="mt-4 p-3 rounded-md bg-muted">
-                <p className="font-medium">Results:</p>
+                <p className="font-medium">{t('contestant.contest.results')}:</p>
                 <p className="text-sm">
-                  {result.assignmentsCreated} new contest assignments created
+                  {result.assignmentsCreated} {t('contestant.contest.assignments_created')}
                 </p>
                 {result.errors && result.errors.length > 0 && (
                   <p className="text-sm text-destructive">
-                    {result.errors.length} errors occurred
+                    {result.errors.length} {t('contestant.contest.errors_occurred')}
                   </p>
                 )}
               </div>
@@ -113,7 +115,7 @@ export default function BulkAssignContests() {
               onClick={() => setIsOpen(false)}
               disabled={isLoading}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleBulkAssign}
@@ -123,10 +125,10 @@ export default function BulkAssignContests() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Assigning...
+                  {t('contestant.contest.assigning')}
                 </>
               ) : (
-                "Assign Contests"
+                t('contestant.contest.assign')
               )}
             </Button>
           </DialogFooter>

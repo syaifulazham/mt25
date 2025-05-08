@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
+import { downloadContestantsAsDocx } from "@/lib/docx-export";
 import { Contestant } from "@/types/contestant";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
@@ -26,7 +28,8 @@ import {
   Upload, 
   Trash2,
   Pencil,
-  FileText
+  FileText,
+  FileDown
 } from "lucide-react";
 import Link from "next/link";
 import EditContestantModal from "./_components/edit-contestant-modal";
@@ -63,6 +66,7 @@ import {
 
 export default function ContestantsPage() {
   const { data: session, status } = useSession();
+  const { t } = useLanguage();
   const [contestants, setContestants] = useState<Contestant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
@@ -118,7 +122,7 @@ export default function ContestantsPage() {
       
       if (!contestantsResponse.ok) {
         const errorData = await contestantsResponse.json();
-        throw new Error(errorData.error || "Failed to fetch contestants");
+        throw new Error(errorData.error || t('contestant.error_fetch'));
       }
       
       const result = await contestantsResponse.json();
@@ -133,7 +137,7 @@ export default function ContestantsPage() {
       }
     } catch (error) {
       console.error("Error fetching contestants:", error);
-      setError("Failed to load contestants. Please try again later.");
+      setError(t('contestant.error_load'));
     } finally {
       setIsLoading(false);
     }
@@ -203,15 +207,15 @@ export default function ContestantsPage() {
       
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to delete contestant");
+        throw new Error(error.error || t('contestant.delete.error'));
       }
       
       // Update the local state
       setContestants(contestants.filter(c => c.id !== id));
-      toast.success("Contestant deleted successfully");
+      toast.success(t('contestant.delete.success'));
     } catch (error: any) {
       console.error("Error deleting contestant:", error);
-      toast.error(error.message || "Failed to delete contestant");
+      toast.error(error.message || t('contestant.delete.error'));
     } finally {
       setIsLoading(false);
     }
@@ -221,11 +225,11 @@ export default function ContestantsPage() {
   const EduLevelBadge = ({ eduLevel }: { eduLevel: string }) => {
     switch (eduLevel) {
       case "sekolah rendah":
-        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600">Primary School</Badge>;
+        return <Badge variant="outline" className="bg-blue-500/10 text-blue-600">{t('contestant.primary_school')}</Badge>;
       case "sekolah menengah":
-        return <Badge variant="outline" className="bg-purple-500/10 text-purple-600">Secondary School</Badge>;
+        return <Badge variant="outline" className="bg-purple-500/10 text-purple-600">{t('contestant.secondary_school')}</Badge>;
       case "belia":
-        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600">Youth</Badge>;
+        return <Badge variant="outline" className="bg-amber-500/10 text-amber-600">{t('contestant.youth')}</Badge>;
       default:
         return <Badge variant="outline">{eduLevel}</Badge>;
     }
@@ -252,11 +256,11 @@ export default function ContestantsPage() {
     if (contestantsToRender.length === 0) {
       return (
         <div className="p-8 text-center">
-          <p className="text-muted-foreground">No contestants found.</p>
+          <p className="text-muted-foreground">{t('contestant.no_contestants_found')}</p>
           <div className="flex justify-center mt-4">
             <Button asChild>
               <Link href="/participants/contestants/new">
-                <UserPlus className="mr-2 h-4 w-4" /> Add Contestant
+                <UserPlus className="mr-2 h-4 w-4" /> {t('contestant.add_contestant')}
               </Link>
             </Button>
           </div>
@@ -272,22 +276,22 @@ export default function ContestantsPage() {
         <Table>
           <TableCaption>
             {shouldShowPagination 
-              ? `Showing ${contestants.length} of ${totalContestants} contestants (Page ${currentPage} of ${totalPages})`
-              : `Total: ${contestantsToRender.length} contestants`
+              ? `${t('contestant.showing')} ${contestants.length} ${t('contestant.of')} ${totalContestants} ${t('contestant.contestants')} (${t('contestant.page')} ${currentPage} ${t('contestant.of')} ${totalPages})`
+              : `${t('contestant.total')}: ${contestantsToRender.length} ${t('contestant.contestants')}`
             }
           </TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>IC Number</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead>Education Level</TableHead>
-              <TableHead>Class</TableHead>
-              <TableHead>Added By</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('contestant.name')}</TableHead>
+              <TableHead>{t('contestant.ic_number')}</TableHead>
+              <TableHead>{t('contestant.contact')}</TableHead>
+              <TableHead>{t('contestant.gender')}</TableHead>
+              <TableHead>{t('contestant.age')}</TableHead>
+              <TableHead>{t('contestant.education_level')}</TableHead>
+              <TableHead>{t('contestant.class')}</TableHead>
+              <TableHead>{t('contestant.added_by')}</TableHead>
+              <TableHead>{t('contestant.status')}</TableHead>
+              <TableHead className="text-right">{t('contestant.actions')}</TableHead>
             </TableRow>
           </TableHeader>
         <TableBody>
@@ -370,10 +374,10 @@ export default function ContestantsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t('contestant.actions')}</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => {}}>
                       <Link href={`/participants/contingents/${contestant.contingentId}`} className="flex items-center w-full">
-                        <School className="h-4 w-4 mr-2" /> View Contingent
+                        <Pencil className="h-4 w-4 mr-2" /> {t('contestant.view')} Contingent
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -386,7 +390,7 @@ export default function ContestantsPage() {
                           );
                         }} 
                       />
-                      <span className="ml-2">Edit Contestant</span>
+                      <span className="ml-2">{t('contestant.edit_contestant')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                       <AssignContestsModal
@@ -394,14 +398,14 @@ export default function ContestantsPage() {
                         contestantName={contestant.name}
                         onSuccess={() => fetchContestants(currentPage)}
                       />
-                      <span className="ml-2">Assign Contests</span>
+                      <span className="ml-2">{t('contestant.contests.assign_button')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"
                       onClick={() => handleDeleteContestant(contestant.id, contestant.contingentId)}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      <Trash2 className="h-4 w-4 mr-2" /> {t('contestant.delete')}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -445,26 +449,26 @@ export default function ContestantsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Contestants</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t('contestant.title')}</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Register and manage contestants for Techlympics 2025
+            {t('contestant.description')}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button asChild>
             <Link href="/participants/contestants/new">
-              <UserPlus className="mr-2 h-4 w-4" /> Add Contestant
+              <UserPlus className="mr-2 h-4 w-4" /> {t('contestant.add')}
             </Link>
           </Button>
           <Button variant="secondary" asChild>
             <Link href="/participants/contestants/bulk">
-              <Upload className="mr-2 h-4 w-4" /> Bulk Upload
+              <Upload className="mr-2 h-4 w-4" /> {t('contestant.bulk_upload')}
             </Link>
           </Button>
           <Button variant="outline" className="gap-2" asChild>
             <Link href="/templates/contestants-template.csv" download>
               <Download className="h-4 w-4" />
-              Template
+              {t('contestant.template')}
             </Link>
           </Button>
           <BulkAssignContests />
@@ -478,7 +482,7 @@ export default function ContestantsPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search by name or IC number..."
+              placeholder={t('contestant.search_placeholder')}
               className="pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -491,10 +495,10 @@ export default function ContestantsPage() {
               value={eduLevelFilter}
               onChange={(e) => setEduLevelFilter(e.target.value)}
             >
-              <option value="all">All Education Levels</option>
-              <option value="sekolah rendah">Primary School</option>
-              <option value="sekolah menengah">Secondary School</option>
-              <option value="belia">Youth</option>
+              <option value="all">{t('contestant.all_edu_levels')}</option>
+              <option value="sekolah rendah">{t('contestant.primary_school')}</option>
+              <option value="sekolah menengah">{t('contestant.secondary_school')}</option>
+              <option value="belia">{t('contestant.youth')}</option>
             </select>
           </div>
         </div>
@@ -569,11 +573,12 @@ export default function ContestantsPage() {
         </p>
         
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="mr-2 h-4 w-4" /> Export
-          </Button>
-          <Button variant="outline" size="sm">
-            <Upload className="mr-2 h-4 w-4" /> Import
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => downloadContestantsAsDocx(filteredContestants, `senarai_peserta_${new Date().toISOString().split('T')[0]}`)}
+          >
+            <FileDown className="mr-2 h-4 w-4" /> {t('contestant.export')}
           </Button>
         </div>
       </div>

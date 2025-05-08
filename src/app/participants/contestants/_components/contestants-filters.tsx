@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,21 +30,22 @@ export default function ContestantsFilters({
   onFilterApply,
   onFilterReset
 }: ContestantsFiltersProps) {
+  const { t } = useLanguage(); // Initialize language context
   return (
     <Card>
       <CardContent className="pt-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="class_grade">Grade</Label>
+            <Label htmlFor="class_grade">{t('contestant.filter.grade')}</Label>
             <Select
               value={classGrade}
               onValueChange={setClassGrade}
             >
               <SelectTrigger id="class_grade">
-                <SelectValue placeholder="All Grades" />
+                <SelectValue placeholder={t('contestant.filter.all_grades')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="all">{t('contestant.filter.all_grades')}</SelectItem>
                 <SelectItem value="1">1</SelectItem>
                 <SelectItem value="2">2</SelectItem>
                 <SelectItem value="3">3</SelectItem>
@@ -56,21 +58,21 @@ export default function ContestantsFilters({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="class_name">Class Name</Label>
+            <Label htmlFor="class_name">{t('contestant.filter.class_name')}</Label>
             <Input
               id="class_name"
-              placeholder="Enter class name"
+              placeholder={t('contestant.filter.enter_class_name')}
               value={className}
               onChange={(e) => setClassName(e.target.value)}
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="age">Age</Label>
+            <Label htmlFor="age">{t('contestant.filter.age')}</Label>
             <Input
               id="age"
               type="number"
-              placeholder="Enter age"
+              placeholder={t('contestant.filter.enter_age')}
               value={age}
               onChange={(e) => setAge(e.target.value)}
               min={5}
@@ -84,7 +86,7 @@ export default function ContestantsFilters({
               className="flex-1"
             >
               <Search className="mr-2 h-4 w-4" />
-              Apply Filters
+              {t('contestant.filter.apply')}
             </Button>
             <Button 
               variant="outline"

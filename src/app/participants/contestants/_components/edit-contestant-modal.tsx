@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLanguage } from '@/lib/i18n/language-context';
 import { Contestant } from '@/types/contestant';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +27,7 @@ interface EditContestantModalProps {
 }
 
 export default function EditContestantModal({ contestant, onUpdate }: EditContestantModalProps) {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Contestant>({...contestant});
@@ -48,32 +50,32 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
     const errors: string[] = [];
     
     if (!formData.name?.trim()) {
-      errors.push('Name is required');
+      errors.push(t('contestant.edit.error_name_required'));
     }
     
     const cleanedIC = formData.ic?.replace(/\D/g, '');
     if (!cleanedIC || cleanedIC.length !== 12) {
-      errors.push('IC must be exactly 12 digits');
+      errors.push(t('contestant.edit.error_ic_format'));
     }
     
     if (!['MALE', 'FEMALE'].includes(formData.gender)) {
-      errors.push('Gender must be MALE or FEMALE');
+      errors.push(t('contestant.edit.error_gender_format'));
     }
     
     const age = parseInt(formData.age.toString());
     if (isNaN(age) || age <= 0) {
-      errors.push('Age must be a positive number');
+      errors.push(t('contestant.edit.error_age_format'));
     }
     
     const validEduLevels = ['sekolah rendah', 'sekolah menengah', 'belia'];
     if (!formData.edu_level || !validEduLevels.includes(formData.edu_level.toLowerCase())) {
-      errors.push('Education level must be one of: sekolah rendah, sekolah menengah, belia');
+      errors.push(t('contestant.edit.error_edu_level_format'));
     }
     
     if (formData.class_grade) {
       const validGrades = ['1', '2', '3', '4', '5', '6', 'PPKI'];
       if (!validGrades.includes(formData.class_grade)) {
-        errors.push('Grade must be 1, 2, 3, 4, 5, 6, or PPKI');
+        errors.push(t('contestant.edit.error_grade_format'));
       }
     }
     
@@ -103,16 +105,16 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update contestant');
+        throw new Error(errorData.error || t('contestant.edit.error_update'));
       }
       
       const updatedContestant = await response.json();
       onUpdate(updatedContestant);
-      toast.success('Contestant updated successfully');
+      toast.success(t('contestant.edit.success_update'));
       setIsOpen(false);
     } catch (error) {
       console.error('Error updating contestant:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update contestant');
+      toast.error(error instanceof Error ? error.message : t('contestant.edit.error_update'));
     } finally {
       setIsSubmitting(false);
     }
@@ -123,21 +125,21 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
       <DialogTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
           <Pencil className="h-4 w-4" />
-          <span className="sr-only">Edit contestant</span>
+          <span className="sr-only">{t('contestant.edit.edit_button')}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Contestant</DialogTitle>
+          <DialogTitle>{t('contestant.edit.title')}</DialogTitle>
           <DialogDescription>
-            Update contestant information. Click save when you're done.
+            {t('contestant.edit.description')}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">
-                Name
+                {t('contestant.edit.name')}
               </Label>
               <Input
                 id="name"
@@ -148,7 +150,7 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="ic" className="text-right">
-                IC Number
+                {t('contestant.edit.ic_number')}
               </Label>
               <Input
                 id="ic"
@@ -159,7 +161,7 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="email" className="text-right">
-                Email
+                {t('contestant.edit.email')}
               </Label>
               <Input
                 id="email"
@@ -171,7 +173,7 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="phoneNumber" className="text-right">
-                Phone
+                {t('contestant.edit.phone')}
               </Label>
               <Input
                 id="phoneNumber"
@@ -182,24 +184,24 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="gender" className="text-right">
-                Gender
+                {t('contestant.edit.gender')}
               </Label>
               <Select 
                 value={formData.gender} 
                 onValueChange={(value) => handleChange('gender', value)}
               >
                 <SelectTrigger id="gender" className="col-span-3">
-                  <SelectValue placeholder="Select gender" />
+                  <SelectValue placeholder={t('contestant.edit.select_gender')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MALE">MALE</SelectItem>
-                  <SelectItem value="FEMALE">FEMALE</SelectItem>
+                  <SelectItem value="MALE">{t('contestant.edit.gender_male')}</SelectItem>
+                  <SelectItem value="FEMALE">{t('contestant.edit.gender_female')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="age" className="text-right">
-                Age
+                {t('contestant.edit.age')}
               </Label>
               <Input
                 id="age"
@@ -211,25 +213,25 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="edu_level" className="text-right">
-                Education
+                {t('contestant.edit.education')}
               </Label>
               <Select 
                 value={formData.edu_level} 
                 onValueChange={(value) => handleChange('edu_level', value)}
               >
                 <SelectTrigger id="edu_level" className="col-span-3">
-                  <SelectValue placeholder="Select education level" />
+                  <SelectValue placeholder={t('contestant.edit.select_education')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sekolah rendah">Sekolah Rendah</SelectItem>
-                  <SelectItem value="sekolah menengah">Sekolah Menengah</SelectItem>
-                  <SelectItem value="belia">Belia</SelectItem>
+                  <SelectItem value="sekolah rendah">{t('contestant.edit.edu_primary')}</SelectItem>
+                  <SelectItem value="sekolah menengah">{t('contestant.edit.edu_secondary')}</SelectItem>
+                  <SelectItem value="belia">{t('contestant.edit.edu_youth')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="class_name" className="text-right">
-                Class Name
+                {t('contestant.edit.class_name')}
               </Label>
               <Input
                 id="class_name"
@@ -240,14 +242,14 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="class_grade" className="text-right">
-                Class Grade
+                {t('contestant.edit.class_grade')}
               </Label>
               <Select 
                 value={formData.class_grade || ''} 
                 onValueChange={(value) => handleChange('class_grade', value)}
               >
                 <SelectTrigger id="class_grade" className="col-span-3">
-                  <SelectValue placeholder="Select grade" />
+                  <SelectValue placeholder={t('contestant.edit.select_grade')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="1">1</SelectItem>
@@ -262,19 +264,19 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="status" className="text-right">
-                Status
+                {t('contestant.edit.status')}
               </Label>
               <Select 
                 value={formData.status} 
                 onValueChange={(value) => handleChange('status', value)}
               >
                 <SelectTrigger id="status" className="col-span-3">
-                  <SelectValue placeholder="Select status" />
+                  <SelectValue placeholder={t('contestant.edit.select_status')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="INACTIVE">INACTIVE</SelectItem>
-                  <SelectItem value="PENDING">PENDING</SelectItem>
+                  <SelectItem value="ACTIVE">{t('contestant.edit.status_active')}</SelectItem>
+                  <SelectItem value="INACTIVE">{t('contestant.edit.status_inactive')}</SelectItem>
+                  <SelectItem value="PENDING">{t('contestant.edit.status_pending')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -284,12 +286,12 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {t('contestant.edit.saving')}
                 </>
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                  {t('contestant.edit.save_changes')}
                 </>
               )}
             </Button>

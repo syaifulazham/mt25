@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useLanguage } from '@/lib/i18n/language-context';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +41,7 @@ interface ValidationResult {
 }
 
 export default function BulkUploadModal() {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -99,7 +101,7 @@ export default function BulkUploadModal() {
 
   const validateFile = async () => {
     if (!file) {
-      toast.error('Please select a file to validate');
+      toast.error(t('contestant.bulk_upload.error_no_file'));
       return;
     }
 
@@ -134,7 +136,7 @@ export default function BulkUploadModal() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Validation API error:', errorData);
-        throw new Error(errorData.error || 'Failed to validate contestants');
+        throw new Error(errorData.error || t('contestant.bulk_upload.error_validation'));
       }
 
       const result = await response.json();
@@ -142,13 +144,13 @@ export default function BulkUploadModal() {
       setActiveStep('verify');
       
       if (result.invalidRecords > 0) {
-        toast.warning(`${result.invalidRecords} records have validation issues`);
+        toast.warning(`${result.invalidRecords} ${t('contestant.bulk_upload.records_have_issues')}`);
       } else {
-        toast.success(`All ${result.totalRecords} records are valid`);
+        toast.success(`${t('contestant.bulk_upload.all_records_valid')} ${result.totalRecords}`);
       }
     } catch (error) {
       console.error('Error validating contestants:', error);
-      toast.error(`Failed to validate contestants: ${error instanceof Error ? error.message : 'Please try again'}`);
+      toast.error(`${t('contestant.bulk_upload.error_validation')}: ${error instanceof Error ? error.message : t('contestant.bulk_upload.please_try_again')}`);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -157,7 +159,7 @@ export default function BulkUploadModal() {
 
   const handleUpload = async () => {
     if (!validationResult || validationResult.validRecords === 0) {
-      toast.error('No valid records to upload');
+      toast.error(t('contestant.bulk_upload.error_no_valid_records'));
       return;
     }
 
@@ -202,7 +204,7 @@ export default function BulkUploadModal() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload contestants');
+        throw new Error(errorData.error || t('contestant.bulk_upload.error_upload'));
       }
 
       const result = await response.json();
@@ -210,15 +212,15 @@ export default function BulkUploadModal() {
       setActiveStep('confirm');
       
       if (result.success > 0) {
-        toast.success(`Successfully uploaded ${result.success} contestants`);
+        toast.success(`${t('contestant.bulk_upload.success_upload')} ${result.success} ${t('contestant.bulk_upload.contestants')}`);
       }
       
       if (result.errors.length > 0) {
-        toast.error(`${result.errors.length} contestants failed to upload`);
+        toast.error(`${result.errors.length} ${t('contestant.bulk_upload.failed_upload')}`);
       }
     } catch (error) {
       console.error('Error uploading contestants:', error);
-      toast.error('Failed to upload contestants. Please try again.');
+      toast.error(t('contestant.bulk_upload.error_upload_try_again'));
     } finally {
       setIsUploading(false);
     }
@@ -238,7 +240,7 @@ export default function BulkUploadModal() {
       invalidRecords: 0
     });
     
-    toast.success("Invalid rows removed");
+    toast.success(t('contestant.bulk_upload.invalid_rows_removed'));
   };
   
   const closeModal = () => {
@@ -315,37 +317,37 @@ export default function BulkUploadModal() {
     
     // Validate name
     if (!record.name?.trim()) {
-      errors.name = 'Name is required';
+      errors.name = t('contestant.edit.error_name_required');
     }
     
     // Validate IC number
     const cleanedIC = record.ic?.replace(/\D/g, '');
     if (!cleanedIC || cleanedIC.length !== 12) {
-      errors.ic = 'IC must be exactly 12 digits';
+      errors.ic = t('contestant.edit.error_ic_format');
     }
     
     // Validate gender
     if (!['MALE', 'FEMALE'].includes(record.gender)) {
-      errors.gender = 'Gender must be MALE or FEMALE';
+      errors.gender = t('contestant.edit.error_gender_format');
     }
     
     // Validate age
     const age = parseInt(record.age);
     if (isNaN(age) || age <= 0) {
-      errors.age = 'Age must be a positive number';
+      errors.age = t('contestant.edit.error_age_format');
     }
     
     // Validate education level
     const validEduLevels = ['sekolah rendah', 'sekolah menengah', 'belia'];
     if (!record.edu_level || !validEduLevels.includes(record.edu_level.toLowerCase())) {
-      errors.edu_level = 'Education level must be one of: sekolah rendah, sekolah menengah, belia';
+      errors.edu_level = t('contestant.edit.error_edu_level_format');
     }
     
     // Validate class grade
     if (record.class_grade) {
       const validGrades = ['1', '2', '3', '4', '5', '6', 'PPKI'];
       if (!validGrades.includes(record.class_grade)) {
-        errors.class_grade = 'Grade must be 1, 2, 3, 4, 5, 6, or PPKI';
+        errors.class_grade = t('contestant.edit.error_grade_format');
       }
     }
     
@@ -364,7 +366,7 @@ export default function BulkUploadModal() {
             <div className="flex flex-col gap-4">
               <div className="grid w-full items-center gap-4">
                 <div className="flex flex-col space-y-1.5">
-                  <Label>Upload CSV File</Label>
+                  <Label>{t('contestant.bulk_upload.upload_csv')}</Label>
                   <div 
                     {...getRootProps()} 
                     className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors
@@ -378,18 +380,18 @@ export default function BulkUploadModal() {
                       <Upload className={`h-10 w-10 ${file ? 'text-primary' : 'text-muted-foreground'}`} />
                       {file ? (
                         <div className="flex flex-col items-center">
-                          <p className="text-sm font-medium">File ready for validation</p>
+                          <p className="text-sm font-medium">{t('contestant.bulk_upload.file_ready')}</p>
                           <p className="text-xs text-muted-foreground flex items-center mt-1">
                             <FileText className="h-3 w-3 mr-1" />
                             {file.name} ({Math.round(file.size / 1024)} KB)
                           </p>
                         </div>
                       ) : isDragActive ? (
-                        <p className="text-sm">Drop the CSV file here...</p>
+                        <p className="text-sm">{t('contestant.bulk_upload.drop_here')}</p>
                       ) : (
                         <div className="text-center">
-                          <p className="text-sm font-medium">Drag & drop a CSV file here</p>
-                          <p className="text-xs text-muted-foreground mt-1">or click to browse files</p>
+                          <p className="text-sm font-medium">{t('contestant.bulk_upload.drag_drop')}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{t('contestant.bulk_upload.or_click')}</p>
                         </div>
                       )}
                     </div>
@@ -399,7 +401,7 @@ export default function BulkUploadModal() {
                 <div className="flex justify-end">
                   <Button variant="outline" size="sm" asChild>
                     <a href="/templates/contestants-template.csv" download>
-                      <Download className="h-4 w-4 mr-2" /> Download Template
+                      <Download className="h-4 w-4 mr-2" /> {t('contestant.bulk_upload.download_template')}
                     </a>
                   </Button>
                 </div>
@@ -407,7 +409,7 @@ export default function BulkUploadModal() {
 
               {isUploading && (
                 <div className="space-y-2">
-                  <Label>Validating...</Label>
+                  <Label>{t('contestant.bulk_upload.validating')}</Label>
                   <Progress value={uploadProgress} className="h-2" />
                 </div>
               )}
@@ -420,14 +422,14 @@ export default function BulkUploadModal() {
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-medium">Validation Results</h3>
+                <h3 className="text-sm font-medium">{t('contestant.bulk_upload.validation_results')}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {validationResult.validRecords} of {validationResult.totalRecords} records are valid
+                  {validationResult.validRecords} {t('contestant.bulk_upload.of')} {validationResult.totalRecords} {t('contestant.bulk_upload.records_are_valid')}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant={validationResult.invalidRecords > 0 ? "destructive" : "default"}>
-                  {validationResult.invalidRecords} issues
+                  {validationResult.invalidRecords} {t('contestant.bulk_upload.issues')}
                 </Badge>
                 {validationResult.invalidRecords > 0 && (
                   <Button 
@@ -436,7 +438,7 @@ export default function BulkUploadModal() {
                     onClick={removeInvalidRows}
                     className="text-xs"
                   >
-                    <X className="h-3 w-3 mr-1" /> Remove Invalid Rows
+                    <X className="h-3 w-3 mr-1" /> {t('contestant.bulk_upload.remove_invalid')}
                   </Button>
                 )}
               </div>
@@ -446,15 +448,15 @@ export default function BulkUploadModal() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">Row</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>IC Number</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>Age</TableHead>
-                    <TableHead>Education Level</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[50px]">{t('contestant.bulk_upload.row')}</TableHead>
+                    <TableHead>{t('contestant.edit.name')}</TableHead>
+                    <TableHead>{t('contestant.edit.ic_number')}</TableHead>
+                    <TableHead>{t('contestant.edit.gender')}</TableHead>
+                    <TableHead>{t('contestant.edit.age')}</TableHead>
+                    <TableHead>{t('contestant.edit.education')}</TableHead>
+                    <TableHead>{t('contestant.edit.class_name')}</TableHead>
+                    <TableHead>{t('contestant.edit.class_grade')}</TableHead>
+                    <TableHead className="w-[100px]">{t('contestant.edit.status')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -605,11 +607,11 @@ export default function BulkUploadModal() {
                           ) : (
                             record.isValid ? (
                               <Badge variant="outline" className="bg-green-500/10 text-green-600">
-                                <Check className="h-3 w-3 mr-1" /> Valid
+                                <Check className="h-3 w-3 mr-1" /> {t('contestant.bulk_upload.valid')}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="bg-red-500/10 text-red-600">
-                                <X className="h-3 w-3 mr-1" /> Invalid
+                                <X className="h-3 w-3 mr-1" /> {t('contestant.bulk_upload.invalid')}
                               </Badge>
                             )
                           )}
@@ -623,7 +625,7 @@ export default function BulkUploadModal() {
             
             {validationResult.invalidRecords > 0 && (
               <div className="space-y-2">
-                <h3 className="text-sm font-medium">Validation Issues</h3>
+                <h3 className="text-sm font-medium">{t('contestant.bulk_upload.validation_issues')}</h3>
                 <div className="max-h-[150px] overflow-y-auto rounded-md border p-2">
                   <ul className="space-y-1 text-sm">
                     {validationResult.records
@@ -632,7 +634,7 @@ export default function BulkUploadModal() {
                         <li key={record.rowNumber} className="flex items-start gap-2">
                           <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                           <div>
-                            <span className="font-medium">Row {record.rowNumber}:</span>
+                            <span className="font-medium">{t('contestant.bulk_upload.row')} {record.rowNumber}:</span>
                             <ul className="list-disc list-inside ml-2">
                               {Object.entries(record.errors).map(([field, error]) => (
                                 <li key={`${record.rowNumber}-${field}`} className="text-xs">
@@ -650,7 +652,7 @@ export default function BulkUploadModal() {
             
             {isUploading && (
               <div className="space-y-2">
-                <Label>Uploading...</Label>
+                <Label>{t('contestant.bulk_upload.uploading')}</Label>
                 <Progress value={uploadProgress} className="h-2" />
               </div>
             )}
@@ -662,24 +664,24 @@ export default function BulkUploadModal() {
           <div className="space-y-4 py-4">
             <Alert variant={uploadResult.errors.length > 0 ? "destructive" : "default"}>
               <CheckCircle className="h-4 w-4" />
-              <AlertTitle>Upload Results</AlertTitle>
+              <AlertTitle>{t('contestant.bulk_upload.upload_results')}</AlertTitle>
               <AlertDescription>
-                Successfully uploaded {uploadResult.success} contestants.
+                {t('contestant.bulk_upload.success_upload')} {uploadResult.success} {t('contestant.bulk_upload.contestants')}.
                 {uploadResult.errors.length > 0 && (
-                  <span> Failed to upload {uploadResult.errors.length} contestants.</span>
+                  <span> {t('contestant.bulk_upload.failed_count')} {uploadResult.errors.length} {t('contestant.bulk_upload.contestants')}.</span>
                 )}
               </AlertDescription>
             </Alert>
 
             {uploadResult.errors.length > 0 && (
               <div className="max-h-40 overflow-y-auto border rounded-md p-2">
-                <p className="font-medium mb-2">Errors:</p>
+                <p className="font-medium mb-2">{t('contestant.bulk_upload.errors')}:</p>
                 <ul className="space-y-1 text-sm">
                   {uploadResult.errors.map((error, index) => (
                     <li key={index} className="flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                       <span>
-                        Row {error.row}: {error.message}
+                        {t('contestant.bulk_upload.row')} {error.row}: {error.message}
                       </span>
                     </li>
                   ))}
@@ -701,7 +703,7 @@ export default function BulkUploadModal() {
         return (
           <>
             <Button variant="outline" onClick={closeModal}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button 
               onClick={validateFile} 
@@ -709,7 +711,7 @@ export default function BulkUploadModal() {
               className="gap-2"
             >
               <ArrowRight className="h-4 w-4" />
-              Validate
+              {t('contestant.bulk_upload.validate')}
             </Button>
           </>
         );
@@ -718,7 +720,7 @@ export default function BulkUploadModal() {
         return (
           <>
             <Button variant="outline" onClick={() => setActiveStep('upload')}>
-              Back
+              {t('common.back')}
             </Button>
             <Button 
               onClick={handleUpload} 
@@ -726,7 +728,7 @@ export default function BulkUploadModal() {
               className="gap-2"
             >
               <Upload className="h-4 w-4" />
-              Upload {validationResult?.validRecords || 0} Records
+              {t('contestant.bulk_upload.upload')} {validationResult?.validRecords || 0} {t('contestant.bulk_upload.records')}
             </Button>
           </>
         );
@@ -734,7 +736,7 @@ export default function BulkUploadModal() {
       case 'confirm':
         return (
           <Button variant="default" onClick={closeModal}>
-            Close
+            {t('common.close')}
           </Button>
         );
         
@@ -748,14 +750,14 @@ export default function BulkUploadModal() {
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Upload className="h-4 w-4" />
-          Bulk Upload
+          {t('contestant.bulk_upload.bulk_upload')}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Contestants</DialogTitle>
+          <DialogTitle>{t('contestant.bulk_upload.title')}</DialogTitle>
           <DialogDescription>
-            Upload multiple contestants at once using a CSV or Excel file.
+            {t('contestant.bulk_upload.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -763,15 +765,15 @@ export default function BulkUploadModal() {
         <div className="flex items-center justify-center mb-4">
           <div className="flex items-center space-x-2">
             <Badge variant={activeStep === 'upload' ? 'default' : 'outline'} className="px-3">
-              1. Upload
+              1. {t('contestant.bulk_upload.step_upload')}
             </Badge>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
             <Badge variant={activeStep === 'verify' ? 'default' : 'outline'} className="px-3">
-              2. Verify
+              2. {t('contestant.bulk_upload.step_verify')}
             </Badge>
             <ArrowRight className="h-4 w-4 text-muted-foreground" />
             <Badge variant={activeStep === 'confirm' ? 'default' : 'outline'} className="px-3">
-              3. Confirm
+              3. {t('contestant.bulk_upload.step_confirm')}
             </Badge>
           </div>
         </div>

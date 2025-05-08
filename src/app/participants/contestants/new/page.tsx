@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, School, GraduationCap, User } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/language-context";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ interface Contingent {
 export default function NewContestantPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useLanguage(); // Initialize language context
   
   const [isLoading, setIsLoading] = useState(false);
   const [contingents, setContingents] = useState<Contingent[]>([]);
@@ -211,14 +213,14 @@ export default function NewContestantPage() {
     
     // Check if user has a contingent
     if (!userContingent) {
-      toast.error("You need to create or join a contingent before adding contestants");
+      toast.error(t('contestant.new.error_no_contingent'));
       router.push('/participants/contingents');
       return;
     }
     
     // Basic validation
     if (!formData.name || !formData.ic || !formData.gender || !formData.age || !formData.edu_level) {
-      toast.error("Please fill in all required fields");
+      toast.error(t('contestant.new.error_required_fields'));
       return;
     }
     
@@ -242,14 +244,14 @@ export default function NewContestantPage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create contestant");
+        throw new Error(data.error || t('contestant.new.error_create'));
       }
       
-      toast.success("Contestant registered successfully");
+      toast.success(t('contestant.new.success_create'));
       router.push('/participants/contestants');
     } catch (error: any) {
       console.error("Error creating contestant:", error);
-      toast.error(error.message || "Failed to create contestant");
+      toast.error(error.message || t('contestant.new.error_create'));
     } finally {
       setIsLoading(false);
     }
@@ -276,14 +278,14 @@ export default function NewContestantPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Add New Contestant</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t('contestant.new.title')}</h1>
           <p className="text-sm md:text-base text-muted-foreground mt-1">
-            Register a new contestant for Techlympics 2025
+            {t('contestant.new.description')}
           </p>
         </div>
         <Button asChild variant="outline">
           <Link href="/participants/contestants">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Contestants
+            <ArrowLeft className="mr-2 h-4 w-4" /> {t('contestant.new.back_button')}
           </Link>
         </Button>
       </div>
@@ -291,36 +293,36 @@ export default function NewContestantPage() {
       <form onSubmit={handleSubmit}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl">Contestant Information</CardTitle>
+            <CardTitle className="text-xl">{t('contestant.new.card_title')}</CardTitle>
             <CardDescription>
-              Enter the contestant's personal details
+              {t('contestant.new.card_description')}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Contingent Information</h3>
+              <h3 className="text-lg font-medium">{t('contestant.new.contingent_section')}</h3>
               
               <div className="space-y-2">
-                <Label>Your Contingent</Label>
+                <Label>{t('contestant.new.your_contingent')}</Label>
                 {userContingent ? (
                   <div className="p-3 border rounded-md bg-muted/30">
                     <div className="font-medium">{userContingent.name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {userContingent.school?.name || userContingent.higherInstitution?.name || 'No institution'}
+                      {userContingent.school?.name || userContingent.higherInstitution?.name || t('contestant.new.no_institution')}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      Contestants will be registered under this contingent
+                      {t('contestant.new.will_register_under')}
                     </div>
                   </div>
                 ) : (
                   <div className="p-3 border border-yellow-200 rounded-md bg-yellow-50">
-                    <div className="font-medium text-yellow-800">No Contingent Found</div>
+                    <div className="font-medium text-yellow-800">{t('contestant.new.no_contingent')}</div>
                     <div className="text-sm text-yellow-700">
-                      You need to create or join a contingent before adding contestants
+                      {t('contestant.new.need_contingent')}
                     </div>
                     <Button asChild className="mt-2" size="sm">
                       <Link href="/participants/contingents">
-                        Manage Contingents
+                        {t('contestant.new.manage_contingents')}
                       </Link>
                     </Button>
                   </div>
@@ -331,15 +333,15 @@ export default function NewContestantPage() {
             <Separator />
             
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Personal Information</h3>
+              <h3 className="text-lg font-medium">{t('contestant.new.personal_section')}</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label htmlFor="name">{t('contestant.new.full_name')}</Label>
                   <Input
                     id="name"
                     name="name"
-                    placeholder="Full name as in IC"
+                    placeholder={t('contestant.new.name_placeholder')}
                     value={formData.name}
                     onChange={handleInputChange}
                     required
@@ -347,41 +349,41 @@ export default function NewContestantPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="ic">IC Number</Label>
+                  <Label htmlFor="ic">{t('contestant.new.ic_number')}</Label>
                   <Input
                     id="ic"
                     name="ic"
-                    placeholder="Without dashes"
+                    placeholder={t('contestant.new.ic_placeholder')}
                     value={formData.ic}
                     onChange={handleInputChange}
                     required
                   />
                   {formData.ic.length > 0 && formData.ic.length !== 12 && (
-                    <p className="text-sm text-destructive mt-1">IC must contain exactly 12 digits</p>
+                    <p className="text-sm text-destructive mt-1">{t('contestant.new.ic_error')}</p>
                   )}
                   {formData.ic.length === 12 && (
-                    <p className="text-sm text-muted-foreground mt-1">Age, gender, and education level have been auto-filled based on IC</p>
+                    <p className="text-sm text-muted-foreground mt-1">{t('contestant.new.ic_autofill')}</p>
                   )}
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email (Optional)</Label>
+                  <Label htmlFor="email">{t('contestant.new.email')}</Label>
                   <Input
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="Email address"
+                    placeholder={t('contestant.new.email_placeholder')}
                     value={formData.email}
                     onChange={handleInputChange}
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+                  <Label htmlFor="phoneNumber">{t('contestant.new.phone')}</Label>
                   <Input
                     id="phoneNumber"
                     name="phoneNumber"
-                    placeholder="Phone number"
+                    placeholder={t('contestant.new.phone_placeholder')}
                     value={formData.phoneNumber}
                     onChange={handleInputChange}
                   />
@@ -389,32 +391,32 @@ export default function NewContestantPage() {
               </div>
               
               <div className="space-y-2">
-                <Label>Gender</Label>
+                <Label>{t('contestant.new.gender')}</Label>
                 <Select
                   value={formData.gender}
                   onValueChange={(value) => handleSelectChange("gender", value)}
                   required
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select gender" />
+                    <SelectValue placeholder={t('contestant.new.gender_placeholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MALE">MALE</SelectItem>
-                    <SelectItem value="FEMALE">FEMALE</SelectItem>
+                    <SelectItem value="MALE">{t('contestant.edit.gender_male')}</SelectItem>
+                    <SelectItem value="FEMALE">{t('contestant.edit.gender_female')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="age">Age</Label>
+                  <Label htmlFor="age">{t('contestant.new.age')}</Label>
                   <Input
                     id="age"
                     name="age"
                     type="number"
                     min="5"
                     max="25"
-                    placeholder="Age in years"
+                    placeholder={t('contestant.new.age_placeholder')}
                     value={formData.age}
                     onChange={handleInputChange}
                     required
@@ -422,20 +424,20 @@ export default function NewContestantPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edu_level">Education Level</Label>
+                  <Label htmlFor="edu_level">{t('contestant.new.education_level')}</Label>
                   <Select
                     value={formData.edu_level}
                     onValueChange={(value) => handleSelectChange("edu_level", value)}
                     required
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select education level" />
+                      <SelectValue placeholder={t('contestant.new.education_placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="sekolah rendah">Sekolah Rendah</SelectItem>
-                      <SelectItem value="sekolah menengah">Sekolah Menengah</SelectItem>
-                      <SelectItem value="belia">Belia</SelectItem>
-                      <SelectItem value="pendidikan khas">Pendidikan Khas</SelectItem>
+                      <SelectItem value="sekolah rendah">{t('contestant.edit.edu_primary')}</SelectItem>
+                      <SelectItem value="sekolah menengah">{t('contestant.edit.edu_secondary')}</SelectItem>
+                      <SelectItem value="belia">{t('contestant.edit.edu_youth')}</SelectItem>
+                      <SelectItem value="pendidikan khas">{t('contestant.new.edu_special')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -445,17 +447,17 @@ export default function NewContestantPage() {
             <Separator />
             
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Class Information (Optional)</h3>
+              <h3 className="text-lg font-medium">{t('contestant.new.class_section')}</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="class_grade">Class Grade</Label>
+                  <Label htmlFor="class_grade">{t('contestant.new.class_grade')}</Label>
                   <Select
                     value={formData.class_grade}
                     onValueChange={(value) => handleSelectChange("class_grade", value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select grade" />
+                      <SelectValue placeholder={t('contestant.new.grade_placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="1">1</SelectItem>
@@ -470,11 +472,11 @@ export default function NewContestantPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="class_name">Class Name</Label>
+                  <Label htmlFor="class_name">{t('contestant.new.class_name')}</Label>
                   <Input
                     id="class_name"
                     name="class_name"
-                    placeholder="e.g., Cerdik, 5A"
+                    placeholder={t('contestant.new.class_name_placeholder')}
                     value={formData.class_name}
                     onChange={handleInputChange}
                   />
@@ -484,7 +486,7 @@ export default function NewContestantPage() {
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline" type="button" onClick={() => router.push('/participants/contestants')}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isLoading}>
               {isLoading ? (
@@ -493,11 +495,11 @@ export default function NewContestantPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Saving...
+                  {t('contestant.new.saving')}
                 </span>
               ) : (
                 <span className="flex items-center">
-                  <Save className="mr-2 h-4 w-4" /> Save Contestant
+                  <Save className="mr-2 h-4 w-4" /> {t('contestant.new.save_button')}
                 </span>
               )}
             </Button>
