@@ -161,7 +161,12 @@ export function ContingentProvider({ children, contingentId }: {
       // Always try to fetch real data first, even in development mode
       
       // Production mode - fetch real data
-      const response = await fetch(`/api/organizer/contingents/${numericId}`);
+      const response = await fetch(`/api/organizer/contingents/${numericId}`, {
+        credentials: 'include', // This ensures cookies are sent with the request
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (response.status === 401) {
         console.error('Authentication required. User is not logged in.');
@@ -240,8 +245,13 @@ export function ContingentProvider({ children, contingentId }: {
       
       // Always try to fetch real data first, even in development mode
       
-      // Production mode - fetch real data
-      const response = await fetch(`/api/organizer/contingents/${numericId}/contestants`);
+      // Try to fetch real data
+      const response = await fetch(`/api/organizer/contingents/${numericId}/contestants`, {
+        credentials: 'include', // This ensures cookies are sent with the request
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (response.status === 401) {
         console.error('Authentication required. User is not logged in.');
@@ -321,7 +331,12 @@ export function ContingentProvider({ children, contingentId }: {
       // Always try to fetch real data first, even in development mode
       
       // Production mode - fetch real data
-      const response = await fetch(`/api/organizer/contingents/${numericId}/teams`);
+      const response = await fetch(`/api/organizer/contingents/${numericId}/teams`, {
+        credentials: 'include', // This ensures cookies are sent with the request
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (response.status === 401) {
         console.error('Authentication required. User is not logged in.');
