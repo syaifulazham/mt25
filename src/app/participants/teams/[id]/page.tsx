@@ -39,7 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Tabs removed as requested
 import { Separator } from "@/components/ui/separator";
 
 interface TeamMember {
@@ -68,7 +68,11 @@ interface Team {
   institutionType?: string;
   members: TeamMember[];
   maxMembers: number;
+  contestMaxMembers?: number; // Max members from contest configuration
   isOwner: boolean;
+  isManager?: boolean;
+  minAge?: number;  // Min age from the contest
+  maxAge?: number;  // Max age from the contest
   createdAt: string;
   updatedAt: string;
 }
@@ -228,29 +232,10 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
                     </div>
                     
                     <div>
-                      <span className="text-sm text-muted-foreground block">Contingent</span>
-                      <span className="font-medium">{team.contingentName}</span>
-                    </div>
-                    
-                    {team.institutionName && (
-                      <div>
-                        <span className="text-sm text-muted-foreground block">Institution</span>
-                        <div className="flex items-center">
-                          {team.institutionType === 'SCHOOL' ? (
-                            <School className="h-4 w-4 mr-1 text-muted-foreground" />
-                          ) : (
-                            <Building className="h-4 w-4 mr-1 text-muted-foreground" />
-                          )}
-                          <span className="font-medium">{team.institutionName}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div>
                       <span className="text-sm text-muted-foreground block">Team Size</span>
                       <div className="flex items-center">
                         <Users className="h-4 w-4 mr-1 text-muted-foreground" />
-                        <span className="font-medium">{team.members.length} / {team.maxMembers} members</span>
+                        <span className="font-medium">{team.members.length} / {team.contestMaxMembers || team.maxMembers} members</span>
                       </div>
                     </div>
                   </div>
@@ -303,82 +288,71 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
             </CardFooter>
           </Card>
           
-          <Tabs defaultValue="members">
-            <TabsList className="w-full md:w-auto">
-              <TabsTrigger value="members" className="flex items-center">
-                <Users className="h-4 w-4 mr-2" />
-                Team Members
-              </TabsTrigger>
-            </TabsList>
+          <Card className="mt-6">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <CardTitle>Team Members</CardTitle>
+                  <CardDescription>
+                    Manage contestants in your team
+                  </CardDescription>
+                </div>
+                <Button asChild>
+                  <Link href={`/participants/teams/${team.id}/members`}>
+                    <Users className="mr-2 h-4 w-4" />
+                    Manage Members
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
             
-            <TabsContent value="members" className="mt-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                      <CardTitle>Team Members</CardTitle>
-                      <CardDescription>
-                        Manage contestants in your team
-                      </CardDescription>
-                    </div>
-                    <Button asChild>
-                      <Link href={`/participants/teams/${team.id}/members`}>
-                        <Users className="mr-2 h-4 w-4" />
-                        Manage Members
-                      </Link>
-                    </Button>
-                  </div>
-                </CardHeader>
-                
-                <CardContent>
-                  {team.members.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                      <h3 className="text-lg font-medium">No members yet</h3>
-                      <p className="text-muted-foreground mb-6 max-w-md">
-                        This team doesn't have any members yet. Add contestants to your team to participate in the competition.
-                      </p>
-                      <Button asChild>
-                        <Link href={`/participants/teams/${team.id}/members`}>
-                          <Users className="mr-2 h-4 w-4" />
-                          Add Members
-                        </Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-[300px] rounded-md">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>IC Number</TableHead>
-                            <TableHead>Education</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Joined</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {team.members.map((member) => (
-                            <TableRow key={member.id}>
-                              <TableCell className="font-medium">{member.contestantName}</TableCell>
-                              <TableCell>{member.icNumber || "—"}</TableCell>
-                              <TableCell>{member.educationLevel || "—"}</TableCell>
-                              <TableCell>
-                                <Badge className={getStatusColor(member.status)}>
-                                  {member.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{formatDate(member.joinDate)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+            <CardContent>
+              {team.members.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-medium">No members yet</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md">
+                    This team doesn't have any members yet. Add contestants to your team to participate in the competition.
+                  </p>
+                  <Button asChild>
+                    <Link href={`/participants/teams/${team.id}/members`}>
+                      <Users className="mr-2 h-4 w-4" />
+                      Add Members
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <ScrollArea className="h-[300px] rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>IC Number</TableHead>
+                        <TableHead>Education</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Joined</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {team.members.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell className="font-medium">{member.contestantName}</TableCell>
+                          <TableCell>{member.icNumber || "—"}</TableCell>
+                          <TableCell>{member.educationLevel || "—"}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(member.status)}>
+                              {member.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(member.joinDate)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
       

@@ -181,7 +181,7 @@ export default async function ContestsPage() {
                   <TableCell className="font-medium">{contest.code || `CNT-${contest.id}`}</TableCell>
                   <TableCell>{contest.name}</TableCell>
                   <TableCell>{getContestTypeDisplay(contest.contestType)}</TableCell>
-                  <TableCell>{getParticipationModeBadge(contest.participation_mode || 'INDIVIDUAL')}</TableCell>
+                  <TableCell>{getParticipationModeBadge(contest.participation_mode || 'INDIVIDUAL')} {contest.participation_mode === 'TEAM' && contest.maxMembersPerTeam && `of ${contest.maxMembersPerTeam}`}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {contest.theme?.logoPath && (

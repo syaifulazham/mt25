@@ -185,9 +185,56 @@ export function hasRequiredRole(user: AuthUser | null | any, requiredRoles: user
     return false;
   }
   
+  // ADMIN always has access to everything
+  if (user.role === 'ADMIN') {
+    return true;
+  }
+  
   // Handle both string roles and enum roles
   const userRole = typeof user.role === 'string' ? user.role : String(user.role);
   return requiredRoles.includes(userRole as any);
+}
+
+// Special handler for organizer API routes with more flexible authentication
+export async function authenticateOrganizerApi(requiredRoles: user_role[] | string[] = ['ADMIN', 'OPERATOR']) {
+  try {
+    // DEVELOPMENT MODE ONLY: For development, automatically provide ADMIN access
+    // This creates a mock admin user to bypass authentication in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('DEVELOPMENT MODE: Bypassing authentication with mock ADMIN user');
+      const mockAdminUser = {
+        id: '-1',  // Next Auth IDs are strings
+        name: 'Development Admin',
+        email: 'dev-admin@example.com',
+        role: 'ADMIN',
+        username: 'dev-admin'
+      };
+      return { success: true, user: mockAdminUser };
+    }
+    
+    // PRODUCTION: Use normal authentication
+    const user = await getCurrentUser();
+    
+    // If no user, return auth error
+    if (!user) {
+      return { success: false, status: 401, message: 'Authentication required' };
+    }
+    
+    // Check if user has the required role
+    if (!hasRequiredRole(user, requiredRoles)) {
+      return { 
+        success: false, 
+        status: 403, 
+        message: `Insufficient permissions. Required roles: ${requiredRoles.join(', ')}` 
+      };
+    }
+    
+    // Authentication successful
+    return { success: true, user };
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return { success: false, status: 500, message: 'Authentication system error' };
+  }
 }
 
 // Create initial admin user if no users exist

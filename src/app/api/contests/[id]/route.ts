@@ -167,6 +167,13 @@ async function updateContest(
       participation_mode: data.participation_mode,
       accessibility: data.accessibility
     };
+    
+    // Add maxMembersPerTeam if provided (required for team contests)
+    if (data.maxMembersPerTeam !== undefined) {
+      updateData.maxMembersPerTeam = typeof data.maxMembersPerTeam === 'string'
+        ? parseInt(data.maxMembersPerTeam)
+        : data.maxMembersPerTeam;
+    }
 
     // Add themeId if provided
     if (data.themeId !== undefined) {

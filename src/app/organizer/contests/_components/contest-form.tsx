@@ -35,7 +35,7 @@ import { themeApi } from '@/lib/api-client';
 import { format } from 'date-fns';
 
 // Define contest form schema with Zod
-const contestFormSchema = z.object({
+const baseSchema = z.object({
   name: z.string().min(3, {
     message: "Contest name must be at least 3 characters.",
   }),
@@ -66,7 +66,24 @@ const contestFormSchema = z.object({
   }),
   themeId: z.number().nullable().optional(),
   participation_mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
+  maxMembersPerTeam: z.number().optional(),
 });
+
+// Create the final schema with conditional validation
+const contestFormSchema = baseSchema.refine(
+  (data) => {
+    // If participation mode is TEAM, maxMembersPerTeam must be defined and > 0
+    if (data.participation_mode === "TEAM") {
+      return data.maxMembersPerTeam !== undefined && data.maxMembersPerTeam > 0;
+    }
+    // Otherwise, no validation needed
+    return true;
+  },
+  {
+    message: "Maximum members per team is required for team contests",
+    path: ["maxMembersPerTeam"], // This ensures the error is shown on the maxMembersPerTeam field
+  }
+);
 
 // Define the form values type
 type ContestFormValues = z.infer<typeof contestFormSchema>;
@@ -85,6 +102,7 @@ const defaultValues: Partial<ContestFormValues> = {
   targetGroupIds: [],
   themeId: null,
   participation_mode: "INDIVIDUAL",
+  maxMembersPerTeam: undefined,
 };
 
 interface ContestFormProps {
@@ -188,6 +206,7 @@ export function ContestForm({ initialData }: ContestFormProps) {
       targetGroupIds: initialData.targetgroup ? initialData.targetgroup.map((tg: any) => tg.id) : [],
       themeId: initialData.themeId || null,
       participation_mode: initialData.participation_mode || "INDIVIDUAL",
+      maxMembersPerTeam: initialData.maxMembersPerTeam || undefined,
     };
   };
 
@@ -448,41 +467,73 @@ export function ContestForm({ initialData }: ContestFormProps) {
             </div>
 
             {/* Participation Mode */}
-            <FormField
-              control={form.control}
-              name="participation_mode"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Participation Mode</FormLabel>
-                  <div className="mt-2">
-                    <div className="flex items-center space-x-2">
-                      <div className="grid grid-cols-2 gap-2 rounded-md border p-1">
-                        <Button
-                          type="button"
-                          variant={field.value === "INDIVIDUAL" ? "default" : "outline"}
-                          className={`px-3 ${field.value === "INDIVIDUAL" ? "bg-primary text-primary-foreground" : ""}`}
-                          onClick={() => field.onChange("INDIVIDUAL")}
-                        >
-                          Individual
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={field.value === "TEAM" ? "default" : "outline"}
-                          className={`px-3 ${field.value === "TEAM" ? "bg-primary text-primary-foreground" : ""}`}
-                          onClick={() => field.onChange("TEAM")}
-                        >
-                          Team
-                        </Button>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="participation_mode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Participation Mode</FormLabel>
+                    <div className="mt-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="grid grid-cols-2 gap-2 rounded-md border p-1">
+                          <Button
+                            type="button"
+                            variant={field.value === "INDIVIDUAL" ? "default" : "outline"}
+                            className={`px-3 ${field.value === "INDIVIDUAL" ? "bg-primary text-primary-foreground" : ""}`}
+                            onClick={() => field.onChange("INDIVIDUAL")}
+                          >
+                            Individual
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={field.value === "TEAM" ? "default" : "outline"}
+                            className={`px-3 ${field.value === "TEAM" ? "bg-primary text-primary-foreground" : ""}`}
+                            onClick={() => field.onChange("TEAM")}
+                          >
+                            Team
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <FormDescription>
-                    Select whether contestants will participate individually or in teams.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
+                    <FormDescription>
+                      Select whether contestants will participate individually or in teams.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Max Members Per Team - Only show when Team mode is selected */}
+              {form.watch("participation_mode") === "TEAM" && (
+                <FormField
+                  control={form.control}
+                  name="maxMembersPerTeam"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Maximum Members Per Team</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          placeholder="e.g. 4"
+                          {...field}
+                          onChange={(e) => {
+                            const value = e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                            field.onChange(value);
+                          }}
+                          value={field.value === undefined ? "" : field.value}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        The maximum number of members allowed in each team.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
-            />
+            </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Contest Dates */}

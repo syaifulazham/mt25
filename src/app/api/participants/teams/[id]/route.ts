@@ -44,7 +44,8 @@ export async function GET(
             startDate: true,
             endDate: true,
             minAge: true,
-            maxAge: true
+            maxAge: true,
+            maxMembersPerTeam: true
           }
         },
         contingent: {
@@ -141,6 +142,7 @@ export async function GET(
       contestName: team.contest.name,
       minAge: team.contest?.minAge ?? undefined,
       maxAge: team.contest?.maxAge ?? undefined,
+      contestMaxMembers: team.contest.maxMembersPerTeam,
       contingentId: team.contingentId,
       contingentName: team.contingent.name,
       institutionName: team.contingent.school 

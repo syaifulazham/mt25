@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
         contest: {
           select: {
             name: true,
-            code: true
+            code: true,
+            maxMembersPerTeam: true
           }
         },
         contingent: {
@@ -94,6 +95,7 @@ export async function GET(request: NextRequest) {
       contingentName: team.contingent.name,
       memberCount: team.members.length,
       maxMembers: team.maxMembers,
+      contestMaxMembers: team.contest.maxMembersPerTeam || team.maxMembers,
       isOwner: team.managers.length > 0 ? team.managers[0].isOwner : false,
       createdAt: team.createdAt,
       updatedAt: team.updatedAt
@@ -208,7 +210,7 @@ export async function POST(request: NextRequest) {
     console.error("Error creating team:", error);
     
     // Handle unique constraint violations
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: "A team with this name or hashcode already exists" },
         { status: 409 }

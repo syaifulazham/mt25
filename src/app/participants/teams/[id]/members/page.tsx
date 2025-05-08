@@ -40,6 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -77,6 +78,7 @@ interface Team {
   institutionType?: string;
   members: TeamMember[];
   maxMembers: number;
+  contestMaxMembers?: number; // Max members from contest configuration
   isOwner: boolean;
   isManager: boolean;
   minAge?: number;  // Min age from the contest
@@ -111,6 +113,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   const [confirmRemoveDialogOpen, setConfirmRemoveDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   
   // Fetch the team details and available contestants
   useEffect(() => {
@@ -314,8 +317,18 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   };
   
   // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "—";
+    
+    // Try to parse the date
+    const date = new Date(dateString);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return "—";
+    }
+    
+    return date.toLocaleDateString("en-US", {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -416,8 +429,16 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="flex gap-1 items-center">
                     <Users className="h-3 w-3" />
-                    {team.members.length} / {team.maxMembers}
+                    {team.members.length} / {team.contestMaxMembers || team.maxMembers}
                   </Badge>
+                  
+                  {/* Add Member Button */}
+                  {team.members.length < (team.contestMaxMembers || team.maxMembers) && (team.isOwner || team.isManager) && (
+                    <Button size="sm" onClick={() => setAddMemberDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Member
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -452,7 +473,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                           <TableCell>{member.educationLevel ? getEducationLevelText(member.educationLevel) : "—"}</TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(member.status)}>
-                              {member.status}
+                              {member.status || "ACTIVE"}
                             </Badge>
                           </TableCell>
                           <TableCell>{formatDate(member.joinDate)}</TableCell>
@@ -479,63 +500,59 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <CardTitle className="text-lg font-semibold">Add Team Members</CardTitle>
-                  <CardDescription>
-                    Select contestants to add to this team
-                    {team && (team.minAge || team.maxAge) && (
-                      <>
-                        <br />
-                        <span className="text-xs text-amber-600 mt-1 inline-block">
-                          <AlertCircle className="h-3 w-3 inline mr-1" />
-                          Age restrictions: 
-                          {team.minAge !== undefined && team.maxAge !== undefined ? (
-                            `${team.minAge} to ${team.maxAge} years old`
-                          ) : team.minAge !== undefined ? (
-                            `Minimum ${team.minAge} years old`
-                          ) : team.maxAge !== undefined ? (
-                            `Maximum ${team.maxAge} years old`
-                          ) : ''
-                          }
-                        </span>
-                      </>
-                    )}
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="search"
-                      placeholder="Search contestants..."
-                      className="pl-8 w-[200px] md:w-[260px]"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  
-                  <Select
-                    value={educationFilter}
-                    onValueChange={setEducationFilter}
-                  >
-                    <SelectTrigger className="w-full sm:w-[180px]">
-                      <SelectValue placeholder="Filter by level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Levels</SelectItem>
-                      <SelectItem value="sekolah rendah">Primary School</SelectItem>
-                      <SelectItem value="sekolah menengah">Secondary School</SelectItem>
-                      <SelectItem value="belia">Youth</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
+        {/* Add Member Dialog */}
+        <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
+          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Add Team Members</DialogTitle>
+              <DialogDescription>
+                Select contestants to add to your team
+                {team && (team.minAge || team.maxAge) && (
+                  <span className="text-xs text-amber-600 mt-1 inline-block">
+                    <AlertCircle className="h-3 w-3 inline mr-1" />
+                    Age restrictions: 
+                    {team.minAge !== undefined && team.maxAge !== undefined ? (
+                      `${team.minAge} to ${team.maxAge} years old`
+                    ) : team.minAge !== undefined ? (
+                      `Minimum ${team.minAge} years old`
+                    ) : team.maxAge !== undefined ? (
+                      `Maximum ${team.maxAge} years old`
+                    ) : ''
+                    }
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
             
-            <CardContent>
+            <div className="flex items-center gap-2 mb-4 pt-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search contestants..."
+                  className="pl-8 w-full"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <Select
+                value={educationFilter}
+                onValueChange={setEducationFilter}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="sekolah rendah">Primary School</SelectItem>
+                  <SelectItem value="sekolah menengah">Secondary School</SelectItem>
+                  <SelectItem value="belia">Youth</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
               {filteredContestants.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -546,7 +563,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                       : "No contestants match your search criteria. Try a different search term or filter."}
                   </p>
                   {contestants.length === 0 && (
-                    <Button asChild>
+                    <Button asChild onClick={() => setAddMemberDialogOpen(false)}>
                       <Link href="/participants/contestants/new">
                         <Plus className="mr-2 h-4 w-4" />
                         Create Contestant
@@ -555,8 +572,8 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   )}
                 </div>
               ) : (
-                <ScrollArea className="h-[400px]">
-                  <div className="border rounded-md">
+                <div className="border rounded-md overflow-hidden h-[400px]">
+                  <ScrollArea className="h-full">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -588,7 +605,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                                 <Button
                                   size="sm"
                                   onClick={() => handleAddMember(contestant.id)}
-                                  disabled={isAddingMember || team.members.length >= team.maxMembers}
+                                  disabled={isAddingMember || team.members.length >= (team.contestMaxMembers || team.maxMembers)}
                                 >
                                   {isAddingMember ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -603,22 +620,30 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                </ScrollArea>
+                  </ScrollArea>
+                </div>
               )}
-            </CardContent>
-            {team.members.length >= team.maxMembers && (
-              <CardFooter>
+            </div>
+            
+            {team.members.length >= (team.contestMaxMembers || team.maxMembers) && (
+              <div className="mt-4">
                 <div className="bg-amber-50 p-3 rounded-md text-amber-800 text-sm flex items-start w-full">
                   <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
                   <p>
-                    You've reached the maximum team size ({team.maxMembers} members). 
+                    You've reached the maximum team size ({team.contestMaxMembers || team.maxMembers} members). 
                     Remove existing members before adding new ones.
                   </p>
                 </div>
-              </CardFooter>
+              </div>
             )}
-          </Card>
+            
+            <DialogFooter className="mt-4">
+              <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         </div>
       )}
       

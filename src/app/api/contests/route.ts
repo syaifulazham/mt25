@@ -186,6 +186,13 @@ export async function POST(req: NextRequest) {
       startDate,
       endDate
     };
+    
+    // Add maxMembersPerTeam if provided (required for team contests)
+    if (data.maxMembersPerTeam !== undefined) {
+      contestData.maxMembersPerTeam = typeof data.maxMembersPerTeam === 'string'
+        ? parseInt(data.maxMembersPerTeam)
+        : data.maxMembersPerTeam;
+    }
 
     // Add themeId if provided
     if (data.themeId !== undefined) {

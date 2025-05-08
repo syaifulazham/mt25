@@ -62,6 +62,7 @@ interface Team {
   contingentName: string;
   memberCount: number;
   maxMembers: number;
+  contestMaxMembers: number;
   isOwner: boolean;
   createdAt: string;
   updatedAt: string;
@@ -377,7 +378,7 @@ export default function TeamsPage() {
                             <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
                             <div>
                               <div className="text-sm">
-                                <span className="font-medium">{team.memberCount}</span> of <span className="font-medium">{team.maxMembers}</span> members
+                                <span className="font-medium">{team.memberCount}</span> of <span className="font-medium">{team.contestMaxMembers}</span> members
                               </div>
                             </div>
                           </div>

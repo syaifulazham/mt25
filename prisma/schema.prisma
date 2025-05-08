@@ -45,6 +45,7 @@ model contest {
   accessibility     Boolean              @default(false)
   minAge            Int?                 // Minimum age for contestants
   maxAge            Int?                 // Maximum age for contestants
+  maxMembersPerTeam Int?                 @default(1) // Maximum number of contestants per team
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
   themeId           Int?
