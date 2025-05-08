@@ -220,7 +220,13 @@ export async function authenticateOrganizerApi(requiredRoles: user_role[] | stri
       return { success: false, status: 401, message: 'Authentication required' };
     }
     
-    // Check if user has the required role
+    // ADMIN users always have full permissions - immediately grant access
+    if (user.role === 'ADMIN') {
+      console.log('Admin user detected - granting full access');
+      return { success: true, user };
+    }
+    
+    // For non-admin users, check if they have the required role
     if (!hasRequiredRole(user, requiredRoles)) {
       return { 
         success: false, 
