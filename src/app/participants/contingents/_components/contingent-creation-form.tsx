@@ -100,12 +100,12 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   // Handle contingent creation
   const handleCreateContingent = async () => {
     if (!selectedInstitution) {
-      toast.error("Please select a school or institution");
+      toast.error(t('contingent.error_no_institution'));
       return;
     }
 
     if (!contingentName.trim()) {
-      toast.error("Please enter a contingent name");
+      toast.error(t('contingent.error_no_name'));
       return;
     }
 
@@ -124,7 +124,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
 
       // Create the contingent
       await contingentApi.createContingent(data);
-      toast.success("Contingent created successfully");
+      toast.success(t('contingent.create_success'));
       
       // Add a small delay before fetching contingents to ensure database consistency
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -134,7 +134,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
       
     } catch (error: any) {
       console.error("Error creating contingent:", error);
-      toast.error(error.message || "Failed to create contingent");
+      toast.error(error.message || t('contingent.create_error'));
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +143,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   // Handle request to join contingent
   const handleJoinContingent = async () => {
     if (!selectedInstitution) {
-      toast.error("Please select a school or institution");
+      toast.error(t('contingent.error_no_institution'));
       return;
     }
 
@@ -156,14 +156,14 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
       };
       
       await contingentApi.requestToJoinContingent(data);
-      toast.success("Request to join contingent submitted successfully");
+      toast.success(t('contingent.join_request_success'));
       
       // Reload contingents
       await onContingentCreated();
       
     } catch (error: any) {
       console.error("Error requesting to join contingent:", error);
-      toast.error(error.message || "Failed to request joining contingent");
+      toast.error(error.message || t('contingent.join_request_error'));
     } finally {
       setIsLoading(false);
     }
@@ -172,9 +172,9 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Select Your Institution</CardTitle>
+        <CardTitle>{t('contingent.select_institution')}</CardTitle>
         <CardDescription>
-          Search for your school or higher institution to create or join a contingent
+          {t('contingent.select_institution_desc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -187,13 +187,13 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="school" id="school" />
             <Label htmlFor="school" className="flex items-center gap-1">
-              <SchoolIcon className="h-4 w-4" /> School
+              <SchoolIcon className="h-4 w-4" /> {t('contingent.school')}
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="higher" id="higher" />
             <Label htmlFor="higher" className="flex items-center gap-1">
-              <Building className="h-4 w-4" /> Higher Institution
+              <Building className="h-4 w-4" /> {t('contingent.higher_institution')}
             </Label>
           </div>
         </RadioGroup>
@@ -201,7 +201,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
         <div className="flex gap-2">
           <div className="flex-1">
             <Input
-              placeholder={`Search for ${institutionType === "school" ? "school" : "higher institution"} by name, code, or location`}
+              placeholder={t(institutionType === "school" ? 'contingent.search_school_placeholder' : 'contingent.search_higher_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -217,19 +217,19 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
             ) : (
               <Search className="h-4 w-4 mr-2" />
             )}
-            Search
+            {t('contingent.search')}
           </Button>
         </div>
         
         {selectedInstitution && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Selected Institution</CardTitle>
+              <CardTitle className="text-base">{t('contingent.selected_institution')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="font-medium">{selectedInstitution.name}</div>
               <div className="text-sm text-muted-foreground">
-                {institutionType === "school" ? "School" : "Higher Institution"} | {selectedInstitution.code}
+                {t(institutionType === "school" ? 'contingent.school' : 'contingent.higher_institution')} | {selectedInstitution.code}
               </div>
               {institutionType === "school" && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -249,22 +249,22 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
           <div className="space-y-4">
             <Separator />
             <div>
-              <h3 className="text-lg font-medium mb-2">Contingent Details</h3>
+              <h3 className="text-lg font-medium mb-2">{t('contingent.details')}</h3>
               <div className="space-y-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="contingent-name">Contingent Name</Label>
+                  <Label htmlFor="contingent-name">{t('contingent.name')}</Label>
                   <Input
                     id="contingent-name"
-                    placeholder="Enter contingent name"
+                    placeholder={t('contingent.enter_name')}
                     value={contingentName}
                     onChange={(e) => setContingentName(e.target.value)}
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="contingent-description">Description (Optional)</Label>
+                  <Label htmlFor="contingent-description">{t('contingent.description')}</Label>
                   <Input
                     id="contingent-description"
-                    placeholder="Brief description of your contingent"
+                    placeholder={t('contingent.description_placeholder')}
                     value={contingentDescription}
                     onChange={(e) => setContingentDescription(e.target.value)}
                   />
@@ -278,24 +278,24 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
         <CardFooter className="flex flex-col space-y-4">
           <div className="flex justify-between w-full">
             <Button variant="outline" onClick={() => setSelectedInstitution(null)}>
-              Clear Selection
+              {t('contingent.clear_selection')}
             </Button>
             
             <div className="space-x-2">
               {checkingExistingContingent ? (
                 <Button disabled>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Checking...
+                  {t('contingent.checking')}
                 </Button>
               ) : existingContingent ? (
                 <div className="text-right space-y-2">
                   <div className="text-sm text-amber-500 font-medium">
-                    A contingent already exists for this institution
+                    {t('contingent.already_exists')}
                   </div>
                   <Button onClick={handleJoinContingent} disabled={isLoading} className="w-full">
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : "Request to Join Existing Contingent"}
+                    ) : t('contingent.join_existing')}
                   </Button>
                 </div>
               ) : (
@@ -303,12 +303,12 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
                   <Button variant="outline" onClick={handleJoinContingent} disabled={isLoading}>
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : "Request to Join Existing"}
+                    ) : t('contingent.request_join')}
                   </Button>
                   <Button onClick={handleCreateContingent} disabled={isLoading}>
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : "Create New Contingent"}
+                    ) : t('contingent.create_new')}
                   </Button>
                 </div>
               )}

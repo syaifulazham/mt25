@@ -13,6 +13,14 @@ import { toast } from "sonner";
 import { School as SchoolIcon, Building, Users, CheckCircle, XCircle, Clock, Search, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useLanguage } from "@/lib/i18n/language-context";
 import contingentApi, { School, HigherInstitution, Contingent, ContingentRequest } from "./contingent-api";
 // Import components directly - TypeScript might need a rebuild to recognize the module files
@@ -24,15 +32,19 @@ interface ContingentManagerClientProps {
 }
 
 export default function ContingentManagerClient({ userId }: ContingentManagerClientProps) {
+  const { language, t } = useLanguage();
   const router = useRouter();
-  const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [userContingents, setUserContingents] = useState<Contingent[]>([]);
   const [contingentRequests, setContingentRequests] = useState<ContingentRequest[]>([]);
   const [selectedContingent, setSelectedContingent] = useState<Contingent | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [name, setName] = useState("");
+  const [shortName, setShortName] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [shortName, setShortName] = useState<string>("");
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
   // Load user's contingents on component mount
   useEffect(() => {
@@ -51,11 +63,13 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
         const managerContingent = contingents.find((c: Contingent) => c.isManager);
         if (managerContingent) {
           setSelectedContingent(managerContingent);
+          setName(managerContingent.name || "");
           setShortName(managerContingent.short_name || "");
           // Load contingent requests if user is a manager
           loadContingentRequests(managerContingent.id);
         } else {
           setSelectedContingent(contingents[0]);
+          setName(contingents[0].name || "");
           setShortName(contingents[0].short_name || "");
         }
       }
@@ -115,6 +129,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
       setUpdateSuccess(false);
       
       await contingentApi.updateContingentDetails(selectedContingent.id, {
+        name: name,
         short_name: shortName,
         logoFile: logoFile || undefined,
       });
@@ -127,6 +142,28 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
     } catch (error) {
       console.error("Error updating contingent:", error);
       toast.error("Failed to update contingent details");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to handle leaving a contingent
+  const handleLeaveContingent = async () => {
+    if (!selectedContingent || !userId) return;
+    
+    try {
+      setIsLoading(true);
+      
+      await contingentApi.leaveContingent(selectedContingent.id, userId);
+      
+      toast.success("You have left the contingent successfully");
+      setLeaveDialogOpen(false);
+      
+      // Reload contingents to get updated data
+      await loadUserContingents();
+    } catch (error: any) {
+      console.error("Error leaving contingent:", error);
+      toast.error(error.message || "Failed to leave contingent");
     } finally {
       setIsLoading(false);
     }
@@ -177,6 +214,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                       ${selectedContingent?.id === contingent.id ? 'border-primary bg-accent/50' : ''}`}
                     onClick={() => {
                       setSelectedContingent(contingent);
+                      setName(contingent.name || "");
                       setShortName(contingent.short_name || "");
                       if (contingent.isManager) {
                         loadContingentRequests(contingent.id);
@@ -244,6 +282,8 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                     <>
                       <ContingentDetailsForm 
                         selectedContingent={selectedContingent}
+                        name={name}
+                        setName={setName}
                         shortName={shortName}
                         setShortName={setShortName}
                         handleLogoUpload={handleLogoUpload}
@@ -252,21 +292,25 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                         updateSuccess={updateSuccess}
                       />
                       
-                      {/* Show manage contestants button only for managers */}
-                      {selectedContingent.isManager && (
-                        <div className="pt-4">
-                          <Button 
-                            onClick={() => router.push(`/participants/contingents/${selectedContingent.id}`)}
-                            className="w-full"
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            Manage Contestants
-                          </Button>
-                          <p className="text-xs text-muted-foreground mt-1 text-center">
-                            Register and manage contestants for your contingent
-                          </p>
-                        </div>
-                      )}
+                      {/* Action buttons */}
+                      <div className="flex flex-col gap-4 pt-4">
+                        
+                        {/* Leave Contingent button - always visible for members */}
+                        {!selectedContingent.isOwner && (
+                          <div>
+                            <Button 
+                              variant="outline"
+                              onClick={() => setLeaveDialogOpen(true)}
+                              className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            >
+                              {t('contingent.leave')}
+                            </Button>
+                            <p className="text-xs text-muted-foreground mt-1 text-center">
+                              {t('contingent.leave_desc')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
                 </CardContent>
@@ -276,15 +320,15 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
               {selectedContingent.isManager && selectedContingent.status === 'ACTIVE' && (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Pending Requests</CardTitle>
+                    <CardTitle>{t('contingent.pending_requests')}</CardTitle>
                     <CardDescription>
-                      Manage requests from users who want to join this contingent
+                      {t('contingent.pending_requests_desc')}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {contingentRequests.length === 0 ? (
                       <div className="p-4 border rounded-md bg-muted/50 text-center">
-                        <p>No pending requests</p>
+                        <p>{t('contingent.no_pending_requests')}</p>
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -296,7 +340,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                               <div className="flex items-center gap-1 mt-1">
                                 <Clock className="h-3 w-3 text-muted-foreground" />
                                 <span className="text-xs text-muted-foreground">
-                                  Requested {new Date(request.createdAt).toLocaleDateString()}
+                                  {t('contingent.requested_on')} {new Date(request.createdAt).toLocaleDateString()}
                                 </span>
                               </div>
                             </div>
@@ -308,7 +352,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                                 onClick={() => handleUpdateRequest(request.id, 'REJECTED')}
                                 disabled={isLoading}
                               >
-                                <XCircle className="h-4 w-4 mr-1" /> Reject
+                                <XCircle className="h-4 w-4 mr-1" /> {t('contingent.reject')}
                               </Button>
                               <Button 
                                 size="sm" 
@@ -316,7 +360,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                                 onClick={() => handleUpdateRequest(request.id, 'APPROVED')}
                                 disabled={isLoading}
                               >
-                                <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                                <CheckCircle className="h-4 w-4 mr-1" /> {t('contingent.approve')}
                               </Button>
                             </div>
                           </div>
@@ -325,16 +369,6 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                     )}
                   </CardContent>
                 </Card>
-              )}
-              
-              {/* Pending status message */}
-              {selectedContingent.status === 'PENDING' && (
-                <Alert>
-                  <AlertTitle>Waiting for approval</AlertTitle>
-                  <AlertDescription>
-                    Your request to join this contingent is pending approval from the contingent manager.
-                  </AlertDescription>
-                </Alert>
               )}
             </div>
           ) : (
@@ -355,6 +389,45 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
   return (
     <div className="space-y-6">
       {renderContent()}
+      
+      {/* Leave Contingent Confirmation Dialog */}
+      {selectedContingent && (
+        <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Leave Contingent</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to leave the contingent "{selectedContingent.name}"?
+                This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-amber-600 text-sm">
+                {t('contingent.leave_note')}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLeaveDialogOpen(false)}>
+                {t('common.cancel')}
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleLeaveContingent}
+                disabled={isLeaving}
+              >
+                {isLeaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('contingent.leaving')}
+                  </>
+                ) : (
+                  t('contingent.leave')
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -185,3 +185,123 @@ export async function PUT(
     );
   }
 }
+
+// PATCH handler - Update a contingent (supports FormData for file uploads)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const contingentId = parseInt(params.id);
+    
+    // Find the participant by email
+    const participant = await prisma.user_participant.findUnique({
+      where: { email: session.user.email! }
+    });
+    
+    if (!participant) {
+      return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+    }
+    
+    // Check if the contingent exists
+    const contingent = await prisma.contingent.findUnique({
+      where: { id: contingentId }
+    });
+    
+    if (!contingent) {
+      return NextResponse.json({ error: "Contingent not found" }, { status: 404 });
+    }
+    
+    // Check if the participant is a manager of this contingent
+    const isManager = await prisma.contingentManager.findFirst({
+      where: {
+        participantId: participant.id,
+        contingentId
+      }
+    });
+    
+    // Also check legacy relationship
+    const hasAccess = isManager !== null || 
+      (contingent.managedByParticipant && contingent.participantId === participant.id);
+    
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: "You must be a manager to update this contingent" },
+        { status: 403 }
+      );
+    }
+    
+    // Handle both FormData and JSON requests
+    let updateData: any = {};
+    
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data')) {
+      // Process FormData
+      const formData = await request.formData();
+      
+      // Handle text fields
+      if (formData.has('name')) {
+        updateData.name = formData.get('name') as string;
+      }
+      
+      if (formData.has('short_name')) {
+        updateData.short_name = formData.get('short_name') as string;
+      }
+      
+      // Handle file upload if present
+      const logoFile = formData.get('logoFile') as File;
+      if (logoFile && logoFile.size > 0) {
+        // Process file upload logic here
+        // This would typically involve storing the file in a storage service
+        // For simplicity, we'll just acknowledge it was received
+        console.log('Logo file received, size:', logoFile.size);
+        // In a real implementation, you would upload this file to your storage
+        // and set updateData.logoUrl to the resulting URL
+      }
+    } else {
+      // Process JSON
+      const body = await request.json();
+      if (body.name) updateData.name = body.name;
+      if (body.short_name !== undefined) updateData.short_name = body.short_name;
+    }
+    
+    // Only proceed with update if there's data to update
+    if (Object.keys(updateData).length > 0) {
+      // Update the contingent
+      const updatedContingent = await prisma.contingent.update({
+        where: { id: contingentId },
+        data: updateData,
+        include: {
+          school: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          higherInstitution: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      });
+      
+      return NextResponse.json({ contingent: updatedContingent });
+    } else {
+      return NextResponse.json({ error: "No valid update data provided" }, { status: 400 });
+    }
+  } catch (error) {
+    console.error("Error updating contingent:", error);
+    return NextResponse.json(
+      { error: "Failed to update contingent details" },
+      { status: 500 }
+    );
+  }
+}

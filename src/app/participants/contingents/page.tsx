@@ -3,6 +3,24 @@ import { redirect } from "next/navigation";
 import ContingentManagerClient from "./_components/contingent-manager-client";
 import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
+import { ContingentPageHeader } from "./_components/contingent-page-header";
+
+// Main container without internationalized content
+function ContingentPageContent({ userId }: { userId: number }) {  
+  return (
+    <div className="container py-6 space-y-6">
+      <ContingentPageHeader />
+      
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-[50vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }>
+        <ContingentManagerClient userId={userId} />
+      </Suspense>
+    </div>
+  );
+}
 
 export default async function ContingentsPage() {
   // Get the current user
@@ -13,22 +31,5 @@ export default async function ContingentsPage() {
     redirect("/participants/auth/login");
   }
 
-  return (
-    <div className="container py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Contingent Management</h1>
-        <p className="text-muted-foreground">
-          Create, join, or manage your contingent for Techlympics 2025
-        </p>
-      </div>
-      
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-[50vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      }>
-        <ContingentManagerClient userId={(user as any).id} />
-      </Suspense>
-    </div>
-  );
+  return <ContingentPageContent userId={(user as any).id} />;
 }

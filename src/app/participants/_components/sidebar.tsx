@@ -27,8 +27,7 @@ export default function ParticipantSidebar({ user }: { user: UserInfo | null }) 
 
   return (
     <aside className="hidden lg:block w-64 border-r bg-gray-50 dark:bg-gray-900 overflow-y-auto min-h-full">
-      <div className="p-4 font-medium text-sm uppercase text-gray-500 dark:text-gray-400">{t('sidebar.explorer')}</div>
-      <div className="w-64 p-4 border-t">
+      <div className="w-64 p-4 border-b">
         <div className="flex items-center space-x-3">
           <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
             {user?.name?.charAt(0) || user?.username?.charAt(0) || 'G'}

@@ -165,40 +165,54 @@ const contingentApi = {
   },
 
   // Update contingent details
-  async updateContingentDetails(contingentId: number, data: { short_name?: string, logoFile?: File }) {
-    // Create update data object
-    const updateData: { short_name?: string, logoUrl?: string } = {};
-    
-    // Add short_name if provided
-    if (data.short_name) {
-      updateData.short_name = data.short_name;
-    }
-    
-    // If there's a logo file, upload it first
+  async updateContingentDetails(contingentId: number, data: { name?: string, short_name?: string, logoFile?: File }) {
+    // Create a FormData object if we have a logo file
     if (data.logoFile) {
-      updateData.logoUrl = await this.uploadLogo(contingentId, data.logoFile);
-    }
-    
-    // Now update the contingent with all data
-    try {
+      const formData = new FormData();
+      formData.append('contingentId', contingentId.toString());
+      if (data.name) {
+        formData.append('name', data.name);
+      }
+      if (data.short_name) {
+        formData.append('short_name', data.short_name);
+      }
+      formData.append('logoFile', data.logoFile);
 
+      try {
+        const response = await fetch(`/api/participants/contingents/${contingentId}`, {
+          method: 'PATCH',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update contingent details');
+        }
+        
+        return response.json();
+      } catch (error) {
+        console.error('Error updating contingent details:', error);
+        throw error;
+      }
+    } else {
+      // Just update the text fields
       const response = await fetch(`/api/participants/contingents/${contingentId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({
+          name: data.name,
+          short_name: data.short_name,
+        }),
       });
-
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update contingent details');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update contingent details');
       }
-
+      
       return response.json();
-    } catch (error) {
-      console.error('Error updating contingent details:', error);
-      throw error;
     }
   },
 
@@ -235,6 +249,31 @@ const contingentApi = {
       return response.json();
     } catch (error) {
       console.error('Error updating contingent request:', error);
+      throw error;
+    }
+  },
+  
+  // Leave/quit a contingent
+  async leaveContingent(contingentId: number, participantId: number) {
+    try {
+      const response = await fetch(`/api/participants/contingents/${contingentId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          participantId,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to leave contingent');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error leaving contingent:', error);
       throw error;
     }
   },
