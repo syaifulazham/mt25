@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser, hasRequiredRole, authenticateOrganizerApi } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
+// Force dynamic rendering - required for routes that use cookies
+export const dynamic = 'force-dynamic';
+
 // GET /api/organizer/contingents/[id]
 export async function GET(
   request: Request,
