@@ -52,6 +52,7 @@ interface TeamMember {
   email?: string;
   gender?: string;
   educationLevel?: string;
+  class?: string;
 }
 
 interface Team {
@@ -166,6 +167,68 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
         return 'bg-amber-500/20 text-amber-600 border-amber-500/20';
       default:
         return 'bg-blue-500/20 text-blue-600 border-blue-500/20';
+    }
+  };
+  
+  // Get gender badge color
+  const getGenderColor = (gender?: string) => {
+    if (!gender) return 'bg-gray-500/20 text-gray-600 border-gray-500/20';
+    
+    switch (gender.toUpperCase()) {
+      case 'MALE':
+        return 'bg-blue-500/20 text-blue-600 border-blue-500/20';
+      case 'FEMALE':
+        return 'bg-pink-500/20 text-pink-600 border-pink-500/20';
+      default:
+        return 'bg-gray-500/20 text-gray-600 border-gray-500/20';
+    }
+  };
+  
+  // Format class information based on education level and class data
+  const formatClassInfo = (member: TeamMember) => {
+    // First, check if we have any data
+    if (!member.educationLevel) return '—';
+    
+    // Get base education level for display
+    const educationDisplay = getEducationLevelText(member.educationLevel);
+    
+    // Get the education level in lowercase for comparison
+    const eduLevel = member.educationLevel.toLowerCase();
+    
+    // If we have the class data directly from the API, use it
+    if (member.class) {
+      // Determine the prefix based on education level
+      let prefix = '';
+      if (eduLevel === 'sekolah rendah') {
+        prefix = 'Tahun';
+      } else if (eduLevel === 'sekolah menengah') {
+        prefix = 'Tingkatan';
+      } else {
+        // For other education levels, just use the translated education level
+        return educationDisplay;
+      }
+      
+      // Concatenate prefix with the class data
+      return `${prefix} ${member.class}`;
+    }
+    
+    // If no class data is available, return the education level
+    return educationDisplay;
+  };
+  
+  // Original education level formatter
+  const getEducationLevelText = (level: string) => {
+    if (!level) return '—';
+    
+    switch (level?.toLowerCase()) {
+      case 'sekolah rendah':
+        return 'Primary School';
+      case 'sekolah menengah':
+        return 'Secondary School';
+      case 'belia':
+        return 'Youth';
+      default:
+        return level;
     }
   };
   
@@ -328,7 +391,9 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>IC Number</TableHead>
+                        <TableHead>Gender</TableHead>
                         <TableHead>Education</TableHead>
+                        <TableHead>Class</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Joined</TableHead>
                       </TableRow>
@@ -338,7 +403,17 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
                         <TableRow key={member.id}>
                           <TableCell className="font-medium">{member.contestantName}</TableCell>
                           <TableCell>{member.icNumber || "—"}</TableCell>
-                          <TableCell>{member.educationLevel || "—"}</TableCell>
+                          <TableCell>
+                            {member.gender ? (
+                              <Badge className={getGenderColor(member.gender)}>
+                                {member.gender.toUpperCase()}
+                              </Badge>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell>{getEducationLevelText(member.educationLevel || '')}</TableCell>
+                          <TableCell>{formatClassInfo(member)}</TableCell>
                           <TableCell>
                             <Badge className={getStatusColor(member.status)}>
                               {member.status}

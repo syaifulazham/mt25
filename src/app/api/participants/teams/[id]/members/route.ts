@@ -216,7 +216,9 @@ export async function POST(
                 edu_level: true,
                 email: true,
                 phoneNumber: true,
-                status: true
+                status: true,
+                class_grade: true,
+                class_name: true
               }
             }
           }
@@ -252,7 +254,9 @@ export async function POST(
       icNumber: member.contestant.ic,
       email: member.contestant.email,
       gender: member.contestant.gender,
-      educationLevel: member.contestant.edu_level
+      educationLevel: member.contestant.edu_level,
+      classGrade: member.contestant.class_grade,
+      className: member.contestant.class_name
     }));
     
     // Check if current user is a manager of this team
@@ -466,7 +470,9 @@ export async function DELETE(
                 edu_level: true,
                 email: true,
                 phoneNumber: true,
-                status: true
+                status: true,
+                class_grade: true,
+                class_name: true
               }
             }
           }
@@ -492,7 +498,7 @@ export async function DELETE(
     }
     
     // Format the members for the response
-    const formattedMembers = updatedTeam.members.map(member => ({
+    const formattedMembers = updatedTeam.members.map((member: any) => ({
       id: member.id,
       contestantId: member.contestantId,
       contestantName: member.contestant.name,
@@ -502,7 +508,9 @@ export async function DELETE(
       icNumber: member.contestant.ic,
       email: member.contestant.email,
       gender: member.contestant.gender,
-      educationLevel: member.contestant.edu_level
+      educationLevel: member.contestant.edu_level,
+      classGrade: member.contestant.class_grade,
+      className: member.contestant.class_name
     }));
     
     // Check if current user is a manager of this team

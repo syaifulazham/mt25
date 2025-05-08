@@ -62,6 +62,9 @@ interface TeamMember {
   email?: string;
   gender?: string;
   educationLevel?: string;
+  classGrade?: string;
+  className?: string;
+  class?: string;
 }
 
 interface Team {
@@ -349,7 +352,94 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     }
   };
   
+  // Get gender badge color
+  const getGenderColor = (gender?: string) => {
+    if (!gender) return 'bg-gray-500/20 text-gray-600 border-gray-500/20';
+    
+    switch (gender.toUpperCase()) {
+      case 'MALE':
+        return 'bg-blue-500/20 text-blue-600 border-blue-500/20';
+      case 'FEMALE':
+        return 'bg-pink-500/20 text-pink-600 border-pink-500/20';
+      default:
+        return 'bg-gray-500/20 text-gray-600 border-gray-500/20';
+    }
+  };
+  
+  // Format class information based on education level, class grade and class name
+  const formatClassInfo = (member: TeamMember) => {
+    // First, check if we have any data
+    if (!member.educationLevel) return '—';
+    
+    // Get base education level for display
+    const educationDisplay = getEducationLevelText(member.educationLevel);
+    
+    // Get the education level in lowercase for comparison
+    const eduLevel = member.educationLevel.toLowerCase();
+    
+    // If we have the class data directly from the API, use it
+    if (member.class) {
+      // Determine the prefix based on education level
+      let prefix = '';
+      if (eduLevel === 'sekolah rendah') {
+        prefix = 'Tahun';
+      } else if (eduLevel === 'sekolah menengah') {
+        prefix = 'Tingkatan';
+      } else {
+        // For other education levels, just use the translated education level
+        return educationDisplay;
+      }
+      
+      // Concatenate prefix with the class data
+      return `${prefix} ${member.class}`;
+    }
+    
+    // For backward compatibility, use the old method if class isn't available
+    // Determine the prefix based on education level
+    let prefix = '';
+    if (eduLevel === 'sekolah rendah') {
+      prefix = 'Tahun';
+    } else if (eduLevel === 'sekolah menengah') {
+      prefix = 'Tingkatan';
+    } else {
+      // For other education levels, just use the translated education level
+      return educationDisplay;
+    }
+    
+    // Use real data if available, otherwise use empty values
+    const grade = member.classGrade || '';
+    const className = member.className || '';
+    
+    // If we have no grade or class name information, just return the education level
+    if (!grade && !className) {
+      return educationDisplay;
+    }
+    
+    // Build the class string: prefix + grade + name
+    let classString = prefix;
+    
+    // Add grade if available
+    if (grade) {
+      classString += ' ' + grade;
+    }
+    
+    // Add class name if available
+    if (className) {
+      classString += ' ' + className;
+    }
+    
+    // If we only have the prefix, return the full education level instead
+    if (classString.trim() === prefix) {
+      return educationDisplay;
+    }
+    
+    return classString.trim();
+  };
+  
+  // Original education level formatter for the contestants list
   const getEducationLevelText = (level: string) => {
+    if (!level) return '—';
+    
     switch (level?.toLowerCase()) {
       case 'sekolah rendah':
         return 'Primary School';
@@ -358,7 +448,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       case 'belia':
         return 'Youth';
       default:
-        return level || 'Unknown';
+        return level;
     }
   };
   
@@ -458,10 +548,9 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
-                        <TableHead>IC Number</TableHead>
-                        <TableHead>Education</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Joined</TableHead>
+                        <TableHead>IC</TableHead>
+                        <TableHead>Class</TableHead>
+                        <TableHead>Gender</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -470,13 +559,16 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                         <TableRow key={member.id}>
                           <TableCell className="font-medium">{member.contestantName}</TableCell>
                           <TableCell>{member.icNumber || "—"}</TableCell>
-                          <TableCell>{member.educationLevel ? getEducationLevelText(member.educationLevel) : "—"}</TableCell>
+                          <TableCell>{formatClassInfo(member)}</TableCell>
                           <TableCell>
-                            <Badge className={getStatusColor(member.status)}>
-                              {member.status || "ACTIVE"}
-                            </Badge>
+                            {member.gender ? (
+                              <Badge className={getGenderColor(member.gender)}>
+                                {member.gender.toUpperCase()}
+                              </Badge>
+                            ) : (
+                              "—"
+                            )}
                           </TableCell>
-                          <TableCell>{formatDate(member.joinDate)}</TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"

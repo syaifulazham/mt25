@@ -81,7 +81,9 @@ export async function GET(
                 edu_level: true,
                 email: true,
                 phoneNumber: true,
-                status: true
+                status: true,
+                class_grade: true,
+                class_name: true
               }
             }
           }
@@ -158,7 +160,10 @@ export async function GET(
         icNumber: member.contestant.ic,
         email: member.contestant.email,
         gender: member.contestant.gender,
-        educationLevel: member.contestant.edu_level
+        educationLevel: member.contestant.edu_level,
+        class: member.contestant.class_grade 
+          ? `${member.contestant.class_grade}${member.contestant.class_name ? ` - ${member.contestant.class_name}` : ''}`
+          : member.contestant.class_name || 'N/A'
       })),
       isOwner: isOwner,
       isManager: isTeamManager || isContingentManager,
