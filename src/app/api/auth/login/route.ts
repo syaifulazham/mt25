@@ -29,13 +29,14 @@ export async function POST(request: NextRequest) {
       // Set auth cookie
       const cookieStore = cookies();
       
-      // Set cookie with more permissive settings for development
+      // Set cookie with production-friendly settings
       cookieStore.set(COOKIE_NAME, token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         maxAge: 60 * 60 * 8, // 8 hours
         path: '/',
-        sameSite: 'lax', // Changed from 'strict' to 'lax' for better compatibility
+        sameSite: 'lax', // Use 'lax' for better compatibility across browsers and environments
+        // Do not set domain to ensure it works on all environments
       });
 
       console.log('Auth cookie set successfully');

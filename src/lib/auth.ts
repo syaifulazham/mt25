@@ -145,36 +145,56 @@ export async function loginWithCredentials(credentials: LoginCredentials): Promi
 
 // Get current user from cookies
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const cookieStore = cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-
-  if (!token) {
-    return null;
-  }
-
-  const decoded = await verifyToken(token);
-  if (!decoded) {
-    return null;
-  }
-
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-    });
-
-    if (!user || !user.isActive) {
+    const cookieStore = cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value;
+    
+    if (!token) {
+      console.log('Authentication failed: No auth cookie found');
       return null;
     }
-
-    return {
-      id: user.id,
-      name: user.name || '',
-      email: user.email!, // Non-null assertion since email is required in the schema
-      role: user.role,
-      username: user.username,
-    };
+    
+    // Log the token existence (not the actual token for security)
+    console.log('Auth token found in cookie, attempting to verify...');
+    
+    const decoded = await verifyToken(token);
+    if (!decoded) {
+      console.log('Authentication failed: Invalid or expired token');
+      return null;
+    }
+    
+    console.log(`Token verified successfully for user ID: ${decoded.id}`);
+    
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+      });
+      
+      if (!user) {
+        console.log(`Authentication failed: User with ID ${decoded.id} not found`);
+        return null;
+      }
+      
+      if (!user.isActive) {
+        console.log(`Authentication failed: User with ID ${decoded.id} is not active`);
+        return null;
+      }
+      
+      console.log(`Authentication successful for ${user.username} (${user.role})`);
+      
+      return {
+        id: user.id,
+        name: user.name || '',
+        email: user.email!, // Non-null assertion since email is required in the schema
+        role: user.role,
+        username: user.username,
+      };
+    } catch (error) {
+      console.error(`Database error when looking up user: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
   } catch (error) {
-    console.error('Get current user error:', error);
+    console.error(`Unexpected error in getCurrentUser: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

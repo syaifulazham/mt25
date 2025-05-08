@@ -160,11 +160,16 @@ export function ContingentProvider({ children, contingentId }: {
       
       // Always try to fetch real data first, even in development mode
       
-      // Production mode - fetch real data
+      // Get the auth token from localStorage if available (we'll need to implement this in the login flow)
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('techlympics-auth-token') : null;
+      
+      // Production mode - fetch real data with fallback authentication
       const response = await fetch(`/api/organizer/contingents/${numericId}`, {
         credentials: 'include', // This ensures cookies are sent with the request
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          // Include Authorization header as fallback if token exists in localStorage
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         }
       });
       
@@ -245,11 +250,16 @@ export function ContingentProvider({ children, contingentId }: {
       
       // Always try to fetch real data first, even in development mode
       
-      // Try to fetch real data
+      // Get the auth token from localStorage if available
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('techlympics-auth-token') : null;
+      
+      // Try to fetch real data with fallback authentication
       const response = await fetch(`/api/organizer/contingents/${numericId}/contestants`, {
         credentials: 'include', // This ensures cookies are sent with the request
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          // Include Authorization header as fallback if token exists
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         }
       });
       
@@ -330,11 +340,16 @@ export function ContingentProvider({ children, contingentId }: {
       
       // Always try to fetch real data first, even in development mode
       
-      // Production mode - fetch real data
+      // Get the auth token from localStorage if available
+      const authToken = typeof localStorage !== 'undefined' ? localStorage.getItem('techlympics-auth-token') : null;
+      
+      // Production mode - fetch real data with fallback authentication
       const response = await fetch(`/api/organizer/contingents/${numericId}/teams`, {
         credentials: 'include', // This ensures cookies are sent with the request
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          // Include Authorization header as fallback if token exists
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
         }
       });
       
