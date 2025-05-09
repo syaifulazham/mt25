@@ -5,6 +5,8 @@ import Link from "next/link";
 import MTLogo from "@/lib/images/techlympics-white.png"
 import ThemesSection from "./_components/themes-section";
 import AnnouncementSection from "./_components/announcement-section";
+import GallerySection from "./_components/gallery-section";
+import GalleryCarousel from "./_components/gallery-carousel";
 import NewsSection from "./_components/news-section";
 import PartnersSection from "./_components/partners-section";
 import { useLanguage } from "@/lib/i18n/language-context";
@@ -85,22 +87,7 @@ export default function Home() {
             </Link>
           </div>
         </div>
-        <div className="md:w-1/2 relative">
-          <div className="w-full h-64 md:h-96 bg-gradient-to-br from-blue-400 to-purple-600 rounded-2xl relative overflow-hidden shadow-2xl">
-            <div className="absolute inset-0 bg-black opacity-10"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-[90%] h-[90%] relative">
-                {/* Olympic-inspired rings with tech twist */}
-                <div className="absolute w-full h-full flex items-center justify-center">
-                  <Image src={MTLogo} alt="Techlympics Logo" className="w-full h-full object-contain" />
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-4 right-4 text-xs md:text-sm text-white opacity-70">
-              Techlympics 2025
-            </div>
-          </div>
-        </div>
+        <GalleryCarousel />
       </section>
 
       {/* Competition Themes Section */}
@@ -108,6 +95,9 @@ export default function Home() {
 
       {/* Announcement Section */}
       <AnnouncementSection />
+
+      {/* Gallery Section */}
+      <GallerySection />
 
       {/* News Section */}
       <NewsSection />
