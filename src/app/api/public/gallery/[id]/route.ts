@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
+// Mark this route as dynamic to fix the build error
+export const dynamic = 'force-dynamic';
+
 // GET /api/public/gallery/[id] - Get a gallery by ID (public, no auth required)
 export async function GET(
   request: NextRequest,
