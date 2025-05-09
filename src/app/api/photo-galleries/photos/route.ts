@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if gallery exists
-    const gallery = await prisma.photoGallery.findUnique({
+    const gallery = await prisma.photogallery.findUnique({
       where: { id: galleryId },
     });
 
