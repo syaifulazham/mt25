@@ -30,6 +30,33 @@ type News = {
 // Fallback image for when the actual image is missing
 const fallbackImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23334155'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='20' text-anchor='middle' alignment-baseline='middle' fill='%2394a3b8'%3ENo Image%3C/text%3E%3C/svg%3E";
 
+// Helper function to normalize image paths
+const normalizeImagePath = (path: string | null | undefined): string => {
+  if (!path) return fallbackImage;
+  
+  // If it's already a data URL or absolute URL, return as is
+  if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  
+  // Ensure path starts with /
+  if (!path.startsWith('/')) {
+    path = `/${path}`;
+  }
+  
+  // For production environment, we might need to add the base URL
+  // This handles cases where the image might be stored in a different location
+  if (process.env.NODE_ENV === 'production') {
+    // Check if we're using a base path in production
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    if (basePath && !path.startsWith(basePath)) {
+      return `${basePath}${path}`;
+    }
+  }
+  
+  return path;
+};
+
 export default function NewsSection() {
   const { t } = useLanguage();
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
@@ -195,11 +222,13 @@ export default function NewsSection() {
               <div className="bg-gray-800 bg-opacity-50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all">
                 <div className="relative h-80 w-full">
                   <Image 
-                    src={imageErrors[featuredNews.id] ? fallbackImage : (featuredNews.coverImage || fallbackImage)} 
+                    src={imageErrors[featuredNews.id] ? fallbackImage : normalizeImagePath(featuredNews.coverImage)} 
                     alt={featuredNews.title}
                     fill
                     className="object-cover"
                     onError={() => handleImageError(featuredNews.id)}
+                    unoptimized={featuredNews.coverImage?.startsWith('data:') || false}
+                    priority
                   />
                 </div>
                 <div className="p-6">
@@ -214,7 +243,7 @@ export default function NewsSection() {
                       <span>{featuredNews.readTime || calculateReadTime(featuredNews.content)}</span>
                     </div>
                     <Link 
-                      href={`/news/${featuredNews.slug}`} 
+                      href={`/news/${featuredNews.id}`} 
                       className="text-blue-400 hover:text-blue-300 flex items-center transition-colors"
                     >
                       {t('news.readMore')} <ArrowRight className="h-4 w-4 ml-1" />
@@ -232,15 +261,16 @@ export default function NewsSection() {
               <div key={news.id} className="flex space-x-4 group">
                 <div className="relative w-24 h-24 bg-gray-800 rounded-lg overflow-hidden flex-shrink-0">
                   <Image 
-                    src={imageErrors[news.id] ? fallbackImage : (news.coverImage || fallbackImage)} 
+                    src={imageErrors[news.id] ? fallbackImage : normalizeImagePath(news.coverImage)} 
                     alt={news.title}
                     fill
                     className="object-cover"
                     onError={() => handleImageError(news.id)}
+                    unoptimized={news.coverImage?.startsWith('data:') || false}
                   />
                 </div>
                 <div className="flex-1">
-                  <Link href={`/news/${news.slug}`} className="block">
+                  <Link href={`/news/${news.id}`} className="block">
                     <h4 className="font-semibold group-hover:text-blue-400 transition-colors">{news.title}</h4>
                     <p className="text-gray-400 text-sm mt-1 line-clamp-2">{news.excerpt}</p>
                   </Link>

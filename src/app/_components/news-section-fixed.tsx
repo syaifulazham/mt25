@@ -214,7 +214,7 @@ export default function NewsSection() {
                       <span>{featuredNews.readTime || calculateReadTime(featuredNews.content)}</span>
                     </div>
                     <Link 
-                      href={`/news/${featuredNews.slug}`} 
+                      href={`/news/${featuredNews.id}`} 
                       className="text-blue-400 hover:text-blue-300 flex items-center transition-colors"
                     >
                       {t('news.readMore')} <ArrowRight className="h-4 w-4 ml-1" />
@@ -240,7 +240,7 @@ export default function NewsSection() {
                   />
                 </div>
                 <div className="flex-1">
-                  <Link href={`/news/${news.slug}`} className="block">
+                  <Link href={`/news/${news.id}`} className="block">
                     <h4 className="font-semibold group-hover:text-blue-400 transition-colors">{news.title}</h4>
                     <p className="text-gray-400 text-sm mt-1 line-clamp-2">{news.excerpt}</p>
                   </Link>

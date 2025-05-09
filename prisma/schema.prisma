@@ -264,6 +264,35 @@ model news {
   @@index([userId], map: "News_userId_fkey")
 }
 
+model photoGallery {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  coverPhoto  String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      Int
+  user        user     @relation(fields: [userId], references: [id], map: "PhotoGallery_userId_fkey")
+  photos      photo[]
+
+  @@index([userId], map: "PhotoGallery_userId_fkey")
+}
+
+model photo {
+  id           Int         @id @default(autoincrement())
+  path         String      // URL or path to the photo
+  title        String?
+  description  String?     @db.Text
+  sortOrder    Int         @default(0)
+  galleryId    Int
+  gallery      photoGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([galleryId])
+}
+
 model notification {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -402,6 +431,7 @@ model user {
   news         news[]
   notification notification[]
   submission   submission[]
+  photoGalleries photoGallery[]
 }
 
 model user_participant {

@@ -191,7 +191,7 @@ export const authOptions: NextAuthOptions = {
             participant = await prisma.user_participant.create({
               data: {
                 email: profile.email,
-                name: profile.name,
+                name: profile.name || '',
                 username: profile.email, // Use email as username for now
                 isActive: true,
                 updatedAt: new Date()

@@ -6,6 +6,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { NewsManagement } from "@/app/organizer/content/_components/news-management";
 import { AnnouncementManagement } from "@/app/organizer/content/_components/announcement-management";
+import { PhotoGalleryManagement } from "@/app/organizer/content/_components/photo-gallery-management";
 
 export default function ContentManagementPage() {
   const [activeTab, setActiveTab] = useState("news");
@@ -27,12 +28,16 @@ export default function ContentManagementPage() {
         <TabsList>
           <TabsTrigger value="news">News Articles</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
+          <TabsTrigger value="galleries">Photo Galleries</TabsTrigger>
         </TabsList>
         <TabsContent value="news" className="space-y-4">
           <NewsManagement />
         </TabsContent>
         <TabsContent value="announcements" className="space-y-4">
           <AnnouncementManagement />
+        </TabsContent>
+        <TabsContent value="galleries" className="space-y-4">
+          <PhotoGalleryManagement />
         </TabsContent>
       </Tabs>
     </DashboardShell>

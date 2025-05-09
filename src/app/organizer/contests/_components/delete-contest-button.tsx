@@ -18,11 +18,11 @@ import { Loader2, Trash2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface DeleteContestButtonProps {
-  contestId: number;
-  contestName: string;
+  id: number;
+  name: string;
 }
 
-export default function DeleteContestButton({ contestId, contestName }: DeleteContestButtonProps) {
+export default function DeleteContestButton({ id, name }: DeleteContestButtonProps) {
   const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function DeleteContestButton({ contestId, contestName }: DeleteCo
     try {
       setIsDeleting(true);
       
-      const response = await fetch(`/api/contests/${contestId}`, {
+      const response = await fetch(`/api/contests/${id}`, {
         method: 'DELETE',
       });
 
@@ -40,7 +40,7 @@ export default function DeleteContestButton({ contestId, contestName }: DeleteCo
         throw new Error(error.error || 'Failed to delete contest');
       }
 
-      toast.success(`Contest "${contestName}" has been deleted`);
+      toast.success(`Contest "${name}" has been deleted`);
       router.refresh(); // Refresh the page to update the contest list
     } catch (error: any) {
       toast.error(error.message || 'An error occurred while deleting the contest');
@@ -76,7 +76,7 @@ export default function DeleteContestButton({ contestId, contestName }: DeleteCo
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to delete this contest?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the contest "{contestName}" and all associated data. 
+              This will permanently delete the contest "{name}" and all associated data. 
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
