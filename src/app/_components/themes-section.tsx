@@ -33,6 +33,15 @@ type Contest = {
     color?: string | null;
     logoPath?: string | null;
   };
+  targetgroups: {
+    id: string | number;
+    name: string;
+    minAge?: number;
+    maxAge?: number;
+    schoolLevel: string;
+    ageGroup?: string;
+    code?: string;
+  }[];
 };
 
 // Placeholder themes (will be replaced with real data fetched client-side)
@@ -82,8 +91,12 @@ async function getContestsByTheme(themeId: string | number) {
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const data = await response.json();
-    return data;
+    
+    const contests = await response.json();
+    console.log('Raw contest data from API:', contests);
+    
+    // Make sure the API response is correctly structured
+    return contests;
   } catch (error) {
     console.error("Error fetching contests:", error);
     return [];
@@ -96,6 +109,14 @@ export default function ThemesSection() {
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [themeContests, setThemeContests] = useState<Contest[]>([]);
+  
+  // Helper function to log data for debugging
+  const logContestData = (data: Contest[]) => {
+    console.log('Contest data loaded:', data);
+    if (data.length > 0) {
+      console.log('First contest target group:', data[0].targetgroup);
+    }
+  };
   const [isLoadingContests, setIsLoadingContests] = useState(false);
   
   // Fetch themes on component mount
@@ -113,16 +134,17 @@ export default function ThemesSection() {
   }, []);
   
   // Handle opening the modal with contests for a specific theme
-  const handleViewCompetitions = async (theme: Theme) => {
+  async function handleViewCompetitions(theme: Theme) {
     setSelectedTheme(theme);
     setIsModalOpen(true);
     setIsLoadingContests(true);
     
     try {
-      const contests = await getContestsByTheme(theme.id);
-      setThemeContests(contests);
+      const contestData = await getContestsByTheme(theme.id);
+      logContestData(contestData); // Log data for debugging
+      setThemeContests(contestData);
     } catch (error) {
-      console.error('Error fetching contests for theme:', error);
+      console.error("Error loading contests:", error);
       setThemeContests([]);
     } finally {
       setIsLoadingContests(false);
@@ -253,31 +275,64 @@ export default function ThemesSection() {
               </div>
             ) : themeContests.length > 0 ? (
               <div className="space-y-4">
-                {themeContests.map((contest) => (
-                  <div 
-                    key={contest.id} 
-                    className="bg-black bg-opacity-20 rounded-lg p-4 hover:bg-opacity-30 transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-lg">{contest.name}</h3>
-                      <span 
-                        className="px-2 py-1 text-xs rounded-full" 
-                        style={{ 
-                          backgroundColor: `${contest.theme?.color || '#4338ca'}20`,
-                          color: contest.theme?.color || '#4338ca'
-                        }}
-                      >
-                        {contest.contestType}
-                      </span>
+                {themeContests.map((contest) => {
+                  // More detailed debug output for understanding the data structure
+                  console.log(`Contest ${contest.id}:`, {
+                    id: contest.id,
+                    name: contest.name,
+                    targetgroups: contest.targetgroups
+                  });
+                  
+                  return (
+                    <div 
+                      key={contest.id} 
+                      className="bg-black bg-opacity-20 rounded-lg p-4 hover:bg-opacity-30 transition-all"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-lg">{contest.name}</h3>
+                        <span 
+                          className="px-2 py-1 text-xs rounded-full" 
+                          style={{ 
+                            backgroundColor: `${contest.theme?.color || '#4338ca'}20`,
+                            color: contest.theme?.color || '#4338ca'
+                          }}
+                        >
+                          {contest.contestType}
+                        </span>
+                      </div>
+                      <p className="text-gray-300 text-sm mb-3 line-clamp-2">{contest.description}</p>
+                      <div className="flex flex-col space-y-2">
+                        <div className="flex items-center">
+                          <span className="text-xs text-gray-400">
+                            {contest.participation_mode === "INDIVIDUAL" ? "Individual" : "Team"} participation
+                          </span>
+                        </div>
+                        
+                        {/* Target Group Information - Now using targetgroups array */}
+                        {contest.targetgroups && contest.targetgroups.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {/* School Level Badge */}
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-900/50 text-indigo-300">
+                              <span className="font-medium">Level:</span> {contest.targetgroups[0].schoolLevel}
+                            </span>
+                            
+                            {/* Target Group Name Badge */}
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-purple-900/50 text-purple-300">
+                              <span className="font-medium">Group:</span> {contest.targetgroups[0].name}
+                            </span>
+                            
+                            {/* Age Group Badge - Only show when it exists */}
+                            {contest.targetgroups[0].ageGroup && (
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-900/50 text-blue-300">
+                                <span className="font-medium">Age:</span> {contest.targetgroups[0].ageGroup}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-gray-300 text-sm mb-3 line-clamp-2">{contest.description}</p>
-                    <div className="flex items-center">
-                      <span className="text-xs text-gray-400">
-                        {contest.participation_mode === "INDIVIDUAL" ? "Individual" : "Team"} participation
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12">
