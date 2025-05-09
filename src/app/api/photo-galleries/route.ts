@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Count total galleries matching the filter
-    const totalGalleries = await prisma.photoGallery.count({
+    const totalGalleries = await prisma.photogallery.count({
       where: whereClause,
     });
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const totalPages = Math.ceil(totalGalleries / pageSize);
 
     // Get galleries with pagination
-    const galleries = await prisma.photoGallery.findMany({
+    const galleries = await prisma.photogallery.findMany({
       where: whereClause,
       orderBy: {
         createdAt: "desc",
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new gallery
-    const gallery = await prisma.photoGallery.create({
+    const gallery = await prisma.photogallery.create({
       data: {
         title: data.title,
         description: data.description,

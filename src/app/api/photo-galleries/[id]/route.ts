@@ -22,7 +22,7 @@ export async function GET(
     }
 
     // Get the gallery with photos
-    const gallery = await prisma.photoGallery.findUnique({
+    const gallery = await prisma.photogallery.findUnique({
       where: { id: galleryId },
       include: {
         photos: {
@@ -72,7 +72,7 @@ export async function PATCH(
     const data = await request.json();
     
     // Check if gallery exists and belongs to the user
-    const existingGallery = await prisma.photoGallery.findUnique({
+    const existingGallery = await prisma.photogallery.findUnique({
       where: { id: galleryId },
     });
 
@@ -92,7 +92,7 @@ export async function PATCH(
     }
 
     // Update the gallery
-    const updatedGallery = await prisma.photoGallery.update({
+    const updatedGallery = await prisma.photogallery.update({
       where: { id: galleryId },
       data: {
         title: data.title !== undefined ? data.title : undefined,
@@ -133,7 +133,7 @@ export async function DELETE(
     }
 
     // Check if gallery exists
-    const existingGallery = await prisma.photoGallery.findUnique({
+    const existingGallery = await prisma.photogallery.findUnique({
       where: { id: galleryId },
     });
 
@@ -151,7 +151,7 @@ export async function DELETE(
     });
 
     // Delete the gallery
-    await prisma.photoGallery.delete({
+    await prisma.photogallery.delete({
       where: { id: galleryId },
     });
 
