@@ -264,7 +264,7 @@ model news {
   @@index([userId], map: "News_userId_fkey")
 }
 
-model photoGallery {
+model photogallery {
   id          Int      @id @default(autoincrement())
   title       String
   description String?  @db.Text
@@ -286,7 +286,7 @@ model photo {
   description  String?     @db.Text
   sortOrder    Int         @default(0)
   galleryId    Int
-  gallery      photoGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  gallery      photogallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -431,7 +431,7 @@ model user {
   news         news[]
   notification notification[]
   submission   submission[]
-  photoGalleries photoGallery[]
+  photogalleries photogallery[]
 }
 
 model user_participant {
