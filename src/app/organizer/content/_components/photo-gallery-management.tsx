@@ -119,6 +119,30 @@ export function PhotoGalleryManagement() {
   const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | null>(null);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  
+  // Temporary fix to force image reload and fix cache issues
+  useEffect(() => {
+    // Wait for component to be fully rendered
+    const timer = setTimeout(() => {
+      // Force reload all images to fix caching issues
+      const images = document.querySelectorAll('img');
+      images.forEach(img => {
+        const currentSrc = img.src;
+        if (currentSrc) {
+          // Add a cache-busting parameter
+          const cacheBuster = `?t=${Date.now()}`;
+          // Check if the URL already has query parameters
+          const newSrc = currentSrc.includes('?') 
+            ? `${currentSrc}&cb=${Date.now()}` 
+            : `${currentSrc}${cacheBuster}`;
+          img.src = newSrc;
+        }
+      });
+      console.log('Applied image cache-busting fix');
+    }, 1000); // Wait 1 second after render
+    
+    return () => clearTimeout(timer);
+  }, [filteredGalleries]); // Run when filtered galleries change
   const [photoTitles, setPhotoTitles] = useState<(string | null)[]>([]);
   const [photoDescriptions, setPhotoDescriptions] = useState<(string | null)[]>([]);
   
