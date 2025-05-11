@@ -15,8 +15,17 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Techlympics 2025",
-  description: "Where Technology Meets Olympic Spirit",
+  title: "Malaysia Techlympics 2025",
+  description: "Luar Biasa, Global, Inklusif",
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: [
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({
