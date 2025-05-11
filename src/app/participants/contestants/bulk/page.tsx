@@ -193,50 +193,79 @@ export default function BulkUploadPage() {
     setIsUploading(true);
     setUploadProgress(0);
     
-    // Create a FormData object to send the validated data
-    const formData = new FormData();
-    
     // Only include valid records
     const validRecords = validationResult.records
       .filter(record => record.isValid)
       .map(record => record.validatedData);
     
-    formData.append('data', JSON.stringify(validRecords));
+    // Split records into batches of 50
+    const BATCH_SIZE = 50;
+    const batches = [];
+    for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
+      batches.push(validRecords.slice(i, i + BATCH_SIZE));
+    }
     
-    // No need to add contingent ID as it's now handled by the API
-
+    // Track overall results
+    const overallResults = {
+      success: 0,
+      errors: [] as Array<{ row: number; message: string }>,
+      contingent: ''
+    };
+    
     try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 5;
+      let batchesCompleted = 0;
+      let totalBatches = batches.length;
+      
+      // Upload each batch sequentially
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        const formData = new FormData();
+        formData.append('data', JSON.stringify(batch));
+        
+        // Update progress based on batches completed
+        setUploadProgress(Math.floor((batchesCompleted / totalBatches) * 100));
+        
+        // Show toast for each batch
+        toast.info(`${t('contestant.bulk.uploading_batch')} ${i+1}/${totalBatches} (${batch.length} ${t('contestant.bulk.records')})`);
+        
+        // Send this batch to the API
+        const response = await fetch('/api/participants/contestants/bulk-upload', {
+          method: 'POST',
+          body: formData,
         });
-      }, 200);
 
-      // Send the data to the upload API
-      const response = await fetch('/api/participants/contestants/bulk-upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        toast.error(errorData.error || t('contestant.bulk.error_upload'));
-        setIsUploading(false);
-        return;
+        if (!response.ok) {
+          const errorData = await response.json();
+          toast.error(`${t('contestant.bulk.error_batch')} ${i+1}: ${errorData.error || t('contestant.bulk.error_upload')}`);
+          // Continue with next batch despite error
+        } else {
+          const data = await response.json();
+          
+          // Add results from this batch to overall results
+          overallResults.success += data.success;
+          if (data.errors && Array.isArray(data.errors)) {
+            overallResults.errors = [...overallResults.errors, ...data.errors];
+          }
+          if (!overallResults.contingent && data.contingent) {
+            overallResults.contingent = data.contingent;
+          }
+          
+          toast.success(`${t('contestant.bulk.batch_success')} ${i+1}: ${data.success} ${t('contestant.bulk.records_uploaded')}`);
+        }
+        
+        batchesCompleted++;
+        setUploadProgress(Math.floor((batchesCompleted / totalBatches) * 100));
+        
+        // Small delay between batches to avoid overwhelming the server
+        if (i < batches.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
-
-      const data = await response.json();
-      setUploadResult(data);
+      
+      setUploadProgress(100);
+      setUploadResult(overallResults);
       setActiveStep('confirm');
-      toast.success(t('contestant.bulk.success_upload').replace('{count}', data.success.toString()));
+      toast.success(t('contestant.bulk.success_upload').replace('{count}', overallResults.success.toString()));
     } catch (error) {
       console.error('Error uploading data:', error);
       toast.error(t('contestant.bulk.error_uploading'));
