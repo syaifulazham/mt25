@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import DevAuthProvider from "@/components/dev/auth-provider";
 import AuthSessionProvider from "@/providers/session-provider";
 import { LanguageProvider } from "@/lib/i18n/language-context";
+import { CookieConsent } from "@/components/cookie-consent";
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -34,6 +35,7 @@ export default function RootLayout({
           <LanguageProvider>
             <DevAuthProvider>
               {children}
+              <CookieConsent />
             </DevAuthProvider>
           </LanguageProvider>
         </AuthSessionProvider>
