@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/lib/i18n/language-context';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/lib/i18n/client';
 import { useDropzone } from 'react-dropzone';
 import { useCommonTranslations } from './common-translations';
 import { Button } from '@/components/ui/button';

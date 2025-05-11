@@ -105,16 +105,16 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || t('contestant.edit.error_update'));
+        throw new Error(errorData.error || t('contestant.edit.error_updating'));
       }
       
       const updatedContestant = await response.json();
       onUpdate(updatedContestant);
-      toast.success(t('contestant.edit.success_update'));
+      toast.success(t('contestant.edit.success_updating'));
       setIsOpen(false);
     } catch (error) {
       console.error('Error updating contestant:', error);
-      toast.error(error instanceof Error ? error.message : t('contestant.edit.error_update'));
+      toast.error(error instanceof Error ? error.message : t('contestant.edit.error_updating'));
     } finally {
       setIsSubmitting(false);
     }

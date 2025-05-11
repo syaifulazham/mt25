@@ -236,7 +236,7 @@ export default function GalleryCarousel() {
   }
 
   return (
-    <div className="md:w-1/2 relative">
+    <div className="md:w-full relative">
       <div className="w-full h-64 md:h-96 bg-gradient-to-br from-blue-400 to-purple-600 rounded-2xl relative overflow-hidden shadow-2xl">
         <div className="absolute inset-0 bg-black opacity-10"></div>
         
