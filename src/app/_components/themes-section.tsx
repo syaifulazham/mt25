@@ -255,11 +255,11 @@ export default function ThemesSection() {
                     alt="" 
                     width={24} 
                     height={24} 
-                    className="object-contain"
+                    className="object-contain min-w-8 min-h-8 mr-6"
                   />
                 </div>
               )}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500 pl-6">
                 {selectedTheme?.name} Competitions
               </span>
             </DialogTitle>
