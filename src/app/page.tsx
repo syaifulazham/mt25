@@ -52,10 +52,10 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <LanguageSwitcher />
             <div className="hidden md:flex flex-wrap gap-2 sm:gap-4">
-              <Link href="/participants/auth/login" className="text-sm sm:text-base px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all whitespace-nowrap">
+              <Link href="/auth/participants/login" className="text-sm sm:text-base px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all whitespace-nowrap">
                 {t('nav.login')}
               </Link>
-              <Link href="/participants/auth/register" className="text-sm sm:text-base px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all whitespace-nowrap">
+              <Link href="/auth/participants/login" className="text-sm sm:text-base px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all whitespace-nowrap">
                 {t('nav.register')}
               </Link>
             </div>
@@ -125,14 +125,14 @@ export default function Home() {
             </Link>
             <div className="flex justify-evenly mt-2 pt-2 border-t border-white/20">
               <Link 
-                href="/participants/auth/login" 
+                href="/auth/participants/login" 
                 className="text-sm px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {t('nav.login')}
               </Link>
               <Link 
-                href="/participants/auth/register" 
+                href="/auth/participants/login" 
                 className="text-sm px-4 py-2 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -161,7 +161,7 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link 
-                href="/participants/auth/register" 
+                href="/auth/participants/login" 
                 className="text-center px-6 sm:px-8 py-3 rounded-full bg-gradient-to-r from-yellow-400 to-red-500 hover:from-yellow-500 hover:to-red-600 transition-all font-medium text-sm sm:text-base w-full sm:w-auto"
               >
                 {t('hero.cta.register')}

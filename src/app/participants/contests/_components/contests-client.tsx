@@ -118,12 +118,12 @@ export default function ContestsClient() {
                     >
                       {contest.contestType}
                     </Badge>
-                    <CardDescription className="line-clamp-2 mt-2">
-                      {contest.description}
-                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="flex items-center text-sm text-muted-foreground">
+                  <CardContent className="pt-0">
+                    <div className="prose prose-sm prose-slate max-w-none mb-4">
+                      <p className="text-muted-foreground">{contest.description}</p>
+                    </div>
+                    <div className="flex items-center text-sm text-muted-foreground mt-3 border-t pt-3">
                       <Users 
                         className="h-4 w-4 mr-2" 
                         style={{ color: `${getThemeColor(contest)}70` }} 
@@ -131,29 +131,6 @@ export default function ContestsClient() {
                       <span>{contest.participation_mode === "INDIVIDUAL" ? "Individual" : "Team"} participation</span>
                     </div>
                   </CardContent>
-                  <CardFooter>
-                    <Button 
-                      variant="outline" 
-                      asChild 
-                      className="w-full hover:text-white"
-                      style={{ 
-                        borderColor: getThemeColor(contest), 
-                        color: getThemeColor(contest),
-                        "--hover-bg": getThemeColor(contest)
-                      } as React.CSSProperties}
-                      onMouseOver={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = getThemeColor(contest);
-                      }}
-                      onMouseOut={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
-                      }}
-                    >
-                      <Link href={`/participants/contests/${contest.id}`}>
-                        <span>View Details</span>
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Link>
-                    </Button>
-                  </CardFooter>
                 </Card>
               ))}
             </div>

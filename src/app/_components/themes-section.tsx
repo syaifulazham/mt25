@@ -114,7 +114,7 @@ export default function ThemesSection() {
   const logContestData = (data: Contest[]) => {
     console.log('Contest data loaded:', data);
     if (data.length > 0) {
-      console.log('First contest target group:', data[0].targetgroup);
+      //console.log('First contest target group:', data[0].targetgroup);
     }
   };
   const [isLoadingContests, setIsLoadingContests] = useState(false);
@@ -290,15 +290,7 @@ export default function ThemesSection() {
                     >
                       <div className="flex justify-between items-start mb-2">
                         <h3 className="font-medium text-lg">{contest.name}</h3>
-                        <span 
-                          className="px-2 py-1 text-xs rounded-full" 
-                          style={{ 
-                            backgroundColor: `${contest.theme?.color || '#4338ca'}20`,
-                            color: contest.theme?.color || '#4338ca'
-                          }}
-                        >
-                          {contest.contestType}
-                        </span>
+                        
                       </div>
                       <p className="text-gray-300 text-sm mb-3 line-clamp-2">{contest.description}</p>
                       <div className="flex flex-col space-y-2">
@@ -321,12 +313,7 @@ export default function ThemesSection() {
                               <span className="font-medium">Group:</span> {contest.targetgroups[0].name}
                             </span>
                             
-                            {/* Age Group Badge - Only show when it exists */}
-                            {contest.targetgroups[0].ageGroup && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-900/50 text-blue-300">
-                                <span className="font-medium">Age:</span> {contest.targetgroups[0].ageGroup}
-                              </span>
-                            )}
+                            
                           </div>
                         )}
                       </div>

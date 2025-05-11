@@ -3,8 +3,8 @@ import ParticipantLoginClient from './client';
 
 // Define metadata for SEO
 export const metadata = {
-  title: "Login | Participant Portal",
-  description: "Login to the Techlympics 2025 Participant Portal",
+  title: "Techlympics 2025 | Login",
+  description: "Extraordinary, Global, Inclusive - Login to the Techlympics 2025 Platform",
 };
 
 // Mark this page as dynamic to ensure fresh authentication state
