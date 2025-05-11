@@ -13,7 +13,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, School, GraduationCap, User } from "lucide-react";
 import Link from "next/link";
-import { useLanguage } from "@/lib/i18n/language-context";
+import { useLanguage } from '@/lib/i18n/language-context';
+import { useCommonTranslations } from '../_components/common-translations';
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ export default function NewContestantPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { t } = useLanguage(); // Initialize language context
+  const commonT = useCommonTranslations();
   
   const [isLoading, setIsLoading] = useState(false);
   const [contingents, setContingents] = useState<Contingent[]>([]);
@@ -486,7 +488,7 @@ export default function NewContestantPage() {
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button variant="outline" type="button" onClick={() => router.push('/participants/contestants')}>
-              {t('common.cancel')}
+              {commonT.cancel}
             </Button>
             <Button type="submit" disabled={isLoading}>
               {isLoading ? (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/lib/i18n/language-context";
+import { useCommonTranslations } from './common-translations';
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -41,9 +42,10 @@ interface AssignContestsModalProps {
 export default function AssignContestsModal({ 
   contestantId, 
   contestantName,
-  onSuccess 
+  onSuccess
 }: AssignContestsModalProps) {
   const { t } = useLanguage();
+  const commonT = useCommonTranslations();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -237,7 +239,7 @@ export default function AssignContestsModal({
               onClick={() => setIsOpen(false)}
               disabled={isLoading}
             >
-              {t('common.cancel')}
+              {commonT.cancel}
             </Button>
             <Button
               onClick={handleSave}

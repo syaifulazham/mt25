@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useCommonTranslations } from './common-translations';
 import { useLanguage } from "@/lib/i18n/language-context";
 import { Button } from "@/components/ui/button";
 import { 
@@ -16,6 +17,7 @@ import { Award, Loader2 } from "lucide-react";
 
 export default function BulkAssignContests() {
   const { t } = useLanguage(); // Initialize language context
+  const commonT = useCommonTranslations();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
@@ -115,7 +117,7 @@ export default function BulkAssignContests() {
               onClick={() => setIsOpen(false)}
               disabled={isLoading}
             >
-              {t('common.cancel')}
+              {commonT.cancel}
             </Button>
             <Button
               onClick={handleBulkAssign}

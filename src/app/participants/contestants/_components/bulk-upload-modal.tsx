@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/lib/i18n/language-context';
+import { useTranslation } from 'react-i18next';
 import { useDropzone } from 'react-dropzone';
+import { useCommonTranslations } from './common-translations';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,7 +43,9 @@ interface ValidationResult {
 }
 
 export default function BulkUploadModal() {
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const { t } = useTranslation();
+  const commonT = useCommonTranslations();
   const [isOpen, setIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -703,7 +707,7 @@ export default function BulkUploadModal() {
         return (
           <>
             <Button variant="outline" onClick={closeModal}>
-              {t('common.cancel')}
+              {commonT.cancel}
             </Button>
             <Button 
               onClick={validateFile} 
