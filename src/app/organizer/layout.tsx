@@ -1,10 +1,12 @@
 import { Metadata } from "next";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import MobileMenu from "@/components/dashboard/mobile-menu";
 import { user_role } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getBaseUrl } from "@/lib/url-utils";
 import React from "react";
+import Link from "next/link";
 import { getSessionUser } from "@/lib/session";
 import { getEmergencyAuthUser } from "@/lib/auth-debug";
 import { PrismaClient } from "@prisma/client";
@@ -159,11 +161,32 @@ async function AuthenticatedContent({
     };
     
     return (
-      <div className="flex min-h-screen">
-        <DashboardNav user={dashboardUser} />
-        <main className="flex-1 bg-background">
-          {children}
-        </main>
+      <div className="min-h-screen">
+        {/* Mobile Header - Only visible on small screens */}
+        <div className="sm:hidden">
+          <div className="flex items-center justify-between p-4 bg-sidebar border-b border-sidebar-border">
+            <Link href="/organizer/dashboard" className="flex items-center">
+              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
+                TECHLYMPICS
+              </span>
+            </Link>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-sidebar-foreground">{dashboardUser.name}</span>
+              <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground">
+                {dashboardUser.name.charAt(0)}
+              </div>
+              <MobileMenu user={dashboardUser} />
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="flex">
+          <DashboardNav user={dashboardUser} />
+          <main className="flex-1 bg-background w-full">
+            {children}
+          </main>
+        </div>
       </div>
     );
   } catch (error) {

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { AuthUser } from "@/lib/auth";
 
 // Navigation items for the dashboard
-const navItems = [
+export const navItems = [
   {
     title: "Dashboard",
     href: "/organizer/dashboard",
@@ -115,6 +115,8 @@ type DashboardNavProps = {
 export function DashboardNav({ user }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
+  // We'll keep the manual collapse option for user preference
+  // but also add responsive behavior
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleLogout = async () => {
@@ -135,13 +137,18 @@ export function DashboardNav({ user }: DashboardNavProps) {
   };
 
   return (
-    <aside className={`${isCollapsed ? "w-20" : "w-64"} bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out`}>
+    <aside className={`hidden sm:block ${isCollapsed ? "w-20" : "lg:w-64 md:w-20"} bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out`}>
       <div className="flex items-center justify-between p-6">
-        <Link href="/organizer/dashboard" className={`flex items-center ${isCollapsed ? "justify-center" : ""}`}>
+        <Link href="/organizer/dashboard" className={`flex items-center ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-start"}`}>
           {!isCollapsed ? (
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
-              TECHLYMPICS
-            </span>
+            <>
+              <span className="hidden lg:inline text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
+                TECHLYMPICS
+              </span>
+              <span className="lg:hidden text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
+                T
+              </span>
+            </>
           ) : (
             <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">
               T
@@ -165,11 +172,18 @@ export function DashboardNav({ user }: DashboardNavProps) {
       </div>
 
       {/* User info */}
-      <div className={`px-6 py-4 border-t border-b border-sidebar-border ${isCollapsed ? "text-center" : ""}`}>
+      <div className={`px-6 py-4 border-t border-b border-sidebar-border ${isCollapsed ? "text-center" : "md:text-center lg:text-left"}`}>
         {!isCollapsed ? (
           <>
-            <p className="text-sm font-medium text-sidebar-foreground">{user.name}</p>
-            <p className="text-xs text-sidebar-foreground/70">{user.role}</p>
+            <div className="hidden lg:block">
+              <p className="text-sm font-medium text-sidebar-foreground">{user.name}</p>
+              <p className="text-xs text-sidebar-foreground/70">{user.role}</p>
+            </div>
+            <div className="lg:hidden flex justify-center">
+              <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground">
+                {user.name.charAt(0)}
+              </div>
+            </div>
           </>
         ) : (
           <div className="flex justify-center">
@@ -188,14 +202,14 @@ export function DashboardNav({ user }: DashboardNavProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center ${isCollapsed ? "justify-center" : ""} px-4 py-2 text-sm font-medium rounded-md ${
+              className={`flex items-center ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-start"} px-4 py-2 text-sm font-medium rounded-md ${
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
               }`}
             >
               <span className="flex-shrink-0">{item.icon}</span>
-              {!isCollapsed && <span className="ml-3">{item.title}</span>}
+              {!isCollapsed && <span className="hidden lg:inline ml-3">{item.title}</span>}
             </Link>
           );
         })}
@@ -205,12 +219,12 @@ export function DashboardNav({ user }: DashboardNavProps) {
       <div className="fixed bottom-0 p-4 border-sidebar-border">
         <button
           onClick={handleLogout}
-          className={`flex items-center ${isCollapsed ? "justify-center w-full" : ""} px-4 py-2 text-sm font-medium rounded-md text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground`}
+          className={`flex items-center ${isCollapsed ? "justify-center w-full" : "md:justify-center lg:justify-start w-full"} px-4 py-2 text-sm font-medium rounded-md text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground`}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          {!isCollapsed && <span className="ml-3">Logout</span>}
+          {!isCollapsed && <span className="hidden lg:inline ml-3">Logout</span>}
         </button>
       </div>
     </aside>
