@@ -72,12 +72,12 @@ interface PhotoGallery {
 
 // Types for photos
 interface Photo {
-  id: number;
+  id: string;
+  galleryId: string;
   path: string;
   title: string | null;
   description: string | null;
   sortOrder: number;
-  galleryId: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -110,7 +110,13 @@ export function PhotoGalleryManagement() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentTab, setCurrentTab] = useState("all");
   const [filteredGalleries, setFilteredGalleries] = useState<PhotoGallery[]>([]);
-
+  
+  // State for editing photo captions
+  const [isEditPhotoOpen, setIsEditPhotoOpen] = useState(false);
+  const [currentPhoto, setCurrentPhoto] = useState<Photo | null>(null);
+  const [photoTitle, setPhotoTitle] = useState("");
+  const [photoDescription, setPhotoDescription] = useState("");
+  
   // Form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -440,12 +446,16 @@ export function PhotoGalleryManagement() {
   };
 
   // Prepare edit form
-  const prepareEditForm = (gallery: PhotoGallery) => {
+  const prepareEditForm = async (gallery: PhotoGallery) => {
     setCurrentGallery(gallery);
     setTitle(gallery.title);
     setDescription(gallery.description || "");
     setIsPublished(gallery.isPublished);
     setCoverPhotoUrl(gallery.coverPhoto);
+    
+    // Fetch photos for this gallery to allow editing them
+    await fetchPhotos(gallery.id);
+    
     setIsEditOpen(true);
   };
 
@@ -482,7 +492,33 @@ export function PhotoGalleryManagement() {
       });
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        if (errorData?.error === 'unauthorized') {
+          throw new Error('You can only edit galleries you have created');
+        }
         throw new Error(`Failed to update gallery: ${response.status}`);
+      }
+      
+      // Upload new photos if provided
+      if (photoFiles.length > 0) {
+        for (let i = 0; i < photoFiles.length; i++) {
+          const uploadUrl = await uploadFile(photoFiles[i], 'photo-galleries/photos');
+          
+          // Create the photo entry
+          await fetch('/api/photo-galleries/photos', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              galleryId: currentGallery.id,
+              path: uploadUrl,
+              title: photoTitles[i] || null,
+              description: photoDescriptions[i] || null,
+              sortOrder: photos.length + i, // Add at the end
+            }),
+          });
+        }
       }
       
       toast.success("Gallery updated successfully");
@@ -587,7 +623,7 @@ export function PhotoGalleryManagement() {
   };
 
   // Delete a photo
-  const handleDeletePhoto = async (photoId: number) => {
+  const handleDeletePhoto = async (photoId: string) => {
     try {
       setLoading(true);
       
@@ -599,15 +635,60 @@ export function PhotoGalleryManagement() {
         throw new Error(`Failed to delete photo: ${response.status}`);
       }
       
+      // Refresh photos list
+      if (currentGallery) {
+        await fetchPhotos(currentGallery.id);
+      }
+      
       toast.success("Photo deleted successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete photo");
+      console.error("Error deleting photo:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Prepare edit photo caption form
+  const prepareEditPhotoCaption = (photo: Photo) => {
+    setCurrentPhoto(photo);
+    setPhotoTitle(photo.title || "");
+    setPhotoDescription(photo.description || "");
+    setIsEditPhotoOpen(true);
+  };
+
+  // Handle update photo caption
+  const handleUpdatePhotoCaption = async () => {
+    try {
+      if (!currentPhoto) return;
+      
+      setLoading(true);
+      
+      const response = await fetch(`/api/photo-galleries/photos/${currentPhoto.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: photoTitle || null,
+          description: photoDescription || null,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update photo: ${response.status}`);
+      }
       
       // Refresh photos list
       if (currentGallery) {
         await fetchPhotos(currentGallery.id);
       }
+      
+      toast.success("Photo caption updated successfully");
+      setIsEditPhotoOpen(false);
     } catch (err: any) {
-      toast.error(err.message || "Failed to delete photo");
-      console.error("Error deleting photo:", err);
+      toast.error(err.message || "Failed to update photo caption");
+      console.error("Error updating photo caption:", err);
     } finally {
       setLoading(false);
     }
@@ -991,6 +1072,10 @@ export function PhotoGalleryManagement() {
                       <span>{gallery.photoCount || gallery.photos?.length || 0} photos</span>
                     </div>
                     <div className="flex gap-2 mt-3">
+                      <Button variant="outline" size="sm" onClick={() => prepareEditForm(gallery)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
                       {gallery.isPublished ? (
                         <Button variant="outline" size="sm" onClick={() => handleTogglePublish(gallery)}>
                           <StarOff className="h-4 w-4 mr-2" />
@@ -1077,11 +1162,11 @@ export function PhotoGalleryManagement() {
 
       {/* Edit Gallery Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Photo Gallery</DialogTitle>
             <DialogDescription>
-              Update gallery information and settings.
+              Update gallery information, settings, and manage photos.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -1141,6 +1226,102 @@ export function PhotoGalleryManagement() {
                 onChange={handleCoverPhotoChange}
               />
             </div>
+            
+            {/* New section for editing existing photos */}
+            {photos.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-medium mb-2">Existing Photos</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="relative rounded-md overflow-hidden border">
+                      <div className="relative aspect-square">
+                        <Image 
+                          src={photo.path}
+                          alt={photo.title || 'Gallery photo'}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs truncate">{photo.title || 'Untitled'}</p>
+                        {photo.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{photo.description}</p>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full mt-1 h-6 text-xs" 
+                          onClick={() => prepareEditPhotoCaption(photo)}
+                        >
+                          <Edit className="h-3 w-3 mr-1" /> Edit Caption
+                        </Button>
+                      </div>
+                      <div className="absolute top-1 right-1 flex space-x-1">
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleDeletePhoto(photo.id)}
+                        >
+                          <Trash className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Section for adding new photos */}
+            <div className="grid gap-2 mt-4">
+              <Label htmlFor="editAddPhotos">Add New Photos</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {previewUrls.map((url, index) => (
+                  <div key={index} className="relative border rounded-md overflow-hidden">
+                    <div className="relative aspect-square">
+                      <Image
+                        src={url}
+                        alt={`Photo preview ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="p-2 space-y-1">
+                      <Input
+                        placeholder="Title (optional)"
+                        value={photoTitles[index] || ''}
+                        onChange={(e) => updatePhotoTitle(index, e.target.value)}
+                        className="mb-2 text-xs"
+                      />
+                      <Textarea
+                        placeholder="Description (optional)"
+                        value={photoDescriptions[index] || ''}
+                        onChange={(e) => updatePhotoDescription(index, e.target.value)}
+                        className="text-xs"
+                        rows={2}
+                      />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                      onClick={() => removePhoto(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <Input
+                id="editAddPhotos"
+                type="file"
+                accept="image/*"
+                multiple
+                ref={photosInputRef}
+                onChange={handlePhotosChange}
+              />
+            </div>
+            
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="editIsPublished"
@@ -1159,6 +1340,55 @@ export function PhotoGalleryManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Photo Caption Dialog */}
+      <Dialog open={isEditPhotoOpen} onOpenChange={setIsEditPhotoOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Photo Caption</DialogTitle>
+            <DialogDescription>
+              Update the title and description for this photo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {currentPhoto && (
+              <div className="relative w-full h-48 mb-2 rounded-md overflow-hidden">
+                <Image 
+                  src={currentPhoto.path}
+                  alt={photoTitle || 'Gallery photo'}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label htmlFor="photoTitle">Title (Optional)</Label>
+              <Input
+                id="photoTitle"
+                placeholder="Enter photo title"
+                value={photoTitle}
+                onChange={(e) => setPhotoTitle(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="photoDescription">Description (Optional)</Label>
+              <Textarea
+                id="photoDescription"
+                placeholder="Enter photo description"
+                value={photoDescription}
+                onChange={(e) => setPhotoDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsEditPhotoOpen(false)}>Cancel</Button>
+            <Button type="button" disabled={loading} onClick={handleUpdatePhotoCaption}>
+              {loading ? 'Updating...' : 'Update Caption'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
         <DialogContent>
