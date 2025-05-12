@@ -129,61 +129,141 @@ export default async function DashboardPage() {
   }
 
   // 5. Number of contingents by states
-  // For now, use sample data to demonstrate the visualization since the database schema
-  // might not match our expectations exactly
-  let contingentStateData: Array<{state: string, count: number}> = [
-    { state: "Selangor", count: 85 },
-    { state: "Kuala Lumpur", count: 76 },
-    { state: "Penang", count: 62 },
-    { state: "Johor", count: 58 },
-    { state: "Perak", count: 45 },
-    { state: "Sarawak", count: 38 },
-    { state: "Sabah", count: 36 },
-    { state: "Negeri Sembilan", count: 30 },
-    { state: "Melaka", count: 28 },
-    { state: "Kedah", count: 24 }
-  ];
+  // Fetch real contingent data by state 
+  let contingentStateData: Array<{state: string, count: number}> = [];
   
   try {
-    // Try to get actual contingent count data if possible
-    // This is a simplified query that should work regardless of the exact schema
-    const contingents = await prisma.contingent.findMany();
-    console.log(`Found ${contingents.length} contingents in total`);
-  } catch (error) {
-    console.error('Error accessing contingent data:', error);
-    // Continue with the sample data
-  }
-
-  // 6. Number of contest participations by state and gender
-  // Use sample data to demonstrate the visualization
-  let participationStateData: Array<{state: string, MALE: number, FEMALE: number}> = [
-    { state: "Selangor", MALE: 120, FEMALE: 105 },
-    { state: "Kuala Lumpur", MALE: 95, FEMALE: 85 },
-    { state: "Penang", MALE: 80, FEMALE: 75 },
-    { state: "Johor", MALE: 70, FEMALE: 65 },
-    { state: "Perak", MALE: 60, FEMALE: 55 },
-    { state: "Sarawak", MALE: 50, FEMALE: 45 },
-    { state: "Sabah", MALE: 45, FEMALE: 50 },
-    { state: "Negeri Sembilan", MALE: 40, FEMALE: 35 },
-    { state: "Melaka", MALE: 35, FEMALE: 40 },
-    { state: "Kedah", MALE: 30, FEMALE: 25 }
-  ];
-  
-  try {
-    // Try to get some real contestant data if possible
-    const contestants = await prisma.contestant.findMany({
-      take: 5, // Just get a few to avoid overloading
-      select: {
-        id: true,
-        gender: true
+    // Query contingents and join related tables to get state information
+    // Using the relationship: contingent -> schoolid -> school -> stateid -> state
+    const contingentsWithState = await prisma.contingent.findMany({
+      include: {
+        school: {
+          include: {
+            state: true
+          }
+        }
       }
     });
     
-    console.log(`Found ${contestants.length} contestants for sampling`);
-    // We'll still use the sample data for now, but this confirms we can access the table
+    console.log(`Found ${contingentsWithState.length} contingents in total`);
+    
+    // Group contingents by state and count them
+    const stateCountMap = new Map<string, number>();
+    
+    contingentsWithState.forEach(contingent => {
+      // Skip if school or state is null
+      if (!contingent.school || !contingent.school.state) return;
+      
+      const stateName = contingent.school.state.name;
+      if (!stateName) return; // Skip if state name is empty
+      
+      const currentCount = stateCountMap.get(stateName) || 0;
+      stateCountMap.set(stateName, currentCount + 1);
+    });
+    
+    console.log('State count map:', Object.fromEntries(stateCountMap));
+    
+    // Convert the map to the required array format
+    contingentStateData = Array.from(stateCountMap.entries())
+      .map(([state, count]) => ({ state, count }))
+      .sort((a, b) => b.count - a.count); // Sort by count in descending order
+    
+    console.log('Live contingent data by state:', contingentStateData);
+    
+    // Only use fallback if absolutely no data is found
+    if (contingentStateData.length === 0) {
+      console.log('No state data found, but not using fallback data since we want to show accurate numbers');
+      // Create an empty state entry to show there's no data rather than showing fake data
+      contingentStateData = [
+        { state: "No Data Available", count: 0 }
+      ];
+    }
   } catch (error) {
-    console.error('Error accessing contestant data:', error);
-    // Continue with the sample data
+    console.error('Error accessing contingent data by state:', error);
+    // Show an error state instead of fake data
+    contingentStateData = [
+      { state: "Error Loading Data", count: 0 }
+    ];
+  }
+
+  // 6. Number of contest participations by state and gender
+  // Get real data for contest participations by state and gender
+  let participationStateData: Array<{state: string, MALE: number, FEMALE: number}> = [];
+  
+  try {
+    // Query contestants with their contest participations, contingent, school, and state information
+    const contestants = await prisma.contestant.findMany({
+      include: {
+        contingent: {
+          include: {
+            school: {
+              include: {
+                state: true
+              }
+            }
+          }
+        },
+        contests: true  // Include contest participations
+      }
+    });
+    
+    console.log(`Found ${contestants.length} contestants in total`);
+    
+    // Create a map to track state and gender counts
+    const stateGenderMap = new Map<string, { MALE: number, FEMALE: number }>();
+    
+    // Process each contestant who has contest participations
+    contestants.forEach(contestant => {
+      // Only count contestants who have participations in contests
+      if (!contestant.contests || contestant.contests.length === 0) return;
+      
+      // Skip if contingent, school, or state is missing
+      if (!contestant.contingent || !contestant.contingent.school || !contestant.contingent.school.state) return;
+      
+      const stateName = contestant.contingent.school.state.name;
+      if (!stateName) return; // Skip if state name is missing
+      
+      // Get gender (default to 'UNKNOWN' if missing)
+      const gender = contestant.gender || 'UNKNOWN';
+      
+      // Only track MALE and FEMALE genders for the chart
+      if (gender !== 'MALE' && gender !== 'FEMALE') return;
+      
+      // Update the state-gender map
+      if (!stateGenderMap.has(stateName)) {
+        stateGenderMap.set(stateName, { MALE: 0, FEMALE: 0 });
+      }
+      
+      const stateData = stateGenderMap.get(stateName)!;
+      stateData[gender as 'MALE' | 'FEMALE'] += 1;
+    });
+    
+    console.log('State-gender participation map:', Object.fromEntries(stateGenderMap));
+    
+    // Convert the map to the required array format
+    participationStateData = Array.from(stateGenderMap.entries())
+      .map(([state, genderCounts]) => ({
+        state,
+        MALE: genderCounts.MALE,
+        FEMALE: genderCounts.FEMALE
+      }))
+      .sort((a, b) => (b.MALE + b.FEMALE) - (a.MALE + a.FEMALE)); // Sort by total count
+    
+    console.log('Live participation data by state and gender:', participationStateData);
+    
+    // Handle empty data case
+    if (participationStateData.length === 0) {
+      console.log('No participation data by state and gender found');
+      participationStateData = [
+        { state: "No Data Available", MALE: 0, FEMALE: 0 }
+      ];
+    }
+  } catch (error) {
+    console.error('Error accessing contest participation data by state and gender:', error);
+    // Show error state instead of fake data
+    participationStateData = [
+      { state: "Error Loading Data", MALE: 0, FEMALE: 0 }
+    ];
   }
   
   // Get recent logins
