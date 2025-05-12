@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,7 @@ interface Team {
 export default function TeamsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [teams, setTeams] = useState<Team[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,11 +143,11 @@ export default function TeamsPage() {
       
       // Remove the deleted team from the state
       setTeams(teams.filter(team => team.id !== teamToDelete.id));
-      toast.success("Team deleted successfully");
+      toast.success(t('team.delete_success'));
       setDeleteDialogOpen(false);
     } catch (error: any) {
       console.error("Error deleting team:", error);
-      toast.error(error.message || "Failed to delete team");
+      toast.error(error.message || t('team.delete_error'));
     } finally {
       setIsDeleting(false);
     }
@@ -171,6 +173,20 @@ export default function TeamsPage() {
         return 'bg-amber-500/20 text-amber-600 border-amber-500/20';
       default:
         return 'bg-blue-500/20 text-blue-600 border-blue-500/20';
+    }
+  };
+  
+  // Translate status
+  const translateStatus = (status: string) => {
+    switch (status) {
+      case 'ACTIVE':
+        return t('team.status.active');
+      case 'INACTIVE':
+        return t('team.status.inactive');
+      case 'PENDING':
+        return t('team.status.pending');
+      default:
+        return status;
     }
   };
   
@@ -279,9 +295,9 @@ export default function TeamsPage() {
     <div className="container mx-auto py-6 max-w-7xl">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">My Teams</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t('team.title')}</h1>
           <p className="text-muted-foreground">
-            Manage your teams for Techlympics competitions
+            {t('team.description')}
           </p>
         </div>
         
@@ -290,7 +306,7 @@ export default function TeamsPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search teams..."
+              placeholder={t('team.search')}
               className="pl-8 w-full sm:w-[250px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -300,7 +316,7 @@ export default function TeamsPage() {
           <Button asChild>
             <Link href="/participants/teams/new">
               <Plus className="mr-2 h-4 w-4" />
-              Create Team
+              {t('team.create')}
             </Link>
           </Button>
         </div>
@@ -316,17 +332,17 @@ export default function TeamsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Trophy className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">No teams found</h3>
+            <h3 className="text-lg font-medium">{t('team.none_found')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
               {teams.length === 0
-                ? "You haven't created any teams yet. Create your first team to participate in Techlympics competitions."
-                : "No teams match your search criteria. Try a different search term."}
+                ? t('team.none_added')
+                : t('team.no_search_results')}
             </p>
             {teams.length === 0 && (
               <Button asChild>
                 <Link href="/participants/teams/new">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Team
+                  {t('team.create_first')}
                 </Link>
               </Button>
             )}
@@ -352,7 +368,7 @@ export default function TeamsPage() {
                       {/* Status indicator */}
                       <div className="absolute top-2 right-2">
                         <Badge className={getStatusColor(team.status)}>
-                          {team.status}
+                          {translateStatus(team.status)}
                         </Badge>
                       </div>
                       
@@ -378,7 +394,7 @@ export default function TeamsPage() {
                             <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
                             <div>
                               <div className="text-sm">
-                                <span className="font-medium">{team.memberCount}</span> of <span className="font-medium">{team.contestMaxMembers}</span> members
+                                <span className="font-medium">{team.memberCount}</span> of <span className="font-medium">{team.contestMaxMembers}</span> {t('team.members_count')}
                               </div>
                             </div>
                           </div>
@@ -387,7 +403,7 @@ export default function TeamsPage() {
                           <div className="flex items-start gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
                             <div className="text-sm">
-                              Created {formatDate(team.createdAt)}
+                              {t('team.created_on')} {formatDate(team.createdAt)}
                             </div>
                           </div>
                         </div>
@@ -397,14 +413,14 @@ export default function TeamsPage() {
                           <Button variant="outline" size="sm" asChild title="View Team Details">
                             <Link href={`/participants/teams/${team.id}`}>
                               <EyeIcon className="h-4 w-4 mr-1" />
-                              View
+                              {t('team.view')}
                             </Link>
                           </Button>
                           
                           <Button variant="outline" size="sm" asChild title="Manage Team Members">
                             <Link href={`/participants/teams/${team.id}/members`}>
                               <Users className="h-4 w-4 mr-1" />
-                              Members
+                              {t('team.members')}
                             </Link>
                           </Button>
                           
@@ -418,7 +434,7 @@ export default function TeamsPage() {
                               <DropdownMenuItem asChild>
                                 <Link href={`/participants/teams/${team.id}/edit`}>
                                   <Edit className="h-4 w-4 mr-2" />
-                                  Edit Team
+                                  {t('team.edit')}
                                 </Link>
                               </DropdownMenuItem>
                               
@@ -431,7 +447,7 @@ export default function TeamsPage() {
                                   }}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete Team
+                                  {t('team.delete')}
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -451,9 +467,9 @@ export default function TeamsPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Team</DialogTitle>
+            <DialogTitle>{t('team.delete_title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the team "{teamToDelete?.name}"? This action cannot be undone.
+              {t('team.delete_confirm')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -462,7 +478,7 @@ export default function TeamsPage() {
               onClick={() => setDeleteDialogOpen(false)}
               disabled={isDeleting}
             >
-              Cancel
+              {t('team.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -475,10 +491,10 @@ export default function TeamsPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Deleting...
+                  {t('team.deleting')}
                 </>
               ) : (
-                "Delete Team"
+                <>{t('team.delete')}</>
               )}
             </Button>
           </DialogFooter>

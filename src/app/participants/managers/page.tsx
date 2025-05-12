@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ interface Manager {
 export default function ManagersPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [managers, setManagers] = useState<Manager[]>([]);
   const [filteredManagers, setFilteredManagers] = useState<Manager[]>([]);
@@ -177,11 +179,11 @@ export default function ManagersPage() {
       setManagers(managers.filter((manager) => manager.id !== managerToDelete.id));
       setFilteredManagers(filteredManagers.filter((manager) => manager.id !== managerToDelete.id));
       
-      toast.success("Manager deleted successfully");
+      toast.success(t('manager.delete_success'));
       setDeleteDialogOpen(false);
     } catch (error) {
       console.error("Error deleting manager:", error);
-      toast.error("Failed to delete manager");
+      toast.error(t('manager.delete_error'));
     } finally {
       setIsDeleting(false);
     }
@@ -196,9 +198,9 @@ export default function ManagersPage() {
     <div className="container px-4 py-8 mx-auto space-y-6">
       <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
         <div>
-          <h1 className="text-2xl font-bold">Managers</h1>
+          <h1 className="text-2xl font-bold">{t('manager.title')}</h1>
           <p className="text-muted-foreground">
-            View and manage independent team managers
+            {t('manager.description')}
           </p>
         </div>
         
@@ -207,7 +209,7 @@ export default function ManagersPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search managers..."
+              placeholder={t('manager.search')}
               className="pl-8 w-full sm:w-[260px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -217,7 +219,7 @@ export default function ManagersPage() {
           <Button asChild>
             <Link href="/participants/managers/new">
               <Plus className="mr-2 h-4 w-4" />
-              Add Manager
+              {t('manager.add')}
             </Link>
           </Button>
         </div>
@@ -225,9 +227,9 @@ export default function ManagersPage() {
       
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Manager Listing</CardTitle>
+          <CardTitle>{t('manager.listing')}</CardTitle>
           <CardDescription>
-            View and manage independent team managers
+            {t('manager.description')}
           </CardDescription>
         </CardHeader>
         
@@ -240,17 +242,17 @@ export default function ManagersPage() {
           ) : filteredManagers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium">No managers found</h3>
+              <h3 className="text-lg font-medium">{t('manager.none_found')}</h3>
               <p className="text-muted-foreground mb-6 max-w-md">
                 {managers.length === 0
-                  ? "You haven't added any independent managers yet."
-                  : "No managers match your search criteria. Try a different search term."}
+                  ? t('manager.none_added')
+                  : t('manager.no_search_results')}
               </p>
               {managers.length === 0 && (
                 <Button asChild>
                   <Link href="/participants/managers/new">
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Manager
+                    {t('manager.add_first')}
                   </Link>
                 </Button>
               )}
@@ -260,12 +262,12 @@ export default function ManagersPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>IC Number</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Hashcode</TableHead>
-                    <TableHead>Team</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t('manager.table.name')}</TableHead>
+                    <TableHead>{t('manager.table.ic')}</TableHead>
+                    <TableHead>{t('manager.table.contact')}</TableHead>
+                    <TableHead>{t('manager.table.hashcode')}</TableHead>
+                    <TableHead>{t('manager.table.team')}</TableHead>
+                    <TableHead className="text-right">{t('manager.table.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -299,7 +301,7 @@ export default function ManagersPage() {
                               )}
                             </>
                           ) : (
-                            <span className="text-muted-foreground italic text-xs">No contact info</span>
+                            <span className="text-muted-foreground italic text-xs">{t('manager.no_contact')}</span>
                           )}
                         </div>
                       </TableCell>
@@ -318,18 +320,18 @@ export default function ManagersPage() {
                             <span>{manager.teamName}</span>
                           </Link>
                         ) : (
-                          <span className="text-muted-foreground text-sm">Not assigned</span>
+                          <span className="text-muted-foreground text-sm">{t('manager.not_assigned')}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button variant="outline" size="sm" asChild title="View Manager Details">
+                          <Button variant="outline" size="sm" asChild title={t('manager.view')}>
                             <Link href={`/participants/managers/${manager.id}`}>
                               <EyeIcon className="h-4 w-4" />
                             </Link>
                           </Button>
                           
-                          <Button variant="outline" size="sm" asChild title="Edit Manager">
+                          <Button variant="outline" size="sm" asChild title={t('manager.edit')}>
                             <Link href={`/participants/managers/${manager.id}/edit`}>
                               <Edit className="h-4 w-4" />
                             </Link>
@@ -339,7 +341,7 @@ export default function ManagersPage() {
                             variant="outline" 
                             size="sm" 
                             className="text-red-600 hover:bg-red-100 hover:text-red-700" 
-                            title="Delete Manager"
+                            title={t('manager.delete')}
                             onClick={() => {
                               setManagerToDelete(manager);
                               setDeleteDialogOpen(true);
@@ -362,9 +364,9 @@ export default function ManagersPage() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Manager</DialogTitle>
+            <DialogTitle>{t('manager.delete')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the manager "{managerToDelete?.name}"? This action cannot be undone.
+              {t('manager.delete_confirm', { name: managerToDelete?.name || '' })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -373,7 +375,7 @@ export default function ManagersPage() {
               onClick={() => setDeleteDialogOpen(false)}
               disabled={isDeleting}
             >
-              Cancel
+              {t('manager.cancel')}
             </Button>
             <Button
               variant="destructive"
@@ -386,10 +388,10 @@ export default function ManagersPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Deleting...
+                  {t('manager.deleting')}
                 </>
               ) : (
-                "Delete Manager"
+                <>{t('manager.delete')}</>
               )}
             </Button>
           </DialogFooter>

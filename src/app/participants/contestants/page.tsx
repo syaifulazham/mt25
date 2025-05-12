@@ -92,6 +92,40 @@ export default function ContestantsPage() {
     }
   }, [status]);
   
+  // State to track if user has any contingents
+  const [hasContingents, setHasContingents] = useState<boolean | null>(null);
+
+  // Check if the user has any contingents
+  const checkContingents = async () => {
+    if (!session?.user?.email) return;
+    
+    try {
+      setIsLoading(true);
+      
+      const contingentsResponse = await fetch('/api/participants/contingents/managed');
+      
+      if (!contingentsResponse.ok) {
+        throw new Error('Failed to check contingents');
+      }
+      
+      const contingentsData = await contingentsResponse.json();
+      const hasAnyContingents = contingentsData && contingentsData.length > 0;
+      
+      setHasContingents(hasAnyContingents);
+      
+      // Only proceed to fetch contestants if the user has contingents
+      if (hasAnyContingents) {
+        fetchContestants(1);
+      } else {
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Error checking contingents:", error);
+      setHasContingents(false);
+      setIsLoading(false);
+    }
+  };
+  
   // Fetch contestants with filters and pagination
   const fetchContestants = async (page = currentPage) => {
     if (!session?.user?.email) return;
@@ -143,10 +177,10 @@ export default function ContestantsPage() {
     }
   };
   
-  // Initial fetch
+  // Initial check for contingents before fetching contestants
   useEffect(() => {
     if (session?.user?.email) {
-      fetchContestants(1);
+      checkContingents();
     }
   }, [session]);
   
@@ -445,6 +479,34 @@ export default function ContestantsPage() {
     );
   }
   
+  // If user has no contingents, display message to create one first
+  if (hasContingents === false) {
+    return (
+      <div className="container py-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">{t('contestant.title')}</h1>
+        </div>
+        
+        <Card className="border-gray-200 dark:border-gray-800">
+          <CardContent className="pt-6 text-center py-12">
+            <School className="mx-auto h-12 w-12 text-primary mb-4" />
+            <h2 className="text-xl font-semibold mb-2">{t('contestant.no_contingent_title') || "No Contingent Found"}</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              {t('contestant.no_contingent_message') || "You need to create or join a contingent before you can add contestants. Please create a contingent first."}
+            </p>
+            <Link href="/participants/contingents">
+              <Button size="lg">
+                <Users className="mr-2 h-5 w-5" />
+                {t('contestant.create_contingent') || "Go to Contingents"}
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Normal page rendering when user has contingents
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Trophy, Users, School, Building } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/language-context";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,7 @@ interface Contest {
 export default function NewTeamPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,12 +98,12 @@ export default function NewTeamPage() {
             contingentId: managedContingents[0].id.toString()
           }));
         } else {
-          toast.error("You need to be a manager of a contingent to create a team");
+          toast.error(t('team.new.error_need_manager'));
           router.push('/participants/contingents');
         }
       } catch (error) {
         console.error("Error fetching user contingents:", error);
-        toast.error("Failed to load your contingent information");
+        toast.error(t('team.new.error_fetch_contingents'));
       } finally {
         setIsLoading(false);
       }
@@ -163,7 +165,7 @@ export default function NewTeamPage() {
         setContests(teamContests);
       } catch (error) {
         console.error("Error fetching contests:", error);
-        toast.error("Failed to load available contests. Please try refreshing the page.");
+        toast.error(t('team.new.error_fetch_contests'));
         
         // Try to provide the most helpful information to developers in console
         if (error instanceof Error) {
@@ -197,7 +199,7 @@ export default function NewTeamPage() {
     
     // Basic validation
     if (!formData.name || !formData.contestId) {
-      toast.error("Please fill in all required fields");
+      toast.error(t('team.new.error_required'));
       return;
     }
     
@@ -207,7 +209,7 @@ export default function NewTeamPage() {
     }
     
     if (!formData.contingentId) {
-      toast.error("You need to have a contingent to create a team");
+      toast.error(t('team.new.error_contingent'));
       return;
     }
     
@@ -232,14 +234,14 @@ export default function NewTeamPage() {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create team");
+        throw new Error(data.error || t('team.new.error'));
       }
       
-      toast.success("Team created successfully");
+      toast.success(t('team.new.success'));
       router.push('/participants/teams');
     } catch (error: any) {
       console.error("Error creating team:", error);
-      toast.error(error.message || "Failed to create team");
+      toast.error(error.message || t('team.new.error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -261,7 +263,7 @@ export default function NewTeamPage() {
         >
           <Link href="/participants/teams">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Teams
+            {t('team.new.back')}
           </Link>
         </Button>
       </div>
@@ -270,10 +272,10 @@ export default function NewTeamPage() {
         <CardHeader>
           <CardTitle className="text-xl flex items-center">
             <Trophy className="mr-2 h-5 w-5 text-primary" />
-            Create New Team
+            {t('team.new.title')}
           </CardTitle>
           <CardDescription>
-            Create a team to participate in Techlympics competitions. Teams allow you to group contestants for team-based competitions.
+            {t('team.new.description')}
           </CardDescription>
         </CardHeader>
         
@@ -291,21 +293,21 @@ export default function NewTeamPage() {
               <div className="space-y-4">
                 <h3 className="font-medium flex items-center">
                   <Trophy className="h-4 w-4 mr-2 text-primary" />
-                  Select Contest
+                  {t('team.new.select_contest')}
                 </h3>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="contestId">Contest <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="contestId">{t('team.new.contest')} <span className="text-red-500">*</span></Label>
                   <Select
                     value={formData.contestId}
                     onValueChange={(value) => handleSelectChange('contestId', value)}
                   >
                     <SelectTrigger id="contestId">
-                      <SelectValue placeholder="Select a contest" />
+                      <SelectValue placeholder={t('team.new.contest_placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
                       {contests.length === 0 ? (
-                        <SelectItem value="no_contests" disabled>No contests available</SelectItem>
+                        <SelectItem value="no_contests" disabled>{t('team.new.no_contests')}</SelectItem>
                       ) : (
                         contests.map((contest) => (
                           <SelectItem key={contest.id} value={contest.id.toString()} className="flex items-center">
@@ -318,7 +320,7 @@ export default function NewTeamPage() {
                     </SelectContent>
                   </Select>
                   <span className="text-xs text-muted-foreground">
-                    Choose the contest this team will participate in
+                    {t('team.new.contest_help')}
                   </span>
                 </div>
               </div>
@@ -329,29 +331,29 @@ export default function NewTeamPage() {
               <div className="space-y-4">
                 <h3 className="font-medium flex items-center">
                   <Users className="h-4 w-4 mr-2 text-primary" />
-                  Team Information
+                  {t('team.new.team_info')}
                 </h3>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="name">Team Name <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="name">{t('team.new.team_name')} <span className="text-red-500">*</span></Label>
                   <Input
                     id="name"
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    placeholder="Enter team name"
+                    placeholder={t('team.new.team_name_placeholder')}
                     required
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">{t('team.new.team_description')}</Label>
                   <Textarea
                     id="description"
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}
-                    placeholder="Describe your team and its goals"
+                    placeholder={t('team.new.team_description_placeholder')}
                     rows={3}
                   />
                 </div>
@@ -362,7 +364,7 @@ export default function NewTeamPage() {
                 <div className="bg-muted/30 p-4 rounded-lg border">
                   <div className="flex items-center">
                     <School className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Team will be created under contingent:</span>
+                    <span className="text-sm text-muted-foreground">{t('team.new.contingent_info')}</span>
                   </div>
                   <p className="font-medium mt-1">
                     {contingents[0].name}
@@ -379,7 +381,7 @@ export default function NewTeamPage() {
             onClick={() => router.push('/participants/teams')}
             disabled={isSubmitting}
           >
-            Cancel
+            {t('team.new.cancel')}
           </Button>
           <Button 
             onClick={handleSubmit}
@@ -392,12 +394,12 @@ export default function NewTeamPage() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Creating Team...
+                {t('team.new.creating')}
               </>
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Create Team
+                {t('team.new.create')}
               </>
             )}
           </Button>

@@ -29,20 +29,22 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/language-context";
 
-// Form validation schema
-const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+// Form validation schema - using error messages from translations
+const createFormSchema = (t: (key: string) => string) => z.object({
+  name: z.string().min(1, t('manager.new.error_name')),
   ic: z.string()
-    .min(12, "IC number must be 12 digits")
-    .max(12, "IC number must be 12 digits")
-    .regex(/^\d+$/, "IC number must contain only digits"),
-  email: z.string().email("Invalid email format").optional().nullable(),
+    .min(12, t('manager.new.error_ic_length'))
+    .max(12, t('manager.new.error_ic_length'))
+    .regex(/^\d+$/, t('manager.new.error_ic_format')),
+  email: z.string().email(t('manager.new.error_email')).optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
   teamId: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+// Using ReturnType to get the schema type from our function
+type FormValues = z.infer<ReturnType<typeof createFormSchema>>;
 
 interface Team {
   id: number;
@@ -55,10 +57,11 @@ export default function NewManagerPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [isLoadingTeams, setIsLoadingTeams] = useState(true);
+  const { t } = useLanguage();
 
-  // Initialize form
+  // Initialize form with translated schema
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(createFormSchema(t)),
     defaultValues: {
       name: "",
       ic: "",
@@ -79,13 +82,13 @@ export default function NewManagerPage() {
         // The teams API requires a participantId parameter
         const response = await fetch(`/api/participants/teams?participantId=${session.user.id}`);
         if (!response.ok) {
-          throw new Error("Failed to fetch teams");
+          throw new Error(t('manager.new.error_teams'));
         }
         const data = await response.json();
         setTeams(data);
       } catch (error) {
         console.error("Error fetching teams:", error);
-        toast.error("Failed to load teams");
+        toast.error(t('manager.new.error_teams'));
       } finally {
         setIsLoadingTeams(false);
       }
@@ -122,17 +125,17 @@ export default function NewManagerPage() {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create manager");
+        throw new Error(errorData.message || t('manager.new.error'));
       }
       
-      toast.success("Manager created successfully");
+      toast.success(t('manager.new.success'));
       
       // Redirect to managers list
       router.push("/participants/managers");
       router.refresh();
     } catch (error) {
       console.error("Error creating manager:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create manager");
+      toast.error(error instanceof Error ? error.message : t('manager.new.error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -149,7 +152,7 @@ export default function NewManagerPage() {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/participants/managers">
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Managers
+            {t('manager.new.back')}
           </Link>
         </Button>
       </div>
@@ -158,9 +161,9 @@ export default function NewManagerPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Add New Manager</CardTitle>
+              <CardTitle>{t('manager.new.title')}</CardTitle>
               <CardDescription>
-                Create a new independent manager for team management
+                {t('manager.new.description')}
               </CardDescription>
             </CardHeader>
             
@@ -171,12 +174,12 @@ export default function NewManagerPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Manager Name</FormLabel>
+                    <FormLabel>{t('manager.new.name')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter manager's full name" {...field} />
+                      <Input placeholder={t('manager.new.name_placeholder')} {...field} />
                     </FormControl>
                     <FormDescription>
-                      Full name as per identification document
+                      {t('manager.new.name_description')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -189,12 +192,12 @@ export default function NewManagerPage() {
                 name="ic"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>IC Number</FormLabel>
+                    <FormLabel>{t('manager.new.ic')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="12-digit IC number without dashes" {...field} />
+                      <Input placeholder={t('manager.new.ic_placeholder')} {...field} />
                     </FormControl>
                     <FormDescription>
-                      Malaysian IC number (12 digits without dashes)
+                      {t('manager.new.ic_description')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -207,17 +210,17 @@ export default function NewManagerPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
+                    <FormLabel>{t('manager.new.email')}</FormLabel>
                     <FormControl>
                       <Input 
                         type="email" 
-                        placeholder="manager@example.com" 
+                        placeholder={t('manager.new.email_placeholder')} 
                         {...field} 
                         value={field.value || ''}
                       />
                     </FormControl>
                     <FormDescription>
-                      Contact email for the manager (optional)
+                      {t('manager.new.email_description')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -230,17 +233,17 @@ export default function NewManagerPage() {
                 name="phoneNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
+                    <FormLabel>{t('manager.new.phone')}</FormLabel>
                     <FormControl>
                       <Input 
                         type="tel" 
-                        placeholder="e.g. 0123456789" 
+                        placeholder={t('manager.new.phone_placeholder')} 
                         {...field} 
                         value={field.value || ''}
                       />
                     </FormControl>
                     <FormDescription>
-                      Contact phone number for the manager (optional)
+                      {t('manager.new.phone_description')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -253,7 +256,7 @@ export default function NewManagerPage() {
                 name="teamId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Assign to Team (Optional)</FormLabel>
+                    <FormLabel>{t('manager.new.team')}</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
                       value={field.value}
@@ -261,7 +264,7 @@ export default function NewManagerPage() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a team (optional)" />
+                          <SelectValue placeholder={t('manager.new.team_placeholder')} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -273,7 +276,7 @@ export default function NewManagerPage() {
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Optionally assign this manager to an existing team
+                      {t('manager.new.team_description')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -283,16 +286,16 @@ export default function NewManagerPage() {
             
             <CardFooter className="flex justify-between">
               <Button variant="outline" asChild>
-                <Link href="/participants/managers">Cancel</Link>
+                <Link href="/participants/managers">{t('manager.new.cancel')}</Link>
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
+                    {t('manager.new.creating')}
                   </>
                 ) : (
-                  "Create Manager"
+                  t('manager.new.create')
                 )}
               </Button>
             </CardFooter>
