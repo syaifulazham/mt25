@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Chart colors for gender representation
@@ -35,8 +35,12 @@ export default function ParticipationStateChart({ data }: { data: ParticipationS
               <YAxis dataKey="state" type="category" width={80} />
               <Tooltip formatter={(value, name) => [`${value} participants`, name]} />
               <Legend />
-              <Bar dataKey="MALE" stackId="a" fill={GENDER_COLORS.MALE} name="Male" />
-              <Bar dataKey="FEMALE" stackId="a" fill={GENDER_COLORS.FEMALE} name="Female" />
+              <Bar dataKey="MALE" stackId="a" fill={GENDER_COLORS.MALE} name="Male">
+                <LabelList dataKey="MALE" position="inside" fill="#FFFFFF" />
+              </Bar>
+              <Bar dataKey="FEMALE" stackId="a" fill={GENDER_COLORS.FEMALE} name="Female">
+                <LabelList dataKey="FEMALE" position="inside" fill="#FFFFFF" />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : (

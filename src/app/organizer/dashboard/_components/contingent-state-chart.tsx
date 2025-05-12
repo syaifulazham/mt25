@@ -1,10 +1,10 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer, LabelList } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Chart colors
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+// Single chart color
+const BAR_COLOR = '#0088FE';
 
 type ContingentStateData = {
   state: string;
@@ -30,10 +30,8 @@ export default function ContingentStateChart({ data }: { data: ContingentStateDa
               <XAxis type="number" />
               <YAxis dataKey="state" type="category" width={80} />
               <Tooltip formatter={(value) => [`${value} contingents`, 'Count']} />
-              <Bar dataKey="count" fill="#8884d8">
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
+              <Bar dataKey="count" fill={BAR_COLOR}>
+                <LabelList dataKey="count" position="right" fill="#000000" />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

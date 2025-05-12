@@ -62,20 +62,24 @@ export default async function ContestsPage() {
         }));
       } 
       // Then check if it's a single object
-      else if (!Array.isArray(contest.targetgroup) && typeof contest.targetgroup === 'object') {
+      else if (!Array.isArray(contest.targetgroup) && typeof contest.targetgroup === 'object' && contest.targetgroup !== null) {
+        // Add type assertion to help TypeScript understand the structure
+        const targetGroup = contest.targetgroup as { id: number; name: string };
         transformedContest.targetgroups = [{
-          id: contest.targetgroup.id,
-          name: contest.targetgroup.name
+          id: targetGroup.id,
+          name: targetGroup.name
         }];
       }
     }
     
     // Handle theme
-    if (contest.theme) {
+    if (contest.theme && typeof contest.theme === 'object' && contest.theme !== null) {
+      // Add type assertion to help TypeScript understand the structure
+      const theme = contest.theme as { id: number; name: string; logoPath?: string | null };
       transformedContest.theme = {
-        id: contest.theme.id,
-        name: contest.theme.name,
-        logoPath: contest.theme.logoPath
+        id: theme.id,
+        name: theme.name,
+        logoPath: theme.logoPath
       };
     }
     

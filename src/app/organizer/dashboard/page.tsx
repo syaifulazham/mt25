@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/auth-options";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/prisma";
+import { Fragment } from "react";
 import { CalendarDays, CheckCircle, Users, Award, Layers, Database, Trophy, Bell, ArrowUpRight, School, Flag, UserCheck, UsersRound } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -368,10 +369,46 @@ export default async function DashboardPage() {
       {/* Visualization Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Use client component for Contingents by State Chart */}
-        <ContingentStateChart data={contingentStateData} />
+        <div className="border rounded-lg p-4 shadow-sm">
+          <h3 className="text-lg font-medium mb-4">Contingents by State</h3>
+          <ContingentStateChart data={contingentStateData} />
+          <div className="mt-4 border-t pt-4">
+            <h4 className="font-medium mb-2">Data Values:</h4>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              {contingentStateData.map((item, i) => (
+                <div key={i} className="flex justify-between">
+                  <span>{item.state}:</span>
+                  <span className="font-medium">{item.count}</span>
+                </div>
+              ))}
+              {contingentStateData.length === 0 && <div>No data available</div>}
+            </div>
+          </div>
+        </div>
         
         {/* Use client component for Contest Participations by State and Gender Chart */}
-        <ParticipationStateChart data={participationStateData} />
+        <div className="border rounded-lg p-4 shadow-sm">
+          <h3 className="text-lg font-medium mb-4">Contest Participations by State and Gender</h3>
+          <ParticipationStateChart data={participationStateData} />
+          <div className="mt-4 border-t pt-4">
+            <h4 className="font-medium mb-2">Data Values:</h4>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
+              <div className="font-medium">State</div>
+              <div className="font-medium text-blue-600">Male</div>
+              <div className="font-medium text-pink-600">Female</div>
+              {participationStateData.map((item, i) => (
+                <Fragment key={i}>
+                  <div>{item.state}</div>
+                  <div>{item.MALE}</div>
+                  <div>{item.FEMALE}</div>
+                </Fragment>
+              ))}
+              {participationStateData.length === 0 && 
+                <div className="col-span-3">No data available</div>
+              }
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs for Recent Activity */}
