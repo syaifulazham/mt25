@@ -1,0 +1,98 @@
+    // Calculate contest participation statistics
+    const contestStats = {
+      totalContests: 0,
+      upcomingContests: 0,
+      completedContests: 0
+    };
+
+    const contestIds = new Set<number>();
+    const now = new Date();
+
+    // Calculate contest statistics by iterating through each contestant's contests
+    contingentWithDetails.contestants.forEach(contestant => {
+      contestant.contests.forEach(participation => {
+        // Add to unique contest IDs set
+        contestIds.add(participation.contest.id);
+        
+        // If contest has start/end dates, use them for statistics
+        if (participation.contest.startDate && participation.contest.endDate) {
+          const startDate = new Date(participation.contest.startDate);
+          const endDate = new Date(participation.contest.endDate);
+          
+          if (endDate < now) {
+            contestStats.completedContests++;
+          } else if (startDate > now) {
+            contestStats.upcomingContests++;
+          }
+        }
+      });
+    });
+    
+    contestStats.totalContests = contestIds.size;
+
+    // Get the institution details - either school or higher institution
+    const institution = contingentWithDetails.school || contingentWithDetails.higherInstitution;
+    const isSchool = !!contingentWithDetails.school;
+    
+    return (
+      <div className="container mx-auto py-6 space-y-8">
+        {/* Back button and header */}
+        <div className="space-y-4">
+          <Link 
+            href="/organizer/contingents" 
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back to Contingents
+          </Link>
+          
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <PageHeader 
+              title={contingentWithDetails.name}
+              description={
+                <>
+                  {institution?.name || "No institution"}
+                  <StateFormatter state={institution?.state} />
+                </>
+              }
+            />
+            
+            <div className="flex items-center gap-2">
+              <Button variant="outline" className="gap-1" size="sm">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="destructive" size="sm" className="gap-1">
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Main content */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left column - Contingent details */}
+          <div className="space-y-6">
+            {/* Contingent info card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {isSchool ? (
+                    <School className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <Building2 className="h-5 w-5 text-purple-500" />
+                  )}
+                  {isSchool ? 'School Contingent' : 'Higher Institution Contingent'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="text-sm font-medium">Contingent Name</div>
+                  <div>{contingentWithDetails.name}</div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <div className="text-sm font-medium">{isSchool ? 'School' : 'Institution'}</div>
+                  <div>{institution?.name || "No institution"}</div>
+                </div>

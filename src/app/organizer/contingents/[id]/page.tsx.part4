@@ -1,0 +1,123 @@
+                {institution?.state && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">State</div>
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        {typeof institution.state === 'object' 
+                          ? (institution.state as StateObject).name 
+                          : institution.state}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {isSchool && contingentWithDetails.school?.ppd && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">PPD</div>
+                    <div className="flex items-center gap-1.5">
+                      <div>{contingentWithDetails.school.ppd}</div>
+                    </div>
+                  </div>
+                )}
+
+                {isSchool && contingentWithDetails.school?.category && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">Category</div>
+                    <div className="flex items-center gap-1.5">
+                      <div>{contingentWithDetails.school.category}</div>
+                    </div>
+                  </div>
+                )}
+
+                {institution?.address && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">Address</div>
+                    <div className="text-sm">{institution.address}</div>
+                  </div>
+                )}
+
+                {/* Display contact info from contestant manager if available */}
+                {contingentWithDetails.contestants[0]?.phoneNumber && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{contingentWithDetails.contestants[0].phoneNumber}</span>
+                  </div>
+                )}
+
+                {contingentWithDetails.contestants[0]?.email && (
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{contingentWithDetails.contestants[0].email}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 pt-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Created on {format(new Date(contingentWithDetails.createdAt), 'PPP')}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Statistics cards */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Users className="h-8 w-8 text-blue-500 mb-2" />
+                    <div className="text-2xl font-bold">{contingentWithDetails._count.contestants}</div>
+                    <p className="text-sm text-muted-foreground">Contestants</p>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Award className="h-8 w-8 text-amber-500 mb-2" />
+                    <div className="text-2xl font-bold">{contestStats.totalContests}</div>
+                    <p className="text-sm text-muted-foreground">Contests</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Contest statistics */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Contest Participation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-blue-50 text-blue-600 hover:bg-blue-100">
+                        {contestStats.totalContests}
+                      </Badge>
+                      <span className="text-sm">Total Contests</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-green-50 text-green-600 hover:bg-green-100">
+                        {contestStats.completedContests}
+                      </Badge>
+                      <span className="text-sm">Completed</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-amber-50 text-amber-600 hover:bg-amber-100">
+                        {contestStats.upcomingContests}
+                      </Badge>
+                      <span className="text-sm">Upcoming</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>

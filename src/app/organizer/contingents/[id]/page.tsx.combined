@@ -1,0 +1,519 @@
+import React from "react";
+import { Metadata } from "next";
+import Link from "next/link";
+import { format } from "date-fns";
+import { notFound } from "next/navigation";
+import { 
+  ArrowLeft, 
+  Award, 
+  Building2, 
+  CalendarIcon, 
+  Clock, 
+  Edit, 
+  Mail, 
+  MapPin, 
+  Phone, 
+  School, 
+  ShieldAlert, 
+  Trash2, 
+  UserRound, 
+  Users 
+} from "lucide-react";
+
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { StateFormatter } from "../_components/state-formatter";
+import prisma from "@/lib/prisma";
+
+type PageProps = {
+  params: {
+    id: string;
+  };
+};
+
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
+// This function generates the page metadata dynamically based on the contingent name
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const id = parseInt(params.id);
+  
+  if (isNaN(id)) {
+    return {
+      title: "Contingent Not Found | Techlympics 2025",
+    };
+  }
+  
+  try {
+    const contingent = await prisma.contingent.findUnique({
+      where: { id },
+      select: { name: true }
+    });
+    
+    if (!contingent) {
+      return {
+        title: "Contingent Not Found | Techlympics 2025",
+      };
+    }
+    
+    return {
+      title: `${contingent.name} | Contingent Details | Techlympics 2025`,
+      description: `View and manage details for the ${contingent.name} contingent`,
+    };
+  } catch (error) {
+    return {
+      title: "Contingent Details | Techlympics 2025",
+    };
+  }
+}
+
+// Define State Object interface for type safety
+interface StateObject {
+  name: string;
+  id: number;
+  zoneId: number;
+}
+// Define detailed contingent type to match Prisma schema
+interface ContingentWithDetails {
+  id: number;
+  name: string;
+  short_name: string | null;
+  logoUrl: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  participantId: number | null;
+  managedByParticipant: boolean;
+  schoolId: number | null;
+  higherInstId: number | null;
+  school?: {
+    id: number;
+    name: string;
+    state: string | StateObject;
+    ppd: string | null;
+    address: string | null;
+    category: string | null;
+  } | null;
+  higherInstitution?: {
+    id: number;
+    name: string;
+    state: string | StateObject;
+    address: string | null;
+  } | null;
+  contestants: Array<{
+    id: number;
+    name: string;
+    gender: string | null;
+    ic: string | null;
+    phoneNumber: string | null;
+    email: string | null;
+    contests: Array<{
+      id: number;
+      contest: {
+        id: number;
+        name: string;
+        startDate?: Date;
+        endDate?: Date;
+      };
+    }>;
+  }>;
+  _count: {
+    contestants: number;
+  };
+}
+
+export default async function ContingentDetailPage({ params }: PageProps) {
+  const id = parseInt(params.id);
+  
+  if (isNaN(id)) {
+    notFound();
+  }
+  
+  try {
+    // Fetch contingent details with all related information
+    // The query structure matches the actual Prisma schema
+    const contingent = await prisma.contingent.findUnique({
+      where: { id },
+      include: {
+        school: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            ppd: true,
+            address: true,
+            category: true
+          }
+        },
+        higherInstitution: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            address: true,
+          }
+        },
+        contestants: {
+          select: {
+            id: true,
+            name: true,
+            gender: true,
+            ic: true,
+            phoneNumber: true,
+            email: true,
+            contests: {
+              select: {
+                id: true,
+                contest: {
+                  select: {
+                    id: true,
+                    name: true,
+                    startDate: true,
+                    endDate: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            name: 'asc'
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
+        }
+      }
+    });
+    
+    if (!contingent) {
+      notFound();
+    }
+
+    // Cast to our detailed type
+    const contingentWithDetails = contingent as unknown as ContingentWithDetails;
+    // Calculate contest participation statistics
+    const contestStats = {
+      totalContests: 0,
+      upcomingContests: 0,
+      completedContests: 0
+    };
+
+    const contestIds = new Set<number>();
+    const now = new Date();
+
+    // Calculate contest statistics by iterating through each contestant's contests
+    contingentWithDetails.contestants.forEach(contestant => {
+      contestant.contests.forEach(participation => {
+        // Add to unique contest IDs set
+        contestIds.add(participation.contest.id);
+        
+        // If contest has start/end dates, use them for statistics
+        if (participation.contest.startDate && participation.contest.endDate) {
+          const startDate = new Date(participation.contest.startDate);
+          const endDate = new Date(participation.contest.endDate);
+          
+          if (endDate < now) {
+            contestStats.completedContests++;
+          } else if (startDate > now) {
+            contestStats.upcomingContests++;
+          }
+        }
+      });
+    });
+    
+    contestStats.totalContests = contestIds.size;
+
+    // Get the institution details - either school or higher institution
+    const institution = contingentWithDetails.school || contingentWithDetails.higherInstitution;
+    const isSchool = !!contingentWithDetails.school;
+    
+    return (
+      <div className="container mx-auto py-6 space-y-8">
+        {/* Back button and header */}
+        <div className="space-y-4">
+          <Link 
+            href="/organizer/contingents" 
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-primary"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back to Contingents
+          </Link>
+          
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <PageHeader 
+              title={contingentWithDetails.name}
+              description={
+                <>
+                  {institution?.name || "No institution"}
+                  <StateFormatter state={institution?.state} />
+                </>
+              }
+            />
+            
+            <div className="flex items-center gap-2">
+              <Button variant="outline" className="gap-1" size="sm">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="destructive" size="sm" className="gap-1">
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Main content */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left column - Contingent details */}
+          <div className="space-y-6">
+            {/* Contingent info card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {isSchool ? (
+                    <School className="h-5 w-5 text-amber-500" />
+                  ) : (
+                    <Building2 className="h-5 w-5 text-purple-500" />
+                  )}
+                  {isSchool ? 'School Contingent' : 'Higher Institution Contingent'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <div className="text-sm font-medium">Contingent Name</div>
+                  <div>{contingentWithDetails.name}</div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <div className="text-sm font-medium">{isSchool ? 'School' : 'Institution'}</div>
+                  <div>{institution?.name || "No institution"}</div>
+                </div>
+                {institution?.state && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">State</div>
+                    <div className="flex items-center gap-1.5">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span>
+                        {typeof institution.state === 'object' 
+                          ? (institution.state as StateObject).name 
+                          : institution.state}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {isSchool && contingentWithDetails.school?.ppd && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">PPD</div>
+                    <div className="flex items-center gap-1.5">
+                      <div>{contingentWithDetails.school.ppd}</div>
+                    </div>
+                  </div>
+                )}
+
+                {isSchool && contingentWithDetails.school?.category && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">Category</div>
+                    <div className="flex items-center gap-1.5">
+                      <div>{contingentWithDetails.school.category}</div>
+                    </div>
+                  </div>
+                )}
+
+                {institution?.address && (
+                  <div className="space-y-1.5">
+                    <div className="text-sm font-medium">Address</div>
+                    <div className="text-sm">{institution.address}</div>
+                  </div>
+                )}
+
+                {/* Display contact info from contestant manager if available */}
+                {contingentWithDetails.contestants[0]?.phoneNumber && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{contingentWithDetails.contestants[0].phoneNumber}</span>
+                  </div>
+                )}
+
+                {contingentWithDetails.contestants[0]?.email && (
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{contingentWithDetails.contestants[0].email}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 pt-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Created on {format(new Date(contingentWithDetails.createdAt), 'PPP')}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Statistics cards */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Users className="h-8 w-8 text-blue-500 mb-2" />
+                    <div className="text-2xl font-bold">{contingentWithDetails._count.contestants}</div>
+                    <p className="text-sm text-muted-foreground">Contestants</p>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Award className="h-8 w-8 text-amber-500 mb-2" />
+                    <div className="text-2xl font-bold">{contestStats.totalContests}</div>
+                    <p className="text-sm text-muted-foreground">Contests</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Contest statistics */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Contest Participation</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-blue-50 text-blue-600 hover:bg-blue-100">
+                        {contestStats.totalContests}
+                      </Badge>
+                      <span className="text-sm">Total Contests</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-green-50 text-green-600 hover:bg-green-100">
+                        {contestStats.completedContests}
+                      </Badge>
+                      <span className="text-sm">Completed</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-amber-50 text-amber-600 hover:bg-amber-100">
+                        {contestStats.upcomingContests}
+                      </Badge>
+                      <span className="text-sm">Upcoming</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Right column - Contestants */}
+          <div className="md:col-span-2">
+            <Card className="h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-xl font-bold">Contestants</CardTitle>
+                <Button size="sm" className="gap-1">
+                  <UserRound className="h-4 w-4" />
+                  Add Contestant
+                </Button>
+              </CardHeader>
+              
+              <CardContent>
+                {contingentWithDetails.contestants.length > 0 ? (
+                  <div className="space-y-4">
+                    {contingentWithDetails.contestants.map((contestant) => (
+                      <Card key={contestant.id} className="overflow-hidden border-l-4 border-l-primary">
+                        <CardHeader className="py-3">
+                          <div className="flex items-start gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarFallback>{contestant.name.substring(0, 2)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <CardTitle className="text-base">{contestant.name}</CardTitle>
+                              <CardDescription>
+                                ID: {contestant.ic || 'N/A'} 
+                                {contestant.gender && (
+                                  <span className="ml-2">
+                                    Gender: {contestant.gender === 'M' ? 'Male' : 'Female'}
+                                  </span>
+                                )}
+                              </CardDescription>
+                            </div>
+                            
+                            <div className="ml-auto">
+                              <Link href={`/organizer/participants/${contestant.id}`}>
+                                <Button variant="outline" size="sm">View Profile</Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        
+                        {contestant.contests.length > 0 && (
+                          <CardContent className="pt-0 pb-3">
+                            <Separator className="mb-3" />
+                            <div className="text-sm font-medium mb-2">Contests</div>
+                            <div className="flex flex-wrap gap-2">
+                              {contestant.contests.map((participation) => (
+                                <Badge 
+                                  key={participation.id}
+                                  variant="secondary" 
+                                  className="flex items-center gap-1"
+                                >
+                                  <Award className="h-3 w-3" />
+                                  {participation.contest.name}
+                                </Badge>
+                              ))}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <ShieldAlert className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No Contestants</h3>
+                    <p className="text-muted-foreground mb-4">
+                      This contingent doesn't have any contestants yet.
+                    </p>
+                    <Button>
+                      <UserRound className="h-4 w-4 mr-1" />
+                      Add Contestant
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+              
+              {contingentWithDetails.contestants.length > 0 && (
+                <CardFooter className="flex justify-between border-t pt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {contingentWithDetails.contestants.length} contestants
+                  </div>
+                  {contingentWithDetails.contestants.length > 10 && (
+                    <Button variant="outline" size="sm">Load More</Button>
+                  )}
+                </CardFooter>
+              )}
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  } catch (error) {
+    console.error("Error fetching contingent:", error);
+    notFound();
+  }
+}

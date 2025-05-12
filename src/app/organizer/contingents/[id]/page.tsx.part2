@@ -1,0 +1,120 @@
+// Define detailed contingent type to match Prisma schema
+interface ContingentWithDetails {
+  id: number;
+  name: string;
+  short_name: string | null;
+  logoUrl: string | null;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  participantId: number | null;
+  managedByParticipant: boolean;
+  schoolId: number | null;
+  higherInstId: number | null;
+  school?: {
+    id: number;
+    name: string;
+    state: string | StateObject;
+    ppd: string | null;
+    address: string | null;
+    category: string | null;
+  } | null;
+  higherInstitution?: {
+    id: number;
+    name: string;
+    state: string | StateObject;
+    address: string | null;
+  } | null;
+  contestants: Array<{
+    id: number;
+    name: string;
+    gender: string | null;
+    ic: string | null;
+    phoneNumber: string | null;
+    email: string | null;
+    contests: Array<{
+      id: number;
+      contest: {
+        id: number;
+        name: string;
+        startDate?: Date;
+        endDate?: Date;
+      };
+    }>;
+  }>;
+  _count: {
+    contestants: number;
+  };
+}
+
+export default async function ContingentDetailPage({ params }: PageProps) {
+  const id = parseInt(params.id);
+  
+  if (isNaN(id)) {
+    notFound();
+  }
+  
+  try {
+    // Fetch contingent details with all related information
+    // The query structure matches the actual Prisma schema
+    const contingent = await prisma.contingent.findUnique({
+      where: { id },
+      include: {
+        school: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            ppd: true,
+            address: true,
+            category: true
+          }
+        },
+        higherInstitution: {
+          select: {
+            id: true,
+            name: true,
+            state: true,
+            address: true,
+          }
+        },
+        contestants: {
+          select: {
+            id: true,
+            name: true,
+            gender: true,
+            ic: true,
+            phoneNumber: true,
+            email: true,
+            contests: {
+              select: {
+                id: true,
+                contest: {
+                  select: {
+                    id: true,
+                    name: true,
+                    startDate: true,
+                    endDate: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            name: 'asc'
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
+        }
+      }
+    });
+    
+    if (!contingent) {
+      notFound();
+    }
+
+    // Cast to our detailed type
+    const contingentWithDetails = contingent as unknown as ContingentWithDetails;

@@ -1,0 +1,80 @@
+import React from "react";
+import { Metadata } from "next";
+import Link from "next/link";
+import { format } from "date-fns";
+import { notFound } from "next/navigation";
+import { 
+  ArrowLeft, 
+  Award, 
+  Building2, 
+  CalendarIcon, 
+  Clock, 
+  Edit, 
+  Mail, 
+  MapPin, 
+  Phone, 
+  School, 
+  ShieldAlert, 
+  Trash2, 
+  UserRound, 
+  Users 
+} from "lucide-react";
+
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { StateFormatter } from "../_components/state-formatter";
+import prisma from "@/lib/prisma";
+
+type PageProps = {
+  params: {
+    id: string;
+  };
+};
+
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
+// This function generates the page metadata dynamically based on the contingent name
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const id = parseInt(params.id);
+  
+  if (isNaN(id)) {
+    return {
+      title: "Contingent Not Found | Techlympics 2025",
+    };
+  }
+  
+  try {
+    const contingent = await prisma.contingent.findUnique({
+      where: { id },
+      select: { name: true }
+    });
+    
+    if (!contingent) {
+      return {
+        title: "Contingent Not Found | Techlympics 2025",
+      };
+    }
+    
+    return {
+      title: `${contingent.name} | Contingent Details | Techlympics 2025`,
+      description: `View and manage details for the ${contingent.name} contingent`,
+    };
+  } catch (error) {
+    return {
+      title: "Contingent Details | Techlympics 2025",
+    };
+  }
+}
+
+// Define State Object interface for type safety
+interface StateObject {
+  name: string;
+  id: number;
+  zoneId: number;
+}
