@@ -166,9 +166,24 @@ export default async function DashboardPage() {
     
     console.log('State count map:', Object.fromEntries(stateCountMap));
     
-    // Convert the map to the required array format
+    // Function to abbreviate long state names
+    const formatStateName = (stateName: string): string => {
+      if (!stateName) return stateName;
+      
+      const upperStateName = stateName.toUpperCase();
+      
+      if (upperStateName.includes('NEGERI SEMBILAN')) return 'N9';
+      if (upperStateName.includes('PULAU PINANG')) return 'P. PINANG';
+      if (upperStateName.includes('KUALA LUMPUR')) return 'KUALA LUMPUR';
+      if (upperStateName.includes('WILAYAH PERSEKUTUAN KUALA LUMPUR')) return 'WP KUALA LUMPUR';
+      if (upperStateName.includes('WILAYAH PERSEKUTUAN')) return `WP ${upperStateName.replace('WILAYAH PERSEKUTUAN', '').trim()}`;
+      
+      return stateName;
+    };
+    
+    // Convert the map to the required array format with formatted state names
     contingentStateData = Array.from(stateCountMap.entries())
-      .map(([state, count]) => ({ state, count }))
+      .map(([state, count]) => ({ state: formatStateName(state), count }))
       .sort((a, b) => b.count - a.count); // Sort by count in descending order
     
     console.log('Live contingent data by state:', contingentStateData);
@@ -360,10 +375,25 @@ export default async function DashboardPage() {
       }
     }
     
-    // Convert the map to the required array format
+    // Function to abbreviate long state names
+    const formatStateName = (stateName: string): string => {
+      if (!stateName) return stateName;
+      
+      const upperStateName = stateName.toUpperCase();
+      
+      if (upperStateName.includes('NEGERI SEMBILAN')) return 'N9';
+      if (upperStateName.includes('PULAU PINANG')) return 'P. PINANG';
+      if (upperStateName.includes('KUALA LUMPUR')) return 'KUALA LUMPUR';
+      if (upperStateName.includes('WILAYAH PERSEKUTUAN KUALA LUMPUR')) return 'WP KUALA LUMPUR';
+      if (upperStateName.includes('WILAYAH PERSEKUTUAN')) return `WP ${upperStateName.replace('WILAYAH PERSEKUTUAN', '').trim()}`;
+      
+      return stateName;
+    };
+    
+    // Convert the map to the required array format with formatted state names
     participationStateData = Array.from(stateGenderMap.entries())
       .map(([state, genderCounts]) => ({
-        state,
+        state: formatStateName(state),
         MALE: genderCounts.MALE,
         FEMALE: genderCounts.FEMALE
       }))

@@ -1,12 +1,29 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Chart colors for gender representation
 const GENDER_COLORS = {
   MALE: '#0088FE',  // Blue for male
   FEMALE: '#FF6B93'  // Pink for female
+};
+
+// Function to abbreviate long state names for better display
+const formatStateName = (stateName: string): string => {
+  if (!stateName) return stateName;
+  
+  const upperStateName = stateName.toUpperCase();
+  
+  if (upperStateName.includes('NEGERI SEMBILAN')) return 'N9';
+  if (upperStateName.includes('PULAU PINANG')) return 'P. PINANG';
+  if (upperStateName.includes('WILAYAH PERSEKUTUAN KUALA LUMPUR')) return 'WP KL';
+  if (upperStateName.includes('WILAYAH PERSEKUTUAN')) {
+    return `WP ${upperStateName.replace('WILAYAH PERSEKUTUAN', '').trim()}`;
+  }
+  if (upperStateName.includes('KUALA LUMPUR')) return 'KL';
+  
+  return stateName;
 };
 
 type ParticipationStateData = {
@@ -30,10 +47,16 @@ export default function ParticipationStateChart({ data }: { data: ParticipationS
               data={data}
               margin={{ top: 20, right: 30, left: 80, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" />
-              <YAxis dataKey="state" type="category" width={80} />
-              <Tooltip formatter={(value, name) => [`${value} participants`, name]} />
+              <XAxis type="number" axisLine={false} tickLine={false} hide />
+              <YAxis 
+                dataKey="state" 
+                type="category" 
+                width={80} 
+                axisLine={false} 
+                tickLine={false}
+                tickFormatter={formatStateName} 
+              />
+              <Tooltip formatter={(value, name) => [`${value} participations`, name]} cursor={false} />
               <Legend />
               <Bar dataKey="MALE" stackId="a" fill={GENDER_COLORS.MALE} name="Male">
                 <LabelList dataKey="MALE" position="inside" fill="#FFFFFF" />
