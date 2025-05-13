@@ -74,13 +74,10 @@ export default function UnifiedSearchClient() {
   // Use the API search function directly
   const performSearch = () => {
     if (searchTerm.length >= 2) {
-      // Call the real API instead of using mock data
+      // Call the real API to get search results
       searchAPI();
     }
   };
-  
-  // Uncomment this line to use the API-based search instead of mock data
-  // const performSearch = searchAPI;
 
   // Function to determine avatar color based on result type
   const getAvatarClass = (type: SearchResultType) => {
