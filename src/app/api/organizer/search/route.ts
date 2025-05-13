@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 
 // Define the types for search results
-type SearchResultType = 'contestant' | 'contingent' | 'team' | 'school';
+type SearchResultType = 'contestant' | 'contingent' | 'team' | 'school' | 'participant';
 
 export async function GET(request: Request) {
   // Check authentication
@@ -43,6 +43,50 @@ export async function GET(request: Request) {
 
     const results: any[] = [];
     
+    // Search for user participants (by email) if filter is 'all'
+    if (filter === "all") {
+      try {
+        // Fetch user participants and filter in memory for case-insensitive search
+        const allParticipants = await prisma.user_participant.findMany({
+          include: {
+            school: true,
+            higherInstitution: true,
+            contingents: {
+              take: 1 // Just to check if they're managing any contingent
+            },
+          },
+          // No limit to ensure we find email matches
+        });
+        
+        console.log(`Found ${allParticipants.length} user participants total`);
+        
+        // Filter by email
+        const participants = allParticipants.filter(participant => {
+          return participant.email.toLowerCase().includes(lowerTerm);
+        }).slice(0, 20); // Cap at 20 results
+        
+        console.log(`Found ${participants.length} participants matching email "${term}"`);
+
+        results.push(
+          ...participants.map((participant) => ({
+            id: participant.id,
+            type: "participant" as SearchResultType,
+            name: participant.name,
+            description: `Email: ${participant.email} | ${participant.contingents.length > 0 ? 'Manages contingent' : 'No contingent'}`,
+            tags: [
+              'Participant',
+              participant.school ? "School" : null,
+              participant.higherInstitution ? "Higher Institution" : null,
+              participant.isActive ? "Active" : "Inactive",
+            ].filter(Boolean),
+            url: `/organizer/participants/${participant.id}`,
+          }))
+        );
+      } catch (error) {
+        console.error("Error searching participants:", error);
+      }
+    }
+    
     // Search for contestants if filter is 'all' or 'contestant'
     if (filter === "all" || filter === "contestant") {
       try {
@@ -53,21 +97,18 @@ export async function GET(request: Request) {
           include: {
             contingent: true,
           },
-          take: 50, // Fetch more to allow for filtering
+          // Remove the limit to ensure all contestants are included
         });
         
         console.log(`Found ${allContestants.length} contestants total`);
         
-        // Manual case-insensitive filtering
+        // Manual case-insensitive filtering - only name and ic as requested
         const contestants = allContestants.filter(contestant => {
           return (
             (contestant.name && contestant.name.toLowerCase().includes(lowerTerm)) ||
-            (contestant.ic && contestant.ic.toLowerCase().includes(lowerTerm)) ||
-            (contestant.email && contestant.email.toLowerCase().includes(lowerTerm)) ||
-            (contestant.phoneNumber && contestant.phoneNumber.toLowerCase().includes(lowerTerm)) ||
-            (contestant.class_name && contestant.class_name.toLowerCase().includes(lowerTerm))
+            (contestant.ic && contestant.ic.toLowerCase().includes(lowerTerm))
           );
-        }).slice(0, 10); // Take only 10 results
+        }).slice(0, 20); // Increased to show more results
         
         console.log(`Found ${contestants.length} contestants matching "${term}"`);
 
@@ -106,7 +147,7 @@ export async function GET(request: Request) {
               },
             },
           },
-          take: 50, // Fetch more to allow for filtering
+          // Remove the limit to ensure all contingents are included
         });
         
         console.log(`Found ${allContingents.length} contingents total`);
@@ -116,14 +157,12 @@ export async function GET(request: Request) {
           console.log('First contingent:', JSON.stringify(allContingents[0], null, 2));
         }
         
-        // Manual case-insensitive filtering
+        // Manual case-insensitive filtering - only name as requested
         const contingents = allContingents.filter(contingent => {
           return (
-            (contingent.name && contingent.name.toLowerCase().includes(lowerTerm)) ||
-            (contingent.short_name && contingent.short_name.toLowerCase().includes(lowerTerm)) ||
-            (contingent.description && contingent.description.toLowerCase().includes(lowerTerm))
+            (contingent.name && contingent.name.toLowerCase().includes(lowerTerm))
           );
-        }).slice(0, 10); // Take only 10 results
+        }).slice(0, 20); // Increased to show more results
         
         console.log(`Found ${contingents.length} contingents matching "${term}"`);
 
@@ -141,7 +180,7 @@ export async function GET(request: Request) {
               contingent.higherInstitution ? "Higher Institution" : null,
               "Active",
             ].filter(Boolean),
-            url: `/organizer/participants/contingents/${contingent.id}`,
+            url: `/organizer/contingents/${contingent.id}`,
           }))
         );
       } catch (error) {
@@ -161,22 +200,49 @@ export async function GET(request: Request) {
               },
             },
           },
-          take: 50, // Fetch more to allow for filtering
+          // Remove the limit to ensure all schools are included
         });
         
         console.log(`Found ${allSchools.length} schools total`);
         
-        // Manual case-insensitive filtering
+        // Debug: Check if there are schools with 'simpang' or 'sungai' in their name
+        const simpangSchools = allSchools.filter(s => 
+          s.name && s.name.toLowerCase().includes('simpang')
+        );
+        const sungaiSchools = allSchools.filter(s => 
+          s.name && s.name.toLowerCase().includes('sungai')
+        );
+        
+        console.log(`DEBUG - Schools with 'simpang' in name: ${simpangSchools.length}`);
+        console.log(`DEBUG - Schools with 'sungai' in name: ${sungaiSchools.length}`);
+        
+        if (simpangSchools.length > 0) {
+          console.log(`DEBUG - First 'simpang' school: ${JSON.stringify(simpangSchools[0].name)}`);
+        }
+        if (sungaiSchools.length > 0) {
+          console.log(`DEBUG - First 'sungai' school: ${JSON.stringify(sungaiSchools[0].name)}`);
+        }
+        
+        // Manual case-insensitive filtering - only name as requested
         const schools = allSchools.filter(school => {
-          return (
-            (school.name && school.name.toLowerCase().includes(lowerTerm)) ||
-            (school.address && school.address.toLowerCase().includes(lowerTerm)) ||
-            (school.city && school.city.toLowerCase().includes(lowerTerm)) ||
-            (school.postcode && school.postcode.toLowerCase().includes(lowerTerm))
-          );
-        }).slice(0, 10); // Take only 10 results
+          const nameMatch = school.name && school.name.toLowerCase().includes(lowerTerm);
+          
+          // Debug specific search terms
+          if (lowerTerm.includes('simpang') || lowerTerm.includes('sungai')) {
+            console.log(`DEBUG - School: ${school.name}, Match for '${lowerTerm}': ${nameMatch}`);
+          }
+          
+          return nameMatch;
+        }).slice(0, 20); // Increased to show more results
         
         console.log(`Found ${schools.length} schools matching "${term}"`);
+        
+        // Extra debug for specific terms
+        if (lowerTerm.includes('simpang')) {
+          console.log(`DEBUG - Searching for 'simpang', found ${schools.length} matches`);
+        } else if (lowerTerm.includes('sungai')) {
+          console.log(`DEBUG - Searching for 'sungai', found ${schools.length} matches`);
+        }
 
         results.push(
           ...schools.map((school) => ({
@@ -203,18 +269,17 @@ export async function GET(request: Request) {
       try {
         // Fetch teams and filter in memory
         const allTeams = await prisma.team.findMany({
-          take: 50, // Fetch more to allow for filtering
+          // Remove the limit to ensure all teams are included
         });
         
         console.log(`Found ${allTeams.length} teams total`);
         
-        // Manual case-insensitive filtering
+        // Manual case-insensitive filtering - only name as requested
         const teams = allTeams.filter(team => {
           return (
-            (team.name && team.name.toLowerCase().includes(lowerTerm)) ||
-            (team.description && team.description.toLowerCase().includes(lowerTerm))
+            (team.name && team.name.toLowerCase().includes(lowerTerm))
           );
-        }).slice(0, 10); // Take only 10 results
+        }).slice(0, 20); // Increased to show more results
         
         console.log(`Found ${teams.length} teams matching "${term}"`);
 
@@ -261,63 +326,9 @@ export async function GET(request: Request) {
     // For debugging
     console.log(`Search term: "${term}", Results count: ${results.length}`);
     
-    // If no results found, add sample data for testing/demonstration purposes
+    // Return actual database results, even if empty
     if (results.length === 0) {
-      console.log('No database results found. Adding sample data that matches the search term...');
-      
-      // Create sample data that includes the search term
-      const sampleResults: any[] = [
-        {
-          id: 1001,
-          type: 'contingent' as SearchResultType,
-          name: `SEKOLAH KEBANGSAAN SIMPANG LIMA`,
-          description: `Sample School | 25 members`,
-          tags: ['School', 'Active', 'Sample Data'],
-          url: '#'
-        },
-        {
-          id: 1002,
-          type: 'contestant' as SearchResultType,
-          name: `Ahmad ${term.toUpperCase()} Abdullah`,
-          description: `IC: 960123145678 | SEKOLAH KEBANGSAAN SIMPANG LIMA`,
-          tags: ['MALE', 'Age: 29', 'Sample Data'],
-          url: '#'
-        },
-        {
-          id: 1003,
-          type: 'team' as SearchResultType,
-          name: `Team ${term.charAt(0).toUpperCase() + term.slice(1)}`,
-          description: `From SEKOLAH KEBANGSAAN SIMPANG LIMA | 4 members`,
-          tags: ['Coding Challenge', 'Sample Data'],
-          url: '#'
-        },
-        {
-          id: 1004, 
-          type: 'school' as SearchResultType,
-          name: `SEKOLAH MENENGAH ${term.toUpperCase()}`,
-          description: `Address: Jalan ${term.charAt(0).toUpperCase() + term.slice(1)}, Kuala Lumpur`,
-          tags: ['Secondary School', 'Sample Data'],
-          url: '#'
-        }
-      ];
-      
-      // Filter sample results to only include those that match the search term
-      const matchingResults = sampleResults.filter(result => {
-        // Always include the first item (SEKOLAH KEBANGSAAN SIMPANG LIMA)
-        if (result.id === 1001) return true;
-        
-        // For other items, check if they match the current filter
-        if (filter !== 'all' && result.type !== filter) return false;
-        
-        // Check if the item contains the search term
-        return (
-          result.name.toLowerCase().includes(lowerTerm) ||
-          result.description.toLowerCase().includes(lowerTerm)
-        );
-      });
-      
-      results.push(...matchingResults);
-      console.log(`Added ${matchingResults.length} sample results`);
+      console.log('No database results found for the search term.');
     }
     
     // Sort results by relevance (how closely the name matches the search term)
