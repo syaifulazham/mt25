@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     // Find the participant by email
     const participant = await prismaExecute(prisma => prisma.user_participant.findUnique({
       where: { email: session.user.email! }
-    }));
+    });
     
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
@@ -124,12 +124,12 @@ export async function GET(request: NextRequest) {
       }
       
       // Get total count for pagination
-      const totalCount = await prismaExecute(prisma => prisma.contestant.count({
+      const totalCount = await prisma.contestant.count({
         where
-      }));
+      });
       
       // Get contestants for all managed contingents with filters and pagination
-      const contestants = await prismaExecute(prisma => prisma.contestant.findMany({
+      const contestants = await prisma.contestant.findMany({
         where,
         skip,
         take: limit,
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
             }
           }
         }
-      }));
+      });
       
       // Return contestants with pagination metadata
       return NextResponse.json({
@@ -169,17 +169,17 @@ export async function GET(request: NextRequest) {
     }
     
     // If contingentId is provided, check if participant is a manager of this contingent
-    const isManager = await prismaExecute(prisma => prisma.contingentManager.findFirst({
+    const isManager = await prisma.contingentManager.findFirst({
       where: {
         participantId: participant.id,
         contingentId: parseInt(contingentId)
       }
-    }));
+    });
     
     // Also check legacy relationship
-    const contingent = await prismaExecute(prisma => prisma.contingent.findUnique({
+    const contingent = await prisma.contingent.findUnique({
       where: { id: parseInt(contingentId) }
-    }));
+    });
     
     const hasAccess = isManager !== null || 
       (contingent?.managedByParticipant && contingent?.participantId === participant.id);
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Get contestants for this specific contingent with updated fields
-    const contestants = await prismaExecute(prisma => prisma.contestant.findMany({
+    const contestants = await prisma.contestant.findMany({
       where: {
         contingentId: parseInt(contingentId)
       },
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         name: 'asc'
       }
-    }));
+    });
     
     return NextResponse.json(contestants);
   } catch (error) {
@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
     // Find the participant by email
     const participant = await prismaExecute(prisma => prisma.user_participant.findUnique({
       where: { email: session.user.email! }
-    }));
+    });
     
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
@@ -264,9 +264,9 @@ export async function POST(request: NextRequest) {
     // Verify that the contingent exists
     const contingentId = parseInt(body.contingentId);
     
-    const contingent = await prismaExecute(prisma => prisma.contingent.findUnique({
+    const contingent = await prisma.contingent.findUnique({
       where: { id: contingentId }
-    }));
+    });
     
     if (!contingent) {
       return NextResponse.json(
@@ -276,12 +276,12 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if participant is a manager of this contingent
-    const isManager = await prismaExecute(prisma => prisma.contingentManager.findFirst({
+    const isManager = await prisma.contingentManager.findFirst({
       where: {
         participantId: participant.id,
         contingentId: contingentId
       }
-    }));
+    });
     
     // Also check legacy relationship
     const hasAccess = isManager !== null || 
@@ -304,9 +304,9 @@ export async function POST(request: NextRequest) {
     }
     
     // Check if IC number is already registered
-    const existingContestant = await prismaExecute(prisma => prisma.contestant.findFirst({
+    const existingContestant = await prisma.contestant.findFirst({
       where: { ic: body.ic }
-    }));
+    });
     
     if (existingContestant) {
       return NextResponse.json(
@@ -353,14 +353,14 @@ export async function POST(request: NextRequest) {
     // Try a simplified approach by explicitly setting all fields without any relations
     try {
       // First, try to create with the standard approach
-      const contestant = await prismaExecute(prisma => prisma.contestant.create({
+      const contestant = await prisma.contestant.create({
         data: {
           ...createData,
           // Explicitly set createdAt and updatedAt to avoid issues
           createdAt: new Date(),
           updatedAt: new Date()
         }
-      }));
+      });
       
       return NextResponse.json(contestant, { status: 201 });
     } catch (error) {
@@ -371,21 +371,21 @@ export async function POST(request: NextRequest) {
         console.log("Attempting to create contestant with direct database query");
         
         try {
-          // Use Prisma's queryRaw to execute a direct SQL query via prismaExecute
+          // Use Prisma's queryRaw to execute a direct SQL query
           // Use participant ID for updatedById and createdById
-          await prismaExecute(prisma => prisma.$queryRaw`
+          await prisma.$queryRaw`
             INSERT INTO contestant 
             (name, ic, gender, age, edu_level, class_name, class_grade, hashcode, contingentId, updatedById, createdById, createdAt, updatedAt) 
             VALUES 
             (${body.name}, ${body.ic}, ${body.gender}, ${parseInt(body.age)}, 
              ${body.edu_level}, ${formattedClassName}, ${classGrade}, 
              ${hashcode}, ${contingentId}, ${participant.id}, ${participant.id}, NOW(), NOW())
-          `);
+          `;
           
           // Fetch the created contestant
-          const createdContestant = await prismaExecute(prisma => prisma.contestant.findFirst({
+          const createdContestant = await prisma.contestant.findFirst({
             where: { ic: body.ic }
-          }));
+          });
           
           if (!createdContestant) {
             throw new Error("Contestant was created but could not be retrieved");

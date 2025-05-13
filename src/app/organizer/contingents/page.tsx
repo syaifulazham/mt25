@@ -70,15 +70,37 @@ interface ContingentData {
   };
 }
 
-export default async function ContingentsPage() {
-  // Use prismaExecute to get all contingent data with proper connection management
-  const contingentData = await prismaExecute(async (prisma) => {
-    // Get all contingents with details in a single query
+export default async function ContingentsPage({ searchParams }: { searchParams: { page?: string, search?: string } }) {
+  // Get the current page from the query params or default to 1
+  const currentPage = parseInt(searchParams.page || '1', 10);
+  const pageSize = 12; // Number of contingents per page
+  const skip = (currentPage - 1) * pageSize;
+  const searchTerm = searchParams.search || '';
+  
+  // Use prismaExecute to get contingent data with pagination and proper connection management
+  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents } = await prismaExecute(async (prisma) => {
+    // Build where clause for searching
+    const whereClause = searchTerm ? {
+      OR: [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { school: { name: { contains: searchTerm, mode: 'insensitive' } } },
+        { higherInstitution: { name: { contains: searchTerm, mode: 'insensitive' } } }
+      ]
+    } : {};
+    
+    // Get total count for pagination
+    const totalContingents = await prisma.contingent.count({
+      where: whereClause
+    });
+    
+    // Get contingents with details and pagination
     const contingentsWithDetails = await prisma.contingent.findMany({
+      where: whereClause,
       orderBy: {
         createdAt: 'desc'
       },
-      take: 10,
+      skip,
+      take: pageSize,
       include: {
         school: {
           select: {
@@ -111,6 +133,7 @@ export default async function ContingentsPage() {
     // Get contingents without contestants
     const contingentsWithoutContestants = await prisma.contingent.findMany({
       where: {
+        ...whereClause,
         contestants: {
           none: {}
         }
@@ -118,7 +141,8 @@ export default async function ContingentsPage() {
       orderBy: {
         createdAt: 'desc'
       },
-      take: 5,
+      take: pageSize,
+      skip,
       include: {
         school: {
           select: {
@@ -143,6 +167,7 @@ export default async function ContingentsPage() {
     // Get school-based contingents
     const schoolContingents = await prisma.contingent.findMany({
       where: {
+        ...whereClause,
         schoolId: {
           not: null
         }
@@ -150,7 +175,8 @@ export default async function ContingentsPage() {
       orderBy: {
         createdAt: 'desc'
       },
-      take: 5,
+      take: pageSize,
+      skip,
       include: {
         school: {
           select: {
@@ -169,6 +195,7 @@ export default async function ContingentsPage() {
     // Get higher institution contingents
     const higherInstContingents = await prisma.contingent.findMany({
       where: {
+        ...whereClause,
         higherInstId: {
           not: null
         }
@@ -176,7 +203,8 @@ export default async function ContingentsPage() {
       orderBy: {
         createdAt: 'desc'
       },
-      take: 5,
+      take: pageSize,
+      skip,
       include: {
         higherInstitution: {
           select: {
@@ -194,20 +222,20 @@ export default async function ContingentsPage() {
     
     // Return all contingent data objects
     return {
-      contingentsWithDetails,
+      contingents: contingentsWithDetails,
+      totalContingents,
       contingentsWithoutContestants,
       schoolContingents,
       higherInstContingents
     };
   });
   
-  // Extract data from the prismaExecute result
-  const {
-    contingentsWithDetails,
-    contingentsWithoutContestants,
-    schoolContingents,
-    higherInstContingents
-  } = contingentData;
+  // Calculate total pages for pagination
+  const totalPages = Math.ceil(totalContingents / pageSize);
+  
+  // Calculate showing range for pagination display
+  const showingFrom = totalContingents === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const showingTo = Math.min(currentPage * pageSize, totalContingents);
 
   // Format state names for display
   const formatStateName = (stateName: string | StateObject | null | undefined): string => {
@@ -234,34 +262,42 @@ export default async function ContingentsPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <PageHeader 
-        title="Contingent Management" 
-        description="Search and manage all contingents in the Techlympics system"
-      />
-      
-      {/* Search and filter */}
-      <div className="flex flex-col md:flex-row gap-4 md:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            type="search" 
-            placeholder="Search contingents by name, school, or location..." 
-            className="pl-8"
-          />
+    <div className="container mx-auto py-10">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Contingents</h1>
+          <p className="text-muted-foreground">
+            Manage all contingents participating in Techlympics 2025
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1">
-            <Filter className="h-4 w-4" />
-            Filters
-          </Button>
-          <Button size="sm" className="gap-1">
+        <Button asChild>
+          <Link href="/organizer/contingents/register" className="gap-1">
             <Plus className="h-4 w-4" />
-            New Contingent
-          </Button>
+            Add New Contingent
+          </Link>
+        </Button>
+      </div>
+
+      {/* Search and filter controls */}
+      <div className="flex flex-wrap gap-3 items-center mb-6">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <form method="get">
+            <Input 
+              type="search" 
+              name="search" 
+              defaultValue={searchTerm}
+              placeholder="Search contingents..." 
+              className="pl-8 bg-white" 
+            />
+            <input type="hidden" name="page" value="1" />
+          </form>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Showing <strong>{showingFrom}</strong> to <strong>{showingTo}</strong> of <strong>{totalContingents}</strong> contingents
         </div>
       </div>
-      
+
       {/* Contingent type tabs */}
       <Tabs defaultValue="all">
         <TabsList className="mb-4">
@@ -272,8 +308,8 @@ export default async function ContingentsPage() {
         </TabsList>
         
         <TabsContent value="all" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {contingentsWithDetails.map((contingent) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {contingents.map((contingent: any) => (
               <Card key={contingent.id} className="overflow-hidden">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -324,8 +360,8 @@ export default async function ContingentsPage() {
         </TabsContent>
         
         <TabsContent value="schools" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {schoolContingents.map((contingent) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {schoolContingents?.map((contingent: any) => (
               <Card key={contingent.id} className="overflow-hidden">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -381,8 +417,8 @@ export default async function ContingentsPage() {
         </TabsContent>
         
         <TabsContent value="higher" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {higherInstContingents.map((contingent) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {higherInstContingents?.map((contingent: any) => (
               <Card key={contingent.id} className="overflow-hidden">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -438,8 +474,8 @@ export default async function ContingentsPage() {
         </TabsContent>
         
         <TabsContent value="no-contestants" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            {contingentsWithoutContestants.map((contingent) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {contingentsWithoutContestants.map((contingent: any) => (
               <Card key={contingent.id} className="overflow-hidden">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
@@ -495,6 +531,73 @@ export default async function ContingentsPage() {
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center space-x-2 mt-8">
+          <Button 
+            variant="outline" 
+            disabled={currentPage <= 1}
+            asChild
+          >
+            <Link href={`/organizer/contingents?page=${currentPage - 1}${searchTerm ? `&search=${searchTerm}` : ''}`}>
+              Previous
+            </Link>
+          </Button>
+          
+          <div className="flex items-center space-x-1">
+            {[...Array(totalPages)].map((_, index) => {
+              const page = index + 1;
+              // Create a window of pages to display
+              if (
+                page === 1 || 
+                page === totalPages || 
+                (page >= currentPage - 1 && page <= currentPage + 1) ||
+                (totalPages <= 7) ||
+                (currentPage <= 3 && page <= 5) ||
+                (currentPage >= totalPages - 2 && page >= totalPages - 4)
+              ) {
+                return (
+                  <Button 
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    asChild
+                  >
+                    <Link href={`/organizer/contingents?page=${page}${searchTerm ? `&search=${searchTerm}` : ''}`}>
+                      {page}
+                    </Link>
+                  </Button>
+                );
+              } else if (
+                (page === currentPage - 2 && currentPage > 3) ||
+                (page === currentPage + 2 && currentPage < totalPages - 2)
+              ) {
+                return <span key={page} className="px-2">...</span>;
+              }
+              return null;
+            })}
+          </div>
+          
+          <Button 
+            variant="outline" 
+            disabled={currentPage >= totalPages}
+            asChild
+          >
+            <Link href={`/organizer/contingents?page=${currentPage + 1}${searchTerm ? `&search=${searchTerm}` : ''}`}>
+              Next
+            </Link>
+          </Button>
+        </div>
+      )}
+      
+      <div className="text-xs text-center text-muted-foreground mt-2">
+        {totalContingents > 0 ? (
+          <p>Showing {showingFrom} to {showingTo} of {totalContingents} contingents</p>
+        ) : (
+          <p>No contingents found</p>
+        )}
+      </div>
     </div>
   );
 }
