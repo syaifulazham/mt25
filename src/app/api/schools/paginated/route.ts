@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import { prisma } from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { Prisma } from "@prisma/client";
@@ -54,33 +54,39 @@ export async function GET(request: NextRequest) {
       // For search queries, use a more specific approach
       const searchCondition = `%${search}%`;
       
-      // Get total count with search
-      const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM school
-        WHERE (name LIKE ${searchCondition} OR code LIKE ${searchCondition} 
-        OR ppd LIKE ${searchCondition} OR city LIKE ${searchCondition})
-        ${stateId && stateId !== "all" ? Prisma.sql`AND stateId = ${parseInt(stateId)}` : Prisma.sql``}
-        ${level && level !== "all" ? Prisma.sql`AND level = ${level}` : Prisma.sql``}
-        ${category && category !== "all" ? Prisma.sql`AND category = ${category}` : Prisma.sql``}
-        ${ppd && ppd !== "all" ? Prisma.sql`AND ppd = ${ppd}` : Prisma.sql``}
-      `;
+      // Execute both queries with connection management
+      const results = await prismaExecute(async (prisma) => {
+        // Get total count with search
+        const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count FROM school
+          WHERE (name LIKE ${searchCondition} OR code LIKE ${searchCondition} 
+          OR ppd LIKE ${searchCondition} OR city LIKE ${searchCondition})
+          ${stateId && stateId !== "all" ? Prisma.sql`AND stateId = ${parseInt(stateId)}` : Prisma.sql``}
+          ${level && level !== "all" ? Prisma.sql`AND level = ${level}` : Prisma.sql``}
+          ${category && category !== "all" ? Prisma.sql`AND category = ${category}` : Prisma.sql``}
+          ${ppd && ppd !== "all" ? Prisma.sql`AND ppd = ${ppd}` : Prisma.sql``}
+        `;
+        
+        // Get schools with search
+        const schoolResults = await prisma.$queryRaw<any[]>`
+          SELECT s.*, st.id as state_id, st.name as state_name
+          FROM school s
+          LEFT JOIN state st ON s.stateId = st.id
+          WHERE (s.name LIKE ${searchCondition} OR s.code LIKE ${searchCondition} 
+          OR s.ppd LIKE ${searchCondition} OR s.city LIKE ${searchCondition})
+          ${stateId && stateId !== "all" ? Prisma.sql`AND s.stateId = ${parseInt(stateId)}` : Prisma.sql``}
+          ${level && level !== "all" ? Prisma.sql`AND s.level = ${level}` : Prisma.sql``}
+          ${category && category !== "all" ? Prisma.sql`AND s.category = ${category}` : Prisma.sql``}
+          ${ppd && ppd !== "all" ? Prisma.sql`AND s.ppd = ${ppd}` : Prisma.sql``}
+          ORDER BY s.name ASC
+          LIMIT ${skip}, ${pageSize}
+        `;
+        
+        return { countResult, schoolResults };
+      });
       
-      totalCount = Number(countResult[0].count);
-      
-      // Get schools with search
-      const schoolResults = await prisma.$queryRaw<any[]>`
-        SELECT s.*, st.id as state_id, st.name as state_name
-        FROM school s
-        LEFT JOIN state st ON s.stateId = st.id
-        WHERE (s.name LIKE ${searchCondition} OR s.code LIKE ${searchCondition} 
-        OR s.ppd LIKE ${searchCondition} OR s.city LIKE ${searchCondition})
-        ${stateId && stateId !== "all" ? Prisma.sql`AND s.stateId = ${parseInt(stateId)}` : Prisma.sql``}
-        ${level && level !== "all" ? Prisma.sql`AND s.level = ${level}` : Prisma.sql``}
-        ${category && category !== "all" ? Prisma.sql`AND s.category = ${category}` : Prisma.sql``}
-        ${ppd && ppd !== "all" ? Prisma.sql`AND s.ppd = ${ppd}` : Prisma.sql``}
-        ORDER BY s.name ASC
-        LIMIT ${skip}, ${pageSize}
-      `;
+      totalCount = Number(results.countResult[0].count);
+      const schoolResults = results.schoolResults;
       
       // Format the results to match the expected structure
       schools = schoolResults.map((school: any) => ({
@@ -91,23 +97,30 @@ export async function GET(request: NextRequest) {
         }
       }));
     } else {
-      // Without search, use the standard Prisma query
-      totalCount = await prisma.school.count({ where: whereConditions });
-      
-      schools = await prisma.school.findMany({
-        where: whereConditions,
-        skip,
-        take: pageSize,
-        orderBy: { name: 'asc' },
-        include: {
-          state: {
-            select: {
-              id: true,
-              name: true
+      // Without search, use the standard Prisma query with connection management
+      const results = await prismaExecute(async (prisma) => {
+        const count = await prisma.school.count({ where: whereConditions });
+        
+        const schoolsData = await prisma.school.findMany({
+          where: whereConditions,
+          skip,
+          take: pageSize,
+          orderBy: { name: 'asc' },
+          include: {
+            state: {
+              select: {
+                id: true,
+                name: true
+              }
             }
           }
-        }
+        });
+        
+        return { count, schoolsData };
       });
+      
+      totalCount = results.count;
+      schools = results.schoolsData;
     }
 
     // Calculate total pages

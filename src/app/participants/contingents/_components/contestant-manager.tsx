@@ -241,13 +241,27 @@ export default function ContestantManager({ contingentId, contingentName, isMana
     }
     
     try {
-      const response = await fetch(`/api/participants/contestants?id=${id}`, {
+      const response = await fetch(`/api/participants/contestants/${id}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete contestant');
+        let errorMessage = 'Failed to delete contestant';
+        
+        // Check if there's content to parse
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
       
       // Update the local state

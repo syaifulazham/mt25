@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 // Mark this route as dynamic to fix the build error
 export const dynamic = 'force-dynamic';
@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const limit = parseInt(searchParams.get("limit") || "5");
     
-    // Get all published galleries
-    const galleries = await prisma.photogallery.findMany({
+    // Get all published galleries using prismaExecute for connection management
+    const galleries = await prismaExecute(prisma => prisma.photogallery.findMany({
       where: {
         isPublished: true
       }
-    });
+    }));
     
     if (galleries.length === 0) {
       return NextResponse.json([]);
@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
     // Get IDs of all galleries
     const galleryIds = galleries.map(gallery => gallery.id);
     
-    // Get all photos from these galleries
-    const photos = await prisma.photo.findMany({
+    // Get all photos from these galleries using prismaExecute for connection management
+    const photos = await prismaExecute(prisma => prisma.photo.findMany({
       where: {
         galleryId: {
           in: galleryIds
         }
       }
-    });
+    }));
     
     // Shuffle and limit the photos
     const shuffled = [...photos].sort(() => 0.5 - Math.random());

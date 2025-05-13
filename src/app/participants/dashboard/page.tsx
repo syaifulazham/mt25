@@ -15,7 +15,7 @@ import ContestantsSummary from "./_components/contestants-summary";
 import TeamsSummary from "./_components/teams-summary";
 import PendingRequestsAlert from "./_components/pending-requests-alert";
 import VideoGallery from "./_components/video-gallery";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import DashboardClient from "./_components/dashboard-client";
 
 // Import gradient card styles
@@ -45,7 +45,7 @@ export default async function DashboardPage() {
   
   // Check if this is a participant user (all users in the participant section should be)
   try {
-    const participantDetails = await prisma.user_participant.findUnique({
+    const participantDetails = await prismaExecute(prisma => prisma.user_participant.findUnique({
       where: { id: Number(user.id) },
       include: {
         school: {
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
           }
         }
       }
-    });
+    }));
     
     if (participantDetails) {
       userDetails = {

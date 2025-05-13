@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-
-const prisma = new PrismaClient();
+import { prismaExecute } from '@/lib/prisma';
 
 /**
  * API route to initialize system with an admin user if none exists
@@ -11,8 +9,8 @@ const prisma = new PrismaClient();
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check if any users exist
-    const userCount = await prisma.user.count();
+    // Check if any users exist using prismaExecute for connection management
+    const userCount = await prismaExecute(prisma => prisma.user.count());
     
     if (userCount === 0) {
       console.log('No users found in database. Creating initial admin user...');
@@ -25,8 +23,8 @@ export async function GET(request: NextRequest) {
       // Hash the password
       const hashedPassword = await bcrypt.hash(defaultPassword, 10);
       
-      // Create the admin user
-      const adminUser = await prisma.user.create({
+      // Create the admin user using prismaExecute for connection management
+      const adminUser = await prismaExecute(prisma => prisma.user.create({
         data: {
           username: defaultUsername,
           password: hashedPassword,
@@ -36,7 +34,7 @@ export async function GET(request: NextRequest) {
           isActive: true,
           updatedAt: new Date(),
         }
-      });
+      }));
       
       return NextResponse.json({
         success: true,
@@ -49,27 +47,26 @@ export async function GET(request: NextRequest) {
         },
         credentials: {
           username: defaultUsername,
-          password: 'Techlympics2025!'
+          password: defaultPassword
         }
       });
+    } else {
+      return NextResponse.json({
+        success: true,
+        message: 'System already initialized with an admin user',
+        userCount
+      });
     }
-    
-    return NextResponse.json({
-      success: true,
-      message: 'System already initialized with users',
-      initialized: true
-    });
   } catch (error) {
     console.error('Error initializing system:', error);
+    
     return NextResponse.json(
-      { 
+      {
         success: false,
-        error: 'Failed to initialize system',
+        message: 'Failed to initialize system',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

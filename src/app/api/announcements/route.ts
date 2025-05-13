@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
 
@@ -107,11 +107,11 @@ export async function GET(request: NextRequest) {
         ...(activeOnly ? { isActive: true } : {}),
       };
 
-      // Get total count for pagination
-      totalCount = await prisma.announcement.count({ where });
+      // Get total count for pagination using prismaExecute for connection management
+      totalCount = await prismaExecute(prisma => prisma.announcement.count({ where }));
 
-      // Get announcements with pagination
-      announcements = await prisma.announcement.findMany({
+      // Get announcements with pagination using prismaExecute for connection management
+      announcements = await prismaExecute(prisma => prisma.announcement.findMany({
         where,
         skip,
         take: pageSize,
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-      });
+      }));
     } catch (dbError) {
       console.error("Database error:", dbError);
       // If database error or no results, use mock data
@@ -206,8 +206,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new announcement
-    const announcement = await prisma.announcement.create({
+    // Create new announcement using prismaExecute for connection management
+    const announcement = await prismaExecute(prisma => prisma.announcement.create({
       data: {
         title: body.title,
         description: body.description,
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
         userId: Number(user.id), // Ensure userId is correctly typed as a number
         updatedAt: new Date(),
       },
-    });
+    }));
 
     return NextResponse.json(announcement, { status: 201 });
   } catch (error) {

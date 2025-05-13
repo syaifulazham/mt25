@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { cookies, headers } from "next/headers";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 // Export dynamic directive to prevent static generation issues
@@ -41,9 +41,9 @@ export async function getCurrentUser(options: GetUserOptions = { redirectToLogin
     // Get user from appropriate database table
     let user;
     if (isParticipant) {
-      user = await prisma.user_participant.findUnique({
+      user = await prismaExecute(prisma => prisma.user_participant.findUnique({
         where: {
-          email: session.user.email,
+          email: session.user.email!,
         },
         select: {
           id: true,
@@ -60,11 +60,11 @@ export async function getCurrentUser(options: GetUserOptions = { redirectToLogin
           lastLogin: true,
           createdAt: true,
         },
-      });
+      }));
     } else {
-      user = await prisma.user.findUnique({
+      user = await prismaExecute(prisma => prisma.user.findUnique({
         where: {
-          email: session.user.email,
+          email: session.user.email!,
         },
         select: {
           id: true,
@@ -76,7 +76,7 @@ export async function getCurrentUser(options: GetUserOptions = { redirectToLogin
           lastLogin: true,
           createdAt: true,
         },
-      });
+      }));
     }
 
     console.log("User from database:", user);
@@ -84,15 +84,15 @@ export async function getCurrentUser(options: GetUserOptions = { redirectToLogin
     // Update last login time
     if (user) {
       if (isParticipant) {
-        await prisma.user_participant.update({
+        await prismaExecute(prisma => prisma.user_participant.update({
           where: { id: user.id },
           data: { lastLogin: new Date() },
-        });
+        }));
       } else {
-        await prisma.user.update({
+        await prismaExecute(prisma => prisma.user.update({
           where: { id: user.id },
           data: { lastLogin: new Date() },
-        });
+        }));
       }
     } else {
       console.log("User not found in database for email:", session.user.email);
@@ -167,9 +167,9 @@ export async function getSessionUser(options: GetSessionUserOptions = { redirect
     // Get user from appropriate database table
     let user;
     if (isParticipant) {
-      user = await prisma.user_participant.findUnique({
+      user = await prismaExecute(prisma => prisma.user_participant.findUnique({
         where: {
-          email: session.user.email,
+          email: session.user.email!,
         },
         select: {
           id: true,
@@ -186,11 +186,11 @@ export async function getSessionUser(options: GetSessionUserOptions = { redirect
           lastLogin: true,
           createdAt: true,
         },
-      });
+      }));
     } else {
-      user = await prisma.user.findUnique({
+      user = await prismaExecute(prisma => prisma.user.findUnique({
         where: {
-          email: session.user.email,
+          email: session.user.email!,
         },
         select: {
           id: true,
@@ -202,7 +202,7 @@ export async function getSessionUser(options: GetSessionUserOptions = { redirect
           lastLogin: true,
           createdAt: true,
         },
-      });
+      }));
     }
 
     console.log("User from database:", user);

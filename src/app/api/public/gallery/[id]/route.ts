@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 // Mark this route as dynamic to fix the build error
 export const dynamic = 'force-dynamic';
@@ -18,8 +18,8 @@ export async function GET(
       );
     }
 
-    // Get the gallery with creator info
-    const gallery = await prisma.photogallery.findUnique({
+    // Get the gallery with creator info using prismaExecute for connection management
+    const gallery = await prismaExecute(prisma => prisma.photogallery.findUnique({
       where: { 
         id: galleryId,
         isPublished: true // Only return published galleries
@@ -32,7 +32,7 @@ export async function GET(
           }
         }
       }
-    });
+    }));
 
     if (!gallery) {
       return NextResponse.json(

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/session';
-import prisma from '@/lib/prisma';
+import { prismaExecute } from '@/lib/prisma';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -109,7 +109,9 @@ export default async function ProfilePage() {
               </div>
               
               <div className="mt-6">
-                <Button className="w-full sm:w-auto">Edit Profile</Button>
+                <Button className="w-full sm:w-auto" asChild>
+                  <Link href="/participants/profile/edit">Edit Profile</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

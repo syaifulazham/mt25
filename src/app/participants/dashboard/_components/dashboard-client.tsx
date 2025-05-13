@@ -10,6 +10,7 @@ import ContestantsSummary from "./contestants-summary";
 import TeamsSummary from "./teams-summary";
 import VideoGallery from "./video-gallery";
 import PendingRequestsAlert from "./pending-requests-alert";
+import ProfileCompletionAlert from "./profile-completion-alert";
 
 interface DashboardClientProps {
   user: any;
@@ -37,6 +38,9 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
           </Button>
         </div>
       </div>
+      
+      {/* Profile Completion Alert - shows when user profile is incomplete */}
+      <ProfileCompletionAlert userDetails={userDetails} />
       
       {/* Pending Requests Alert - more compact, only shows if there are pending requests */}
       <PendingRequestsAlert userId={Number(user.id)} participantId={Number(user.id)} />

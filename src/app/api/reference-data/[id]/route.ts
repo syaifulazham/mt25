@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
 
@@ -37,10 +37,10 @@ export async function GET(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Get reference data from database
-    const referenceData = await prisma.referencedata.findUnique({
+    // Get reference data from database using prismaExecute for connection management
+    const referenceData = await prismaExecute(prisma => prisma.referencedata.findUnique({
       where: { id },
-    });
+    }));
 
     if (!referenceData) {
       return NextResponse.json({ error: "Reference data not found" }, { status: 404 });
@@ -79,9 +79,9 @@ export async function PATCH(
     }
 
     // Check if reference data exists
-    const existingReferenceData = await prisma.referencedata.findUnique({
+    const existingReferenceData = await prismaExecute(prisma => prisma.referencedata.findUnique({
       where: { id },
-    });
+    }));
 
     if (!existingReferenceData) {
       return NextResponse.json({ error: "Reference data not found" }, { status: 404 });
@@ -103,13 +103,13 @@ export async function PATCH(
     // If type or code is changed, check for duplicates
     if ((data.type && data.type !== existingReferenceData.type) || 
         (data.code && data.code !== existingReferenceData.code)) {
-      const duplicate = await prisma.referencedata.findFirst({
+      const duplicate = await prismaExecute(prisma => prisma.referencedata.findFirst({
         where: {
           type: data.type || existingReferenceData.type,
           code: data.code || existingReferenceData.code,
           id: { not: id },
         },
-      });
+      }));
 
       if (duplicate) {
         return NextResponse.json(
@@ -119,11 +119,11 @@ export async function PATCH(
       }
     }
 
-    // Update reference data in database
-    const updatedReferenceData = await prisma.referencedata.update({
+    // Update reference data in database using prismaExecute for connection management
+    const updatedReferenceData = await prismaExecute(prisma => prisma.referencedata.update({
       where: { id },
       data,
-    });
+    }));
 
     return NextResponse.json(updatedReferenceData);
   } catch (error) {
@@ -158,9 +158,9 @@ export async function DELETE(
     }
 
     // Check if reference data exists
-    const existingReferenceData = await prisma.referencedata.findUnique({
+    const existingReferenceData = await prismaExecute(prisma => prisma.referencedata.findUnique({
       where: { id },
-    });
+    }));
 
     if (!existingReferenceData) {
       return NextResponse.json({ error: "Reference data not found" }, { status: 404 });
@@ -169,10 +169,10 @@ export async function DELETE(
     // Check if reference data is in use
     // This would depend on your data model - you may need to add checks for foreign key references
 
-    // Delete reference data from database
-    await prisma.referencedata.delete({
+    // Delete reference data from database using prismaExecute for connection management
+    await prismaExecute(prisma => prisma.referencedata.delete({
       where: { id },
-    });
+    }));
 
     return NextResponse.json({ success: true });
   } catch (error) {

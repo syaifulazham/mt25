@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { Prisma } from "@prisma/client";
 
@@ -36,45 +36,57 @@ export async function GET(request: NextRequest) {
     let institutions = [];
 
     if (!search) {
-      // For non-search queries, use Prisma's standard functionality
-      totalCount = await prisma.higherinstitution.count({
-        where: whereConditions,
-      });
+      // For non-search queries, use Prisma's standard functionality with connection management
+      const results = await prismaExecute(async (prisma) => {
+        const count = await prisma.higherinstitution.count({
+          where: whereConditions,
+        });
 
-      institutions = await prisma.higherinstitution.findMany({
-        where: whereConditions,
-        include: {
-          state: true,
-        },
-        orderBy: { name: "asc" },
-        skip,
-        take: pageSize,
+        const institutionsData = await prisma.higherinstitution.findMany({
+          where: whereConditions,
+          include: {
+            state: true,
+          },
+          orderBy: { name: "asc" },
+          skip,
+          take: pageSize,
+        });
+        
+        return { count, institutionsData };
       });
+      
+      totalCount = results.count;
+      institutions = results.institutionsData;
     } else {
-      // For search queries, use a more specific approach
+      // For search queries, use a more specific approach with connection management
       const searchCondition = `%${search}%`;
       
-      // Get total count with search
-      const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count FROM higherinstitution
-        WHERE (name LIKE ${searchCondition} OR code LIKE ${searchCondition} 
-        OR city LIKE ${searchCondition})
-        ${stateId && stateId !== "all" ? Prisma.sql`AND stateId = ${parseInt(stateId)}` : Prisma.sql``}
-      `;
+      const results = await prismaExecute(async (prisma) => {
+        // Get total count with search
+        const countResult = await prisma.$queryRaw<[{ count: bigint }]>`
+          SELECT COUNT(*) as count FROM higherinstitution
+          WHERE (name LIKE ${searchCondition} OR code LIKE ${searchCondition} 
+          OR city LIKE ${searchCondition})
+          ${stateId && stateId !== "all" ? Prisma.sql`AND stateId = ${parseInt(stateId)}` : Prisma.sql``}
+        `;
+        
+        // Get higher institutions with search
+        const institutionResults = await prisma.$queryRaw<any[]>`
+          SELECT h.*, s.id as state_id, s.name as state_name
+          FROM higherinstitution h
+          LEFT JOIN state s ON h.stateId = s.id
+          WHERE (h.name LIKE ${searchCondition} OR h.code LIKE ${searchCondition} 
+          OR h.city LIKE ${searchCondition})
+          ${stateId && stateId !== "all" ? Prisma.sql`AND h.stateId = ${parseInt(stateId)}` : Prisma.sql``}
+          ORDER BY h.name ASC
+          LIMIT ${skip}, ${pageSize}
+        `;
+        
+        return { countResult, institutionResults };
+      });
       
-      totalCount = Number(countResult[0].count);
-      
-      // Get higher institutions with search
-      const institutionResults = await prisma.$queryRaw<any[]>`
-        SELECT h.*, s.id as state_id, s.name as state_name
-        FROM higherinstitution h
-        LEFT JOIN state s ON h.stateId = s.id
-        WHERE (h.name LIKE ${searchCondition} OR h.code LIKE ${searchCondition} 
-        OR h.city LIKE ${searchCondition})
-        ${stateId && stateId !== "all" ? Prisma.sql`AND h.stateId = ${parseInt(stateId)}` : Prisma.sql``}
-        ORDER BY h.name ASC
-        LIMIT ${skip}, ${pageSize}
-      `;
+      totalCount = Number(results.countResult[0].count);
+      const institutionResults = results.institutionResults;
       
       institutions = institutionResults.map(institution => ({
         id: institution.id,

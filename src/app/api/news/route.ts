@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
 import slugify from "slugify";
@@ -129,11 +129,11 @@ export async function GET(request: NextRequest) {
         ...(featuredOnly ? { featured: true } : {}),
       };
 
-      // Get total count for pagination
-      totalCount = await prisma.news.count({ where });
+      // Get total count for pagination using prismaExecute for connection management
+      totalCount = await prismaExecute(prisma => prisma.news.count({ where }));
 
-      // Get news with pagination
-      news = await prisma.news.findMany({
+      // Get news with pagination using prismaExecute for connection management
+      news = await prismaExecute(prisma => prisma.news.findMany({
         where,
         skip,
         take: pageSize,
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-      });
+      }));
     } catch (dbError) {
       console.error("Database error:", dbError);
       // If database error or no results, use mock data
@@ -243,10 +243,10 @@ export async function POST(request: NextRequest) {
     // Generate slug from title if not provided
     const slug = customSlug || slugify(title, { lower: true, strict: true });
 
-    // Check if slug already exists
-    const existingNews = await prisma.news.findUnique({
+    // Check if slug already exists using prismaExecute for connection management
+    const existingNews = await prismaExecute(prisma => prisma.news.findUnique({
       where: { slug },
-    });
+    }));
 
     if (existingNews) {
       return NextResponse.json(
@@ -255,8 +255,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new news item
-    const news = await prisma.news.create({
+    // Create new news item using prismaExecute for connection management
+    const news = await prismaExecute(prisma => prisma.news.create({
       data: {
         title,
         excerpt,
@@ -270,7 +270,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         updatedAt: new Date(),
       },
-    });
+    }));
 
     return NextResponse.json(news, { status: 201 });
   } catch (error) {

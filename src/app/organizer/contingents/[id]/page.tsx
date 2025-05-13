@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { StateFormatter } from "../_components/state-formatter";
 import { ContingentDetailTabs } from "../_components/contingent-detail-tabs";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 type PageProps = {
   params: {
@@ -50,11 +50,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
   
+  // Fetch contingent name to use in the title with proper connection management
   try {
-    const contingent = await prisma.contingent.findUnique({
-      where: { id },
-      select: { name: true }
-    });
+    const contingent = await prismaExecute(prisma => 
+      prisma.contingent.findUnique({
+        where: { id },
+        select: { name: true }
+      })
+    );
     
     if (!contingent) {
       return {
@@ -64,7 +67,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     
     return {
       title: `${contingent.name} | Contingent Details | Techlympics 2025`,
-      description: `View and manage details for the ${contingent.name} contingent`,
+      description: `Details for contingent ${contingent.name} including contestants, teams, and statistics`
     };
   } catch (error) {
     return {
@@ -167,9 +170,9 @@ export default async function ContingentDetailPage({ params }: PageProps) {
   }
   
   try {
-    // Fetch contingent details with all related information
+    // Fetch contingent details with all related information using prismaExecute for connection management
     // The query structure matches the actual Prisma schema
-    const contingent = await prisma.contingent.findUnique({
+    const contingent = await prismaExecute(prisma => prisma.contingent.findUnique({
       where: { id },
       include: {
         school: {
@@ -261,7 +264,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
           }
         }
       }
-    });
+    }));
     
     if (!contingent) {
       notFound();

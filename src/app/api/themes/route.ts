@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
 
@@ -30,11 +30,11 @@ export async function GET(request: NextRequest) {
         }
       : {};
 
-    // Get total count for pagination
-    const totalCount = await prisma.theme.count({ where });
+    // Get total count for pagination using prismaExecute for connection management
+    const totalCount = await prismaExecute(prisma => prisma.theme.count({ where }));
 
-    // Get themes with pagination
-    const themes = await prisma.theme.findMany({
+    // Get themes with pagination using prismaExecute for connection management
+    const themes = await prismaExecute(prisma => prisma.theme.findMany({
       where,
       skip,
       take: pageSize,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-    });
+    }));
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalCount / pageSize);
@@ -92,10 +92,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if theme with the same name already exists
-    const existingTheme = await prisma.theme.findFirst({
+    // Check if theme with the same name already exists using prismaExecute for connection management
+    const existingTheme = await prismaExecute(prisma => prisma.theme.findFirst({
       where: { name },
-    });
+    }));
 
     if (existingTheme) {
       return NextResponse.json(
@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create new theme
-    const theme = await prisma.theme.create({
+    // Create new theme using prismaExecute for connection management
+    const theme = await prismaExecute(prisma => prisma.theme.create({
       data: {
         name,
         color,
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         description,
         updatedAt: new Date(), // Add the current date for updatedAt
       },
-    });
+    }));
 
     return NextResponse.json(theme, { status: 201 });
   } catch (error) {

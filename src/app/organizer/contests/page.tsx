@@ -5,7 +5,7 @@ import { getCurrentUser } from '@/lib/session';
 import { hasRequiredRole } from '@/lib/auth';
 import { PlusIcon } from 'lucide-react';
 import Link from 'next/link';
-import prisma from '@/lib/prisma';
+import { prismaExecute } from '@/lib/prisma';
 import ContestsTable from './_components/contests-table';
 
 export default async function ContestsPage() {
@@ -22,15 +22,17 @@ export default async function ContestsPage() {
     redirect("/organizer/dashboard");
   }
 
-  // Fetch contests from database
-  const contestsData = await prisma.contest.findMany({
-    include: {
-      targetgroup: true,
-      theme: true
-    },
-    orderBy: {
-      startDate: 'desc'
-    }
+  // Fetch contests from database with proper connection management
+  const contestsData = await prismaExecute(prisma => {
+    return prisma.contest.findMany({
+      include: {
+        targetgroup: true,
+        theme: true
+      },
+      orderBy: {
+        startDate: 'desc'
+      }
+    });
   });
   
   // Transform data to match the Contest type expected by ContestsTable

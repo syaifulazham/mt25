@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
+// Create a singleton PrismaClient instance
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
@@ -13,5 +14,21 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+// Helper function to execute a Prisma query and properly close the connection
+export async function prismaExecute<T>(
+  callback: (prisma: PrismaClient) => Promise<T>
+): Promise<T> {
+  try {
+    // Execute the query
+    return await callback(prisma);
+  } finally {
+    // Explicitly disconnect in production/serverless environments
+    // In development, we keep the connection open
+    if (process.env.NODE_ENV === 'production') {
+      await prisma.$disconnect();
+    }
+  }
+}
 
 export default prisma;

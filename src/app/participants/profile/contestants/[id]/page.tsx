@@ -93,14 +93,29 @@ export default async function ContestantPage({ params }: { params: { id: string 
                     variant="destructive"
                     onClick={async () => {
                       try {
-                        const response = await fetch(`/api/contestants/${contestant.id}`, {
+                        const response = await fetch(`/api/participants/contestants/${contestant.id}`, {
                           method: 'DELETE'
                         });
                         
                         if (response.ok) {
                           window.location.href = '/participants/profile';
                         } else {
-                          throw new Error('Failed to delete contestant');
+                          let errorMessage = 'Failed to delete contestant';
+                          
+                          // Check if there's content to parse
+                          const contentType = response.headers.get('content-type');
+                          if (contentType && contentType.includes('application/json')) {
+                            try {
+                              const errorData = await response.json();
+                              if (errorData && errorData.error) {
+                                errorMessage = errorData.error;
+                              }
+                            } catch (parseError) {
+                              console.error('Error parsing error response:', parseError);
+                            }
+                          }
+                          
+                          throw new Error(errorMessage);
                         }
                       } catch (error) {
                         console.error('Error deleting contestant:', error);

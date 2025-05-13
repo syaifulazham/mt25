@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { Fragment } from "react";
 import { CalendarDays, CheckCircle, Users, Award, Layers, Database, Trophy, Bell, ArrowUpRight, School, Flag, UserCheck, UsersRound } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,37 +86,41 @@ export default async function DashboardPage() {
     console.log('User is not an admin, showing limited dashboard');
   }
   
-  // Fetch basic dashboard data
-  const [userCount, participantCount, contestCount, schoolCount, highEduCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.user_participant.count(), // 1. Number of created user_participant
-    prisma.contest.count(),
-    prisma.school.count(),
-    prisma.higherinstitution.count(),
-  ]);
+  // Fetch basic dashboard data using prismaExecute
+  const [userCount, participantCount, contestCount, schoolCount, highEduCount] = await prismaExecute(async (prisma) => {
+    return Promise.all([
+      prisma.user.count(),
+      prisma.user_participant.count(), // 1. Number of created user_participant
+      prisma.contest.count(),
+      prisma.school.count(),
+      prisma.higherinstitution.count(),
+    ]);
+  });
 
   // 2. Number of contingents
-  const contingentCount = await prisma.contingent.count();
+  const contingentCount = await prismaExecute(prisma => prisma.contingent.count());
 
   // 3. Number of contestants
-  const contestantCount = await prisma.contestant.count();
+  const contestantCount = await prismaExecute(prisma => prisma.contestant.count());
 
   // 4. Number of contest participations
   let participationCount = 0;
   try {
     // Based on the schema, the correct model is contestParticipation
-    participationCount = await prisma.contestParticipation.count();
+    participationCount = await prismaExecute(prisma => prisma.contestParticipation.count());
     console.log('Got participation count:', participationCount);
     
     // If we got 0 but we know there should be data, try a different approach
     if (participationCount === 0) {
       // Try to count contestants that have contest participations
-      const contestantsWithContests = await prisma.contestant.findMany({
-        where: {
-          contests: {
-            some: {} // Any contest participation
+      const contestantsWithContests = await prismaExecute(prisma => {
+        return prisma.contestant.findMany({
+          where: {
+            contests: {
+              some: {} // Any contest participation
+            }
           }
-        }
+        });
       });
       
       if (contestantsWithContests.length > 0) {
@@ -138,14 +142,16 @@ export default async function DashboardPage() {
   try {
     // Query contingents and join related tables to get state information
     // Using the relationship: contingent -> schoolid -> school -> stateid -> state
-    const contingentsWithState = await prisma.contingent.findMany({
-      include: {
-        school: {
-          include: {
-            state: true
+    const contingentsWithState = await prismaExecute(prisma => {
+      return prisma.contingent.findMany({
+        include: {
+          school: {
+            include: {
+              state: true
+            }
           }
         }
-      }
+      });
     });
     
     console.log(`Found ${contingentsWithState.length} contingents in total`);
@@ -210,24 +216,26 @@ export default async function DashboardPage() {
   
   try {
     // Query contestants with their contest participations, contingent, school, and state information
-    const contestants = await prisma.contestant.findMany({
-      include: {
-        contingent: {
-          include: {
-            school: {
-              include: {
-                state: true
+    const contestants = await prismaExecute(prisma => {
+      return prisma.contestant.findMany({
+        include: {
+          contingent: {
+            include: {
+              school: {
+                include: {
+                  state: true
+                }
               }
             }
-          }
+          },
+          contests: true  // Include contest participations
         },
-        contests: true  // Include contest participations
-      },
-      where: {
-        contests: {
-          some: {} // Only include contestants with at least one contest
+        where: {
+          contests: {
+            some: {} // Only include contestants with at least one contest
+          }
         }
-      }
+      });
     });
     
     console.log(`Found ${contestants.length} contestants with contests`);
@@ -268,27 +276,47 @@ export default async function DashboardPage() {
     if (stateGenderMap.size === 0) {
       console.log('No data with first approach, trying with contestant lookup');
       
-      // Get all states first
-      const states = await prisma.state.findMany({
-        select: {
-          id: true,
-          name: true
-        }
+      // Use prismaExecute to get all mapping data at once
+      const mappingData = await prismaExecute(async (prisma) => {
+        // Get all states first
+        const states = await prisma.state.findMany({
+          select: {
+            id: true,
+            name: true
+          }
+        });
+        
+        // Get all schools - we'll filter for valid stateIds in code
+        const schools = await prisma.school.findMany({
+          select: {
+            id: true,
+            stateId: true
+          }
+        });
+        
+        // Get all contingents with their school info
+        const contingents = await prisma.contingent.findMany({
+          select: {
+            id: true,
+            schoolId: true
+          },
+          where: {
+            schoolId: {
+              not: null
+            }
+          }
+        });
+        
+        return { states, schools, contingents };
       });
+      
+      const { states, schools, contingents } = mappingData;
       
       // Create a map of state ID to state name
       const stateIdToName = new Map<number, string>();
       states.forEach(state => {
         if (state.name) {
           stateIdToName.set(state.id, state.name);
-        }
-      });
-      
-      // Get all schools - we'll filter for valid stateIds in code
-      const schools = await prisma.school.findMany({
-        select: {
-          id: true,
-          stateId: true
         }
       });
       
@@ -299,19 +327,6 @@ export default async function DashboardPage() {
           const stateName = stateIdToName.get(school.stateId);
           if (stateName) {
             schoolToState.set(school.id, stateName);
-          }
-        }
-      });
-      
-      // Get all contingents with their school info
-      const contingents = await prisma.contingent.findMany({
-        select: {
-          id: true,
-          schoolId: true
-        },
-        where: {
-          schoolId: {
-            not: null
           }
         }
       });
@@ -330,14 +345,16 @@ export default async function DashboardPage() {
       try {
         // First try to use the direct contestant-contest relationship if it exists
         // Get all contestants with their contingent IDs who have at least one contest
-        const rawContestants = await prisma.$queryRaw<Array<{id: number, gender: string, contingentId: number, contestCount: number}>>`
-          SELECT c.id, c.gender, c.contingentId, COUNT(cp.contestId) as contestCount  
-          FROM contestant c
-          JOIN contestParticipation cp ON c.id = cp.contestantId
-          WHERE c.contingentId IS NOT NULL
-          GROUP BY c.id, c.gender, c.contingentId
-          HAVING COUNT(cp.contestId) > 0
-        `;
+        const rawContestants = await prismaExecute(prisma => {
+          return prisma.$queryRaw<Array<{id: number, gender: string, contingentId: number, contestCount: number}>>`
+            SELECT c.id, c.gender, c.contingentId, COUNT(cp.contestId) as contestCount  
+            FROM contestant c
+            JOIN contestParticipation cp ON c.id = cp.contestantId
+            WHERE c.contingentId IS NOT NULL
+            GROUP BY c.id, c.gender, c.contingentId
+            HAVING COUNT(cp.contestId) > 0
+          `;
+        });
         
         console.log(`Found ${rawContestants.length} contestants with contests using raw SQL`);
         
@@ -416,38 +433,44 @@ export default async function DashboardPage() {
     ];
   }
   
-  // Get recent logins
-  const recentLogins = await prisma.user.findMany({
-    where: {
-      lastLogin: {
-        not: null
+  // Get recent logins and participants with connection management
+  const recentData = await prismaExecute(async (prisma) => {
+    const logins = await prisma.user.findMany({
+      where: {
+        lastLogin: {
+          not: null
+        }
+      },
+      orderBy: {
+        lastLogin: 'desc'
+      },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        lastLogin: true,
+        role: true
       }
-    },
-    orderBy: {
-      lastLogin: 'desc'
-    },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      lastLogin: true,
-      role: true
-    }
+    });
+    
+    const participants = await prisma.user_participant.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true
+      }
+    });
+    
+    return { logins, participants };
   });
   
-  // Get recent participants
-  const recentParticipants = await prisma.user_participant.findMany({
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      createdAt: true
-    }
-  });
+  const recentLogins = recentData.logins;
+  const recentParticipants = recentData.participants;
   
   // 7. Number of contest participations by education level
   let educationLevelData: Array<{level: string, count: number}> = [];
@@ -470,15 +493,17 @@ export default async function DashboardPage() {
     });
     
     // First approach: Try to get contestants with their contest participations
-    const contestantsWithContests = await prisma.contestant.findMany({
-      include: {
-        contests: true // Include contest participations
-      },
-      where: {
-        contests: {
-          some: {} // Only include contestants with at least one contest
+    const contestantsWithContests = await prismaExecute(prisma => {
+      return prisma.contestant.findMany({
+        include: {
+          contests: true // Include contest participations
+        },
+        where: {
+          contests: {
+            some: {} // Only include contestants with at least one contest
+          }
         }
-      }
+      });
     });
     
     console.log(`Found ${contestantsWithContests.length} contestants with contests`);
@@ -521,16 +546,18 @@ export default async function DashboardPage() {
       console.log('No contestants with contests found, trying alternative approach');
       
       // Try to get all contestants and check if they have any contests
-      const allContestants = await prisma.contestant.findMany({
-        select: {
-          id: true,
-          edu_level: true,
-          _count: {
-            select: {
-              contests: true
+      const allContestants = await prismaExecute(prisma => {
+        return prisma.contestant.findMany({
+          select: {
+            id: true,
+            edu_level: true,
+            _count: {
+              select: {
+                contests: true
+              }
             }
           }
-        }
+        });
       });
       
       console.log(`Found ${allContestants.length} total contestants`);
@@ -595,31 +622,39 @@ export default async function DashboardPage() {
   
   try {
     // We'll use a simpler approach that aligns with the Prisma schema
-    // First get all contestants with their contests and school information
-    const contestants = await prisma.contestant.findMany({
-      include: {
-        contests: true
-      },
-      where: {
-        contests: {
-          some: {} // Only include contestants with at least one contest
+    // Use prismaExecute to get both contestants and contingents at once
+    const schoolData = await prismaExecute(async (prisma) => {
+      // First get all contestants with their contests and school information
+      const contestantsData = await prisma.contestant.findMany({
+        include: {
+          contests: true
+        },
+        where: {
+          contests: {
+            some: {} // Only include contestants with at least one contest
+          }
         }
-      }
+      });
+      
+      // Now get all contingents with their schools for lookup
+      const contingentsData = await prisma.contingent.findMany({
+        include: {
+          school: true
+        },
+        where: {
+          school: {
+            isNot: null
+          }
+        }
+      });
+      
+      return { contestantsData, contingentsData };
     });
+    
+    const contestants = schoolData.contestantsData;
+    const contingents = schoolData.contingentsData;
     
     console.log(`Found ${contestants.length} contestants with contests`);
-    
-    // Now get all contingents with their schools for lookup
-    const contingents = await prisma.contingent.findMany({
-      include: {
-        school: true
-      },
-      where: {
-        school: {
-          isNot: null
-        }
-      }
-    });
     
     // Create a map of contingent ID to school category for quick lookup
     const contingentToSchoolCategory = new Map<number, string>();

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CalendarIcon, School, Users, BookOpen, Flag, UserRound, AlertCircle, UserPlus, UsersRound, Clock, UserX, UserMinus, BookX, ShieldAlert, ShieldOff, AlertTriangle } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import SearchWrapper from "./_components/search-wrapper";
 
 export const metadata: Metadata = {
@@ -23,100 +23,108 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 export default async function ParticipantsPage() {
-  // 1. Get last 5 registered participants
-  const recentParticipants = await prisma.user_participant.findMany({
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    include: {
-      contingents: true
-    }
-  });
-  
-  // 2. Get participants with no contingents
-  const participantsWithoutContingent = await prisma.user_participant.findMany({
-    where: {
-      contingents: {
-        none: {}
+  // Get participant data with connection management
+  const participantData = await prismaExecute(async (prisma) => {
+    // 1. Get last 5 registered participants
+    const recentParticipants = await prisma.user_participant.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5,
+      include: {
+        contingents: true
       }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phoneNumber: true,
-      createdAt: true,
-      username: true // Use as fallback for avatar
-    }
-  });
-  
-  // 3. Get contingents with no contestants
-  const contingentsWithoutContestants = await prisma.contingent.findMany({
-    where: {
-      contestants: {
-        none: {}
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      createdAt: true,
-      schoolId: true,
-      higherInstId: true,
-      school: {
-        select: {
-          name: true
+    });
+    
+    // 2. Get participants with no contingents
+    const participantsWithoutContingent = await prisma.user_participant.findMany({
+      where: {
+        contingents: {
+          none: {}
         }
       },
-      higherInstitution: {
-        select: {
-          name: true
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        createdAt: true,
+        username: true // Use as fallback for avatar
+      }
+    });
+    
+    // 3. Get contingents with no contestants
+    const contingentsWithoutContestants = await prisma.contingent.findMany({
+      where: {
+        contestants: {
+          none: {}
         }
       },
-      _count: {
-        select: {
-          contestants: true
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        schoolId: true,
+        higherInstId: true,
+        school: {
+          select: {
+            name: true
+          }
+        },
+        higherInstitution: {
+          select: {
+            name: true
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
         }
       }
-    }
+    });
+    
+    // 4. Get contingents with contestants but no contest assignments
+    const contingentsWithNoContests = await prisma.$queryRaw<Array<{
+      id: number;
+      name: string;
+      createdAt: Date;
+      schoolName: string | null;
+      higherName: string | null;
+      contestantCount: number;
+    }>>` 
+      SELECT 
+        c.id, 
+        c.name, 
+        c.createdAt,
+        s.name as schoolName,
+        h.name as higherName,
+        COUNT(DISTINCT cont.id) as contestantCount
+      FROM contingent c
+      LEFT JOIN school s ON c.schoolId = s.id
+      LEFT JOIN higherinstitution h ON c.higherInstId = h.id
+      JOIN contestant cont ON cont.contingentId = c.id
+      LEFT JOIN contestParticipation cp ON cp.contestantId = cont.id
+      WHERE cp.id IS NULL
+      GROUP BY c.id, c.name, c.createdAt, s.name, h.name
+      HAVING COUNT(DISTINCT cont.id) > 0
+      ORDER BY c.createdAt DESC
+      LIMIT 5
+    `;
+    
+    return { recentParticipants, participantsWithoutContingent, contingentsWithoutContestants, contingentsWithNoContests };
   });
   
-  // 4. Get contingents with contestants but no contest assignments
-  const contingentsWithNoContests = await prisma.$queryRaw<Array<{
-    id: number;
-    name: string;
-    createdAt: Date;
-    schoolName: string | null;
-    higherName: string | null;
-    contestantCount: number;
-  }>>`
-    SELECT 
-      c.id, 
-      c.name, 
-      c.createdAt,
-      s.name as schoolName,
-      h.name as higherName,
-      COUNT(DISTINCT cont.id) as contestantCount
-    FROM contingent c
-    LEFT JOIN school s ON c.schoolId = s.id
-    LEFT JOIN higherinstitution h ON c.higherInstId = h.id
-    JOIN contestant cont ON cont.contingentId = c.id
-    LEFT JOIN contestParticipation cp ON cp.contestantId = cont.id
-    WHERE cp.id IS NULL
-    GROUP BY c.id, c.name, c.createdAt, s.name, h.name
-    HAVING COUNT(DISTINCT cont.id) > 0
-    ORDER BY c.createdAt DESC
-    LIMIT 5
-  `;
+  // Extract data from the prismaExecute result
+  const { recentParticipants, participantsWithoutContingent, contingentsWithoutContestants, contingentsWithNoContests } = participantData;
 
   // Stats card interface
 interface StatsCard {
@@ -130,6 +138,13 @@ interface StatsCard {
 // Stats data for dashboard cards
 const statsCards: StatsCard[] = [
     {
+      title: "All Participants",
+      value: "3,214",
+      description: "View all registered participants",
+      icon: <UserRound className="h-5 w-5 text-purple-600" />,
+      href: "/organizer/participants/list"
+    },
+    {
       title: "Contestants",
       value: "2,456",
       description: "Total registered contestants",
@@ -141,14 +156,14 @@ const statsCards: StatsCard[] = [
       value: "138",
       description: "Active contingents",
       icon: <UsersRound className="h-5 w-5 text-green-600" />,
-      href: "/organizer/participants/contingents"
+      href: "/organizer/contingents"
     },
     {
       title: "Schools",
       value: "75",
       description: "Participating institutions",
       icon: <School className="h-5 w-5 text-amber-600" />,
-      href: "/organizer/participants/schools"
+      href: "/organizer/reference-data"
     }
   ];
   

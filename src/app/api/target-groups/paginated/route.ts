@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 
 // GET /api/target-groups/paginated - Get paginated target groups
@@ -50,20 +50,22 @@ export async function GET(request: NextRequest) {
     orderBy[sortBy] = sortOrder;
 
     // Get target groups from database with pagination
-    const [targetGroups, totalCount] = await Promise.all([
-      prisma.targetgroup.findMany({
-        where,
-        orderBy,
-        skip,
-        take: pageSize,
-        include: {
-          _count: {
-            select: { contest: true }
+    const [targetGroups, totalCount] = await prismaExecute(async (prisma) => {
+      return Promise.all([
+        prisma.targetgroup.findMany({
+          where,
+          orderBy,
+          skip,
+          take: pageSize,
+          include: {
+            _count: {
+              select: { contest: true }
+            }
           }
-        }
-      }),
-      prisma.targetgroup.count({ where })
-    ]);
+        }),
+        prisma.targetgroup.count({ where })
+      ]);
+    });
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalCount / pageSize);

@@ -29,7 +29,8 @@ import {
   Trash2,
   Pencil,
   FileText,
-  FileDown
+  FileDown,
+  AlertTriangle
 } from "lucide-react";
 import Link from "next/link";
 import EditContestantModal from "./_components/edit-contestant-modal";
@@ -61,6 +62,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Using the shared Contestant interface from @/types/contestant
 
@@ -84,6 +95,10 @@ export default function ContestantsPage() {
   const [classGradeFilter, setClassGradeFilter] = useState("");
   const [classNameFilter, setClassNameFilter] = useState("");
   const [ageFilter, setAgeFilter] = useState("");
+  
+  // Delete confirmation dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contestantToDelete, setContestantToDelete] = useState<{id: number, name: string} | null>(null);
   
   // Redirect if not logged in
   useEffect(() => {
@@ -226,32 +241,53 @@ export default function ContestantsPage() {
     "belia": contestants.filter(c => c.edu_level === "belia")
   };
   
+  // Handle opening delete confirmation dialog
+  const openDeleteDialog = (id: number, name: string) => {
+    setContestantToDelete({ id, name });
+    setDeleteDialogOpen(true);
+  };
+
   // Handle contestant deletion
-  const handleDeleteContestant = async (id: number, contingentId: number) => {
-    if (!confirm("Are you sure you want to delete this contestant?")) {
-      return;
-    }
+  const handleDeleteContestant = async () => {
+    if (!contestantToDelete) return;
     
     try {
       setIsLoading(true);
       
-      const response = await fetch(`/api/participants/contestants?id=${id}`, {
+      const response = await fetch(`/api/participants/contestants/${contestantToDelete.id}`, {
         method: 'DELETE',
       });
       
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || t('contestant.delete.error'));
+        let errorMessage = t('contestant.delete.error');
+        
+        // Check if there's content to parse
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
       
       // Update the local state
-      setContestants(contestants.filter(c => c.id !== id));
+      setContestants(contestants.filter(c => c.id !== contestantToDelete.id));
       toast.success(t('contestant.delete.success'));
     } catch (error: any) {
       console.error("Error deleting contestant:", error);
       toast.error(error.message || t('contestant.delete.error'));
     } finally {
       setIsLoading(false);
+      // Reset the contestant to delete
+      setContestantToDelete(null);
+      setDeleteDialogOpen(false);
     }
   };
   
@@ -381,7 +417,7 @@ export default function ContestantsPage() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    onClick={() => handleDeleteContestant(contestant.id, contestant.contingentId)}
+                    onClick={() => openDeleteDialog(contestant.id, contestant.name)}
                     className="text-red-500 hover:text-red-700 hover:bg-red-100"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -437,7 +473,7 @@ export default function ContestantsPage() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"
-                      onClick={() => handleDeleteContestant(contestant.id, contestant.contingentId)}
+                      onClick={() => openDeleteDialog(contestant.id, contestant.name)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" /> {t('contestant.delete')}
                     </DropdownMenuItem>
@@ -644,6 +680,37 @@ export default function ContestantsPage() {
           </Button>
         </div>
       </div>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('contestant.delete.confirmation_title')}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+                <p>{t('contestant.delete.confirmation_message')}</p>
+              </div>
+              {contestantToDelete && (
+                <p className="font-medium mt-2">
+                  {contestantToDelete.name} ({t('contestant.id')}: {contestantToDelete.id})
+                </p>
+              )}
+              <p className="mt-2">{t('contestant.delete.permanent')}</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteContestant}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {t('contestant.delete.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

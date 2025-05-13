@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 // Public endpoint for themes - no authentication required
 export async function GET() {
   try {
-    // Fetch all themes for public display
-    const themes = await prisma.theme.findMany({
+    // Fetch all themes for public display using prismaExecute for connection management
+    const themes = await prismaExecute(prisma => prisma.theme.findMany({
       orderBy: { name: 'asc' },
-    });
+    }));
     
     return NextResponse.json(themes);
   } catch (error) {

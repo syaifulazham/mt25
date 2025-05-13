@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { compare } from "bcrypt";
 //import { Role } from "@prisma/client";
 
@@ -58,12 +58,12 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        // First check for regular user
-        const user = await prisma.user.findUnique({
+        // First check for regular user using prismaExecute for connection management
+        const user = await prismaExecute(prisma => prisma.user.findUnique({
           where: {
             username: credentials.username
           }
-        });
+        }));
 
         if (user) {
           if (!user.isActive) {
@@ -76,11 +76,11 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Update last login time
-          await prisma.user.update({
+          // Update last login time using prismaExecute for connection management
+          await prismaExecute(prisma => prisma.user.update({
             where: { id: user.id },
             data: { lastLogin: new Date() }
-          });
+          }));
 
           // Convert the numeric id to string for NextAuth
           return {
@@ -93,12 +93,12 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
-        // If not found as a regular user, check participant
-        const participant = await prisma.user_participant.findUnique({
+        // If not found as a regular user, check participant using prismaExecute for connection management
+        const participant = await prismaExecute(prisma => prisma.user_participant.findUnique({
           where: {
             username: credentials.username
           }
-        });
+        }));
 
         if (participant) {
           if (!participant.isActive) {
@@ -112,11 +112,11 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
 
-            // Update last login time
-            await prisma.user_participant.update({
+            // Update last login time using prismaExecute for connection management
+            await prismaExecute(prisma => prisma.user_participant.update({
               where: { id: participant.id },
               data: { lastLogin: new Date() }
-            });
+            }));
 
             return {
               id: String(participant.id),
@@ -178,25 +178,25 @@ export const authOptions: NextAuthOptions = {
           return false;
         }
 
-        // Check if we have a user with this email
-        let participant = await prisma.user_participant.findUnique({
+        // Check if we have a user with this email using prismaExecute for connection management
+        let participant = await prismaExecute(prisma => prisma.user_participant.findUnique({
           where: {
             email: profile.email
           }
-        });
+        }));
 
         // If not, create a new participant
         if (!participant) {
           try {
-            participant = await prisma.user_participant.create({
+            participant = await prismaExecute(prisma => prisma.user_participant.create({
               data: {
-                email: profile.email,
-                name: profile.name || '',
-                username: profile.email, // Use email as username for now
+                email: profile.email!,
+                name: profile.name!,
+                username: profile.email!, // Use email as username for now
                 isActive: true,
                 updatedAt: new Date()
               }
-            });
+            }));
           } catch (error) {
             console.error("Failed to create participant:", error);
             return false;

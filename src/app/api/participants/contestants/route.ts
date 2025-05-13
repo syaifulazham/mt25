@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 // GET handler - Get contestants for a contingent
 export async function GET(request: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     
     // If contestant ID is provided, we're looking for a specific contestant
     if (contestantId) {
-      const contestant = await prisma.contestant.findUnique({
+      const contestant = await prismaExecute(prisma => prisma.contestant.findUnique({
         where: { id: parseInt(contestantId) },
         include: {
           contingent: {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
             }
           }
         }
-      });
+      }));
       
       if (!contestant) {
         return NextResponse.json({ error: "Contestant not found" }, { status: 404 });

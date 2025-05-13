@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { generateContestantHashcode } from '@/lib/hashcode';
 import { Prisma } from '@prisma/client';
 
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
     // Get the participant ID from the session
     const participantId = parseInt(session.user.id as string);
     
-    // Get the user's contingent ID directly from the contingentManager table
-    const managedContingent = await prisma.contingentManager.findFirst({
+    // Get the user's contingent ID directly from the contingentManager table using prismaExecute
+    const managedContingent = await prismaExecute(prisma => prisma.contingentManager.findFirst({
       where: {
         participantId: participantId
       },
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
           }
         }
       }
-    });
+    }));
     
     if (!managedContingent) {
       return NextResponse.json(
@@ -82,8 +82,8 @@ export async function POST(req: NextRequest) {
     // Collect all ICs to check in a batch query
     const icsToCheck = records.map(record => record.ic).filter(Boolean) as string[];
     
-    // Get existing ICs in a single query for better performance
-    const existingICs = await prisma.contestant.findMany({
+    // Get existing ICs in a single query for better performance using prismaExecute
+    const existingICs = await prismaExecute(prisma => prisma.contestant.findMany({
       where: {
         ic: {
           in: icsToCheck // Already filtered above
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       select: {
         ic: true
       }
-    });
+    }));
     
     // Create a Set for faster lookups - ensure all elements are strings and filter out nulls
     const existingICSet = new Set<string>(existingICs.map(c => c.ic).filter((ic): ic is string => ic !== null));
@@ -103,8 +103,8 @@ export async function POST(req: NextRequest) {
     const useTransaction = formData.get('allOrNothing') === 'true';
     
     if (useTransaction) {
-      // Use transaction for all-or-nothing approach
-      await prisma.$transaction(async (tx) => {
+      // Use transaction for all-or-nothing approach with prismaExecute
+      await prismaExecute(prisma => prisma.$transaction(async (tx) => {
         for (let i = 0; i < records.length; i++) {
           await processRecord(records[i], i + 1, existingICSet, results, contingentId, participantId, session, tx);
         }
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       }, {
         maxWait: 10000, // 10s maximum wait time
         timeout: 60000  // 60s maximum transaction time
-      });
+      }));
     } else {
       // Process records individually (continue on error)
       for (let i = 0; i < records.length; i++) {
@@ -164,7 +164,17 @@ async function processRecord(
   session: any,
   tx?: any // Optional transaction client
 ) {
-  const prismaClient = tx || prisma; // Use transaction client if provided
+  // Use transaction client if provided
+  const prismaClient = tx || null;
+  
+  // Function to execute Prisma queries either with the transaction client or with prismaExecute
+  async function executeQuery(query: (client: any) => Promise<any>) {
+    if (prismaClient) {
+      return query(prismaClient);
+    } else {
+      return prismaExecute(query);
+    }
+  }
   
   try {
     // Check for existing IC first (using the pre-queried set)
@@ -220,10 +230,13 @@ async function processRecord(
       updatedById: participantId
     };
 
-    // Create contestant using the appropriate client (transaction or main)
-    await prismaClient.contestant.create({
+    // Create contestant first using the executeQuery helper
+    const createdContestant = await executeQuery(prisma => prisma.contestant.create({
       data: createData,
-    });
+    }));
+
+    // Log for monitoring purposes
+    console.log(`Contestant ${createdContestant.id} (${record.name}) created successfully`);
 
     // Add to set to prevent duplicates within the same batch
     existingICSet.add(record.ic as string);
@@ -253,6 +266,6 @@ async function processRecord(
     });
     
     // If we're in a transaction, this will be caught by the caller and will trigger a rollback
-    if (tx) throw error;
+    if (prismaClient) throw error;
   }
 }

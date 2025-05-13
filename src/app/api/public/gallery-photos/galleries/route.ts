@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 // Mark this route as dynamic to fix the build error
 export const dynamic = 'force-dynamic';
@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
     // Calculate pagination
     const skip = (page - 1) * pageSize;
     
-    // Get published galleries
-    const galleries = await prisma.photogallery.findMany({
+    // Get published galleries using prismaExecute for connection management
+    const galleries = await prismaExecute(prisma => prisma.photogallery.findMany({
       where: {
         isPublished: true
       },
@@ -24,14 +24,14 @@ export async function GET(request: NextRequest) {
       },
       skip,
       take: pageSize
-    });
+    }));
     
-    // Get total count for pagination
-    const totalGalleries = await prisma.photogallery.count({
+    // Get total count for pagination using prismaExecute for connection management
+    const totalGalleries = await prismaExecute(prisma => prisma.photogallery.count({
       where: {
         isPublished: true
       }
-    });
+    }));
     
     // Add pagination metadata
     const result = {

@@ -199,13 +199,17 @@ export function ParticipantsList({
                     {participant.name}
                   </Link>
                 </TableCell>
-                <TableCell className="flex items-center gap-1">
-                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                  {participant.email}
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    {participant.email}
+                  </div>
                 </TableCell>
-                <TableCell className="flex items-center gap-1">
-                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                  {participant.phoneNumber || "N/A"}
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                    {participant.phoneNumber || "N/A"}
+                  </div>
                 </TableCell>
                 <TableCell>
                   {participant.contingents && participant.contingents.length > 0 ? (

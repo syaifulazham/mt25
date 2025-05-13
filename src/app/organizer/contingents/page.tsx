@@ -24,7 +24,7 @@ import {
   ShieldAlert,
   Building2
 } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -71,124 +71,143 @@ interface ContingentData {
 }
 
 export default async function ContingentsPage() {
-  // Get all contingents with details in a single query
-  const contingentsWithDetails = await prisma.contingent.findMany({
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 10,
-    include: {
-      school: {
-        select: {
-          name: true,
-          state: true
-        }
+  // Use prismaExecute to get all contingent data with proper connection management
+  const contingentData = await prismaExecute(async (prisma) => {
+    // Get all contingents with details in a single query
+    const contingentsWithDetails = await prisma.contingent.findMany({
+      orderBy: {
+        createdAt: 'desc'
       },
-      higherInstitution: {
-        select: {
-          name: true,
-          state: true
-        }
-      },
-      contestants: {
-        select: {
-          id: true,
-          name: true,
-          gender: true
+      take: 10,
+      include: {
+        school: {
+          select: {
+            name: true,
+            state: true
+          }
         },
-        take: 6 // Get one more than we need for the +X display
-      },
-      _count: {
-        select: {
-          contestants: true
+        higherInstitution: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        contestants: {
+          select: {
+            id: true,
+            name: true,
+            gender: true
+          },
+          take: 6 // Get one more than we need for the +X display
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
         }
       }
-    }
-  }) as unknown as ContingentData[];
+    });
+    
+    // Get contingents without contestants
+    const contingentsWithoutContestants = await prisma.contingent.findMany({
+      where: {
+        contestants: {
+          none: {}
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5,
+      include: {
+        school: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        higherInstitution: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
+        }
+      }
+    });
 
-  // Get contingents without contestants
-  const contingentsWithoutContestants = await prisma.contingent.findMany({
-    where: {
-      contestants: {
-        none: {}
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    include: {
-      school: {
-        select: {
-          name: true,
-          state: true
+    // Get school-based contingents
+    const schoolContingents = await prisma.contingent.findMany({
+      where: {
+        schoolId: {
+          not: null
         }
       },
-      higherInstitution: {
-        select: {
-          name: true,
-          state: true
-        }
+      orderBy: {
+        createdAt: 'desc'
       },
-      _count: {
-        select: {
-          contestants: true
+      take: 5,
+      include: {
+        school: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
         }
       }
-    }
-  });
+    });
 
-  // Get school-based contingents
-  const schoolContingents = await prisma.contingent.findMany({
-    where: {
-      schoolId: {
-        not: null
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    include: {
-      school: {
-        select: {
-          name: true,
-          state: true
+    // Get higher institution contingents
+    const higherInstContingents = await prisma.contingent.findMany({
+      where: {
+        higherInstId: {
+          not: null
         }
       },
-      _count: {
-        select: {
-          contestants: true
-        }
-      }
-    }
-  });
-
-  // Get higher institution contingents
-  const higherInstContingents = await prisma.contingent.findMany({
-    where: {
-      higherInstId: {
-        not: null
-      }
-    },
-    orderBy: {
-      createdAt: 'desc'
-    },
-    take: 5,
-    include: {
-      higherInstitution: {
-        select: {
-          name: true,
-          state: true
-        }
+      orderBy: {
+        createdAt: 'desc'
       },
-      _count: {
-        select: {
-          contestants: true
+      take: 5,
+      include: {
+        higherInstitution: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
         }
       }
-    }
+    });
+    
+    // Return all contingent data objects
+    return {
+      contingentsWithDetails,
+      contingentsWithoutContestants,
+      schoolContingents,
+      higherInstContingents
+    };
   });
+  
+  // Extract data from the prismaExecute result
+  const {
+    contingentsWithDetails,
+    contingentsWithoutContestants,
+    schoolContingents,
+    higherInstContingents
+  } = contingentData;
 
   // Format state names for display
   const formatStateName = (stateName: string | StateObject | null | undefined): string => {

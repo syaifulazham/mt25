@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/session';
 import { hasRequiredRole } from '@/lib/auth';
 import { ContestForm } from '../../_components/contest-form';
-import prisma from '@/lib/prisma';
+import { prismaExecute } from '@/lib/prisma';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -20,14 +20,16 @@ export default async function EditContestPage({ params }: { params: { id: string
     redirect("/organizer/dashboard");
   }
 
-  // Fetch contest data from database
+  // Fetch contest data from database with proper connection management
   const contestId = parseInt(params.id);
-  const contest = await prisma.contest.findUnique({
-    where: { id: contestId },
-    include: {
-      targetgroup: true,
-      theme: true
-    }
+  const contest = await prismaExecute(prisma => {
+    return prisma.contest.findUnique({
+      where: { id: contestId },
+      include: {
+        targetgroup: true,
+        theme: true
+      }
+    });
   });
 
   // If contest not found, redirect to contests list

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -8,13 +8,13 @@ export async function GET(request: NextRequest) {
     const themeId = searchParams.get("themeId");
 
     if (!themeId) {
-      // If no themeId provided, return all contests
-      const contestsData = await prisma.contest.findMany({
+      // If no themeId provided, return all contests using prismaExecute for connection management
+      const contestsData = await prismaExecute(prisma => prisma.contest.findMany({
         include: {
           targetgroup: true,
           theme: true
         }
-      });
+      }));
       
       // Transform exactly like organizer page does
       const contests = contestsData.map(contest => ({
@@ -56,17 +56,16 @@ export async function GET(request: NextRequest) {
 
     // Convert theme ID to number
     const themeIdNumber = parseInt(themeId, 10);
-    
-    // Fetch contests with target group details
-    const contestsData = await prisma.contest.findMany({
+    // Get contests by theme ID using prismaExecute for connection management
+    const contestsData = await prismaExecute(prisma => prisma.contest.findMany({
       where: {
-        themeId: themeIdNumber
+        themeId: parseInt(themeId)
       },
       include: {
         targetgroup: true,
         theme: true
       }
-    });
+    }));
     
     console.log(`Found ${contestsData.length} contests with themeId: ${themeIdNumber}`);
     

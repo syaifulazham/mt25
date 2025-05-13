@@ -8,7 +8,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Plus } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { ParticipantsList } from "../_components/participants-list";
 
 export const metadata: Metadata = {
@@ -21,23 +21,28 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 export default async function ParticipantsListPage() {
-  // Fetch all participants for the client component to handle pagination
-  const participants = await prisma.user_participant.findMany({
-    orderBy: {
-      createdAt: 'desc'
-    },
-    include: {
-      contingents: {
-        include: {
-          school: true,
-          higherInstitution: true
+  // Fetch all participants and total count with proper connection management
+  const { participants, totalParticipants } = await prismaExecute(async (prisma) => {
+    // Fetch all participants for the client component to handle pagination
+    const participantsData = await prisma.user_participant.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      },
+      include: {
+        contingents: {
+          include: {
+            school: true,
+            higherInstitution: true
+          }
         }
       }
-    }
-  });
+    });
 
-  // Get total count
-  const totalParticipants = await prisma.user_participant.count();
+    // Get total count
+    const count = await prisma.user_participant.count();
+    
+    return { participants: participantsData, totalParticipants: count };
+  });
   
   return (
     <div className="container mx-auto py-6 space-y-6">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 
 // GET handler - Get a specific contestant by ID
 export async function GET(
@@ -21,8 +21,8 @@ export async function GET(
       return NextResponse.json({ error: "Invalid contestant ID" }, { status: 400 });
     }
     
-    // Get the contestant
-    const contestant = await prisma.contestant.findUnique({
+    // Get the contestant using prismaExecute for proper connection management
+    const contestant = await prismaExecute(prisma => prisma.contestant.findUnique({
       where: { id: contestantId },
       include: {
         contingent: {
@@ -32,7 +32,7 @@ export async function GET(
           }
         }
       }
-    });
+    }));
     
     if (!contestant) {
       return NextResponse.json({ error: "Contestant not found" }, { status: 404 });
@@ -70,8 +70,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid contestant ID" }, { status: 400 });
     }
     
-    // Get the existing contestant
-    const contestant = await prisma.contestant.findUnique({
+    // Get the existing contestant using prismaExecute
+    const contestant = await prismaExecute(prisma => prisma.contestant.findUnique({
       where: { id: contestantId },
       include: {
         contingent: {
@@ -81,35 +81,35 @@ export async function PATCH(
           }
         }
       }
-    });
+    }));
     
     if (!contestant) {
       return NextResponse.json({ error: "Contestant not found" }, { status: 404 });
     }
     
-    // Find the current participant
-    const participant = await prisma.user_participant.findUnique({
+    // Find the current participant using prismaExecute
+    const participant = await prismaExecute(prisma => prisma.user_participant.findUnique({
       where: { email: session.user?.email! }
-    });
+    }));
     
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
     
-    // Check if participant is a manager of this contingent or belongs to the same contingent
-    const isManager = await prisma.contingentManager.findFirst({
+    // Check if participant is a manager of this contingent using prismaExecute
+    const isManager = await prismaExecute(prisma => prisma.contingentManager.findFirst({
       where: {
         participantId: participant.id,
         contingentId: contestant.contingentId
       }
-    });
+    }));
     
     // If not a direct manager, check if the participant belongs to the same contingent
     let hasAccess = isManager !== null;
     
     if (!hasAccess) {
-      // Check if participant is part of this contingent
-      const participantContingent = await prisma.contingent.findFirst({
+      // Check if participant is part of this contingent using prismaExecute
+      const participantContingent = await prismaExecute(prisma => prisma.contingent.findFirst({
         where: {
           OR: [
             // Check if participant created this contingent (legacy relationship)
@@ -124,7 +124,7 @@ export async function PATCH(
             }
           ]
         }
-      });
+      }));
       
       hasAccess = participantContingent?.id === contestant.contingentId;
     }
@@ -150,11 +150,11 @@ export async function PATCH(
       }
     }
     
-    // Check if IC number is already used by another contestant
+    // Check if IC number is already used by another contestant using prismaExecute
     if (body.ic && body.ic !== contestant.ic) {
-      const existingContestant = await prisma.contestant.findFirst({
+      const existingContestant = await prismaExecute(prisma => prisma.contestant.findFirst({
         where: { ic: body.ic }
-      });
+      }));
       
       if (existingContestant && existingContestant.id !== contestantId) {
         return NextResponse.json(
@@ -181,11 +181,11 @@ export async function PATCH(
       updateData.contingentId = body.contingentId ? parseInt(body.contingentId) : null;
     }
     
-    // Update the contestant
-    const updatedContestant = await prisma.contestant.update({
+    // Update the contestant using prismaExecute
+    const updatedContestant = await prismaExecute(prisma => prisma.contestant.update({
       where: { id: contestantId },
       data: updateData
-    });
+    }));
     
     return NextResponse.json(updatedContestant);
   } catch (error) {
@@ -216,8 +216,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid contestant ID" }, { status: 400 });
     }
     
-    // Get the contestant
-    const contestant = await prisma.contestant.findUnique({
+    // Get the contestant using prismaExecute
+    const contestant = await prismaExecute(prisma => prisma.contestant.findUnique({
       where: { id: contestantId },
       include: {
         contingent: {
@@ -227,35 +227,35 @@ export async function DELETE(
           }
         }
       }
-    });
+    }));
     
     if (!contestant) {
       return NextResponse.json({ error: "Contestant not found" }, { status: 404 });
     }
     
-    // Find the current participant
-    const participant = await prisma.user_participant.findUnique({
+    // Find the current participant using prismaExecute
+    const participant = await prismaExecute(prisma => prisma.user_participant.findUnique({
       where: { email: session.user?.email! }
-    });
+    }));
     
     if (!participant) {
       return NextResponse.json({ error: "Participant not found" }, { status: 404 });
     }
     
-    // Check if participant is a manager of this contingent or belongs to the same contingent
-    const isManager = await prisma.contingentManager.findFirst({
+    // Check if participant is a manager of this contingent using prismaExecute
+    const isManager = await prismaExecute(prisma => prisma.contingentManager.findFirst({
       where: {
         participantId: participant.id,
         contingentId: contestant.contingentId
       }
-    });
+    }));
     
     // If not a direct manager, check if the participant belongs to the same contingent
     let hasAccess = isManager !== null;
     
     if (!hasAccess) {
-      // Check if participant is part of this contingent
-      const participantContingent = await prisma.contingent.findFirst({
+      // Check if participant is part of this contingent using prismaExecute
+      const participantContingent = await prismaExecute(prisma => prisma.contingent.findFirst({
         where: {
           OR: [
             // Check if participant created this contingent (legacy relationship)
@@ -270,7 +270,7 @@ export async function DELETE(
             }
           ]
         }
-      });
+      }));
       
       hasAccess = participantContingent?.id === contestant.contingentId;
     }
@@ -282,12 +282,17 @@ export async function DELETE(
       );
     }
     
-    // Delete the contestant
-    await prisma.contestant.delete({
+    // Delete the contestant using prismaExecute
+    await prismaExecute(prisma => prisma.contestant.delete({
       where: { id: contestantId }
-    });
+    }));
     
-    return NextResponse.json({ success: true });
+    // Ensure we're sending a properly formatted JSON response with a message
+    return NextResponse.json({ 
+      success: true, 
+      message: "Contestant deleted successfully",
+      contestantId 
+    });
   } catch (error) {
     console.error("Error deleting contestant:", error);
     console.error("Error details:", JSON.stringify(error, null, 2));

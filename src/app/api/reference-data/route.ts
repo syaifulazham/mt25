@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
 import { z } from "zod";
-import prisma from "@/lib/prisma";
+import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
 
@@ -50,14 +50,14 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Get reference data from database
-    const referenceData = await prisma.referencedata.findMany({
+    // Get reference data from database using prismaExecute for connection management
+    const referenceData = await prismaExecute(prisma => prisma.referencedata.findMany({
       where,
       orderBy: [
         { type: "asc" },
         { name: "asc" },
       ],
-    });
+    }));
 
     return NextResponse.json(referenceData);
   } catch (error) {
@@ -97,12 +97,12 @@ export async function POST(request: NextRequest) {
     const data = validationResult.data;
 
     // Check if reference data with same type and code already exists
-    const existingData = await prisma.referencedata.findFirst({
+    const existingData = await prismaExecute(prisma => prisma.referencedata.findFirst({
       where: {
         type: data.type,
         code: data.code,
       },
-    });
+    }));
 
     if (existingData) {
       return NextResponse.json(
@@ -111,13 +111,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create reference data in database
-    const referenceData = await prisma.referencedata.create({
+    // Create reference data in database using prismaExecute for connection management
+    const referenceData = await prismaExecute(prisma => prisma.referencedata.create({
       data: {
         ...data,
         updatedAt: new Date()
       },
-    });
+    }));
 
     return NextResponse.json(referenceData, { status: 201 });
   } catch (error) {
