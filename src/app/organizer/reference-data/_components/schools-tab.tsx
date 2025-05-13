@@ -54,8 +54,55 @@ type UploadResults = {
   total: number;
 };
 
-const schoolLevels = ["Primary", "Secondary"];
-const schoolCategories = ["Public", "Private", "International"];
+// Define school levels with display name and value pairs for better UX
+interface SchoolLevel {
+  display: string;
+  value: string;
+}
+
+const schoolLevels: SchoolLevel[] = [
+  { display: 'Primary', value: 'Rendah' },
+  { display: 'Secondary', value: 'Menengah' }
+];
+
+// Official school categories in Malaysia
+const schoolCategories = [
+  "category",
+  "AK",
+  "K9",
+  "KT6",
+  "KV",
+  "MODEL KHAS",
+  "MRSM",
+  "SBJK",
+  "SBP",
+  "SEK. ANTARABANGSA",
+  "SEK. EKSPATRIAT",
+  "SEK. MEN. PERSENDIRIAN CINA",
+  "SEK. MENENGAH AGAMA",
+  "SEK. MENENGAH AKADEMIK",
+  "SEK. PENDIDIKAN KHAS",
+  "SEK. RENDAH AGAMA",
+  "SEK. RENDAH AKADEMIK",
+  "SENI",
+  "SJKC",
+  "SJKT",
+  "SK",
+  "SK KHAS",
+  "SM KHAS",
+  "SM SABK",
+  "SMK",
+  "SMKA",
+  "SMT",
+  "SR SABK",
+  "SUKAN"
+];
+
+// Helper function to get display name from level value
+const getSchoolLevelDisplay = (value: string): string => {
+  const level = schoolLevels.find(l => l.value === value);
+  return level ? level.display : value;
+};
 
 export function SchoolsTab() {
   const [schools, setSchools] = useState<any[]>([]);
@@ -967,8 +1014,8 @@ export function SchoolsTab() {
                     </SelectTrigger>
                     <SelectContent>
                       {schoolLevels.map((level) => (
-                        <SelectItem key={level} value={level}>
-                          {level}
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.display}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1111,8 +1158,8 @@ export function SchoolsTab() {
                 <SelectContent>
                   <SelectItem value="all">All Levels</SelectItem>
                   {schoolLevels.map((level) => (
-                    <SelectItem key={level} value={level}>
-                      {level}
+                    <SelectItem key={level.value} value={level.value}>
+                      {level.display}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1355,8 +1402,8 @@ export function SchoolsTab() {
                                   </SelectTrigger>
                                   <SelectContent>
                                     {schoolLevels.map((level) => (
-                                      <SelectItem key={level} value={level}>
-                                        {level}
+                                      <SelectItem key={level.value} value={level.value}>
+                                        {level.display}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
