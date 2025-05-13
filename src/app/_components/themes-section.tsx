@@ -300,20 +300,13 @@ export default function ThemesSection() {
                           </span>
                         </div>
                         
-                        {/* Target Group Information - Now using targetgroups array */}
+                        {/* School Level Information */}
                         {contest.targetgroups && contest.targetgroups.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-1">
                             {/* School Level Badge */}
                             <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-900/50 text-indigo-300">
                               <span className="font-medium">Level:</span> {contest.targetgroups[0].schoolLevel}
                             </span>
-                            
-                            {/* Target Group Name Badge */}
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-purple-900/50 text-purple-300">
-                              <span className="font-medium">Group:</span> {contest.targetgroups[0].name}
-                            </span>
-                            
-                            
                           </div>
                         )}
                       </div>
