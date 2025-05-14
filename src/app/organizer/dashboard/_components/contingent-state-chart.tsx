@@ -23,6 +23,13 @@ const formatStateName = (stateName: string): string => {
   return stateName;
 };
 
+// Custom label styling props for state names
+const STATE_NAME_STYLE = {
+  fontSize: 10, // Smaller font size for state names
+  textAnchor: 'end' as const,
+  fill: '#6b7280' // Using a slightly muted color for better readability
+};
+
 type ContingentStateData = {
   state: string;
   count: number;
@@ -49,8 +56,9 @@ export default function ContingentStateChart({ data }: { data: ContingentStateDa
                 type="category" 
                 width={80} 
                 axisLine={false} 
-                tickLine={false}
-                tickFormatter={formatStateName} 
+                tickLine={false} 
+                tick={STATE_NAME_STYLE}
+                tickFormatter={formatStateName}
               />
               <Tooltip formatter={(value) => [`${value} contingents`, 'Count']} cursor={false} />
               <Bar dataKey="count" fill={BAR_COLOR}>

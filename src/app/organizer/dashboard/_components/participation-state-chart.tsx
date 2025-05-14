@@ -26,6 +26,13 @@ const formatStateName = (stateName: string): string => {
   return stateName;
 };
 
+// Custom label styling props for state names
+const STATE_NAME_STYLE = {
+  fontSize: 10, // Smaller font size for state names
+  textAnchor: 'end' as const,
+  fill: '#6b7280' // Using a slightly muted color for better readability
+};
+
 type ParticipationStateData = {
   state: string;
   MALE: number;
@@ -54,7 +61,8 @@ export default function ParticipationStateChart({ data }: { data: ParticipationS
                 width={80} 
                 axisLine={false} 
                 tickLine={false}
-                tickFormatter={formatStateName} 
+                tick={STATE_NAME_STYLE}
+                tickFormatter={formatStateName}
               />
               <Tooltip formatter={(value, name) => [`${value} participations`, name]} cursor={false} />
               <Legend />
