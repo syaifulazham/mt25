@@ -688,12 +688,9 @@ export default function EventDetailsPage() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          asChild
                           title="View Contest Details"
                         >
-                          <Link href={`/organizer/events/${eventId}/${eventcontest.id}`}>
-                            Details
-                          </Link>
+                          Details
                         </Button>
                         <Button
                           variant="ghost"
