@@ -1011,4 +1011,50 @@ export const eventApi = {
     apiRequest<{ success: boolean; message: string }>(`/api/events/${id}`, {
       method: 'DELETE',
     }),
+
+  /**
+   * Get all contests for an event
+   */
+  getEventContests: (eventId: number | string) =>
+    apiRequest<any[]>(`/api/events/${eventId}/contests`),
+
+  /**
+   * Get a specific event contest
+   */
+  getEventContest: (eventId: number | string, contestId: number | string) =>
+    apiRequest<any>(`/api/events/${eventId}/contests/${contestId}`),
+
+  /**
+   * Add contests to an event
+   */
+  addContestsToEvent: (eventId: number | string, data: {
+    contestIds: number[];
+    maxteampercontingent?: number;
+    person_incharge?: string;
+    person_incharge_phone?: string;
+  }) => apiRequest<{message: string; eventContests: any[]}>(`/api/events/${eventId}/contests`, {
+    method: 'POST',
+    body: data,
+  }),
+
+  /**
+   * Update an event contest
+   */
+  updateEventContest: (eventId: number | string, contestId: number | string, data: {
+    maxteampercontingent?: number;
+    person_incharge?: string | null;
+    person_incharge_phone?: string | null;
+    isActive?: boolean;
+  }) => apiRequest<any>(`/api/events/${eventId}/contests/${contestId}`, {
+    method: 'PATCH',
+    body: data,
+  }),
+
+  /**
+   * Remove a contest from an event
+   */
+  removeContestFromEvent: (eventId: number | string, contestId: number | string) =>
+    apiRequest<{message: string}>(`/api/events/${eventId}/contests/${contestId}`, {
+      method: 'DELETE',
+    }),
 };

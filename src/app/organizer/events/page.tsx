@@ -44,7 +44,16 @@ import {
   PaginationNext, 
   PaginationPrevious 
 } from '@/components/ui/pagination';
-import { CalendarIcon, MoreHorizontal, PlusIcon, SearchIcon } from 'lucide-react';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { CalendarIcon, Edit, Loader2, MoreHorizontal, PlusIcon, SearchIcon, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { eventApi } from '@/lib/api-client';
 import { stateApi } from '@/lib/api-client';
@@ -59,6 +68,10 @@ export default function EventsPage() {
   const [selectedStateId, setSelectedStateId] = useState<string>('all');
   const [selectedScopeArea, setSelectedScopeArea] = useState<string>('all');
   const [activeOnly, setActiveOnly] = useState(false);
+  
+  // Delete confirmation dialog state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<{id: number, name: string} | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -151,17 +164,28 @@ export default function EventsPage() {
     router.push(`/organizer/events/${id}/edit`);
   };
 
+  // Open the delete confirmation dialog
+  const confirmDeleteEvent = (event: {id: number, name: string}) => {
+    setEventToDelete(event);
+    setIsDeleteDialogOpen(true);
+  };
+
   // Handle event deletion
-  const handleDeleteEvent = async (id: number) => {
-    if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-      try {
-        await eventApi.deleteEvent(id);
-        toast.success('Event deleted successfully');
-        fetchEvents(); // Refresh the list
-      } catch (error: any) {
-        console.error('Error deleting event:', error);
-        toast.error(error.message || 'Failed to delete event');
-      }
+  const handleDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    
+    try {
+      setIsLoading(true);
+      await eventApi.deleteEvent(eventToDelete.id);
+      toast.success('Event deleted successfully');
+      setIsDeleteDialogOpen(false);
+      setEventToDelete(null);
+      fetchEvents(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error deleting event:', error);
+      toast.error(error.message || 'Failed to delete event');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -369,39 +393,67 @@ export default function EventsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            handleViewEvent(event.id);
-                          }}>
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => {
+                      <div className="flex justify-end items-center space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) => {
                             e.stopPropagation();
                             handleEditEvent(event.id);
-                          }}>
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600"
-                            onClick={(e) => {
+                          }}
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Edit</span>
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="h-8 w-8 text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDeleteEvent({id: event.id, name: event.name});
+                          }}
+                          title="Remove"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Remove</span>
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteEvent(event.id);
-                            }}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                              handleViewEvent(event.id);
+                            }}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditEvent(event.id);
+                            }}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                confirmDeleteEvent({id: event.id, name: event.name});
+                              }}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -438,6 +490,36 @@ export default function EventsPage() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to delete event: <strong>{eventToDelete?.name}</strong>. 
+              This action cannot be undone. All data associated with this event will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white" 
+              onClick={handleDeleteEvent}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Event'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
