@@ -16,7 +16,7 @@ export function LanguageSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center px-3 py-1.5 text-sm rounded-full bg-black/10 hover:bg-black/20 transition-colors border border-gray-200/20">
         <LanguageIcon className="h-4 w-4 mr-1" />
-        <span className="font-medium">{language === 'en' ? 'EN' : language === 'my' ? 'MY' : language === 'zh' ? 'ZH' : language === 'fil' ? 'FIL' : 'TH'}</span>
+        <span className="font-medium">{language === 'en' ? 'EN' : language === 'my' ? 'MY' : language === 'zh' ? 'ZH' : language === 'fil' ? 'FIL' : language === 'th' ? 'TH' : 'IB'}</span>
         <ChevronDown className="h-3 w-3 ml-1 opacity-70" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -31,6 +31,12 @@ export function LanguageSwitcher() {
           className={language === 'my' ? 'bg-blue-50 text-blue-600 font-medium' : ''}
         >
           {t('language.malay')}
+        </DropdownMenuItem>
+        <DropdownMenuItem 
+          onClick={() => setLanguage('ib')}
+          className={language === 'ib' ? 'bg-blue-50 text-blue-600 font-medium' : ''}
+        >
+          {t('language.iban')}
         </DropdownMenuItem>
         <DropdownMenuItem 
           onClick={() => setLanguage('zh')}

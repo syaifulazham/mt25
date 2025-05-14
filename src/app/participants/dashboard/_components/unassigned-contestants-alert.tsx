@@ -77,6 +77,18 @@ const translations = {
     bulk_assign_results: "ผลลัพธ์",
     bulk_assign_cancel: "ยกเลิก",
     bulk_assign_confirm: "มอบหมาย"
+  },
+  ib: {
+    title: "Gawa Diperlukan",
+    description: "Nuan bisi {count} peserta ti bedau ditugaska ke pertandingan. Peserta mesti ditugaska ke pertandingan untuk bekunsi.",
+    action: "Tugaska Pertandingan Ngagai Peserta",
+    bulk_action: "Tugaska Pertandingan Bekumpul",
+    loading: "Meriksa status peserta...",
+    bulk_assign_title: "Tugaska Pertandingan Bekumpul",
+    bulk_assign_description: "Otomatik tugaska pertandingan ngagai semua peserta bedaska pengawa belajar enggau umur sida.",
+    bulk_assign_results: "Keputusan",
+    bulk_assign_cancel: "Enda Jadi",
+    bulk_assign_confirm: "Tugaska"
   }
 };
 
@@ -99,33 +111,35 @@ export default function UnassignedContestantsAlert() {
     errors?: any[];
   } | null>(null);
 
-  useEffect(() => {
-    const checkUnassignedContestants = async () => {
-      try {
-        setIsLoading(true);
-        console.log('Fetching unassigned contestants data...');
-        const response = await fetch('/api/participants/contestants/unassigned?t=' + Date.now(), {
-          cache: 'no-store',
-          headers: {
-            'Pragma': 'no-cache',
-            'Cache-Control': 'no-cache'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch unassigned contestants data");
+  // Function to check for unassigned contestants
+  const checkUnassignedContestants = async () => {
+    try {
+      setIsLoading(true);
+      console.log('Fetching unassigned contestants data...');
+      const response = await fetch('/api/participants/contestants/unassigned?t=' + Date.now(), {
+        cache: 'no-store',
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
         }
+      });
 
-        const data = await response.json();
-        console.log('Unassigned contestants data:', data);
-        setUnassignedData(data);
-      } catch (error) {
-        console.error("Error checking unassigned contestants:", error);
-      } finally {
-        setIsLoading(false);
+      if (!response.ok) {
+        throw new Error("Failed to fetch unassigned contestants data");
       }
-    };
 
+      const data = await response.json();
+      console.log('Unassigned contestants data:', data);
+      setUnassignedData(data);
+    } catch (error) {
+      console.error("Error checking unassigned contestants:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Run the check when component mounts
+  useEffect(() => {
     checkUnassignedContestants();
   }, []);
 

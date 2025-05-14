@@ -23,14 +23,14 @@ export default function TeamsSummaryClient({ stats, isLoading, error }: TeamsSum
     <Card className="overflow-hidden border shadow-sm hover:shadow transition-shadow duration-200">
       <CardHeader className="p-4 pb-0 flex justify-between items-start">
         <div>
-          <CardTitle className="text-sm font-medium">{t('teams.title')}</CardTitle>
+          <CardTitle className="text-sm font-medium">{t('teams.card_title') || t('teams.title')}</CardTitle>
           {stats && stats.teamCount > 0 ? (
             <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0 h-4">
               {stats.teamCount} {stats.teamCount === 1 ? t('teams.team') : t('teams.teams')}
             </Badge>
           ) : (
             <Badge variant="secondary" className="mt-1 text-[10px] px-1.5 py-0 h-4">
-              {t('teams.no_teams')}
+              {t('teams.empty_state') || t('teams.no_teams')}
             </Badge>
           )}
         </div>
@@ -52,7 +52,7 @@ export default function TeamsSummaryClient({ stats, isLoading, error }: TeamsSum
               <span className="font-medium">{stats.contestsJoined}</span>
             </div>
             <div className="flex justify-between items-center py-1 border-b">
-              <span className="text-muted-foreground">{t('teams.members')}:</span>
+              <span className="text-muted-foreground">{t('teams.team_members') || t('teams.members')}:</span>
               <span className="font-medium">{stats.teamMembersCount}</span>
             </div>
             <div className="mt-2">

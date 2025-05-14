@@ -47,7 +47,7 @@ export default function ProfileSummaryClient({ user }: ProfileSummaryClientProps
     <Card className="overflow-hidden border shadow-sm hover:shadow transition-shadow duration-200">
       <CardHeader className="p-4 pb-0 flex justify-between items-start">
         <div>
-          <CardTitle className="text-sm font-medium">{t('profile.title')}</CardTitle>
+          <CardTitle className="text-sm font-medium">{t('profile.card_title') || t('profile.title')}</CardTitle>
           <Badge 
             variant={profileCompletion >= 80 ? "default" : profileCompletion >= 50 ? "outline" : "secondary"}
             className="mt-1 text-[10px] px-1.5 py-0 h-4"

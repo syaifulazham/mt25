@@ -15,8 +15,10 @@ import { useRouter } from "next/navigation";
 const languages: { code: Language; name: string; flag: string }[] = [
   { code: "en", name: "English", flag: "🇬🇧" },
   { code: "my", name: "Bahasa Melayu", flag: "🇲🇾" },
+  { code: "ib", name: "Bahasa Iban", flag: "🇮🇧" },
   { code: "zh", name: "中文", flag: "🇨🇳" },
   { code: "fil", name: "Filipino", flag: "🇵🇭" },
+  { code: "th", name: "ไทย", flag: "🇹🇭" },
 ];
 
 interface LanguageSelectorProps {
