@@ -17,7 +17,7 @@ export const navItems = [
     ),
   },
   {
-    title: "User Management",
+    title: "User",
     href: "/organizer/users",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -35,7 +35,7 @@ export const navItems = [
     ),
   },
   {
-    title: "Contest Management",
+    title: "Competitions",
     href: "/organizer/contests",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -44,7 +44,7 @@ export const navItems = [
     ),
   },
   {
-    title: "Quiz Management",
+    title: "Quizzes",
     href: "/organizer/quizzes",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -53,7 +53,7 @@ export const navItems = [
     ),
   },
   {
-    title: "Event Scheduling",
+    title: "Events",
     href: "/organizer/events",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -89,7 +89,7 @@ export const navItems = [
     ),
   },
   {
-    title: "Content Publishing",
+    title: "Contents",
     href: "/organizer/content",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -98,7 +98,7 @@ export const navItems = [
     ),
   },
   {
-    title: "Certificate Management",
+    title: "Certificates",
     href: "/organizer/certificates",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
