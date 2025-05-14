@@ -24,6 +24,7 @@ type Theme = {
 type Contest = {
   id: string | number;
   name: string;
+  code?: string;
   description: string;
   contestType: string;
   participation_mode: string;
@@ -289,8 +290,9 @@ export default function ThemesSection() {
                       className="bg-black bg-opacity-20 rounded-lg p-4 hover:bg-opacity-30 transition-all"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-lg">{contest.name}</h3>
-                        
+                        <h3 className="font-medium text-lg">
+                          {contest.code ? `${contest.code} - ${contest.name}` : contest.name}
+                        </h3>
                       </div>
                       <p className="text-gray-300 text-sm mb-3 line-clamp-2">{contest.description}</p>
                       <div className="flex flex-col space-y-2">
