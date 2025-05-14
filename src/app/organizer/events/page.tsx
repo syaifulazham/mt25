@@ -53,8 +53,8 @@ import {
   DialogTitle
 } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { CalendarIcon, Edit, Loader2, MoreHorizontal, PlusIcon, SearchIcon, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarIcon, Clock, Edit, Loader2, MoreHorizontal, PlusIcon, SearchIcon, Trash2 } from 'lucide-react';
+import { format, differenceInDays } from 'date-fns';
 import { eventApi } from '@/lib/api-client';
 import { stateApi } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -348,6 +348,7 @@ export default function EventsPage() {
                 <TableHead>State</TableHead>
                 <TableHead>Scope Area</TableHead>
                 <TableHead>Date Range</TableHead>
+                <TableHead>Days Left</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -355,13 +356,13 @@ export default function EventsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-10">
+                  <TableCell colSpan={9} className="text-center py-10">
                     Loading events...
                   </TableCell>
                 </TableRow>
               ) : events.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-10">
+                  <TableCell colSpan={9} className="text-center py-10">
                     No events found. Try adjusting your filters or create a new event.
                   </TableCell>
                 </TableRow>
@@ -389,6 +390,51 @@ export default function EventsPage() {
                           }
                         </span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const today = new Date();
+                        const startDate = new Date(event.startDate);
+                        const endDate = new Date(event.endDate);
+                        
+                        // Calculate days left
+                        const daysLeft = differenceInDays(startDate, today);
+                        
+                        // Check if event has already started
+                        if (today >= startDate && today <= endDate) {
+                          return (
+                            <div className="flex items-center">
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                <Clock className="mr-1 h-3 w-3" /> Ongoing
+                              </Badge>
+                            </div>
+                          );
+                        }
+                        
+                        // Check if event has ended
+                        if (today > endDate) {
+                          return (
+                            <div className="flex items-center">
+                              <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">
+                                Completed
+                              </Badge>
+                            </div>
+                          );
+                        }
+                        
+                        // Event is upcoming
+                        return (
+                          <div className="flex items-center">
+                            <Clock className="mr-1 h-4 w-4 text-gray-500" />
+                            <span className={`
+                              ${daysLeft <= 7 ? 'text-red-600 font-medium' : 
+                               daysLeft <= 30 ? 'text-amber-600' : 'text-gray-600'}
+                            `}>
+                              {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        );
+                      })()} 
                     </TableCell>
                     <TableCell>
                       <Badge variant={event.isActive ? "default" : "secondary"}>
