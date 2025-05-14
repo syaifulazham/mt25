@@ -305,7 +305,9 @@ export default function EventDetailsPage() {
               <div>
                 <h1 className="text-3xl font-bold">{event.name}</h1>
                 <p className="text-gray-500 mt-1">
-                  {format(new Date(event.startDate), 'PPP')} - {format(new Date(event.endDate), 'PPP')}
+                  {format(new Date(event.startDate), 'PPP') === format(new Date(event.endDate), 'PPP') 
+                    ? format(new Date(event.startDate), 'PPP')
+                    : `${format(new Date(event.startDate), 'PPP')} - ${format(new Date(event.endDate), 'PPP')}`}
                 </p>
               </div>
               
@@ -365,7 +367,9 @@ export default function EventDetailsPage() {
                       <div className="flex flex-col">
                         <dt className="text-sm font-medium text-gray-500">Date Range</dt>
                         <dd>
-                          {format(new Date(event.startDate), 'PPP')} - {format(new Date(event.endDate), 'PPP')}
+                          {format(new Date(event.startDate), 'PPP') === format(new Date(event.endDate), 'PPP') 
+                            ? format(new Date(event.startDate), 'PPP')
+                            : `${format(new Date(event.startDate), 'PPP')} - ${format(new Date(event.endDate), 'PPP')}`}
                         </dd>
                       </div>
                       <div className="flex flex-col">

@@ -383,7 +383,10 @@ export default function EventsPage() {
                       <div className="flex items-center">
                         <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
                         <span>
-                          {format(new Date(event.startDate), 'MMM d, yyyy')} - {format(new Date(event.endDate), 'MMM d, yyyy')}
+                          {format(new Date(event.startDate), 'MMM d, yyyy') === format(new Date(event.endDate), 'MMM d, yyyy') 
+                            ? format(new Date(event.startDate), 'MMM d, yyyy')
+                            : `${format(new Date(event.startDate), 'MMM d, yyyy')} - ${format(new Date(event.endDate), 'MMM d, yyyy')}`
+                          }
                         </span>
                       </div>
                     </TableCell>
