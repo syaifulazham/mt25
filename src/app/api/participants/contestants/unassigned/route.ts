@@ -4,6 +4,10 @@ import { prismaExecute } from "@/lib/prisma";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { Prisma } from "@prisma/client";
 
+// This route uses dynamic features and cannot be statically generated
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET() {
   try {
     // Get the current session
