@@ -87,26 +87,53 @@ export async function POST(
       );
     }
     
-    // Track created assignments
+    // Track created and removed assignments
     const createdAssignments = [];
+    const removedAssignments = [];
     const errors = [];
     
-    // Create participation records for each contest
-    for (const contestId of contestIds) {
+    // First, get all current contest participations for this contestant
+    const currentParticipations = await prisma.contestParticipation.findMany({
+      where: {
+        contestantId
+      },
+      select: {
+        id: true,
+        contestId: true
+      }
+    });
+    
+    // Find contest IDs that need to be removed (in current but not in the new selection)
+    const currentContestIds = currentParticipations.map(p => p.contestId);
+    const contestIdsToRemove = currentContestIds.filter(id => !contestIds.includes(id));
+    
+    // Step 1: Remove unselected contest participations
+    for (const contestId of contestIdsToRemove) {
       try {
-        // Check if participation already exists
-        const existingParticipation = await prisma.contestParticipation.findUnique({
-          where: {
-            contestId_contestantId: {
-              contestId,
-              contestantId
+        const participation = currentParticipations.find(p => p.contestId === contestId);
+        if (participation) {
+          await prisma.contestParticipation.delete({
+            where: {
+              id: participation.id
             }
-          }
+          });
+          removedAssignments.push({ contestId });
+        }
+      } catch (error) {
+        console.error(`Error removing contestant ${contestantId} from contest ${contestId}:`, error);
+        errors.push({
+          contestId,
+          error: `Error removing contest: ${(error as Error).message}`
         });
-        
-        // Skip if already assigned
-        if (existingParticipation) continue;
-        
+      }
+    }
+    
+    // Step 2: Add new contest participations
+    // Find contest IDs that need to be added (in the new selection but not in current)
+    const contestIdsToAdd = contestIds.filter(id => !currentContestIds.includes(id));
+    
+    for (const contestId of contestIdsToAdd) {
+      try {
         // Create new participation
         const participation = await prisma.contestParticipation.create({
           data: {
@@ -122,7 +149,7 @@ export async function POST(
         console.error(`Error assigning contestant ${contestantId} to contest ${contestId}:`, error);
         errors.push({
           contestId,
-          error: (error as Error).message
+          error: `Error adding contest: ${(error as Error).message}`
         });
       }
     }
@@ -130,6 +157,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       assignmentsCreated: createdAssignments.length,
+      assignmentsRemoved: removedAssignments.length,
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error) {

@@ -11,6 +11,7 @@ import TeamsSummary from "./teams-summary";
 import VideoGallery from "./video-gallery";
 import PendingRequestsAlert from "./pending-requests-alert";
 import ProfileCompletionAlert from "./profile-completion-alert";
+import UnassignedContestantsAlert from "./unassigned-contestants-alert";
 
 interface DashboardClientProps {
   user: any;
@@ -44,6 +45,9 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
       
       {/* Pending Requests Alert - more compact, only shows if there are pending requests */}
       <PendingRequestsAlert userId={Number(user.id)} participantId={Number(user.id)} />
+      
+      {/* Unassigned Contestants Alert - shows when there are contestants without assigned contests */}
+      <UnassignedContestantsAlert />
       
       {/* Quick Action Buttons */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">

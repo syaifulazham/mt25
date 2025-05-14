@@ -14,6 +14,7 @@ import ProfileSummary from "./_components/profile-summary";
 import ContestantsSummary from "./_components/contestants-summary";
 import TeamsSummary from "./_components/teams-summary";
 import PendingRequestsAlert from "./_components/pending-requests-alert";
+import UnassignedContestantsAlert from "./_components/unassigned-contestants-alert";
 import VideoGallery from "./_components/video-gallery";
 import { prismaExecute } from "@/lib/prisma";
 import DashboardClient from "./_components/dashboard-client";
@@ -79,5 +80,4 @@ export default async function DashboardPage() {
   
   // Pass the user data to the client component
   return <DashboardClient user={user} userDetails={userDetails} />;
-
 }

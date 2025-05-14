@@ -41,7 +41,7 @@ export default function ProfileSummaryClient({ user }: ProfileSummaryClientProps
   const profileCompletion = calculateProfileCompletion();
   
   // Determine education institution
-  const educationPlace = user.school?.name || user.higherInstitution?.name || t('profile.no_institution');
+  const educationPlace = user.school?.name || user.higherInstitution?.name || "";
   
   return (
     <Card className="overflow-hidden border shadow-sm hover:shadow transition-shadow duration-200">
@@ -73,10 +73,12 @@ export default function ProfileSummaryClient({ user }: ProfileSummaryClientProps
             <span className="truncate">{user.phoneNumber || t('profile.no_phone')}</span>
           </div>
           
-          <div className="flex items-center gap-1.5 text-muted-foreground overflow-hidden text-ellipsis">
-            <School className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{educationPlace}</span>
-          </div>
+          {educationPlace && (
+            <div className="flex items-center gap-1.5 text-muted-foreground overflow-hidden text-ellipsis">
+              <School className="h-3 w-3 flex-shrink-0" />
+              <span className="truncate">{educationPlace}</span>
+            </div>
+          )}
         </div>
         
         <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden mt-3">
