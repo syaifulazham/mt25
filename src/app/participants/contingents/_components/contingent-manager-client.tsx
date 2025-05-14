@@ -75,7 +75,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
       }
     } catch (error) {
       console.error("Error loading contingents:", error);
-      toast.error("Failed to load your contingents");
+      toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +89,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
       setContingentRequests(requests);
     } catch (error) {
       console.error("Error loading contingent requests:", error);
-      toast.error("Failed to load contingent requests");
+      toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
     }
@@ -111,10 +111,10 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
         }
       }
       
-      toast.success(`Request ${status.toLowerCase()} successfully`);
+      toast.success(status === 'APPROVED' ? t('contingent.request_approved') : t('contingent.request_rejected'));
     } catch (error) {
       console.error('Error updating request:', error);
-      toast.error('Failed to update request');
+      toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
     }
@@ -134,14 +134,14 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
         logoFile: logoFile || undefined,
       });
       
-      toast.success("Contingent details updated successfully");
+      toast.success(t('contingent.update_success'));
       setUpdateSuccess(true);
       
       // Reload contingents to get updated data
       await loadUserContingents();
     } catch (error) {
       console.error("Error updating contingent:", error);
-      toast.error("Failed to update contingent details");
+      toast.error(t('contingent.update_error'));
     } finally {
       setIsLoading(false);
     }
@@ -156,14 +156,14 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
       
       await contingentApi.leaveContingent(selectedContingent.id, userId);
       
-      toast.success("You have left the contingent successfully");
+      toast.success(t('contingent.leave_success'));
       setLeaveDialogOpen(false);
       
       // Reload contingents to get updated data
       await loadUserContingents();
     } catch (error: any) {
       console.error("Error leaving contingent:", error);
-      toast.error(error.message || "Failed to leave contingent");
+      toast.error(error.message || t('contingent.leave_error'));
     } finally {
       setIsLoading(false);
     }
@@ -201,8 +201,8 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
               <CardTitle>{t('contingent.title')}</CardTitle>
               <CardDescription>
                 {userContingents.length > 1 
-                  ? "Select a contingent to manage"
-                  : "Your contingent details"}
+                  ? t('contingent.select_to_manage')
+                  : t('contingent.your_details')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -227,7 +227,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                       </div>
                       {contingent.isManager && (
                         <Badge variant="outline">
-                          {contingent.isOwner ? 'Primary Manager' : 'Co-Manager'}
+                          {contingent.isOwner ? t('contingent.primary_manager') : t('contingent.co_manager')}
                         </Badge>
                       )}
                     </div>
@@ -235,10 +235,10 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                       <span>{contingent.school?.name || contingent.higherInstitution?.name}</span>
                     </div>
                     <div className="flex items-center text-xs text-muted-foreground mt-1">
-                      <Users className="h-3 w-3 mr-1" /> {contingent.memberCount} members
+                      <Users className="h-3 w-3 mr-1" /> {contingent.memberCount} {t('contingent.members')}
                     </div>
                     {contingent.status === 'PENDING' && (
-                      <Badge variant="secondary" className="mt-2">Pending Approval</Badge>
+                      <Badge variant="secondary" className="mt-2">{t('contingent.pending_approval')}</Badge>
                     )}
                   </div>
                 ))}
@@ -257,7 +257,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                   <CardTitle className="flex justify-between items-center">
                     <span>{selectedContingent.name}</span>
                     {selectedContingent.status === 'PENDING' && (
-                      <Badge variant="secondary">Pending Approval</Badge>
+                      <Badge variant="secondary">{t('contingent.pending_approval')}</Badge>
                     )}
                   </CardTitle>
                   <CardDescription>
@@ -272,7 +272,7 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                       </span>
                     </div>
                     <div className="mt-1">
-                      {selectedContingent.description || 'No description provided'}
+                      {selectedContingent.description || t('contingent.no_description')}
                     </div>
                   </CardDescription>
                 </CardHeader>
@@ -374,9 +374,9 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Select a Contingent</CardTitle>
+                <CardTitle>{t('contingent.select_contingent')}</CardTitle>
                 <CardDescription>
-                  Please select a contingent from the list to view its details
+                  {t('contingent.select_to_view')}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -385,49 +385,48 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
       </div>
     );
   };
-
+  
+  // Render confirmation dialogs
   return (
-    <div className="space-y-6">
+    <>
       {renderContent()}
       
-      {/* Leave Contingent Confirmation Dialog */}
-      {selectedContingent && (
-        <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Leave Contingent</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to leave the contingent "{selectedContingent.name}"?
-                This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <p className="text-amber-600 text-sm">
-                {t('contingent.leave_note')}
-              </p>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setLeaveDialogOpen(false)}>
-                {t('common.cancel')}
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={handleLeaveContingent}
-                disabled={isLeaving}
-              >
-                {isLeaving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t('contingent.leaving')}
-                  </>
-                ) : (
-                  t('contingent.leave')
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
+      {/* Leave Contingent Dialog */}
+      <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('contingent.leave_dialog_title')}</DialogTitle>
+            <DialogDescription>
+              {t('contingent.leave_dialog_desc')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="font-medium">{selectedContingent?.name}</p>
+            <p className="text-sm text-muted-foreground">
+              {selectedContingent?.school?.name || selectedContingent?.higherInstitution?.name}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLeaveDialogOpen(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleLeaveContingent}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t('common.processing')}
+                </>
+              ) : (
+                t('contingent.confirm_leave')
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

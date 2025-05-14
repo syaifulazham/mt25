@@ -57,68 +57,31 @@ const contingentApi = {
   },
 
   // Create a new contingent
-  async createContingent(data: any) {
+  async createContingent(data: CreateContingentRequest) {
     console.log('Creating contingent with data:', data);
     
     // If managerIds is not provided, initialize it as an empty array
-    if (!data.managerIds) {
-      data.managerIds = [];
-    }
-    
-    // Transform the data to match the API's expected format
-    // The API expects schoolId or higherInstId, not institutionId and institutionType
-    const transformedData: any = {
-      name: data.name,
-      description: data.description,
-      participantId: data.participantId,
-      managedByParticipant: data.managedByParticipant,
-      managerIds: data.managerIds,
-      short_name: data.short_name
-    };
-    
-    // Map institutionType and institutionId to the correct field
-    if (data.institutionType === 'SCHOOL') {
-      transformedData.schoolId = data.institutionId;
-    } else if (data.institutionType === 'HIGHER_INSTITUTION') {
-      transformedData.higherInstId = data.institutionId;
-    }
-    
-    console.log('Transformed data for API:', transformedData);
-    
-    // Add a retry mechanism for contingent creation
-    let retries = 3;
-    let response;
-    let responseData;
-    
-    while (retries > 0) {
-      try {
-        response = await fetch('/api/participants/contingents', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(transformedData),
-        });
-        
-        responseData = await response.json();
-        console.log('API response:', responseData);
-        
-        if (response.ok) {
-          break; // Success, exit the retry loop
-        } else {
-          throw new Error(responseData.error || 'Failed to create contingent');
-        }
-      } catch (error) {
-        retries--;
-        if (retries === 0) {
-          throw error; // Rethrow the error after all retries fail
-        }
-        console.log(`Retrying contingent creation... ${retries} attempts left`);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retrying
+    data.managerIds = data.managerIds || [];
+
+    try {
+      const response = await fetch('/api/participants/contingents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create contingent');
       }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating contingent:', error);
+      throw error;
     }
-    
-    return responseData;
   },
 
   // Request to join a contingent
@@ -288,7 +251,7 @@ export interface School {
   code: string;
   level: string;
   category: string;
-  state: {
+  state?: {
     name: string;
   };
 }
@@ -297,7 +260,21 @@ export interface HigherInstitution {
   id: number;
   name: string;
   code: string;
-  state: {
+  state?: {
+    name: string;
+  };
+}
+
+export interface Independent {
+  id: number;
+  name: string;
+  address?: string;
+  town?: string;
+  postcode?: string;
+  stateId: number;
+  institution?: string;
+  type: 'PARENT' | 'YOUTH_GROUP';
+  state?: {
     name: string;
   };
 }
@@ -306,8 +283,10 @@ export interface Contingent {
   id: number;
   name: string;
   description: string;
+  contingentType: 'SCHOOL' | 'HIGHER_INST' | 'INDEPENDENT';
   school: School | null;
   higherInstitution: HigherInstitution | null;
+  independent: Independent | null;
   isManager: boolean;
   isOwner: boolean;
   status: 'ACTIVE' | 'PENDING';
@@ -315,6 +294,27 @@ export interface Contingent {
   managerCount?: number;
   short_name?: string;
   logoUrl?: string;
+}
+
+export interface CreateContingentRequest {
+  name: string;
+  description?: string;
+  short_name?: string;
+  participantId: number;
+  managedByParticipant?: boolean;
+  contingentType: 'SCHOOL' | 'HIGHER_INST' | 'INDEPENDENT';
+  schoolId?: number;
+  higherInstId?: number;
+  independentData?: {
+    name: string;
+    address?: string;
+    town?: string;
+    postcode?: string;
+    stateId: number;
+    institution?: string;
+    type: 'PARENT' | 'YOUTH_GROUP';
+  };
+  managerIds?: number[];
 }
 
 export interface ContingentRequest {

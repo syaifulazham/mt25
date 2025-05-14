@@ -41,12 +41,42 @@ export async function GET(request: NextRequest) {
     const where: any = {};
     
     if (search) {
+      // Process search term - handle SK and SMK abbreviations
+      const processedSearch = search.trim();
+      
+      // Create expanded versions for SK and SMK
+      let expandedSearch = processedSearch;
+      
+      // Check for SK/sk pattern - case insensitive match
+      if (processedSearch.match(/^sk\s+/i)) {
+        expandedSearch = `SEKOLAH KEBANGSAAN ${processedSearch.substring(3)}`;
+      } 
+      // Check for SMK/smk pattern - case insensitive match
+      else if (processedSearch.match(/^smk\s+/i)) {
+        expandedSearch = `SEKOLAH MENENGAH KEBANGSAAN ${processedSearch.substring(4)}`;
+      }
+      
+      // Create search conditions
       where.OR = [
-        { name: { contains: search } },
-        { code: { contains: search } },
-        { ppd: { contains: search } },
-        { city: { contains: search } },
+        // Original search term
+        { name: { contains: processedSearch } },
+        { code: { contains: processedSearch } },
+        { ppd: { contains: processedSearch } },
+        { city: { contains: processedSearch } },
       ];
+      
+      // Also search with expanded form if applicable
+      if (expandedSearch !== processedSearch) {
+        where.OR.push({ name: { contains: expandedSearch } });
+      }
+      
+      // For abbreviated searches, also search just the school name without prefix
+      if (processedSearch.match(/^(sk|smk)\s+/i)) {
+        const nameWithoutPrefix = processedSearch.match(/^(?:sk|smk)\s+(.*)/i)?.[1] || '';
+        if (nameWithoutPrefix) {
+          where.OR.push({ name: { contains: nameWithoutPrefix } });
+        }
+      }
     }
     
     if (stateId) {

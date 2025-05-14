@@ -25,7 +25,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [institutionType, setInstitutionType] = useState<"school" | "independent">("school");
+  const [institutionType, setInstitutionType] = useState<"school" | "higher" | "independent">("school");
   const [searchResults, setSearchResults] = useState<(School | HigherInstitution)[]>([]);
   const [selectedInstitution, setSelectedInstitution] = useState<School | HigherInstitution | null>(null);
   const [contingentName, setContingentName] = useState("");
@@ -44,9 +44,13 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
 
     try {
       setIsLoading(true);
-      // Only search for schools since higher institutions option was removed
-      const schools = await contingentApi.searchSchools(searchQuery);
-      setSearchResults(schools);
+      if (institutionType === "school") {
+        const schools = await contingentApi.searchSchools(searchQuery);
+        setSearchResults(schools);
+      } else {
+        const institutions = await contingentApi.searchHigherInstitutions(searchQuery);
+        setSearchResults(institutions);
+      }
       setShowSearchDialog(true);
     } catch (error) {
       console.error("Error searching:", error);
@@ -204,51 +208,43 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>{t('contingent.independent_type')}</CardTitle>
+        <CardTitle>{t('contingent.select_institution')}</CardTitle>
         <CardDescription>
           {t('contingent.select_institution_desc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="flex flex-col space-y-2">
-          <Label className="text-sm font-medium">{t('contingent.select_type')}</Label>
-          <div className="flex space-x-4">
-            <Button 
-              type="button"
-              variant={institutionType === 'school' ? "default" : "outline"}
-              className={`flex-1 justify-start py-6 ${institutionType === 'school' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-              onClick={() => {
-                setInstitutionType("school");
-                setSelectedInstitution(null);
-                setContingentName("");
-              }}
-            >
-              <div className="flex flex-col items-center w-full">
-                <SchoolIcon className={`h-6 w-6 mb-2 ${institutionType === 'school' ? 'text-white' : 'text-blue-600'}`} />
-                <span className={`${institutionType === 'school' ? 'text-white' : ''}`}>{t('contingent.school')}</span>
-              </div>
-            </Button>
-            <Button 
-              type="button"
-              variant={institutionType === 'independent' ? "default" : "outline"}
-              className={`flex-1 justify-start py-6 ${institutionType === 'independent' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-              onClick={() => {
-                setInstitutionType("independent");
-                setSelectedInstitution(null);
-                setContingentName("");
-              }}
-            >
-              <div className="flex flex-col items-center w-full">
-                <Users className={`h-6 w-6 mb-2 ${institutionType === 'independent' ? 'text-white' : 'text-green-600'}`} />
-                <span className={`${institutionType === 'independent' ? 'text-white' : ''}`}>{t('contingent.independent')}</span>
-              </div>
-            </Button>
+        <RadioGroup 
+          defaultValue="school" 
+          value={institutionType}
+          onValueChange={(value: string) => {
+            setInstitutionType(value as "school" | "higher" | "independent");
+            setSelectedInstitution(null);
+            setContingentName("");
+          }}
+          className="flex flex-row space-x-4 flex-wrap"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="school" id="school" />
+            <Label htmlFor="school" className="flex items-center gap-1">
+              <SchoolIcon className="h-4 w-4" /> {t('contingent.school')}
+            </Label>
           </div>
-        </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="higher" id="higher" />
+            <Label htmlFor="higher" className="flex items-center gap-1">
+              <Building className="h-4 w-4" /> Higher Institution
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="independent" id="independent" />
+            <Label htmlFor="independent" className="flex items-center gap-1">
+              <Users className="h-4 w-4" /> Independent
+            </Label>
+          </div>
+        </RadioGroup>
         
-        <Separator className="my-4" />
-        
-        {institutionType === 'school' && (
+        {(institutionType === 'school' || institutionType === 'higher') && (
           <>
             <div className="flex gap-2">
               <Input
@@ -270,45 +266,42 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
             </div>
 
             {selectedInstitution && (
-              <>
-                <div className="p-4 border rounded-md bg-muted">
-                  <h3 className="font-medium mb-1">
-                    {t('contingent.selected_school')}
-                  </h3>
-                  <p className="text-lg">{selectedInstitution.name}</p>
-                  {'ppd' in selectedInstitution && selectedInstitution.ppd ? (
-                    <p className="text-sm text-muted-foreground">{String(selectedInstitution.ppd)}</p>
-                  ) : null}
-                  <p className="text-sm text-muted-foreground">
-                    {'state' in selectedInstitution && selectedInstitution.state ? 
-                      String(selectedInstitution.state.name) : ''}
-                  </p>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="contingentName">{t('contingent.name')}</Label>
-                    <Input
-                      id="contingentName"
-                      value={contingentName}
-                      onChange={(e) => setContingentName(e.target.value)}
-                      placeholder={t('contingent.name_placeholder')}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="contingentDescription">{t('contingent.description')}</Label>
-                    <Input
-                      id="contingentDescription"
-                      value={contingentDescription}
-                      onChange={(e) => setContingentDescription(e.target.value)}
-                      placeholder={t('contingent.description_placeholder')}
-                    />
-                  </div>
-                </div>
-              </>
+              <div className="p-4 border rounded-md bg-muted">
+                <h3 className="font-medium mb-1">
+                  {institutionType === "school" ? t('contingent.selected_school') : t('contingent.selected_institution')}
+                </h3>
+                <p className="text-lg">{selectedInstitution.name}</p>
+                {'ppd' in selectedInstitution && selectedInstitution.ppd && (
+                  <p className="text-sm text-muted-foreground">{selectedInstitution.ppd}</p>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  {'state' in selectedInstitution && selectedInstitution.state && selectedInstitution.state.name}
+                </p>
+              </div>
             )}
+
+            <Separator />
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="contingentName">{t('contingent.name')}</Label>
+                <Input
+                  id="contingentName"
+                  value={contingentName}
+                  onChange={(e) => setContingentName(e.target.value)}
+                  placeholder={t('contingent.name_placeholder')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="contingentDescription">{t('contingent.description')}</Label>
+                <Input
+                  id="contingentDescription"
+                  value={contingentDescription}
+                  onChange={(e) => setContingentDescription(e.target.value)}
+                  placeholder={t('contingent.description_placeholder')}
+                />
+              </div>
+            </div>
           </>
         )}
 
@@ -316,14 +309,14 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
           <>
             <div className="mb-4">
               <p className="text-sm text-muted-foreground mb-2">
-                {t('contingent.independent_desc')}
+                Create an independent contingent for parents managing children or youth groups not affiliated with any school or institution.
               </p>
             </div>
             <IndependentForm 
               onSubmit={(data) => {
                 setIndependentData(data);
                 setContingentName(data.name);
-                toast.success(t('contingent.independent_saved'));
+                toast.success("Independent contingent details saved. Click Create Contingent to continue.");
               }} 
               isLoading={isLoading} 
               initialData={independentData as any} 
@@ -331,21 +324,34 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
           </>
         )}
 
-        {/* Second set of name/description fields removed to prevent duplication */}
+        {institutionType !== 'independent' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-medium mb-2">{t('contingent.details')}</h3>
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="contingent-name">{t('contingent.name')}</Label>
+                  <Input
+                    id="contingent-name"
+                    placeholder={t('contingent.enter_name')}
+                    value={contingentName}
+                    onChange={(e) => setContingentName(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="contingent-description">{t('contingent.description')}</Label>
+                  <Input
+                    id="contingent-description"
+                    placeholder={t('contingent.description_placeholder')}
+                    value={contingentDescription}
+                    onChange={(e) => setContingentDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
-      
-      {/* Card footer for independent form */}
-      {institutionType === 'independent' && independentData && (
-        <CardFooter className="flex justify-end">
-          <Button onClick={handleCreateContingent} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : t('contingent.create_new')}
-          </Button>
-        </CardFooter>
-      )}
-      
-      {/* Card footer for school form */}
       {selectedInstitution && (
         <CardFooter className="flex flex-col space-y-4">
           <div className="flex justify-between w-full">

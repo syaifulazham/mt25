@@ -8,14 +8,27 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0; // Disable all caching
 
+// Schema for creating a new independent contingent
+const createIndependentSchema = z.object({
+  name: z.string().min(1).max(255),
+  address: z.string().optional(),
+  town: z.string().optional(),
+  postcode: z.string().optional(),
+  stateId: z.number(),
+  institution: z.string().optional(),
+  type: z.enum(['PARENT', 'YOUTH_GROUP']),
+});
+
 // Schema for creating a new contingent
 const createContingentSchema = z.object({
   schoolId: z.number().optional(),
   higherInstId: z.number().optional(),
+  independentData: createIndependentSchema.optional(),
   name: z.string().min(1).max(255),
   description: z.string().optional(),
   short_name: z.string().optional(),
   participantId: z.number(),
+  contingentType: z.enum(['SCHOOL', 'HIGHER_INST', 'INDEPENDENT']).default('SCHOOL'),
 });
 
 // Schema for updating a contingent
@@ -141,9 +154,24 @@ export async function POST(request: NextRequest) {
       short_name
     } = validationResult.data;
 
-    if (!schoolId && !higherInstId) {
+    // Validate contingent type requirements
+    if (validationResult.data.contingentType === 'SCHOOL' && !schoolId) {
       return NextResponse.json(
-        { error: "Either schoolId or higherInstId is required" },
+        { error: "schoolId is required for school contingents" },
+        { status: 400 }
+      );
+    }
+    
+    if (validationResult.data.contingentType === 'HIGHER_INST' && !higherInstId) {
+      return NextResponse.json(
+        { error: "higherInstId is required for higher institution contingents" },
+        { status: 400 }
+      );
+    }
+    
+    if (validationResult.data.contingentType === 'INDEPENDENT' && !validationResult.data.independentData) {
+      return NextResponse.json(
+        { error: "Independent contingent details are required" },
         { status: 400 }
       );
     }
@@ -162,6 +190,29 @@ export async function POST(request: NextRequest) {
 
     // Use a transaction to create both the contingent and manager relationship
     const result = await prisma.$transaction(async (tx) => {
+      let independentId: number | undefined = undefined;
+      
+      // Create independent record if needed
+      if (validationResult.data.contingentType === 'INDEPENDENT' && validationResult.data.independentData) {
+        const { name: indName, address, town, postcode, stateId, institution, type } = validationResult.data.independentData;
+        
+        const newIndependent = await tx.independent.create({
+          data: {
+            name: indName,
+            address,
+            town,
+            postcode,
+            stateId,
+            institution,
+            type,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+        
+        independentId = newIndependent.id;
+      }
+      
       // Create the contingent
       const newContingent = await tx.contingent.create({
         data: {
@@ -170,8 +221,10 @@ export async function POST(request: NextRequest) {
           short_name: short_name || "",
           managedByParticipant: true,
           participantId,
-          schoolId,
-          higherInstId,
+          schoolId: validationResult.data.contingentType === 'SCHOOL' ? schoolId : undefined,
+          higherInstId: validationResult.data.contingentType === 'HIGHER_INST' ? higherInstId : undefined,
+          independentId,
+          contingentType: validationResult.data.contingentType,
           createdAt: new Date(),
           updatedAt: new Date()
         }
