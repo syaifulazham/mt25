@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = 'force-dynamic';
-import prisma from "@/lib/prisma";
+import prisma, { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 
 // GET /api/participants/contests - Get all contests that participants can join
@@ -25,22 +25,18 @@ export async function GET(req: NextRequest) {
     console.log("Executing Prisma query for participants with filter:", JSON.stringify(filter, null, 2));
     
     try {
-      // Use a simple query without relations that might cause issues
-      const contests = await prisma.contest.findMany({
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          description: true,
-          contestType: true,
-          startDate: true,
-          endDate: true,
-          participation_mode: true
-        },
-        where: filter
+      const contests = await prismaExecute(async (prisma: any) => {
+        return await prisma.contest.findMany({
+          include: {
+            targetgroup: true,
+            theme: true,
+          },
+          where: filter
+        });
       });
 
       console.log(`Successfully found ${contests.length} contests for participants`);
+      console.log("First contest sample:", JSON.stringify(contests[0], null, 2));
       
       // Return successful response
       return NextResponse.json(contests);
@@ -49,16 +45,18 @@ export async function GET(req: NextRequest) {
       
       // Try an even simpler query as fallback
       console.log("Attempting basic fallback query without filters...");
-      const basicContests = await prisma.contest.findMany({
-        select: {
-          id: true,
-          name: true,
-          code: true,
-          description: true,
-          contestType: true,
-          startDate: true,
-          endDate: true
-        }
+      const basicContests = await prismaExecute(async (prisma: any) => {
+        return await prisma.contest.findMany({
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            description: true,
+            contestType: true,
+            startDate: true,
+            endDate: true
+          }
+        });
       });
       
       console.log(`Fallback query returned ${basicContests.length} basic contests`);

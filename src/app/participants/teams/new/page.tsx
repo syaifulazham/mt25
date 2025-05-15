@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -20,6 +20,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectLabel,
+  SelectGroup
 } from "@/components/ui/select";
 
 interface Contingent {
@@ -44,6 +46,17 @@ interface Contest {
   endDate: string;
   description?: string;
   participation_mode: string;
+  targetgroup: {
+    id: number;
+    name: string;
+    schoolLevel: string;
+    minAge: number;
+    maxAge: number;
+  }[];
+  theme?: {
+    name: string;
+    color: string;
+  };
 }
 
 export default function NewTeamPage() {
@@ -137,7 +150,7 @@ export default function NewTeamPage() {
         }
         
         const data = await response.json();
-        console.log("Available contests:", data);
+        console.log("Available contests:", JSON.stringify(data, null, 2));
         
         console.log("Checking contests for team participation mode...");
         
@@ -161,6 +174,11 @@ export default function NewTeamPage() {
         });
         
         console.log("Found", teamContests.length, "team contests");
+        // Log a sample contest to examine the structure
+        if (teamContests.length > 0) {
+          console.log("Sample contest structure:", JSON.stringify(teamContests[0], null, 2));
+          console.log("Sample targetgroup:", teamContests[0].targetgroup);
+        }
         
         setContests(teamContests);
       } catch (error) {
@@ -309,13 +327,92 @@ export default function NewTeamPage() {
                       {contests.length === 0 ? (
                         <SelectItem value="no_contests" disabled>{t('team.new.no_contests')}</SelectItem>
                       ) : (
-                        contests.map((contest) => (
-                          <SelectItem key={contest.id} value={contest.id.toString()} className="flex items-center">
-                            <div className="flex w-full items-center justify-between">
-                              <span>{contest.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))
+                        // Group contests by education level if possible
+                        (() => {
+                          // Try to group contests by the education level from targetgroups
+                          const contestsByLevel: Record<string, any[]> = {};
+                          
+                          // Process each contest
+                          contests.forEach((contest: any) => {
+                            // Get education level from targetgroup if available
+                            let level = 'Other';
+                            
+                            if (contest.targetgroup && contest.targetgroup.length > 0) {
+                              // Use the first target group's school level
+                              level = contest.targetgroup[0].schoolLevel || 'Other';
+                            }
+                            
+                            // Initialize the level array if needed
+                            if (!contestsByLevel[level]) {
+                              contestsByLevel[level] = [];
+                            }
+                            
+                            // Add the contest to the appropriate level
+                            contestsByLevel[level].push(contest);
+                          });
+                          
+                          // Get all levels that have contests
+                          const usedLevels = Object.keys(contestsByLevel);
+                          
+                          // If we couldn't group properly, just display all contests
+                          if (usedLevels.length <= 1) {
+                            return contests.map((contest: any) => (
+                              <SelectItem 
+                                key={contest.id} 
+                                value={contest.id.toString()} 
+                                className="flex items-center"
+                              >
+                                <div className="flex w-full items-center justify-between">
+                                  <span>
+                                    <span className="font-semibold text-primary">{contest.code}</span>
+                                    {' - '}
+                                    {contest.name}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ));
+                          }
+                          
+                          // Order of education levels
+                          const orderedLevels = [
+                            'Sekolah Rendah',
+                            'Sekolah Menengah',
+                            'Higher Education',
+                            'Open',
+                            'Other'
+                          ].filter(level => contestsByLevel[level]);
+                          
+                          // Add any missing levels that have contests
+                          usedLevels.forEach(level => {
+                            if (!orderedLevels.includes(level)) {
+                              orderedLevels.push(level);
+                            }
+                          });
+                          
+                          // Render grouped contests
+                          return orderedLevels.map(level => (
+                            <SelectGroup key={level}>
+                              <SelectLabel className="px-2 py-1.5 text-xs font-semibold bg-muted/50 sticky top-0">
+                                {level}
+                              </SelectLabel>
+                              {contestsByLevel[level].map((contest: any) => (
+                                <SelectItem 
+                                  key={contest.id} 
+                                  value={contest.id.toString()} 
+                                  className="flex items-center"
+                                >
+                                  <div className="flex w-full items-center justify-between">
+                                    <span>
+                                      <span className="font-semibold text-primary">{contest.code}</span>
+                                      {' - '}
+                                      {contest.name}
+                                    </span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ));
+                        })()
                       )}
                     </SelectContent>
                   </Select>
