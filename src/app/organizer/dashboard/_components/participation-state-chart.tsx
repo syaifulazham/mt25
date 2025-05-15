@@ -33,13 +33,39 @@ const STATE_NAME_STYLE = {
   fill: '#6b7280' // Using a slightly muted color for better readability
 };
 
+// Format numbers with commas
+const formatNumber = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+    useGrouping: true
+  }).format(value);
+};
+
 type ParticipationStateData = {
   state: string;
   MALE: number;
   FEMALE: number;
-}
+  TOTAL?: number;
+};
 
-export default function ParticipationStateChart({ data }: { data: ParticipationStateData[] }) {
+export default function ParticipationStateChart({ data: rawData }: { data: ParticipationStateData[] }) {
+  // Calculate totals for each state and add them to the data
+  const data = rawData.map(item => ({
+    ...item,
+    TOTAL: item.MALE + item.FEMALE
+  }));
+  
+  // Calculate grand total
+  const grandTotal = {
+    state: 'GRAND TOTAL',
+    MALE: data.reduce((acc, curr) => acc + curr.MALE, 0),
+    FEMALE: data.reduce((acc, curr) => acc + curr.FEMALE, 0),
+    TOTAL: data.reduce((acc, curr) => acc + curr.MALE + curr.FEMALE, 0)
+  };
+  
+  // Calculate grand total but don't display it in chart
+  // We'll keep it accessible for external use if needed
+  const completeData = [...data];
   return (
     <Card>
       <CardHeader>
@@ -47,12 +73,12 @@ export default function ParticipationStateChart({ data }: { data: ParticipationS
         <CardDescription>Distribution of contest participations by gender across states</CardDescription>
       </CardHeader>
       <CardContent className="h-[400px]">
-        {data.length > 0 ? (
+        {completeData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               layout="vertical"
-              data={data}
-              margin={{ top: 20, right: 30, left: 80, bottom: 5 }}
+              data={completeData}
+              margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
             >
               <XAxis type="number" axisLine={false} tickLine={false} hide />
               <YAxis 
@@ -64,13 +90,31 @@ export default function ParticipationStateChart({ data }: { data: ParticipationS
                 tick={STATE_NAME_STYLE}
                 tickFormatter={formatStateName}
               />
-              <Tooltip formatter={(value, name) => [`${value} participations`, name]} cursor={false} />
+              <Tooltip 
+                formatter={(value, name) => {
+                  if (typeof value === 'number') {
+                    return [`${formatNumber(value)} participations`, name];
+                  }
+                  return [value, name];
+                }} 
+                cursor={false} 
+              />
               <Legend />
               <Bar dataKey="MALE" stackId="a" fill={GENDER_COLORS.MALE} name="Male">
-                <LabelList dataKey="MALE" position="inside" fill="#FFFFFF" />
+                <LabelList 
+                  dataKey="MALE" 
+                  position="inside" 
+                  fill="#FFFFFF" 
+                  formatter={formatNumber}
+                />
               </Bar>
               <Bar dataKey="FEMALE" stackId="a" fill={GENDER_COLORS.FEMALE} name="Female">
-                <LabelList dataKey="FEMALE" position="inside" fill="#FFFFFF" />
+                <LabelList 
+                  dataKey="FEMALE" 
+                  position="inside" 
+                  fill="#FFFFFF" 
+                  formatter={formatNumber}
+                />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

@@ -5,7 +5,31 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prismaExecute } from "@/lib/prisma";
 import { Fragment } from "react";
-import { CalendarDays, CheckCircle, Users, Award, Layers, Database, Trophy, Bell, ArrowUpRight, School, Flag, UserCheck, UsersRound } from "lucide-react";
+import { 
+  Activity, 
+  BarChart, 
+  Calendar, 
+  LineChart, 
+  MapPin, 
+  PieChart, 
+  School, 
+  Trophy, 
+  User, 
+  Users, 
+  Hash, 
+  CalendarDays, 
+  CheckCircle, 
+  UsersRound, 
+  Award, 
+  Layers, 
+  Database, 
+  Bell, 
+  ArrowUpRight, 
+  Flag, 
+  UserCheck,
+  Mars,
+  Venus
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -836,19 +860,50 @@ export default async function DashboardPage() {
           <ParticipationStateChart data={participationStateData} />
           <div className="mt-4 border-t pt-4">
             <h4 className="font-medium mb-2">Data Values:</h4>
-            <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm">
-              <div className="font-medium">State</div>
-              <div className="font-medium text-blue-600">Male</div>
-              <div className="font-medium text-pink-600">Female</div>
-              {participationStateData.map((item, i) => (
-                <Fragment key={i}>
-                  <div>{item.state}</div>
-                  <div>{item.MALE}</div>
-                  <div>{item.FEMALE}</div>
-                </Fragment>
-              ))}
+            <div className="grid grid-cols-4 gap-x-4 gap-y-1 text-sm">
+              <div className="font-medium flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                <span>State</span>
+              </div>
+              <div className="font-medium text-blue-600 flex items-center gap-1">
+                <Mars className="h-4 w-4" />
+                <span>Male</span>
+              </div>
+              <div className="font-medium text-pink-600 flex items-center gap-1">
+                <Venus className="h-4 w-4" />
+                <span>Female</span>
+              </div>
+              <div className="font-medium text-green-600 flex items-center gap-1">
+                <Hash className="h-4 w-4" />
+                <span>Total</span>
+              </div>
+              {participationStateData.map((item, i) => {
+                const total = item.MALE + item.FEMALE;
+                return (
+                  <Fragment key={i}>
+                    <div>{item.state}</div>
+                    <div>{item.MALE.toLocaleString()}</div>
+                    <div>{item.FEMALE.toLocaleString()}</div>
+                    <div>{total.toLocaleString()}</div>
+                  </Fragment>
+                );
+              })}
+              {participationStateData.length > 0 && (
+                <>
+                  <div className="font-bold text-base border-t pt-2 mt-1">GRAND TOTAL</div>
+                  <div className="font-bold text-base text-blue-600 border-t pt-2 mt-1">
+                    {participationStateData.reduce((sum, item) => sum + item.MALE, 0).toLocaleString()}
+                  </div>
+                  <div className="font-bold text-base text-pink-600 border-t pt-2 mt-1">
+                    {participationStateData.reduce((sum, item) => sum + item.FEMALE, 0).toLocaleString()}
+                  </div>
+                  <div className="font-bold text-base text-green-600 border-t pt-2 mt-1">
+                    {participationStateData.reduce((sum, item) => sum + item.MALE + item.FEMALE, 0).toLocaleString()}
+                  </div>
+                </>
+              )}
               {participationStateData.length === 0 && 
-                <div className="col-span-3">No data available</div>
+                <div className="col-span-4">No data available</div>
               }
             </div>
           </div>
