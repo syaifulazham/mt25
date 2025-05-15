@@ -87,6 +87,11 @@ interface Team {
   isManager: boolean;
   minAge?: number;  // Min age from the contest
   maxAge?: number;  // Max age from the contest
+  targetGroup?: {
+    educationLevels?: string[];
+    schoolCategories?: string[];
+    genders?: string[];
+  }; // Target group criteria
   createdAt: string;
   updatedAt: string;
 }
@@ -148,7 +153,38 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
           name: teamData.name,
           isOwner: teamData.isOwner,
           isManager: teamData.isManager,
+          contestId: teamData.contestId,
         });
+        
+        // Fetch contest details to get target group information if not already included
+        if (teamData.contestId && (!teamData.targetGroup || !teamData.minAge)) {
+          try {
+            const contestResponse = await fetch(`/api/participants/contests/${teamData.contestId}`, {
+              headers: {
+                'Pragma': 'no-cache',
+                'Cache-Control': 'no-cache'
+              }
+            });
+            
+            if (contestResponse.ok) {
+              const contestData = await contestResponse.json();
+              
+              // Update team data with contest target group information
+              teamData.targetGroup = contestData.targetGroup || {};
+              teamData.minAge = contestData.minAge || teamData.minAge;
+              teamData.maxAge = contestData.maxAge || teamData.maxAge;
+              
+              console.log('Contest target group info:', {
+                targetGroup: teamData.targetGroup,
+                minAge: teamData.minAge,
+                maxAge: teamData.maxAge
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching contest details:', error);
+          }
+        }
+        
         setTeam(teamData);
         
         // Fetch available contestants with a large limit to get all contestants
@@ -211,11 +247,36 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       );
     }
     
-    // Apply education level filter
+    // Apply education level filter if selected in UI
     if (educationFilter !== "all") {
       filtered = filtered.filter(contestant => 
         contestant.educationLevel?.toLowerCase() === educationFilter.toLowerCase()
       );
+    }
+    
+    // Apply target group filtering based on contest criteria
+    // Filter by education level from target group
+    if (team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0) {
+      filtered = filtered.filter(contestant => {
+        // Skip filtering if contestant doesn't have education level
+        if (!contestant.educationLevel) return true;
+        
+        return team.targetGroup?.educationLevels?.some(level => 
+          level.toLowerCase() === contestant.educationLevel?.toLowerCase()
+        );
+      });
+    }
+    
+    // Filter by gender if specified in target group
+    if (team.targetGroup?.genders && team.targetGroup.genders.length > 0) {
+      filtered = filtered.filter(contestant => {
+        // Skip filtering if contestant doesn't have gender
+        if (!contestant.gender) return true;
+        
+        return team.targetGroup?.genders?.some(gender => 
+          gender.toLowerCase() === contestant.gender?.toLowerCase()
+        );
+      });
     }
     
     // Apply age criteria filter based on contest requirements
@@ -657,6 +718,33 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
               </div>
               
               <div className="flex-1 overflow-hidden">
+                {team && (team.minAge || team.maxAge || team.targetGroup) && (
+                  <div className="bg-blue-50 p-3 rounded-md text-blue-800 text-sm flex items-start mb-4">
+                    <Info className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
+                    <div>
+                      <p className="font-medium">Filtered by contest requirements:</p>
+                      <ul className="list-disc list-inside mt-1">
+                        {team.minAge && team.maxAge && (
+                          <li>Age range: {team.minAge} to {team.maxAge} years</li>
+                        )}
+                        {team.minAge && !team.maxAge && (
+                          <li>Minimum age: {team.minAge} years</li>
+                        )}
+                        {!team.minAge && team.maxAge && (
+                          <li>Maximum age: {team.maxAge} years</li>
+                        )}
+                        {team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0 && (
+                          <li>Education levels: {team.targetGroup.educationLevels.join(', ')}</li>
+                        )}
+                        {team.targetGroup?.genders && team.targetGroup.genders.length > 0 && (
+                          <li>Gender: {team.targetGroup.genders.join(', ')}</li>
+                        )}
+                      </ul>
+                      <p className="mt-1">Only eligible contestants are shown.</p>
+                    </div>
+                  </div>
+                )}
+                
                 {filteredContestants.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
