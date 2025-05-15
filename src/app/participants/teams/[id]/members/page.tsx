@@ -65,6 +65,7 @@ interface TeamMember {
   classGrade?: string;
   className?: string;
   class?: string;
+  age?: number;
 }
 
 interface Team {
@@ -98,6 +99,8 @@ interface Contestant {
   gender?: string;
   age?: number;
   educationLevel?: string;
+  class_grade?: string;
+  class_name?: string;
   status: string;
   inTeam: boolean;
 }
@@ -148,8 +151,8 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         });
         setTeam(teamData);
         
-        // Fetch available contestants
-        const contestantsResponse = await fetch(`/api/participants/contestants`, {
+        // Fetch available contestants with a large limit to get all contestants
+        const contestantsResponse = await fetch(`/api/participants/contestants?limit=1000`, {
           headers: {
             'Pragma': 'no-cache',
             'Cache-Control': 'no-cache'
@@ -166,6 +169,8 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         const contestantsArray = Array.isArray(contestantsData) 
           ? contestantsData 
           : contestantsData.data || [];
+        
+        console.log('Contestants loaded:', contestantsArray.length);
         
         // Mark contestants who are already in a team
         const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
@@ -547,18 +552,25 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>IC</TableHead>
-                        <TableHead>Class</TableHead>
-                        <TableHead>Gender</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
+                        <TableHead className="w-[40%]">Name</TableHead>
+                        <TableHead className="w-[30%]">Class</TableHead>
+                        <TableHead className="w-[15%]">Gender</TableHead>
+                        <TableHead className="w-[15%] text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {team.members.map((member) => (
                         <TableRow key={member.id}>
-                          <TableCell className="font-medium">{member.contestantName}</TableCell>
-                          <TableCell>{member.icNumber || "—"}</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{member.contestantName}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {member.classGrade ? member.classGrade : ''}
+                              {member.classGrade && member.className ? ' - ' : ''}
+                              {member.className ? member.className : ''}
+                              {(member.classGrade || member.className) && member.email ? ' | ' : ''}
+                              {member.email ? `${member.email}` : ''}
+                            </div>
+                          </TableCell>
                           <TableCell>{formatClassInfo(member)}</TableCell>
                           <TableCell>
                             {member.gender ? (
@@ -592,187 +604,207 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             </CardContent>
           </Card>
           
-        {/* Add Member Dialog */}
-        <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
-          <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Add Team Members</DialogTitle>
-              <DialogDescription>
-                Select contestants to add to your team
-                {team && (team.minAge || team.maxAge) && (
-                  <span className="text-xs text-amber-600 mt-1 inline-block">
-                    <AlertCircle className="h-3 w-3 inline mr-1" />
-                    Age restrictions: 
-                    {team.minAge !== undefined && team.maxAge !== undefined ? (
-                      `${team.minAge} to ${team.maxAge} years old`
-                    ) : team.minAge !== undefined ? (
-                      `Minimum ${team.minAge} years old`
-                    ) : team.maxAge !== undefined ? (
-                      `Maximum ${team.maxAge} years old`
-                    ) : ''
-                    }
-                  </span>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="flex items-center gap-2 mb-4 pt-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search contestants..."
-                  className="pl-8 w-full"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+          {/* Add Member Dialog */}
+          <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
+            <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Add Team Members</DialogTitle>
+                <DialogDescription>
+                  Select contestants to add to your team
+                  {team && (team.minAge || team.maxAge) && (
+                    <span className="text-xs text-amber-600 mt-1 inline-block">
+                      <AlertCircle className="h-3 w-3 inline mr-1" />
+                      Age restrictions: 
+                      {team.minAge !== undefined && team.maxAge !== undefined ? (
+                        ` ${team.minAge} to ${team.maxAge} years old`
+                      ) : team.minAge !== undefined ? (
+                        ` Minimum ${team.minAge} years old`
+                      ) : team.maxAge !== undefined ? (
+                        ` Maximum ${team.maxAge} years old`
+                      ) : ''
+                      }
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="flex items-center gap-2 mb-4 pt-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search contestants..."
+                    className="pl-8 w-full"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                
+                <Select
+                  value={educationFilter}
+                  onValueChange={setEducationFilter}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Filter by level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    <SelectItem value="sekolah rendah">Primary School</SelectItem>
+                    <SelectItem value="sekolah menengah">Secondary School</SelectItem>
+                    <SelectItem value="belia">Youth</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               
-              <Select
-                value={educationFilter}
-                onValueChange={setEducationFilter}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  <SelectItem value="sekolah rendah">Primary School</SelectItem>
-                  <SelectItem value="sekolah menengah">Secondary School</SelectItem>
-                  <SelectItem value="belia">Youth</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex-1 overflow-hidden">
-              {filteredContestants.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-medium">No contestants found</h3>
-                  <p className="text-muted-foreground mb-6 max-w-md">
-                    {contestants.length === 0
-                      ? "You haven't created any contestants yet. Create contestants first to add them to your team."
-                      : "No contestants match your search criteria. Try a different search term or filter."}
-                  </p>
-                  {contestants.length === 0 && (
-                    <Button asChild onClick={() => setAddMemberDialogOpen(false)}>
-                      <Link href="/participants/contestants/new">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Contestant
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="border rounded-md overflow-hidden h-[400px]">
-                  <ScrollArea className="h-full">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>IC Number</TableHead>
-                          <TableHead>Education</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredContestants.map((contestant) => (
-                          <TableRow key={contestant.id}>
-                            <TableCell className="font-medium">{contestant.name}</TableCell>
-                            <TableCell>{contestant.icNumber}</TableCell>
-                            <TableCell>{contestant.educationLevel ? getEducationLevelText(contestant.educationLevel) : "—"}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(contestant.status)}>
-                                {contestant.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {contestant.inTeam ? (
-                                <Badge variant="outline" className="bg-green-50">
-                                  <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
-                                  Added
-                                </Badge>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleAddMember(contestant.id)}
-                                  disabled={isAddingMember || team.members.length >= (team.contestMaxMembers || team.maxMembers)}
-                                >
-                                  {isAddingMember ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Plus className="h-4 w-4 mr-1" />
-                                  )}
-                                  Add
-                                </Button>
-                              )}
-                            </TableCell>
+              <div className="flex-1 overflow-hidden">
+                {filteredContestants.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-medium">No contestants found</h3>
+                    <p className="text-muted-foreground mb-6 max-w-md">
+                      {contestants.length === 0
+                        ? "You haven't created any contestants yet. Create contestants first to add them to your team."
+                        : "No contestants match your search criteria. Try a different search term or filter."}
+                    </p>
+                    {contestants.length === 0 && (
+                      <Button asChild onClick={() => setAddMemberDialogOpen(false)}>
+                        <Link href="/participants/contestants/new">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Create Contestant
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="border rounded-md overflow-hidden h-[400px]">
+                    <ScrollArea className="h-full">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                          <TableRow>
+                            <TableHead className="w-[60%]">Name</TableHead>
+                            <TableHead className="w-[40%] text-right">Action</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredContestants.map((contestant) => (
+                            <TableRow key={contestant.id}>
+                              <TableCell>
+                                <div className="font-medium">{contestant.name || "—"}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {contestant.age ? `Age: ${contestant.age}` : ''}
+                                  {contestant.age && (contestant.class_grade || contestant.class_name) ? ' | ' : ''}
+                                  {contestant.class_grade ? `${contestant.class_grade}` : ''}
+                                  {contestant.class_grade && contestant.class_name ? ' - ' : ''}
+                                  {contestant.class_name ? `${contestant.class_name}` : ''}
+                                  {((contestant.class_grade || contestant.class_name) && contestant.email) ? ' | ' : ''}
+                                  {contestant.email ? `${contestant.email}` : ''}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {contestant.inTeam ? (
+                                  <Badge variant="outline" className="bg-green-50">
+                                    <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                                    Added
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleAddMember(contestant.id)}
+                                    disabled={isAddingMember || team.members.length >= (team.contestMaxMembers || team.maxMembers)}
+                                  >
+                                    {isAddingMember ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Plus className="h-4 w-4 mr-1" />
+                                    )}
+                                    Add
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+              
+              {team.members.length >= (team.contestMaxMembers || team.maxMembers) && (
+                <div className="mt-4">
+                  <div className="bg-amber-50 p-3 rounded-md text-amber-800 text-sm flex items-start w-full">
+                    <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
+                    <p>
+                      You've reached the maximum team size ({team.contestMaxMembers || team.maxMembers} members). 
+                      Remove existing members before adding new ones.
+                    </p>
+                  </div>
                 </div>
               )}
-            </div>
-            
-            {team.members.length >= (team.contestMaxMembers || team.maxMembers) && (
-              <div className="mt-4">
-                <div className="bg-amber-50 p-3 rounded-md text-amber-800 text-sm flex items-start w-full">
-                  <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
-                  <p>
-                    You've reached the maximum team size ({team.contestMaxMembers || team.maxMembers} members). 
-                    Remove existing members before adding new ones.
-                  </p>
+              
+              <DialogFooter className="space-x-2 mt-4">
+                <div className="mr-auto text-sm text-muted-foreground">
+                  {filteredContestants.length} of {contestants.length} contestants shown
                 </div>
-              </div>
-            )}
-            
-            <DialogFooter className="mt-4">
-              <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Remove Member Confirmation Dialog */}
+          <Dialog open={confirmRemoveDialogOpen} onOpenChange={setConfirmRemoveDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Remove Team Member</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to remove this contestant from the team?
+                </DialogDescription>
+              </DialogHeader>
+              
+              {memberToRemove && (
+                <div className="py-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-muted h-12 w-12 rounded-full flex items-center justify-center">
+                      <User className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none">{memberToRemove.contestantName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {memberToRemove.icNumber || "No IC Number"}
+                      </p>
+                      <Badge className={getGenderColor(memberToRemove.gender)} variant="outline">
+                        {memberToRemove.gender || "Gender not specified"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmRemoveDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleRemoveMember}
+                  disabled={isRemoving}
+                >
+                  {isRemoving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Removing...
+                    </>
+                  ) : (
+                    "Remove"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
-      
-      {/* Remove member confirmation dialog */}
-      <Dialog open={confirmRemoveDialogOpen} onOpenChange={setConfirmRemoveDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Team Member</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to remove <span className="font-medium">{memberToRemove?.contestantName}</span> from the team? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmRemoveDialogOpen(false)}
-              disabled={isRemoving}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleRemoveMember}
-              disabled={isRemoving}
-            >
-              {isRemoving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Removing...
-                </>
-              ) : (
-                "Remove Member"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
