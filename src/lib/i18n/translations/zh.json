@@ -176,6 +176,9 @@
   "teams.manage": "管理团队",
   "teams.no_teams_yet": "您尚未创建或加入任何团队",
   "teams.create_team": "创建团队",
+  "teams.card_title": "我的团队",
+  "teams.empty_state": "没有团队",
+  "teams.team_members": "团队成员",
   
   "participants.title": "参与者",
   "participants.registered_singular": "已注册",

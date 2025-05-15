@@ -176,6 +176,9 @@
   "teams.manage": "Manage Teams",
   "teams.no_teams_yet": "You have not created or joined any teams yet",
   "teams.create_team": "Create a Team",
+  "teams.card_title": "My Teams",
+  "teams.empty_state": "No Teams",
+  "teams.team_members": "Team Members",
   
   "participants.title": "Participants",
   "participants.registered_singular": "Registered",

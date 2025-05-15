@@ -176,6 +176,9 @@
   "teams.manage": "จัดการทีม",
   "teams.no_teams_yet": "คุณยังไม่ได้สร้างหรือเข้าร่วมทีม",
   "teams.create_team": "สร้างทีม",
+  "teams.card_title": "ทีมของฉัน",
+  "teams.empty_state": "ไม่มีทีม",
+  "teams.team_members": "สมาชิกทีม",
   
   "participants.title": "ผู้เข้าร่วม",
   "participants.registered_singular": "ลงทะเบียนแล้ว",

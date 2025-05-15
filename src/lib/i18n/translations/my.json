@@ -176,6 +176,9 @@
   "teams.manage": "Urus Pasukan",
   "teams.no_teams_yet": "Anda belum mencipta atau menyertai mana-mana pasukan",
   "teams.create_team": "Cipta Pasukan",
+  "teams.card_title": "Pasukan Saya",
+  "teams.empty_state": "Tiada Pasukan",
+  "teams.team_members": "Ahli Pasukan",
   
   "participants.title": "Peserta",
   "participants.registered_singular": "Berdaftar",

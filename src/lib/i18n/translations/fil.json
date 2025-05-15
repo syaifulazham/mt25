@@ -176,6 +176,9 @@
   "teams.manage": "Pamahalaan ang Mga Koponan",
   "teams.no_teams_yet": "Hindi ka pa nakakagawa o sumasali sa anumang koponan",
   "teams.create_team": "Gumawa ng Koponan",
+  "teams.card_title": "Aking mga Koponan",
+  "teams.empty_state": "Walang Koponan",
+  "teams.team_members": "Mga Miyembro ng Koponan",
   
   "participants.title": "Mga Kalahok",
   "participants.registered_singular": "Nakarehistro",
