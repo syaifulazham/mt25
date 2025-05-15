@@ -1,12 +1,13 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapPin, Mars, Venus } from "lucide-react";
 
 // Chart colors for gender representation
 const GENDER_COLORS = {
-  MALE: '#0088FE',  // Blue for male
-  FEMALE: '#FF6B93'  // Pink for female
+  MALE: 'bg-blue-500',   // Blue for male
+  FEMALE: 'bg-pink-500', // Pink for female
+  TOTAL: 'bg-gray-200'   // Background for total
 };
 
 // Function to abbreviate long state names for better display
@@ -55,74 +56,100 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
     TOTAL: item.MALE + item.FEMALE
   }));
   
-  // Calculate grand total
-  const grandTotal = {
-    state: 'GRAND TOTAL',
-    MALE: data.reduce((acc, curr) => acc + curr.MALE, 0),
-    FEMALE: data.reduce((acc, curr) => acc + curr.FEMALE, 0),
-    TOTAL: data.reduce((acc, curr) => acc + curr.MALE + curr.FEMALE, 0)
-  };
+  // Sort data by total count in descending order
+  const sortedData = [...data].sort((a, b) => b.TOTAL - a.TOTAL);
   
-  // Calculate grand total but don't display it in chart
-  // We'll keep it accessible for external use if needed
-  const completeData = [...data];
+  // Find the maximum count to calculate percentages
+  const maxCount = Math.max(...sortedData.map(item => item.TOTAL), 1); // Ensure at least 1
+  
   return (
     <Card>
       <CardHeader>
         <CardTitle>Contest Participations by State and Gender</CardTitle>
         <CardDescription>Distribution of contest participations by gender across states</CardDescription>
       </CardHeader>
-      <CardContent className="h-[400px]">
-        {completeData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={completeData}
-              margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
-            >
-              <XAxis type="number" axisLine={false} tickLine={false} hide />
-              <YAxis 
-                dataKey="state" 
-                type="category" 
-                width={80} 
-                axisLine={false} 
-                tickLine={false}
-                tick={STATE_NAME_STYLE}
-                tickFormatter={formatStateName}
-              />
-              <Tooltip 
-                formatter={(value, name) => {
-                  if (typeof value === 'number') {
-                    return [`${formatNumber(value)} participations`, name];
-                  }
-                  return [value, name];
-                }} 
-                cursor={false} 
-              />
-              <Legend />
-              <Bar dataKey="MALE" stackId="a" fill={GENDER_COLORS.MALE} name="Male">
-                <LabelList 
-                  dataKey="MALE" 
-                  position="inside" 
-                  fill="#FFFFFF" 
-                  formatter={formatNumber}
-                />
-              </Bar>
-              <Bar dataKey="FEMALE" stackId="a" fill={GENDER_COLORS.FEMALE} name="Female">
-                <LabelList 
-                  dataKey="FEMALE" 
-                  position="inside" 
-                  fill="#FFFFFF" 
-                  formatter={formatNumber}
-                />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-muted-foreground">No data available</p>
+      <CardContent>
+        <div className="w-full">
+          <div className="space-y-3">
+            <div className="flex items-center mb-2 text-xs">
+              <div className="w-1/2">State</div>
+              <div className="w-1/2 flex">
+                <div className="flex items-center mr-3">
+                  <div className="w-3 h-3 mr-1 rounded-sm bg-blue-500"></div>
+                  <span className="flex items-center"><Mars className="h-3 w-3 mr-1" /> Male</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 mr-1 rounded-sm bg-pink-500"></div>
+                  <span className="flex items-center"><Venus className="h-3 w-3 mr-1" /> Female</span>
+                </div>
+              </div>
+            </div>
+            
+            {sortedData.map((item, index) => {
+              // Calculate percentage widths for the male and female bars
+              const totalPercentage = Math.round((item.TOTAL / maxCount) * 100);
+              const malePercentage = Math.round((item.MALE / item.TOTAL) * 100);
+              const femalePercentage = 100 - malePercentage; // Ensure they add up to 100%
+              
+              const shortState = formatStateName(item.state);
+              
+              return (
+                <div key={index} className="relative">
+                  <div className="flex items-center mb-1">
+                    <div className="w-1/2 flex items-center">
+                      <div className="mr-2 p-1 rounded-full bg-muted">
+                        <MapPin className="h-3 w-3" />
+                      </div>
+                      <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
+                    </div>
+                    <div className="w-1/2 flex justify-end">
+                      <span className="text-xs font-semibold">{formatNumber(item.TOTAL)}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Total bar background */}
+                  <div className="h-4 w-full bg-muted rounded-full overflow-hidden">
+                    {/* Stacked bar container with fixed width based on total percentage */}
+                    <div className={`h-full flex ${GENDER_COLORS.TOTAL}`} style={{ width: `${totalPercentage}%` }}>
+                      {/* Male portion */}
+                      <div 
+                        className={`h-full ${GENDER_COLORS.MALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
+                        style={{ width: `${malePercentage}%` }}
+                      >
+                        {item.MALE > 0 && malePercentage > 15 ? formatNumber(item.MALE) : ''}
+                      </div>
+                      {/* Female portion */}
+                      <div 
+                        className={`h-full ${GENDER_COLORS.FEMALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
+                        style={{ width: `${femalePercentage}%` }}
+                      >
+                        {item.FEMALE > 0 && femalePercentage > 15 ? formatNumber(item.FEMALE) : ''}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Show values outside bar if they couldn't fit inside */}
+                  <div className="flex text-[9px] mt-0.5">
+                    <div className="flex-1">
+                      {item.MALE > 0 && malePercentage <= 15 ? 
+                        <span className="text-blue-600 font-medium">{formatNumber(item.MALE)}</span> : null}
+                    </div>
+                    <div className="flex-1 text-right">
+                      {item.FEMALE > 0 && femalePercentage <= 15 ? 
+                        <span className="text-pink-600 font-medium">{formatNumber(item.FEMALE)}</span> : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {sortedData.length === 0 && (
+              <div className="text-sm text-muted-foreground py-2 text-center">
+                No data available
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );

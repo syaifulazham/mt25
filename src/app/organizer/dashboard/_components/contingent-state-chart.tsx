@@ -1,10 +1,18 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, LabelList } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MapPin, Building } from "lucide-react";
 
-// Single chart color
-const BAR_COLOR = '#0088FE';
+// Format numbers with commas
+const formatNumber = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+    useGrouping: true
+  }).format(value);
+};
+
+// Bar color
+const BAR_COLOR = 'bg-blue-500';
 
 // Function to abbreviate long state names for better display
 const formatStateName = (stateName: string): string => {
@@ -35,42 +43,57 @@ type ContingentStateData = {
   count: number;
 }
 
-export default function ContingentStateChart({ data }: { data: ContingentStateData[] }) {
+export default function ContingentStateChart({ data: rawData }: { data: ContingentStateData[] }) {
+  // Sort data by count in descending order
+  const sortedData = [...rawData].sort((a, b) => b.count - a.count);
+  
+  // Find the maximum count to calculate percentages
+  const maxCount = Math.max(...sortedData.map(item => item.count), 1); // Ensure at least 1
+  
   return (
     <Card>
       <CardHeader>
         <CardTitle>Contingents by State</CardTitle>
         <CardDescription>Distribution of contingents across Malaysian states</CardDescription>
       </CardHeader>
-      <CardContent className="h-[400px]">
-        {data.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={data}
-              margin={{ top: 20, right: 30, left: 80, bottom: 5 }}
-            >
-              <XAxis type="number" axisLine={false} tickLine={false} hide />
-              <YAxis 
-                dataKey="state" 
-                type="category" 
-                width={80} 
-                axisLine={false} 
-                tickLine={false} 
-                tick={STATE_NAME_STYLE}
-                tickFormatter={formatStateName}
-              />
-              <Tooltip formatter={(value) => [`${value} contingents`, 'Count']} cursor={false} />
-              <Bar dataKey="count" fill={BAR_COLOR}>
-                <LabelList dataKey="count" position="right" fill="#000000" />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-muted-foreground">No data available</p>
+      <CardContent>
+        <div className="w-full">
+          <div className="space-y-3">
+            {sortedData.map((item, index) => {
+              // Calculate percentage width for the bar (max 96% to leave room for the count)
+              const percentage = Math.round((item.count / maxCount) * 96);
+              const shortState = formatStateName(item.state);
+              
+              return (
+                <div key={index} className="relative">
+                  <div className="flex items-center mb-1">
+                    <div className="w-1/2 flex items-center">
+                      <div className="mr-2 p-1 rounded-full bg-muted">
+                        <MapPin className="h-3 w-3" />
+                      </div>
+                      <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
+                    </div>
+                    <div className="w-1/2 flex justify-end">
+                      <span className="text-xs font-semibold">{formatNumber(item.count)}</span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${BAR_COLOR} rounded-full flex items-center justify-center`} 
+                      style={{ width: `${percentage}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+            
+            {sortedData.length === 0 && (
+              <div className="text-sm text-muted-foreground py-2 text-center">
+                No data available
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );

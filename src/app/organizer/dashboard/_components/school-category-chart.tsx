@@ -3,6 +3,14 @@
 import { useEffect, useRef } from 'react';
 import { School, Building, Home } from 'lucide-react';
 
+// Format numbers with commas
+const formatNumber = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+    useGrouping: true
+  }).format(value);
+};
+
 // Type definition for school category data
 type SchoolCategoryData = {
   category: string;
@@ -69,7 +77,7 @@ export default function SchoolCategoryChart({ data }: SchoolCategoryChartProps) 
                   <IconComponent className="h-3 w-3" />
                 </div>
                 <span className="text-xs font-medium">{item.category}</span>
-                <span className="ml-auto text-xs font-semibold">{item.count}</span>
+                <span className="ml-auto text-xs font-semibold">{formatNumber(item.count)}</span>
               </div>
               <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                 <div 
