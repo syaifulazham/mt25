@@ -130,6 +130,7 @@ model contestant {
   class_name   String?
   hashcode     String?   @unique
   status       String    @default("ACTIVE")
+  is_ppki      Boolean   @default(false)
   contingentId Int
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

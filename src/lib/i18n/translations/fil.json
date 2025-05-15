@@ -602,6 +602,14 @@
   "contestant.contests.assign_success_title": "Tagumpay!",
   "contestant.contests.assign_success_message": "Na-update ang mga pagtalaga ng paligsahan para kay",
 
+  "contestant.is_ppki": "PPKI",
+  "contestant.years": "taon",
+  "contestant.male": "Lalaki",
+  "contestant.female": "Babae",
+  "contestant.edit.is_ppki": "Kalahok na may espesyal na pangangailangan/ PPKI",
+  "contestant.edit.is_ppki_yes": "Oo",
+  "contestant.edit.is_ppki_no": "Hindi",
+
   "contestant.bulk_upload.title": "Bultuhang Pag-upload ng mga Manlalaro",
   "contestant.bulk_upload.description": "Mag-upload ng maraming manlalaro nang sabay-sabay gamit ang CSV o Excel file.",
   "contestant.bulk_upload.bulk_upload": "Bultuhang Pag-upload",

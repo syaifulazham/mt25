@@ -353,14 +353,7 @@ export default function ContestantsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>{t('contestant.name')}</TableHead>
-              <TableHead>{t('contestant.ic_number')}</TableHead>
-              <TableHead>{t('contestant.contact')}</TableHead>
-              <TableHead>{t('contestant.gender')}</TableHead>
-              <TableHead>{t('contestant.age')}</TableHead>
-              <TableHead>{t('contestant.education_level')}</TableHead>
               <TableHead>{t('contestant.class')}</TableHead>
-              <TableHead>{t('contestant.added_by')}</TableHead>
-              <TableHead>{t('contestant.status')}</TableHead>
               <TableHead className="text-right">{t('contestant.actions')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -369,34 +362,36 @@ export default function ContestantsPage() {
             <TableRow key={contestant.id}>
               <TableCell>
                 <div className="font-medium">{contestant.name}</div>
-              </TableCell>
-              <TableCell>{contestant.ic}</TableCell>
-              <TableCell>
-                <div className="space-y-1">
-                  {contestant.email && <div className="text-xs">{contestant.email}</div>}
-                  {contestant.phoneNumber && <div className="text-xs">{contestant.phoneNumber}</div>}
+                <div className="flex items-center text-xs mt-1 text-muted-foreground">
+                  <div className="mr-3">
+                    {contestant.gender === 'MALE' ? (
+                      <Badge variant="outline" className="px-2 min-w-[70px] justify-center bg-blue-50 text-blue-700 border-blue-200 flex items-center space-x-1">
+                        <User className="h-3 w-3" />
+                        <span>{t('contestant.male')}</span>
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="px-2 min-w-[70px] justify-center bg-pink-50 text-pink-700 border-pink-200 flex items-center space-x-1">
+                        <User className="h-3 w-3" />
+                        <span>{t('contestant.female')}</span>
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="mr-3">{contestant.age} {t('contestant.years')}</div>
+                  <div className="flex items-center">
+                    <span className="font-mono mr-2">{contestant.ic}</span>
+                    {contestant.is_ppki && (
+                      <Badge variant="outline" className="px-2 bg-amber-50 text-amber-700 border-amber-200 flex items-center space-x-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span>{t('contestant.is_ppki')}</span>
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-              </TableCell>
-              <TableCell>{contestant.gender}</TableCell>
-              <TableCell>{contestant.age}</TableCell>
-              <TableCell>
-                <EduLevelBadge eduLevel={contestant.edu_level} />
               </TableCell>
               <TableCell>
                 {contestant.class_grade && contestant.class_name 
                   ? `${contestant.class_grade} - ${contestant.class_name}` 
                   : contestant.class_name || contestant.class_grade || '-'}
-              </TableCell>
-              <TableCell>
-                <div className="text-xs">{contestant.updatedBy || '-'}</div>
-              </TableCell>
-              <TableCell>
-                <Badge 
-                  variant={contestant.status === "ACTIVE" ? "default" : "secondary"}
-                  className={contestant.status === "ACTIVE" ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}
-                >
-                  {contestant.status}
-                </Badge>
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end items-center space-x-1">

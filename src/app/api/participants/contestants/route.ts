@@ -343,7 +343,8 @@ export async function POST(request: NextRequest) {
       contingentId: contingentId,
       updatedById: participant.id, // Use participant ID as the updater ID
       createdById: participant.id, // Also set creator ID
-      status: "ACTIVE"
+      status: "ACTIVE",
+      is_ppki: body.is_ppki === true ? true : false // Set PPKI status, default to false if not provided
     };
     
     // Only add email and phoneNumber if they're provided
@@ -375,11 +376,11 @@ export async function POST(request: NextRequest) {
           // Use participant ID for updatedById and createdById
           await prismaExecute(prisma => prisma.$queryRaw`
             INSERT INTO contestant 
-            (name, ic, gender, age, edu_level, class_name, class_grade, hashcode, contingentId, updatedById, createdById, createdAt, updatedAt) 
+            (name, ic, gender, age, edu_level, class_name, class_grade, hashcode, contingentId, updatedById, createdById, createdAt, updatedAt, is_ppki) 
             VALUES 
             (${body.name}, ${body.ic}, ${body.gender}, ${parseInt(body.age)}, 
              ${body.edu_level}, ${formattedClassName}, ${classGrade}, 
-             ${hashcode}, ${contingentId}, ${participant.id}, ${participant.id}, NOW(), NOW())
+             ${hashcode}, ${contingentId}, ${participant.id}, ${participant.id}, NOW(), NOW(), ${body.is_ppki === true ? 1 : 0})
           `);
           
           // Fetch the created contestant

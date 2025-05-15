@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Pencil, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 // Using the shared Contestant interface from @/types/contestant
 
@@ -136,90 +137,121 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
+          <div className="grid gap-6 py-4">
+            {/* PPKI Toggle */}
+            <div className="flex space-x-4 items-center">
+              <div className="flex-grow">
+                <Label htmlFor="is_ppki" className="text-sm font-medium">
+                  {t('contestant.edit.is_ppki')}
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="is_ppki"
+                  checked={formData.is_ppki}
+                  onCheckedChange={(checked) => handleChange('is_ppki', checked)}
+                />
+                <span className="text-sm">
+                  {formData.is_ppki ? t('contestant.edit.is_ppki_yes') : t('contestant.edit.is_ppki_no')}
+                </span>
+              </div>
+            </div>
+
+            {/* Personal Information Section */}
+            <div className="space-y-1">
+              <Label htmlFor="name" className="text-sm font-medium">
                 {t('contestant.edit.name')}
               </Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
-                className="col-span-3"
+                className="w-full"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="ic" className="text-right">
+
+            <div className="space-y-1">
+              <Label htmlFor="ic" className="text-sm font-medium">
                 {t('contestant.edit.ic_number')}
               </Label>
               <Input
                 id="ic"
                 value={formData.ic}
                 onChange={(e) => handleChange('ic', e.target.value)}
-                className="col-span-3"
+                className="w-full"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                {t('contestant.edit.email')}
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email || ''}
-                onChange={(e) => handleChange('email', e.target.value)}
-                className="col-span-3"
-              />
+            
+            {/* Contact Information Section */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  {t('contestant.edit.email')}
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                  {t('contestant.edit.phone')}
+                </Label>
+                <Input
+                  id="phoneNumber"
+                  value={formData.phoneNumber || ''}
+                  onChange={(e) => handleChange('phoneNumber', e.target.value)}
+                  className="w-full"
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="phoneNumber" className="text-right">
-                {t('contestant.edit.phone')}
-              </Label>
-              <Input
-                id="phoneNumber"
-                value={formData.phoneNumber || ''}
-                onChange={(e) => handleChange('phoneNumber', e.target.value)}
-                className="col-span-3"
-              />
+
+            {/* Demographics */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="gender" className="text-sm font-medium">
+                  {t('contestant.edit.gender')}
+                </Label>
+                <Select 
+                  value={formData.gender} 
+                  onValueChange={(value) => handleChange('gender', value)}
+                >
+                  <SelectTrigger id="gender" className="w-full">
+                    <SelectValue placeholder={t('contestant.edit.select_gender')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MALE">{t('contestant.edit.gender_male')}</SelectItem>
+                    <SelectItem value="FEMALE">{t('contestant.edit.gender_female')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="age" className="text-sm font-medium">
+                  {t('contestant.edit.age')}
+                </Label>
+                <Input
+                  id="age"
+                  type="number"
+                  value={formData.age}
+                  onChange={(e) => handleChange('age', parseInt(e.target.value))}
+                  className="w-full"
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="gender" className="text-right">
-                {t('contestant.edit.gender')}
-              </Label>
-              <Select 
-                value={formData.gender} 
-                onValueChange={(value) => handleChange('gender', value)}
-              >
-                <SelectTrigger id="gender" className="col-span-3">
-                  <SelectValue placeholder={t('contestant.edit.select_gender')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MALE">{t('contestant.edit.gender_male')}</SelectItem>
-                  <SelectItem value="FEMALE">{t('contestant.edit.gender_female')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="age" className="text-right">
-                {t('contestant.edit.age')}
-              </Label>
-              <Input
-                id="age"
-                type="number"
-                value={formData.age}
-                onChange={(e) => handleChange('age', parseInt(e.target.value))}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edu_level" className="text-right">
+
+            {/* Education Section */}
+            <div className="space-y-1">
+              <Label htmlFor="edu_level" className="text-sm font-medium">
                 {t('contestant.edit.education')}
               </Label>
               <Select 
                 value={formData.edu_level} 
                 onValueChange={(value) => handleChange('edu_level', value)}
               >
-                <SelectTrigger id="edu_level" className="col-span-3">
+                <SelectTrigger id="edu_level" className="w-full">
                   <SelectValue placeholder={t('contestant.edit.select_education')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,48 +261,53 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="class_name" className="text-right">
-                {t('contestant.edit.class_name')}
-              </Label>
-              <Input
-                id="class_name"
-                value={formData.class_name || ''}
-                onChange={(e) => handleChange('class_name', e.target.value)}
-                className="col-span-3"
-              />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="class_name" className="text-sm font-medium">
+                  {t('contestant.edit.class_name')}
+                </Label>
+                <Input
+                  id="class_name"
+                  value={formData.class_name || ''}
+                  onChange={(e) => handleChange('class_name', e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="class_grade" className="text-sm font-medium">
+                  {t('contestant.edit.class_grade')}
+                </Label>
+                <Select 
+                  value={formData.class_grade || ''} 
+                  onValueChange={(value) => handleChange('class_grade', value)}
+                >
+                  <SelectTrigger id="class_grade" className="w-full">
+                    <SelectValue placeholder={t('contestant.edit.select_grade')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="6">6</SelectItem>
+                    <SelectItem value="PPKI">PPKI</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="class_grade" className="text-right">
-                {t('contestant.edit.class_grade')}
-              </Label>
-              <Select 
-                value={formData.class_grade || ''} 
-                onValueChange={(value) => handleChange('class_grade', value)}
-              >
-                <SelectTrigger id="class_grade" className="col-span-3">
-                  <SelectValue placeholder={t('contestant.edit.select_grade')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="6">6</SelectItem>
-                  <SelectItem value="PPKI">PPKI</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="status" className="text-right">
+
+            {/* Status Section */}
+            <div className="space-y-1">
+              <Label htmlFor="status" className="text-sm font-medium">
                 {t('contestant.edit.status')}
               </Label>
               <Select 
                 value={formData.status} 
                 onValueChange={(value) => handleChange('status', value)}
               >
-                <SelectTrigger id="status" className="col-span-3">
+                <SelectTrigger id="status" className="w-full">
                   <SelectValue placeholder={t('contestant.edit.select_status')} />
                 </SelectTrigger>
                 <SelectContent>

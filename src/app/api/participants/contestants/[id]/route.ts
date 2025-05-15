@@ -180,6 +180,9 @@ export async function PATCH(
     if (body.contingentId !== undefined) {
       updateData.contingentId = body.contingentId ? parseInt(body.contingentId) : null;
     }
+    if (body.is_ppki !== undefined) {
+      updateData.is_ppki = Boolean(body.is_ppki);
+    }
     
     // Update the contestant using prismaExecute
     const updatedContestant = await prismaExecute(prisma => prisma.contestant.update({

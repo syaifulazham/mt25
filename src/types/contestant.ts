@@ -12,6 +12,7 @@ export interface Contestant {
   hashcode: string;
   contingentId: number;
   status: string;
+  is_ppki: boolean;
   updatedBy?: string;
   createdAt?: string;
   updatedAt?: string;
