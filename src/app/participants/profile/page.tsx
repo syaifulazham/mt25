@@ -38,7 +38,10 @@ export default function ProfilePage() {
   useEffect(() => {
     async function fetchUserData() {
       try {
-        const response = await fetch('/api/user/profile');
+        const response = await fetch('/api/participants/profile');
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile data');
+        }
         const userData = await response.json();
         setUser(userData);
       } catch (error) {

@@ -48,48 +48,45 @@ export default function ProfileCompletionAlert({ userDetails }: ProfileCompletio
   const missingFieldsText = missingFields.join(", ");
 
   return (
-    // Full width container that breaks out of parent constraints
-    <div className="mb-6 -mx-6 sm:-mx-10 md:-mx-12 lg:-mx-16">
-      {/* Full width background with no padding to ensure color extends edge to edge */}
-      <div className="w-full bg-amber-50 border-y border-amber-200">
-        <div className="max-w-[95%] w-full mx-auto py-5 px-4 sm:px-6 md:px-8">
-          {/* Main alert content with proper structure */}
-          <div className="flex items-start justify-between gap-4">
-            {/* Icon and text content */}
-            <div className="flex items-start">
-              <AlertTriangle className="h-6 w-6 mt-0.5 mr-4 text-amber-600 flex-shrink-0" />
-              <div>
-                <h3 className="text-amber-800 text-lg font-semibold mb-2">
-                  {t('dashboard.profile_incomplete') || "Complete Your Profile"}
-                </h3>
-                <p className="text-amber-700 mb-4">
+    <div className="mb-6 animate-fadeIn rounded-md overflow-hidden border border-amber-300">
+      <div className="bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 p-4 shadow-sm">
+        <div className="flex gap-3 items-start justify-between">
+          <div className="flex gap-3 items-start">
+            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-medium text-amber-900 dark:text-amber-300">
+                {t('dashboard.profile_incomplete') || "Complete Your Profile"}
+              </h4>
+              <div className="mt-2 text-amber-800 dark:text-amber-200">
+                <p className="mb-3">
                   {/* Replace {{fields}} placeholder in translation with actual missing fields */}
                   {(t('dashboard.profile_required_fields') || 
                     "Please complete your profile by adding the following required information: {{fields}}. Completing your profile is essential for contest participation.").replace('{{fields}}', missingFieldsText)}
                 </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="bg-amber-100 border-amber-200 text-amber-800 hover:bg-amber-200 hover:text-amber-900" 
-                  asChild
-                >
-                  <Link href="/participants/profile/edit">
-                    {t('dashboard.complete_profile') || "Complete Profile"}
-                  </Link>
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button 
+                    size="sm" 
+                    className="whitespace-nowrap w-full sm:w-auto bg-amber-600 hover:bg-amber-700 border-amber-700" 
+                    asChild
+                  >
+                    <Link href="/participants/profile/edit">
+                      {t('dashboard.complete_profile') || "Complete Profile"}
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </div>
-            {/* Close button */}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-8 w-8 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100 flex-shrink-0"
-              onClick={() => setDismissed(true)}
-            >
-              <X className="h-5 w-5" />
-              <span className="sr-only">{t('close') || "Close"}</span>
-            </Button>
           </div>
+          {/* Close button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-8 w-8 p-0 text-amber-700 hover:text-amber-900 hover:bg-amber-100 flex-shrink-0"
+            onClick={() => setDismissed(true)}
+          >
+            <X className="h-5 w-5" />
+            <span className="sr-only">{t('close') || "Close"}</span>
+          </Button>
         </div>
       </div>
     </div>

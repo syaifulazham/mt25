@@ -652,6 +652,39 @@
   "profile.field.phone_number": "Nombor Telefon",
   "profile.field.gender": "Jantina",
   
+  "profile.edit.title": "Edit Profil",
+  "profile.edit.description": "Ngubah penerang peribadi nuan",
+  "profile.edit.form.title": "Edit Profil Nuan",
+  "profile.edit.form.description": "Ngubah penerang peribadi nuan. Alamat emel nuan enda tau diubah.",
+  
+  "profile.edit.field.name": "Nama Menua",
+  "profile.edit.field.phone": "Nombor Telefon",
+  "profile.edit.field.ic": "Nombor KP",
+  "profile.edit.field.gender": "Jantina",
+  
+  "profile.edit.placeholder.name": "Tulih nama menua nuan",
+  "profile.edit.placeholder.phone": "cth., 0123456789",
+  "profile.edit.placeholder.ic": "Tulih nombor KP nuan",
+  "profile.edit.placeholder.gender": "Pilih jantina nuan",
+  
+  "profile.edit.help.name": "Iti nama nuan ti resmi baka ti tertera ba dokumen identifikasi nuan.",
+  "profile.edit.help.phone": "Nombor telefon nuan kena ngaga komunikasi pasal lumba.",
+  "profile.edit.help.ic": "Nombor kad pengenalan nasional nuan.",
+  
+  "profile.edit.gender.male": "Lelaki",
+  "profile.edit.gender.female": "Indu",
+  
+  "profile.edit.button.cancel": "Ngabis",
+  "profile.edit.button.save": "Simpan Pemeri",
+  "profile.edit.button.saving": "Nyimpan...",
+  
+  "profile.edit.success.updated": "Profil udah lengkap diupdate",
+  "profile.edit.error.update_failed": "Enda ulih ngupdate profil",
+  
+  "profile.edit.validation.name_length": "Nama mesti sekurang-kurangnya 2 aksara.",
+  "profile.edit.validation.phone_length": "Nombor telefon mesti sekurang-kurangnya 10 digit.",
+  "profile.edit.validation.ic_length": "Nombor KP mesti sekurang-kurangnya 12 aksara.",
+  
   "sidebar.dashboard": "Papan Pemuka",
   "sidebar.profile": "Profil",
   "sidebar.contingent": "Kontingen",

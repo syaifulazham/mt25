@@ -133,6 +133,39 @@
   "profile.field.phone_number": "电话号码",
   "profile.field.gender": "性别",
   
+  "profile.edit.title": "编辑个人资料",
+  "profile.edit.description": "更新您的个人信息",
+  "profile.edit.form.title": "编辑您的个人资料",
+  "profile.edit.form.description": "更新您的个人信息。您的电子邮件地址无法更改。",
+  
+  "profile.edit.field.name": "全名",
+  "profile.edit.field.phone": "电话号码",
+  "profile.edit.field.ic": "身份证号码",
+  "profile.edit.field.gender": "性别",
+  
+  "profile.edit.placeholder.name": "输入您的全名",
+  "profile.edit.placeholder.phone": "例如：0123456789",
+  "profile.edit.placeholder.ic": "输入您的身份证号码",
+  "profile.edit.placeholder.gender": "选择您的性别",
+  
+  "profile.edit.help.name": "这是您的正式姓名，如您的身份证件上所显示的。",
+  "profile.edit.help.phone": "您的联系电话，用于比赛相关通讯。",
+  "profile.edit.help.ic": "您的国家身份证号码。",
+  
+  "profile.edit.gender.male": "男",
+  "profile.edit.gender.female": "女",
+  
+  "profile.edit.button.cancel": "取消",
+  "profile.edit.button.save": "保存更改",
+  "profile.edit.button.saving": "保存中...",
+  
+  "profile.edit.success.updated": "个人资料更新成功",
+  "profile.edit.error.update_failed": "更新个人资料失败",
+  
+  "profile.edit.validation.name_length": "姓名至少应有 2 个字符。",
+  "profile.edit.validation.phone_length": "电话号码至少应有 10 位数字。",
+  "profile.edit.validation.ic_length": "身份证号码至少应有 12 个字符。",
+  
   "teams.title": "团队",
   "teams.team": "团队",
   "teams.teams": "团队",

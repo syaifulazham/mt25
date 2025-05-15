@@ -1,12 +1,9 @@
-import { Metadata } from 'next';
-import { getCurrentUser } from '@/lib/session';
-import { redirect } from 'next/navigation';
-import { ProfileEditForm } from '../_components/profile-edit-form';
+"use client";
 
-export const metadata: Metadata = {
-  title: 'Edit Profile | Techlympics 2025',
-  description: 'Update your personal information',
-};
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ProfileEditForm } from '../_components/profile-edit-form';
+import { useLanguage } from '@/lib/i18n/language-context';
 
 // Define a combined user type to handle participant user details
 type ParticipantUser = {
@@ -21,24 +18,54 @@ type ParticipantUser = {
   gender?: string | null;
 };
 
-export default async function EditProfilePage() {
-  // Get the current user
-  const user = await getCurrentUser() as unknown as ParticipantUser;
-  
-  if (!user) {
-    // If no user, redirect to login
-    redirect('/participants/auth/login');
+export default function EditProfilePage() {
+  const { t } = useLanguage();
+  const router = useRouter();
+  const [user, setUser] = useState<ParticipantUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchUserData() {
+      try {
+        const response = await fetch('/api/participants/profile');
+        if (!response.ok) {
+          // If not authenticated, redirect to login
+          router.push('/participants/auth/login');
+          return;
+        }
+        const userData = await response.json();
+        setUser(userData);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        router.push('/participants/auth/login');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchUserData();
+  }, [router]);
+
+  // Display loading state
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
-  
-  // Since this page is inside /participants/ route, only participants should access it
-  // Additional checking will be done in the API endpoint
+
+  // If user data is loaded but somehow null/undefined
+  if (!user) {
+    return null; // Will be redirected by the useEffect
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Edit Profile</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{t('profile.edit.title')}</h1>
         <p className="text-sm md:text-base text-muted-foreground">
-          Update your personal information
+          {t('profile.edit.description')}
         </p>
       </div>
 

@@ -33,12 +33,6 @@ export function LanguageSwitcher() {
           {t('language.malay')}
         </DropdownMenuItem>
         <DropdownMenuItem 
-          onClick={() => setLanguage('ib')}
-          className={language === 'ib' ? 'bg-blue-50 text-blue-600 font-medium' : ''}
-        >
-          {t('language.iban')}
-        </DropdownMenuItem>
-        <DropdownMenuItem 
           onClick={() => setLanguage('zh')}
           className={language === 'zh' ? 'bg-blue-50 text-blue-600 font-medium' : ''}
         >

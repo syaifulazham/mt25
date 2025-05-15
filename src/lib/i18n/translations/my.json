@@ -133,6 +133,39 @@
   "profile.field.phone_number": "Nombor Telefon",
   "profile.field.gender": "Jantina",
   
+  "profile.edit.title": "Edit Profil",
+  "profile.edit.description": "Kemaskini maklumat peribadi anda",
+  "profile.edit.form.title": "Edit Profil Anda",
+  "profile.edit.form.description": "Kemaskini maklumat peribadi anda. Alamat e-mel anda tidak boleh diubah.",
+  
+  "profile.edit.field.name": "Nama Penuh",
+  "profile.edit.field.phone": "Nombor Telefon",
+  "profile.edit.field.ic": "Nombor KP",
+  "profile.edit.field.gender": "Jantina",
+  
+  "profile.edit.placeholder.name": "Masukkan nama penuh anda",
+  "profile.edit.placeholder.phone": "cth., 0123456789",
+  "profile.edit.placeholder.ic": "Masukkan nombor KP anda",
+  "profile.edit.placeholder.gender": "Pilih jantina anda",
+  
+  "profile.edit.help.name": "Ini adalah nama rasmi anda seperti yang tertera pada dokumen pengenalan anda.",
+  "profile.edit.help.phone": "Nombor telefon anda untuk komunikasi berkaitan pertandingan.",
+  "profile.edit.help.ic": "Nombor kad pengenalan nasional anda.",
+  
+  "profile.edit.gender.male": "Lelaki",
+  "profile.edit.gender.female": "Perempuan",
+  
+  "profile.edit.button.cancel": "Batal",
+  "profile.edit.button.save": "Simpan Perubahan",
+  "profile.edit.button.saving": "Menyimpan...",
+  
+  "profile.edit.success.updated": "Profil berjaya dikemaskini",
+  "profile.edit.error.update_failed": "Gagal mengemaskini profil",
+  
+  "profile.edit.validation.name_length": "Nama mesti sekurang-kurangnya 2 aksara.",
+  "profile.edit.validation.phone_length": "Nombor telefon mesti sekurang-kurangnya 10 digit.",
+  "profile.edit.validation.ic_length": "Nombor KP mesti sekurang-kurangnya 12 aksara.",
+  
   "teams.title": "Pasukan",
   "teams.team": "Pasukan",
   "teams.teams": "Pasukan",

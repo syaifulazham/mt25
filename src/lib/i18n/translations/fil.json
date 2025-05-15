@@ -133,6 +133,39 @@
   "profile.field.phone_number": "Numero ng Telepono",
   "profile.field.gender": "Kasarian",
   
+  "profile.edit.title": "I-edit ang Profile",
+  "profile.edit.description": "I-update ang iyong personal na impormasyon",
+  "profile.edit.form.title": "I-edit ang Iyong Profile",
+  "profile.edit.form.description": "I-update ang iyong personal na impormasyon. Hindi maaaring baguhin ang iyong email address.",
+  
+  "profile.edit.field.name": "Buong Pangalan",
+  "profile.edit.field.phone": "Numero ng Telepono",
+  "profile.edit.field.ic": "Numero ng ID",
+  "profile.edit.field.gender": "Kasarian",
+  
+  "profile.edit.placeholder.name": "Ilagay ang iyong buong pangalan",
+  "profile.edit.placeholder.phone": "hal., 0123456789",
+  "profile.edit.placeholder.ic": "Ilagay ang iyong numero ng ID",
+  "profile.edit.placeholder.gender": "Piliin ang iyong kasarian",
+  
+  "profile.edit.help.name": "Ito ang iyong opisyal na pangalan na nakikita sa iyong mga dokumento ng pagkakakilanlan.",
+  "profile.edit.help.phone": "Ang iyong numero ng telepono para sa komunikasyon tungkol sa kompetisyon.",
+  "profile.edit.help.ic": "Ang iyong pambansang numero ng pagkakakilanlan.",
+  
+  "profile.edit.gender.male": "Lalaki",
+  "profile.edit.gender.female": "Babae",
+  
+  "profile.edit.button.cancel": "Kanselahin",
+  "profile.edit.button.save": "I-save ang mga Pagbabago",
+  "profile.edit.button.saving": "Nag-sasave...",
+  
+  "profile.edit.success.updated": "Matagumpay na na-update ang profile",
+  "profile.edit.error.update_failed": "Hindi ma-update ang profile",
+  
+  "profile.edit.validation.name_length": "Ang pangalan ay dapat may hindi bababa sa 2 character.",
+  "profile.edit.validation.phone_length": "Ang numero ng telepono ay dapat may hindi bababa sa 10 numero.",
+  "profile.edit.validation.ic_length": "Ang numero ng ID ay dapat may hindi bababa sa 12 character.",
+  
   "teams.title": "Mga Koponan",
   "teams.team": "Koponan",
   "teams.teams": "Mga Koponan",

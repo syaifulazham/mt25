@@ -133,6 +133,39 @@
   "profile.field.phone_number": "Phone Number",
   "profile.field.gender": "Gender",
   
+  "profile.edit.title": "Edit Profile",
+  "profile.edit.description": "Update your personal information",
+  "profile.edit.form.title": "Edit Your Profile",
+  "profile.edit.form.description": "Update your personal information. Your email address cannot be changed.",
+  
+  "profile.edit.field.name": "Full Name",
+  "profile.edit.field.phone": "Phone Number",
+  "profile.edit.field.ic": "IC Number",
+  "profile.edit.field.gender": "Gender",
+  
+  "profile.edit.placeholder.name": "Enter your full name",
+  "profile.edit.placeholder.phone": "e.g., 0123456789",
+  "profile.edit.placeholder.ic": "Enter your IC number",
+  "profile.edit.placeholder.gender": "Select your gender",
+  
+  "profile.edit.help.name": "This is your official name as it appears on your identification documents.",
+  "profile.edit.help.phone": "Your contact number for competition-related communications.",
+  "profile.edit.help.ic": "Your national identification number.",
+  
+  "profile.edit.gender.male": "Male",
+  "profile.edit.gender.female": "Female",
+  
+  "profile.edit.button.cancel": "Cancel",
+  "profile.edit.button.save": "Save Changes",
+  "profile.edit.button.saving": "Saving...",
+  
+  "profile.edit.success.updated": "Profile updated successfully",
+  "profile.edit.error.update_failed": "Failed to update profile",
+  
+  "profile.edit.validation.name_length": "Name must be at least 2 characters.",
+  "profile.edit.validation.phone_length": "Phone number must be at least 10 digits.",
+  "profile.edit.validation.ic_length": "IC number must be at least 12 characters.",
+  
   "teams.title": "Teams",
   "teams.team": "Team",
   "teams.teams": "Teams",

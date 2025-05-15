@@ -133,6 +133,39 @@
   "profile.field.phone_number": "หมายเลขโทรศัพท์",
   "profile.field.gender": "เพศ",
   
+  "profile.edit.title": "แก้ไขโปรไฟล์",
+  "profile.edit.description": "อัปเดตข้อมูลส่วนตัวของคุณ",
+  "profile.edit.form.title": "แก้ไขโปรไฟล์ของคุณ",
+  "profile.edit.form.description": "อัปเดตข้อมูลส่วนตัวของคุณ ไม่สามารถเปลี่ยนอีเมลของคุณได้",
+  
+  "profile.edit.field.name": "ชื่อเต็ม",
+  "profile.edit.field.phone": "หมายเลขโทรศัพท์",
+  "profile.edit.field.ic": "เลขบัตรประชาชน",
+  "profile.edit.field.gender": "เพศ",
+  
+  "profile.edit.placeholder.name": "กรอกชื่อเต็มของคุณ",
+  "profile.edit.placeholder.phone": "เช่น 0123456789",
+  "profile.edit.placeholder.ic": "กรอกเลขบัตรประชาชนของคุณ",
+  "profile.edit.placeholder.gender": "เลือกเพศของคุณ",
+  
+  "profile.edit.help.name": "นี่คือชื่อที่เป็นทางการของคุณตามที่ปรากฏในเอกสารประจำตัวของคุณ",
+  "profile.edit.help.phone": "หมายเลขโทรศัพท์ของคุณสำหรับการสื่อสารเกี่ยวกับการแข่งขัน",
+  "profile.edit.help.ic": "หมายเลขบัตรประจำตัวประชาชนของคุณ",
+  
+  "profile.edit.gender.male": "ชาย",
+  "profile.edit.gender.female": "หญิง",
+  
+  "profile.edit.button.cancel": "ยกเลิก",
+  "profile.edit.button.save": "บันทึกการเปลี่ยนแปลง",
+  "profile.edit.button.saving": "กำลังบันทึก...",
+  
+  "profile.edit.success.updated": "อัปเดตโปรไฟล์สำเร็จ",
+  "profile.edit.error.update_failed": "ไม่สามารถอัปเดตโปรไฟล์ได้",
+  
+  "profile.edit.validation.name_length": "ชื่อต้องมีอย่างน้อย 2 ตัวอักษร",
+  "profile.edit.validation.phone_length": "หมายเลขโทรศัพท์ต้องมีอย่างน้อย 10 ตัวเลข",
+  "profile.edit.validation.ic_length": "เลขบัตรประชาชนต้องมีอย่างน้อย 12 ตัวอักษร",
+  
   "teams.title": "ทีม",
   "teams.team": "ทีม",
   "teams.teams": "ทีม",

@@ -26,6 +26,50 @@ type ParticipantUser = {
   // We only need to check if user is in user_participant table
 };
 
+export async function GET() {
+  try {
+    // Get the current user
+    const currentUser = await getCurrentUser();
+    
+    if (!currentUser) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // Fetch participant user data with related data
+    const participantUser = await prismaExecute(prisma => prisma.user_participant.findUnique({
+      where: { id: currentUser.id }
+    }));
+    
+    if (!participantUser) {
+      return NextResponse.json({ message: 'Unauthorized: Not a participant' }, { status: 401 });
+    }
+    
+    // Return user data
+    return NextResponse.json({
+      id: participantUser.id,
+      name: participantUser.name,
+      email: participantUser.email,
+      username: participantUser.username,
+      isActive: participantUser.isActive,
+      lastLogin: participantUser.lastLogin,
+      createdAt: participantUser.createdAt,
+      isParticipant: true,
+      ic: participantUser.ic,
+      phoneNumber: participantUser.phoneNumber,
+      gender: participantUser.gender,
+      dateOfBirth: participantUser.dateOfBirth,
+      schoolId: participantUser.schoolId,
+      higherInstId: participantUser.higherInstId
+    }, { status: 200 });
+    
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    return NextResponse.json({ 
+      message: 'An error occurred while fetching your profile' 
+    }, { status: 500 });
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     // Get the current user
