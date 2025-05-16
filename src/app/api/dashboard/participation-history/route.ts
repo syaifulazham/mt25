@@ -3,6 +3,11 @@ import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { format } from "date-fns";
 
+// Mark this route as dynamic to prevent static generation issues
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     // Get authenticated user
