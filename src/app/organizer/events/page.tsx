@@ -4,56 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationEllipsis, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious 
-} from '@/components/ui/pagination';
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { CalendarIcon, Clock, Edit, Loader2, MoreHorizontal, PlusIcon, SearchIcon, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { CalendarIcon, Clock, Edit, Loader2, MapPin, MoreHorizontal, PlusIcon, SearchIcon, Trash2 } from 'lucide-react';
+import EventsTimeline from './_components/events-timeline';
 import { format, differenceInDays } from 'date-fns';
 import { eventApi } from '@/lib/api-client';
 import { stateApi } from '@/lib/api-client';
@@ -337,208 +295,207 @@ export default function EventsPage() {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Venue</TableHead>
-                <TableHead>State</TableHead>
-                <TableHead>Scope Area</TableHead>
-                <TableHead>Date Range</TableHead>
-                <TableHead>Days Left</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-10">
-                    Loading events...
-                  </TableCell>
-                </TableRow>
-              ) : events.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-10">
-                    No events found. Try adjusting your filters or create a new event.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                events.map((event) => (
-                  <TableRow key={event.id} className="cursor-pointer hover:bg-gray-50" onClick={() => handleViewEvent(event.id)}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
-                    <TableCell>{event.code}</TableCell>
-                    <TableCell>{event.venue || 'N/A'}</TableCell>
-                    <TableCell>{event.addressState || 'N/A'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {event.scopeArea === 'NATIONAL' ? 'National' :
-                         event.scopeArea === 'ZONE' ? `Zone: ${event.zone?.name || 'N/A'}` :
-                         event.scopeArea === 'STATE' ? `State: ${event.state?.name || 'N/A'}` : 'Open'}
+      <div className="mb-4">
+        {isLoading ? (
+          <div className="flex justify-center items-center min-h-[200px]">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Loading events...</span>
+          </div>
+        ) : events.length === 0 ? (
+          <div className="flex flex-col justify-center items-center min-h-[200px] border rounded-lg p-6 bg-gray-50">
+            <div className="text-center">
+              <h3 className="text-lg font-medium mb-2">No events found</h3>
+              <p className="text-muted-foreground mb-4">Try adjusting your filters or create a new event.</p>
+              <Button onClick={handleCreateEvent}>
+                <PlusIcon className="mr-2 h-4 w-4" />
+                Create Event
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {events.map((event) => {
+              const today = new Date();
+              const startDate = new Date(event.startDate);
+              const endDate = new Date(event.endDate);
+              const daysLeft = differenceInDays(startDate, today);
+              
+              // Determine event status
+              let statusBadge;
+              if (today >= startDate && today <= endDate) {
+                statusBadge = (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    <Clock className="mr-1 h-3 w-3" /> Ongoing
+                  </Badge>
+                );
+              } else if (today > endDate) {
+                statusBadge = (
+                  <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">
+                    Completed
+                  </Badge>
+                );
+              } else {
+                statusBadge = (
+                  <div className="flex items-center">
+                    <Clock className="mr-1 h-4 w-4 text-gray-500" />
+                    <span className={`
+                      ${daysLeft <= 7 ? 'text-red-600 font-medium' : 
+                       daysLeft <= 30 ? 'text-amber-600' : 'text-gray-600'}
+                    `}>
+                      {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                );
+              }
+              
+              return (
+                <Card 
+                  key={event.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  onClick={() => handleViewEvent(event.id)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 truncate">
+                        <CardTitle className="text-lg mb-1 truncate">{event.name}</CardTitle>
+                        <CardDescription>
+                          <span className="text-gray-700 font-medium">{event.code}</span>
+                          {event.venue && <span className="text-muted-foreground"> • {event.venue}</span>}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={event.isActive ? "default" : "secondary"} className="ml-2 shrink-0">
+                        {event.isActive ? 'Active' : 'Inactive'}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 gap-3">
                       <div className="flex items-center">
-                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                        <span>
+                        <CalendarIcon className="h-4 w-4 text-gray-500 mr-2" />
+                        <span className="text-sm">
                           {format(new Date(event.startDate), 'MMM d, yyyy') === format(new Date(event.endDate), 'MMM d, yyyy') 
                             ? format(new Date(event.startDate), 'MMM d, yyyy')
                             : `${format(new Date(event.startDate), 'MMM d, yyyy')} - ${format(new Date(event.endDate), 'MMM d, yyyy')}`
                           }
                         </span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {(() => {
-                        const today = new Date();
-                        const startDate = new Date(event.startDate);
-                        const endDate = new Date(event.endDate);
-                        
-                        // Calculate days left
-                        const daysLeft = differenceInDays(startDate, today);
-                        
-                        // Check if event has already started
-                        if (today >= startDate && today <= endDate) {
-                          return (
-                            <div className="flex items-center">
-                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                <Clock className="mr-1 h-3 w-3" /> Ongoing
-                              </Badge>
-                            </div>
-                          );
-                        }
-                        
-                        // Check if event has ended
-                        if (today > endDate) {
-                          return (
-                            <div className="flex items-center">
-                              <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">
-                                Completed
-                              </Badge>
-                            </div>
-                          );
-                        }
-                        
-                        // Event is upcoming
-                        return (
-                          <div className="flex items-center">
-                            <Clock className="mr-1 h-4 w-4 text-gray-500" />
-                            <span className={`
-                              ${daysLeft <= 7 ? 'text-red-600 font-medium' : 
-                               daysLeft <= 30 ? 'text-amber-600' : 'text-gray-600'}
-                            `}>
-                              {daysLeft} day{daysLeft !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                        );
-                      })()} 
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={event.isActive ? "default" : "secondary"}>
-                        {event.isActive ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end items-center space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditEvent(event.id);
-                          }}
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Edit</span>
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="icon"
-                          className="h-8 w-8 text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            confirmDeleteEvent({id: event.id, name: event.name});
-                          }}
-                          title="Remove"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Remove</span>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewEvent(event.id);
-                            }}>
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => {
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <MapPin className="h-4 w-4 text-gray-500 mr-2" />
+                          <span className="text-sm">{event.addressState || 'N/A'}</span>
+                        </div>
+                        <Badge variant="outline">
+                          {event.scopeArea === 'NATIONAL' ? 'National' :
+                           event.scopeArea === 'ZONE' ? `Zone: ${event.zone?.name || 'N/A'}` :
+                           event.scopeArea === 'STATE' ? `State: ${event.state?.name || 'N/A'}` : 'Open'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          {statusBadge}
+                        </div>
+                        <div className="flex space-x-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
                               e.stopPropagation();
                               handleEditEvent(event.id);
-                            }}>
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-red-600"
-                              onClick={(e) => {
+                            }}
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              confirmDeleteEvent({id: event.id, name: event.name});
+                            }}
+                            title="Remove"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => {
                                 e.stopPropagation();
-                                confirmDeleteEvent({id: event.id, name: event.name});
-                              }}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                                handleViewEvent(event.id);
+                              }}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditEvent(event.id);
+                              }}>
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  confirmDeleteEvent({id: event.id, name: event.name});
+                                }}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          
-          {/* Pagination */}
-          {!isLoading && events.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-4 border-t">
-              <div className="text-sm text-gray-500">
-                Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} events
-              </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      isActive={currentPage > 1}
-                    />
-                  </PaginationItem>
-                  
-                  {renderPaginationItems()}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                      isActive={currentPage < totalPages}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      
+      {/* Chronological Events Timeline */}
+      {!isLoading && events.length > 0 && (
+        <EventsTimeline events={events} onEventClick={handleViewEvent} />
+      )}
+      
+      {/* Pagination */}
+      {!isLoading && events.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-4 border rounded-lg mt-4">
+          <div className="text-sm text-gray-500">
+            Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} events
+          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  isActive={currentPage > 1}
+                />
+              </PaginationItem>
+              
+              {renderPaginationItems()}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  isActive={currentPage < totalPages}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
       
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
