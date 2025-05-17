@@ -594,9 +594,14 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
                                 ) : (
                                   <div className="flex items-center justify-center h-full bg-gray-100">
                                     <img 
-                                      src={team.evidence_doc} 
+                                      src={team.evidence_doc?.startsWith('/') ? team.evidence_doc : `/${team.evidence_doc}`} 
                                       alt="Evidence Document" 
                                       className="max-w-full max-h-full object-contain"
+                                      onError={(e) => {
+                                        console.error("Image failed to load:", team.evidence_doc);
+                                        e.currentTarget.onerror = null;
+                                        e.currentTarget.src = "/images/document-placeholder.png";
+                                      }}
                                     />
                                   </div>
                                 )}
