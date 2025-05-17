@@ -194,7 +194,7 @@ export default function Home() {
         <div className="absolute inset-0 z-0 overflow-hidden">
           <AnimatedHoneycomb 
             color="rgba(255, 255, 255, 0.08)" 
-            density={30} 
+            density={8} 
             speed={0.8} 
             lineWidth={0.4} 
             dotSize={0.8} 
