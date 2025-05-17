@@ -12,6 +12,7 @@ import NewsSection from "./_components/news-section";
 import PartnersSection from "./_components/partners-section";
 import { useLanguage } from "@/lib/i18n/language-context";
 import { LanguageSwitcher } from "@/lib/i18n/language-switcher";
+import AnimatedHoneycomb from "./_components/animated-honeycomb";
 
 export default function Home() {
   const { t } = useLanguage();
@@ -188,8 +189,19 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 sm:px-6 py-10 sm:py-16 md:py-24">
-        <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
+      <section className="relative container mx-auto px-4 sm:px-6 py-10 sm:py-16 md:py-24">
+        {/* Animated Honeycomb Background */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <AnimatedHoneycomb 
+            color="rgba(255, 255, 255, 0.08)" 
+            density={30} 
+            speed={0.8} 
+            lineWidth={0.4} 
+            dotSize={0.8} 
+            maxConnections={3} 
+          />
+        </div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 md:gap-8">
           <div className="w-full md:w-1/2 order-2 md:order-1 mb-8 md:mb-0">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-6">
               <div className="flex flex-col items-start">
