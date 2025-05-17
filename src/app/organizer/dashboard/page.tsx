@@ -484,7 +484,14 @@ export default async function DashboardPage() {
     return { logins, participants };
   });
   
-  const recentLogins = recentData.logins;
+  // Transform recentLogins to match the expected type for the ActivityTabs component
+  // ActivityTabs expects: { id: number; name: string; role: string; lastLogin: Date | null; }[]
+  const recentLogins = recentData.logins.map(user => ({
+    id: user.id,
+    name: user.name || 'Anonymous User', // Provide a default name when null
+    role: String(user.role),            // Convert enum to string
+    lastLogin: user.lastLogin
+  }));
   const recentParticipants = recentData.participants;
   
   // 7. Number of contest participations by education level
