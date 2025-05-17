@@ -19,7 +19,6 @@ export async function GET(request: NextRequest) {
     }
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "10");
-    const publishedOnly = searchParams.get("publishedOnly") === "true";
     const draftOnly = searchParams.get("draftOnly") === "true";
     const searchTerm = searchParams.get("search") || "";
 
