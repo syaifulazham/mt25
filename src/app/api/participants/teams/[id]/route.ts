@@ -9,6 +9,9 @@ import { z } from "zod";
 const updateTeamSchema = z.object({
   name: z.string().min(1, "Name is required").optional(),
   description: z.string().optional().nullable(),
+  team_email: z.string().email("Invalid email format").optional().nullable(),
+  evidence_doc: z.string().optional().nullable(),
+  evidence_submitteddate: z.string().optional().nullable(),
   status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]).optional(),
   maxMembers: z.number().min(1).max(10).optional()
 });
@@ -138,6 +141,9 @@ export async function GET(
       name: team.name,
       hashcode: team.hashcode,
       description: team.description,
+      team_email: team.team_email,
+      evidence_doc: team.evidence_doc,
+      evidence_submitteddate: team.evidence_submitteddate,
       status: team.status,
       maxMembers: team.maxMembers,
       contestId: team.contestId,
@@ -252,7 +258,7 @@ export async function PATCH(
       );
     }
     
-    const { name, description, status, maxMembers } = validationResult.data;
+    const { name, description, team_email, evidence_doc, evidence_submitteddate, status, maxMembers } = validationResult.data;
     
     // Update the team
     const updatedTeam = await prisma.team.update({
@@ -260,6 +266,9 @@ export async function PATCH(
       data: {
         ...(name && { name }),
         ...(description !== undefined && { description }),
+        ...(team_email !== undefined && { team_email }),
+        ...(evidence_doc !== undefined && { evidence_doc }),
+        ...(evidence_submitteddate !== undefined && { evidence_submitteddate }),
         ...(status && { status }),
         ...(maxMembers && { maxMembers })
       }

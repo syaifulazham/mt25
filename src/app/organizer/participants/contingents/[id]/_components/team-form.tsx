@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -25,15 +25,20 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail, Upload, FileText, ExternalLink, Eye } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 // Define the form schema
 const formSchema = z.object({
   name: z.string().min(3, { message: "Team name must be at least 3 characters" }),
   description: z.string().optional(),
+  team_email: z.string().email({ message: "Please enter a valid email address" }).optional(),
   contestId: z.number().min(1, { message: "Please select a contest" }),
   status: z.enum(["ACTIVE", "INACTIVE", "PENDING"]),
   maxMembers: z.number().min(1).max(10),
+  // Evidence document is handled separately since it's a file
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -48,6 +53,9 @@ const TeamForm: React.FC<Props> = ({ team, contingentId, onComplete }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [contests, setContests] = useState<any[]>([]);
   const [isLoadingContests, setIsLoadingContests] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditMode = !!team;
 
@@ -79,20 +87,80 @@ const TeamForm: React.FC<Props> = ({ team, contingentId, onComplete }) => {
     defaultValues: {
       name: team?.name || '',
       description: team?.description || '',
+      team_email: team?.team_email || '',
       contestId: team?.contestId || 0,
       status: team?.status || 'ACTIVE',
       maxMembers: team?.maxMembers || 4,
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      // Check file type (PDF or images)
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+      if (!validTypes.includes(file.type)) {
+        toast.error('Please upload a PDF or image file (JPEG, PNG).');
+        return;
+      }
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB.');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const uploadEvidenceDocument = async (teamId: number) => {
+    if (!selectedFile) return null;
+    
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('teamId', teamId.toString());
+      
+      const response = await fetch('/api/upload/evidence-doc', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload evidence document');
+      }
+      
+      const data = await response.json();
+      return data.documentUrl;
+    } catch (error) {
+      console.error('Error uploading evidence document:', error);
+      toast.error('Failed to upload evidence document');
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
 
     try {
-      const payload = {
+      const payload: any = {
         ...data,
         contingentId
       };
+      
+      // If in edit mode and a new file is selected, upload it
+      let documentUrl = null;
+      if (selectedFile) {
+        if (isEditMode && team.id) {
+          documentUrl = await uploadEvidenceDocument(team.id);
+          if (documentUrl) {
+            payload.evidence_doc = documentUrl;
+            payload.evidence_submitteddate = new Date().toISOString();
+          }
+        }
+      }
 
       const url = isEditMode 
         ? `/api/organizer/teams/${team.id}` 
@@ -107,6 +175,27 @@ const TeamForm: React.FC<Props> = ({ team, contingentId, onComplete }) => {
         },
         body: JSON.stringify(payload),
       });
+      
+      // If creating a new team and we have a file, upload it after team creation
+      if (!isEditMode && selectedFile) {
+        const teamData = await response.json();
+        if (teamData.id) {
+          documentUrl = await uploadEvidenceDocument(teamData.id);
+          if (documentUrl) {
+            // Update the newly created team with the document URL
+            await fetch(`/api/organizer/teams/${teamData.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                evidence_doc: documentUrl,
+                evidence_submitteddate: new Date().toISOString()
+              }),
+            });
+          }
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -192,6 +281,109 @@ const TeamForm: React.FC<Props> = ({ team, contingentId, onComplete }) => {
             </FormItem>
           )}
         />
+        
+        <FormField
+          control={form.control}
+          name="team_email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Team Email</FormLabel>
+              <FormControl>
+                <div className="flex items-center space-x-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <Input type="email" placeholder="team@example.com" {...field} value={field.value || ''} />
+                </div>
+              </FormControl>
+              <FormDescription>
+                Team contact email for communication
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        {/* Evidence Document Upload */}
+        <div className="space-y-2">
+          <Label htmlFor="evidence-doc">Evidence Document</Label>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <Card className="overflow-hidden">
+                <CardContent className="p-4">
+                  {/* Show existing document if available */}
+                  {isEditMode && team?.evidence_doc && !selectedFile ? (
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <FileText className="h-5 w-5 text-blue-500" />
+                        <span className="text-sm">Document uploaded on {team.evidence_submitteddate ? new Date(team.evidence_submitteddate).toLocaleDateString() : 'N/A'}</span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center space-x-1" 
+                          onClick={() => window.open(team.evidence_doc, '_blank')}
+                        >
+                          <Eye className="h-3 w-3" />
+                          <span>View Document</span>
+                        </Button>
+                        <Button
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => {
+                            if (fileInputRef.current) fileInputRef.current.click();
+                          }}
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Replace
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      {selectedFile ? (
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <FileText className="h-5 w-5 text-green-500" />
+                            <span className="text-sm">{selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)</span>
+                          </div>
+                          <Button
+                            variant="secondary" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedFile(null);
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                          >
+                            Change File
+                          </Button>
+                        </div>
+                      ) : (
+                        <div 
+                          className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-md hover:border-primary cursor-pointer"
+                          onClick={() => {
+                            if (fileInputRef.current) fileInputRef.current.click();
+                          }}
+                        >
+                          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">Click to upload evidence document</p>
+                          <p className="text-xs text-muted-foreground mt-1">(PDF, JPEG, PNG, max 5MB)</p>
+                        </div>
+                      )}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        id="evidence-doc"
+                        className="hidden"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField

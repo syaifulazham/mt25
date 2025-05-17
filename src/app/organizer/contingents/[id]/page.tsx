@@ -510,10 +510,13 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                               <Avatar className="h-6 w-6">
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs">{initials}</AvatarFallback>
                               </Avatar>
-                              <span className="text-sm">
-                                {manager.participant.name} 
-                                <Badge variant="outline" className="ml-1 text-xs bg-amber-50 text-amber-700">Primary</Badge>
-                              </span>
+                              <div className="flex flex-col">
+                                <span className="text-sm">
+                                  {manager.participant.name} 
+                                  <Badge variant="outline" className="ml-1 text-xs bg-amber-50 text-amber-700">Primary</Badge>
+                                </span>
+                                <span className="text-xs text-muted-foreground">{manager.participant.email}</span>
+                              </div>
                             </div>
                           );
                         })
@@ -543,7 +546,10 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                               <Avatar className="h-6 w-6">
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs">{initials}</AvatarFallback>
                               </Avatar>
-                              <span className="text-sm">{manager.participant.name}</span>
+                              <div className="flex flex-col">
+                                <span className="text-sm">{manager.participant.name}</span>
+                                <span className="text-xs text-muted-foreground">{manager.participant.email}</span>
+                              </div>
                             </div>
                           );
                         })

@@ -753,6 +753,9 @@ model team {
   name          String
   hashcode      String   @unique // Unique code for team identification
   description   String?  @db.Text
+  team_email    String? // Team contact email
+  evidence_doc  String? // Document reference or URL for submitted evidence
+  evidence_submitteddate DateTime? // Date when evidence was submitted
   contestId     Int // Required contest association
   contingentId  Int // Required contingent association
   eventcontestId Int? // Link to the specific event contest

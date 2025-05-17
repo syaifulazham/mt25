@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/lib/i18n/language-context";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,7 @@ interface Team {
 export default function EditTeamPage({ params }: { params: { id: string } }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +98,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         const response = await fetch(`/api/participants/teams/${params.id}`);
         
         if (!response.ok) {
-          throw new Error("Failed to fetch team details");
+          throw new Error(t('teams.error_fetch_details') || "Failed to fetch team details");
         }
         
         const data = await response.json();
@@ -110,7 +112,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         });
       } catch (error) {
         console.error("Error fetching team:", error);
-        toast.error("Failed to load team details");
+        toast.error(t('teams.error_load_details') || "Failed to load team details");
       } finally {
         setIsLoading(false);
       }
@@ -136,14 +138,14 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update team");
+        throw new Error(errorData.error || t('teams.error_update') || "Failed to update team");
       }
       
-      toast.success("Team updated successfully");
+      toast.success(t('teams.update_success') || "Team updated successfully");
       router.push(`/participants/teams/${params.id}`);
     } catch (error: any) {
       console.error("Error updating team:", error);
-      toast.error(error.message || "Failed to update team");
+      toast.error(error.message || t('teams.error_update') || "Failed to update team");
     } finally {
       setIsSubmitting(false);
     }
@@ -160,10 +162,10 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         <Button variant="outline" size="sm" asChild className="mr-4">
           <Link href={`/participants/teams/${params.id}`}>
             <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Team
+            {t('teams.back_to_team')}
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Edit Team</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('teams.edit_team')}</h1>
       </div>
       
       {isLoading ? (
@@ -185,13 +187,13 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Info className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Team not found</h3>
+            <h3 className="text-lg font-medium">{t('teams.not_found')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              The team you're trying to edit doesn't exist or you don't have permission to modify it.
+              {t('teams.edit_not_found_description')}
             </p>
             <Button asChild>
               <Link href="/participants/teams">
-                Return to Teams
+                {t('teams.return_to_teams')}
               </Link>
             </Button>
           </CardContent>
@@ -200,13 +202,13 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Info className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Permission Denied</h3>
+            <h3 className="text-lg font-medium">{t('teams.permission_denied')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              You don't have permission to edit this team. Only team managers can make changes.
+              {t('teams.edit_permission_description')}
             </p>
             <Button asChild>
               <Link href={`/participants/teams/${params.id}`}>
-                Return to Team Details
+                {t('teams.return_to_details')}
               </Link>
             </Button>
           </CardContent>
@@ -214,9 +216,9 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Edit Team</CardTitle>
+            <CardTitle>{t('teams.edit_team')}</CardTitle>
             <CardDescription>
-              Update your team's information
+              {t('teams.edit_description')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -230,12 +232,12 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Team Name</FormLabel>
+                            <FormLabel>{t('teams.team_name')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter team name" {...field} />
+                              <Input placeholder={t('teams.enter_team_name')} {...field} />
                             </FormControl>
                             <FormDescription>
-                              The name of your team for the competition
+                              {t('teams.team_name_description')}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -247,24 +249,24 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                         name="status"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Status</FormLabel>
+                            <FormLabel>{t('teams.status')}</FormLabel>
                             <Select 
                               onValueChange={field.onChange} 
                               defaultValue={field.value}
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select team status" />
+                                  <SelectValue placeholder={t('teams.select_status')} />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="ACTIVE">Active</SelectItem>
-                                <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                <SelectItem value="PENDING">Pending</SelectItem>
+                                <SelectItem value="ACTIVE">{t('teams.status_active')}</SelectItem>
+                                <SelectItem value="INACTIVE">{t('teams.status_inactive')}</SelectItem>
+                                <SelectItem value="PENDING">{t('teams.status_pending')}</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormDescription>
-                              The current status of your team
+                              {t('teams.status_description')}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -278,16 +280,16 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                         name="description"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Description</FormLabel>
+                            <FormLabel>{t('teams.description')}</FormLabel>
                             <FormControl>
                               <Textarea 
-                                placeholder="Enter team description (optional)" 
+                                placeholder={t('teams.enter_description')} 
                                 className="min-h-[120px]" 
                                 {...field} 
                               />
                             </FormControl>
                             <FormDescription>
-                              A brief description of your team
+                              {t('teams.description_help')}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
@@ -297,27 +299,27 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Contest</Label>
+                    <Label className="text-muted-foreground">{t('teams.contest')}</Label>
                     <div className="p-4 border rounded-md bg-muted/30">
                       <div className="flex items-center">
                         <Trophy className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span className="font-medium">{team.contestName || "N/A"}</span>
+                        <span className="font-medium">{team.contestName || t('teams.na')}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        The contest cannot be changed after team creation.
+                        {t('teams.contest_unchangeable')}
                       </p>
                     </div>
                   </div>
                   
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground">Contingent</Label>
+                    <Label className="text-muted-foreground">{t('teams.contingent')}</Label>
                     <div className="p-4 border rounded-md bg-muted/30">
                       <div className="flex items-center">
                         <Users className="h-4 w-4 text-muted-foreground mr-2" />
-                        <span className="font-medium">{team.contingentName || "N/A"}</span>
+                        <span className="font-medium">{team.contingentName || t('teams.na')}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        The contingent cannot be changed after team creation.
+                        {t('teams.contingent_unchangeable')}
                       </p>
                     </div>
                   </div>
@@ -330,7 +332,7 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                     onClick={() => router.push(`/participants/teams/${params.id}`)}
                     disabled={isSubmitting}
                   >
-                    Cancel
+                    {t('teams.cancel')}
                   </Button>
                   <Button 
                     type="submit"
@@ -339,10 +341,10 @@ export default function EditTeamPage({ params }: { params: { id: string } }) {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating...
+                        {t('teams.updating')}
                       </>
                     ) : (
-                      "Update Team"
+                      t('teams.update_team')
                     )}
                   </Button>
                 </div>
