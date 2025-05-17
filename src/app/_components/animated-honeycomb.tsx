@@ -7,6 +7,10 @@ interface HoneycombPoint {
   y: number;
   vx: number;
   vy: number;
+  ax: number; // acceleration x
+  ay: number; // acceleration y
+  accelerating: boolean;
+  accelerationTimer: number;
   connected: number[];
 }
 
@@ -121,6 +125,10 @@ export default function AnimatedHoneycomb({
         y: Math.random() * height,
         vx: (Math.random() - 0.5) * speed,
         vy: (Math.random() - 0.5) * speed,
+        ax: 0,
+        ay: 0,
+        accelerating: false,
+        accelerationTimer: 0,
         connected: []
       });
     }
@@ -133,6 +141,42 @@ export default function AnimatedHoneycomb({
     const points = pointsRef.current;
     
     points.forEach(point => {
+      // Randomly start acceleration for some particles
+      if (!point.accelerating && Math.random() < 0.005) { // 0.5% chance per frame
+        point.accelerating = true;
+        point.accelerationTimer = Math.random() * 60 + 30; // 0.5-1.5 seconds at 60fps
+        point.ax = (Math.random() - 0.5) * 0.05; // Random acceleration
+        point.ay = (Math.random() - 0.5) * 0.05;
+      }
+      
+      // Apply acceleration if active
+      if (point.accelerating) {
+        point.vx += point.ax;
+        point.vy += point.ay;
+        
+        // Limit maximum velocity
+        const maxVelocity = speed * 3;
+        const currentVelocity = Math.sqrt(point.vx * point.vx + point.vy * point.vy);
+        if (currentVelocity > maxVelocity) {
+          const scale = maxVelocity / currentVelocity;
+          point.vx *= scale;
+          point.vy *= scale;
+        }
+        
+        // Decrease acceleration timer
+        point.accelerationTimer--;
+        if (point.accelerationTimer <= 0) {
+          point.accelerating = false;
+          point.ax = 0;
+          point.ay = 0;
+          
+          // Reset velocity to normal range
+          const normalizeTime = 30; // frames to normalize
+          point.vx = point.vx * (1 - 1/normalizeTime) + ((Math.random() - 0.5) * speed) * (1/normalizeTime);
+          point.vy = point.vy * (1 - 1/normalizeTime) + ((Math.random() - 0.5) * speed) * (1/normalizeTime);
+        }
+      }
+      
       // Move points
       point.x += point.vx;
       point.y += point.vy;
@@ -140,10 +184,12 @@ export default function AnimatedHoneycomb({
       // Bounce off edges
       if (point.x < 0 || point.x > width) {
         point.vx = -point.vx;
+        point.accelerating = false; // Stop acceleration when hitting edges
       }
       
       if (point.y < 0 || point.y > height) {
         point.vy = -point.vy;
+        point.accelerating = false; // Stop acceleration when hitting edges
       }
       
       // Reset connections (will be recalculated in draw phase)
@@ -203,10 +249,15 @@ export default function AnimatedHoneycomb({
     ctx.stroke();
     
     // Draw points
-    ctx.fillStyle = color;
     for (const point of points) {
+      // Use different sizes for accelerating particles
+      const actualDotSize = point.accelerating ? dotSize * 1.5 : dotSize;
+      
+      // Use different colors for accelerating particles
+      ctx.fillStyle = point.accelerating ? 'rgba(255, 255, 255, 0.18)' : color;
+      
       ctx.beginPath();
-      ctx.arc(point.x, point.y, dotSize, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, actualDotSize, 0, Math.PI * 2);
       ctx.fill();
     }
   };
