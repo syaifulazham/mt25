@@ -5,13 +5,18 @@ import prisma from "@/lib/prisma";
 // GET /api/photo-galleries - Get all photo galleries with optional filters and pagination
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Parse query parameters
     const { searchParams } = new URL(request.url);
+    const publishedOnly = searchParams.get("publishedOnly") === "true";
+    
+    // Only check authentication if not requesting just published galleries
+    // This allows public access to published galleries without authentication
+    if (!publishedOnly) {
+      const user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
     const page = parseInt(searchParams.get("page") || "1");
     const pageSize = parseInt(searchParams.get("pageSize") || "10");
     const publishedOnly = searchParams.get("publishedOnly") === "true";
