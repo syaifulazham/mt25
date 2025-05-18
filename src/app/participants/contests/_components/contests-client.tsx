@@ -8,32 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Users, ArrowRight, Loader2, Trophy, Award } from "lucide-react";
 import { toast } from "sonner";
-import contestsApi, { ContestGroupedByTarget, Contest as ContestBase, TargetGroup } from "./contests-api";
-
-// Extend the Contest interface to include our additional properties
-interface Contest extends ContestBase {
-  schoolLevelSource?: string;
-  targetGroupName?: string;
-  targetGroupId?: number;
-}
-
-// Interface for target group-specific contest
-interface TargetGroupSpecificContest {
-  id: number;
-  name: string;
-  code: string;
-  contestId: number;
-  schoolLevel: string;
-}
+import contestsApi, { ContestGroupedByTarget, Contest } from "./contests-api";
 import { useLanguage } from "@/lib/i18n/language-context";
 import Link from "next/link";
 import Image from "next/image";
-
-// Interface for contests grouped by school level
-interface ContestsBySchoolLevel {
-  schoolLevel: string;
-  contests: Contest[];
-}
 
 // Default theme color
 const DEFAULT_THEME_COLOR = "#0070f3";
@@ -42,7 +20,7 @@ export default function ContestsClient() {
   const router = useRouter();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
-  const [contestsByLevel, setContestsByLevel] = useState<ContestsBySchoolLevel[]>([]);
+  const [contestGroups, setContestGroups] = useState<ContestGroupedByTarget[]>([]);
 
   useEffect(() => {
     loadContests();
@@ -53,189 +31,11 @@ export default function ContestsClient() {
     return contest.theme?.color || DEFAULT_THEME_COLOR;
   };
 
-  // Helper function to get the display name for a school level
-  const getSchoolLevelDisplayName = (level: string): string => {
-    switch(level.toLowerCase()) {
-      case 'primary': return 'Primary School';
-      case 'secondary': return 'Secondary School';
-      case 'higher': return 'Higher Education';
-      default: return level;
-    }
-  };
-
   const loadContests = async () => {
     try {
       setIsLoading(true);
       const data = await contestsApi.getContests();
-
-      // FULL DEBUG: Print the complete raw API response
-      console.log('COMPLETE API RESPONSE:', JSON.stringify(data, null, 2));
-      
-      // Count total unique contests by ID for debugging
-      const uniqueContestIds = new Set();
-      const uniqueContestCodes = new Set();
-      const allContestNames = [];
-      
-      data.forEach((group: ContestGroupedByTarget) => {
-        group.contests.forEach((contest: ContestBase) => {
-          uniqueContestIds.add(contest.id);
-          uniqueContestCodes.add(contest.code);
-          allContestNames.push(`${contest.name} (${contest.code})`);
-        });
-      });
-      
-      console.log('DEBUGGING COUNTS:');
-      console.log(`Total unique contest IDs: ${uniqueContestIds.size}`);
-      console.log(`Total unique contest codes: ${uniqueContestCodes.size}`);
-      console.log('All contest names with codes:', allContestNames);
-      
-      // Set up the ordered school levels we want to display
-      const orderedLevels = ['primary', 'secondary', 'higher'];
-      
-      // NEW APPROACH: Directly create school level groups
-      // Initialize empty groups for each education level
-      const schoolLevelGroups: {[key: string]: Contest[]} = {};
-      orderedLevels.forEach(level => {
-        schoolLevelGroups[level] = [];
-      });
-      
-      // Process each target group in the API response
-      data.forEach((group: ContestGroupedByTarget) => {
-        // Get the school level from this target group 
-        // Convert to lowercase for case-insensitive comparison
-        const schoolLevel = group.targetGroup.schoolLevel.toLowerCase();
-        
-        // Skip if not a recognized school level
-        if (!orderedLevels.includes(schoolLevel)) {
-          console.log(`Skipping unrecognized school level: ${schoolLevel}`);
-          return;
-        }
-        
-        console.log(`Processing target group: ${group.targetGroup.name} (${schoolLevel})`);
-        console.log(`Contains ${group.contests.length} contests`);
-        
-        // Process each contest in this group
-        group.contests.forEach((contest: ContestBase) => {
-          console.log(`  - Contest: ${contest.name} (${contest.code})`);
-          
-          // Create a full contest object with school level info
-          const contestWithMeta: Contest = {
-            ...contest,
-            schoolLevelSource: schoolLevel
-          };
-          
-          // Check if this contest (by code) is already in this level
-          const isDuplicate = schoolLevelGroups[schoolLevel].some(
-            (c: Contest) => c.code === contest.code
-          );
-          
-          if (isDuplicate) {
-            console.log(`    > Skipping duplicate in ${schoolLevel}`);
-          } else {
-            console.log(`    > Adding to ${schoolLevel}`);
-            schoolLevelGroups[schoolLevel].push(contestWithMeta);
-          }
-        });
-      });
-      
-      // Log the contents of each school level group
-      orderedLevels.forEach(level => {
-        console.log(`${level} contests: ${schoolLevelGroups[level].length}`);
-        schoolLevelGroups[level].forEach(contest => {
-          console.log(`  - ${contest.name} (${contest.code})`);
-        });
-      });
-      
-      // Log for debugging
-      console.log('School level groups:', schoolLevelGroups);
-      
-      // ADD MISSING CONTESTS MANUALLY (until they're added to the API response)
-      
-      // Add the missing Cabaran Cetakan 3D for Secondary School
-      const missingContestSecondary: Contest = {
-        id: 9999, // Temporary ID, will be replaced when the real contest is added to API
-        name: "Cabaran Cetakan 3D",
-        code: "5.1R",
-        description: "Cabaran Cetakan 3D untuk Sekolah Menengah",
-        contestType: "ENGINEERING_DESIGN",
-        startDate: new Date("2025-05-01"),
-        endDate: new Date("2025-12-31"),
-        participation_mode: "TEAM",
-        targetGroups: [],
-        theme: {
-          id: 6,
-          name: "Inovasi, Kreativiti untuk Kesejahteraan Rakyat",
-          color: "#fbb318",
-          logoPath: "/uploads/themes/theme_0e222a701324ed16.svg"
-        },
-        schoolLevelSource: "secondary"
-      };
-      
-      // Add it to the secondary school level group if not already there
-      const secondaryLevel = "secondary";
-      if (!schoolLevelGroups[secondaryLevel].some(c => c.code === "5.1R")) {
-        schoolLevelGroups[secondaryLevel].push(missingContestSecondary);
-        console.log("Added missing Cabaran Cetakan 3D (5.1R) to Secondary School level manually");
-      }
-      
-      // Add the missing Robot Sumo for Primary School
-      const missingContestPrimary: Contest = {
-        id: 9998, // Temporary ID, will be replaced when the real contest is added to API
-        name: "Robot Sumo",
-        code: "RSP",
-        description: "Robot Sumo untuk Sekolah Rendah",
-        contestType: "ENGINEERING_DESIGN",
-        startDate: new Date("2025-05-01"),
-        endDate: new Date("2025-12-31"),
-        participation_mode: "TEAM",
-        targetGroups: [],
-        theme: {
-          id: 2,
-          name: "Sains & Inovasi",
-          color: "#f85a25",
-          logoPath: "/uploads/themes/theme_675581348bf4ffdf.svg"
-        },
-        schoolLevelSource: "primary"
-      };
-      
-      // Add it to the primary school level group if not already there
-      const primaryLevel = "primary";
-      if (!schoolLevelGroups[primaryLevel].some(c => c.code === "RSP")) {
-        schoolLevelGroups[primaryLevel].push(missingContestPrimary);
-        console.log("Added missing Robot Sumo (RSP) to Primary School level manually");
-      }
-      
-      // Convert the school level groups to the format needed for rendering
-      const contestsByLevel: ContestsBySchoolLevel[] = [];
-      
-      // Process each school level in the specified order
-      orderedLevels.forEach(level => {
-        // Only add levels with contests
-        if (schoolLevelGroups[level]?.length > 0) {
-          contestsByLevel.push({
-            schoolLevel: level,
-            contests: schoolLevelGroups[level]
-          });
-        }
-      });
-      
-      // Print the final contest groups for validation
-      console.log('FINAL GROUPING:');
-      contestsByLevel.forEach(group => {
-        console.log(`${getSchoolLevelDisplayName(group.schoolLevel)} (${group.contests.length} contests):`);
-        group.contests.forEach(contest => {
-          console.log(`  - ${contest.name} (${contest.code})`);
-        });
-      });
-      
-      // Count total contests displayed
-      const totalDisplayedContests = contestsByLevel.reduce(
-        (total, group) => total + group.contests.length, 0
-      );
-      console.log(`Total contests displayed across all levels: ${totalDisplayedContests}`);
-      
-      console.log('Final contests by level:', contestsByLevel);
-      setContestsByLevel(contestsByLevel);
+      setContestGroups(data);
     } catch (error) {
       console.error("Error loading contests:", error);
       toast.error("Failed to load contests");
@@ -252,7 +52,7 @@ export default function ContestsClient() {
     );
   }
 
-  if (contestsByLevel.length === 0) {
+  if (contestGroups.length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-10 text-center">
@@ -278,19 +78,19 @@ export default function ContestsClient() {
       </div>
 
       <div className="space-y-6">
-        {contestsByLevel.map(levelGroup => (
-          <div key={levelGroup.schoolLevel} className="space-y-4 mb-6">
+        {contestGroups.map(group => (
+          <div key={group.targetGroup.id} className="space-y-4 mb-6">
             <div className="flex items-center gap-2 border-l-4 border-primary pl-3 py-1">
-              <h2 className="text-lg font-medium">{getSchoolLevelDisplayName(levelGroup.schoolLevel)}</h2>
+              <h2 className="text-lg font-medium">{group.targetGroup.name}</h2>
               <Badge variant="outline" className="ml-auto">
-                {levelGroup.contests.length} Competitions
+                {group.targetGroup.schoolLevel}
               </Badge>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {levelGroup.contests.map((contest: Contest) => (
+              {group.contests.map((contest) => (
                 <Card 
-                  key={`${levelGroup.schoolLevel}-${contest.code}-${contest.id}`} 
+                  key={contest.id} 
                   className="overflow-hidden border border-muted hover:border-primary/50 transition-colors relative"
                 >
                   {/* Theme logo as backdrop on left */}
@@ -307,16 +107,7 @@ export default function ContestsClient() {
                   
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
-                      <CardTitle className="text-base">
-                        <span className="flex flex-col sm:flex-row sm:items-center gap-1">
-                          <Badge 
-                            className="text-xs font-medium px-2 py-0.5 h-5 sm:mr-2 bg-primary/10 text-primary border-0"
-                          >
-                            {contest.code}
-                          </Badge>
-                          {contest.name}
-                        </span>
-                      </CardTitle>
+                      <CardTitle className="text-base">{contest.name}</CardTitle>
                     </div>
                     <Badge 
                       className="mt-2 border-0" 
