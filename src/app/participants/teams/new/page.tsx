@@ -75,6 +75,9 @@ export default function NewTeamPage() {
     contingentId: ""
   });
   
+  // State for education level filters (multiple selections possible)
+  const [eduLevelFilters, setEduLevelFilters] = useState<string[]>([]);
+  
   // Fetch the user's contingents
   useEffect(() => {
     const fetchUserContingents = async () => {
@@ -97,7 +100,6 @@ export default function NewTeamPage() {
         }
         
         const data = await response.json();
-        console.log("Contingent data loaded:", data);
         
         // Find contingents where the user is a manager
         const managedContingents = data.filter((c: any) => c.isManager && c.status === 'ACTIVE');
@@ -132,16 +134,12 @@ export default function NewTeamPage() {
       
       try {
         setIsLoading(true);
-        console.log("Starting to fetch contests...");
         
         // Use the participant-specific contests API endpoint
         const url = '/api/participants/contests?participation_mode=TEAM';
-        console.log("Fetching from URL:", url);
         
         // Use simple fetch without additional headers
         const response = await fetch(url);
-        
-        console.log("Response status:", response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -150,9 +148,6 @@ export default function NewTeamPage() {
         }
         
         const data = await response.json();
-        console.log("Available contests:", JSON.stringify(data, null, 2));
-        
-        console.log("Checking contests for team participation mode...");
         
         // Filter for team contests (regardless of date)
         // Include resilient fallback logic in case participation_mode isn't available yet
@@ -172,13 +167,6 @@ export default function NewTeamPage() {
             "ANALYSIS_CHALLENGE"
           ].includes(c.contestType);
         });
-        
-        console.log("Found", teamContests.length, "team contests");
-        // Log a sample contest to examine the structure
-        if (teamContests.length > 0) {
-          console.log("Sample contest structure:", JSON.stringify(teamContests[0], null, 2));
-          console.log("Sample targetgroup:", teamContests[0].targetgroup);
-        }
         
         setContests(teamContests);
       } catch (error) {
@@ -315,6 +303,66 @@ export default function NewTeamPage() {
                 </h3>
                 
                 <div className="space-y-2">
+                  <div className="space-y-2 pb-2">
+                    <Label className="block mb-2">{t('team.new.filter_by_level')}</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Toggle buttons for education level filters */}
+                      {[
+                        { id: 'primary', label: t('team.new.primary_school') },
+                        { id: 'secondary', label: t('team.new.secondary_school') },
+                        { id: 'higher', label: t('team.new.higher_education') }
+                      ].map((level) => {
+                        const isActive = eduLevelFilters.includes(level.id);
+                        return (
+                          <button
+                            key={level.id}
+                            type="button"
+                            onClick={() => {
+                              // Toggle this filter on/off
+                              setEduLevelFilters(prev => {
+                                if (prev.includes(level.id)) {
+                                  // Remove if already selected
+                                  return prev.filter(id => id !== level.id);
+                                } else {
+                                  // Add if not selected
+                                  return [...prev, level.id];
+                                }
+                              });
+                              // Reset contest selection when filters change
+                              setFormData(prev => ({
+                                ...prev,
+                                contestId: ''
+                              }));
+                            }}
+                            className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                              isActive 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                            }`}
+                          >
+                            {level.label}
+                          </button>
+                        );
+                      })}
+                      
+                      {/* Clear filters button */}
+                      {eduLevelFilters.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEduLevelFilters([]);
+                            setFormData(prev => ({
+                              ...prev,
+                              contestId: ''
+                            }));
+                          }}
+                          className="px-3 py-2 rounded-md text-sm font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                        >
+                          {t('team.new.clear_filters')}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <Label htmlFor="contestId">{t('team.new.contest')} <span className="text-red-500">*</span></Label>
                   <Select
                     value={formData.contestId}
@@ -323,40 +371,96 @@ export default function NewTeamPage() {
                     <SelectTrigger id="contestId">
                       <SelectValue placeholder={t('team.new.contest_placeholder')} />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
                       {contests.length === 0 ? (
                         <SelectItem value="no_contests" disabled>{t('team.new.no_contests')}</SelectItem>
                       ) : (
-                        // Group contests by education level if possible
+                        // SIMPLIFIED APPROACH: Just filter contests directly without complex grouping
                         (() => {
-                          // Try to group contests by the education level from targetgroups
-                          const contestsByLevel: Record<string, any[]> = {};
+                          // Filter and group contests
                           
-                          // Process each contest
-                          contests.forEach((contest: any) => {
-                            // Get education level from targetgroup if available
-                            let level = 'Other';
-                            
-                            if (contest.targetgroup && contest.targetgroup.length > 0) {
-                              // Use the first target group's school level
-                              level = contest.targetgroup[0].schoolLevel || 'Other';
+                          // Map of allowed school levels for each filter value
+                          const schoolLevelMap: Record<string, string[]> = {
+                            'primary': ['Primary'],
+                            'secondary': ['Secondary'],
+                            'higher': ['Higher Education', 'Higher'] 
+                          };
+                          
+                          // Filter contests based on selected education level(s)
+                          const filteredContests = eduLevelFilters.length === 0 
+                            ? contests // If no filters selected, show all contests
+                            : contests.filter(contest => {
+                                // Only include contests that have a targetgroup
+                                if (!contest.targetgroup || !Array.isArray(contest.targetgroup)) {
+                                  return false;
+                                }
+                                
+                                // A contest matches if ANY of its targetgroups match ANY of the selected filters
+                                return eduLevelFilters.some(filter => {
+                                  // Get the allowed school levels for this filter
+                                  const allowedLevels = schoolLevelMap[filter] || [];
+                                  
+                                  // Check if any targetgroup matches this filter
+                                  return contest.targetgroup.some((tg: any) => 
+                                    allowedLevels.includes(tg.schoolLevel)
+                                  );
+                                });
+                              });
+                              
+                          // Finished filtering contests
+                          
+                          // Group contests by education level for display
+                          const groups: Record<string, any[]> = {};
+                          
+                          // When no filters are selected (equivalent to "all"), show each contest under its proper group
+                          if (eduLevelFilters.length === 0) {
+                            // Try to create sensible groups
+                            filteredContests.forEach(contest => {
+                              let groupName = 'Other';
+                              
+                              // Determine group based on first target group
+                              if (contest.targetgroup && contest.targetgroup.length > 0) {
+                                const level = contest.targetgroup[0].schoolLevel;
+                                
+                                if (level === 'Primary') {
+                                  groupName = 'Primary';
+                                } else if (level === 'Secondary') {
+                                  groupName = 'Secondary';
+                                } else if (level && level.includes('Higher')) {
+                                  groupName = 'Higher';
+                                }
+                              }
+                              
+                              // Initialize group if needed
+                              if (!groups[groupName]) {
+                                groups[groupName] = [];
+                              }
+                              
+                              // Add contest to group
+                              groups[groupName].push(contest);
+                            });
+                          } 
+                          // For specific filters, show all matching contests based on selected filters
+                          else {
+                            // Create a group name based on selected filters (e.g., "primary, secondary")
+                            const groupName = eduLevelFilters.join(', ');
+                            groups[groupName] = filteredContests;
+                          }
+                          
+                          // Get group names in preferred order
+                          const orderedGroups = ['primary', 'secondary', 'higher', 'Other']
+                            .filter(group => groups[group] && groups[group].length > 0);
+                          
+                          // If no ordered groups match, add any remaining groups
+                          Object.keys(groups).forEach(group => {
+                            if (!orderedGroups.includes(group) && groups[group].length > 0) {
+                              orderedGroups.push(group);
                             }
-                            
-                            // Initialize the level array if needed
-                            if (!contestsByLevel[level]) {
-                              contestsByLevel[level] = [];
-                            }
-                            
-                            // Add the contest to the appropriate level
-                            contestsByLevel[level].push(contest);
                           });
                           
-                          // Get all levels that have contests
-                          const usedLevels = Object.keys(contestsByLevel);
-                          
-                          // If we couldn't group properly, just display all contests
-                          if (usedLevels.length <= 1) {
-                            return contests.map((contest: any) => (
+                          // If we couldn't group properly, just show all contests in a flat list
+                          if (orderedGroups.length === 0) {
+                            return filteredContests.map(contest => (
                               <SelectItem 
                                 key={contest.id} 
                                 value={contest.id.toString()} 
@@ -373,45 +477,37 @@ export default function NewTeamPage() {
                             ));
                           }
                           
-                          // Order of education levels
-                          const orderedLevels = [
-                            'Sekolah Rendah',
-                            'Sekolah Menengah',
-                            'Higher Education',
-                            'Open',
-                            'Other'
-                          ].filter(level => contestsByLevel[level]);
-                          
-                          // Add any missing levels that have contests
-                          usedLevels.forEach(level => {
-                            if (!orderedLevels.includes(level)) {
-                              orderedLevels.push(level);
-                            }
+                          // Display contests grouped by education level
+                          return orderedGroups.map(group => {
+                            // Get display name for the group
+                            let displayName = group;
+                            if (group === 'primary') displayName = t('team.new.primary_school');
+                            else if (group === 'secondary') displayName = t('team.new.secondary_school');
+                            else if (group === 'higher') displayName = t('team.new.higher_education');
+                            
+                            return (
+                              <SelectGroup key={group}>
+                                <SelectLabel className="px-2 py-1.5 text-xs font-semibold bg-muted/50 sticky top-0">
+                                  {displayName}
+                                </SelectLabel>
+                                {groups[group].map((contest: any) => (
+                                  <SelectItem 
+                                    key={contest.id} 
+                                    value={contest.id.toString()} 
+                                    className="flex items-center"
+                                  >
+                                    <div className="flex w-full items-center justify-between">
+                                      <span>
+                                        <span className="font-semibold text-primary">{contest.code}</span>
+                                        {' - '}
+                                        {contest.name}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            );
                           });
-                          
-                          // Render grouped contests
-                          return orderedLevels.map(level => (
-                            <SelectGroup key={level}>
-                              <SelectLabel className="px-2 py-1.5 text-xs font-semibold bg-muted/50 sticky top-0">
-                                {level}
-                              </SelectLabel>
-                              {contestsByLevel[level].map((contest: any) => (
-                                <SelectItem 
-                                  key={contest.id} 
-                                  value={contest.id.toString()} 
-                                  className="flex items-center"
-                                >
-                                  <div className="flex w-full items-center justify-between">
-                                    <span>
-                                      <span className="font-semibold text-primary">{contest.code}</span>
-                                      {' - '}
-                                      {contest.name}
-                                    </span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ));
                         })()
                       )}
                     </SelectContent>

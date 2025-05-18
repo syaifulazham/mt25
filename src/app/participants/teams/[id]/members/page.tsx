@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/language-context";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,17 @@ interface TeamMember {
   age?: number;
 }
 
+// Target group item type definition
+interface TargetGroupItem {
+  id: number;
+  code: string;
+  name: string;
+  ageGroup: string;
+  schoolLevel: string;
+  maxAge: number;
+  minAge: number;
+}
+
 interface Team {
   id: number;
   name: string;
@@ -113,6 +125,7 @@ interface Contestant {
 export default function TeamMembersPage({ params }: { params: { id: string } }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t } = useLanguage();
   
   const [team, setTeam] = useState<Team | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -174,11 +187,33 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
               teamData.minAge = contestData.minAge || teamData.minAge;
               teamData.maxAge = contestData.maxAge || teamData.maxAge;
               
+              // More detailed logging to see exactly what targetgroup data we have
               console.log('Contest target group info:', {
-                targetGroup: teamData.targetGroup,
+                contestId: teamData.contestId,
+                targetgroup: contestData.targetgroup || [],
                 minAge: teamData.minAge,
                 maxAge: teamData.maxAge
               });
+              
+              // Extract education levels from the targetgroup array
+              if (contestData.targetgroup && Array.isArray(contestData.targetgroup)) {
+                // Get distinct school levels from the targetgroup array and make them lowercase
+                const schoolLevels = Array.from(new Set(
+                  contestData.targetgroup
+                    .filter((tg: TargetGroupItem) => tg.schoolLevel)
+                    .map((tg: TargetGroupItem) => tg.schoolLevel.toLowerCase()) // Convert to lowercase
+                ));
+                
+                // Store the school levels in the team data for filtering
+                teamData.targetGroup = { 
+                  educationLevels: schoolLevels 
+                };
+                
+                console.log('DEBUG - Extracted school levels for filtering:', {
+                  schoolLevels,
+                  rawTargetgroup: contestData.targetgroup
+                });
+              }
             }
           } catch (error) {
             console.error('Error fetching contest details:', error);
@@ -220,9 +255,9 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         console.error("Error fetching data:", error);
         // Show more specific error message
         if (error.message) {
-          toast.error(`Failed to load data: ${error.message}`);
+          toast.error(t('team.members.load_error_with_details').replace('{message}', error.message));
         } else {
-          toast.error("Failed to load data");
+          toast.error(t('team.members.load_error'));
         }
       } finally {
         setIsLoading(false);
@@ -231,6 +266,24 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     
     fetchData();
   }, [session, params.id]);
+  
+  // For debugging - log education levels when component mounts
+  useEffect(() => {
+    if (contestants.length > 0) {
+      // Get unique education levels in the data
+      const uniqueEduLevels = Array.from(new Set(
+        contestants
+          .filter(c => c.educationLevel)
+          .map(c => c.educationLevel?.toLowerCase().trim())
+      ));
+      
+      console.log('AVAILABLE EDUCATION LEVELS IN DATABASE:', uniqueEduLevels);
+      console.log('Sample contestants:', contestants.slice(0, 5).map(c => ({
+        name: c.name,
+        educationLevel: c.educationLevel || 'NONE'
+      })));
+    }
+  }, [contestants]);
   
   // Filter contestants based on search term, education level, and age criteria
   useEffect(() => {
@@ -249,22 +302,121 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     
     // Apply education level filter if selected in UI
     if (educationFilter !== "all") {
-      filtered = filtered.filter(contestant => 
-        contestant.educationLevel?.toLowerCase() === educationFilter.toLowerCase()
-      );
+      console.log(`Filtering by education level: "${educationFilter}"`); // Debug logging
+      
+      // Log what we know before filtering
+      console.log('Before filtering:', {
+        totalContestants: filtered.length,
+        filterValue: educationFilter,
+        sampleContestants: filtered.slice(0, 3).map(c => ({
+          name: c.name, 
+          educationLevel: c.educationLevel || 'NONE'
+        }))
+      });
+      
+      // EDUCATIONAL LEVEL MAPPING TABLE
+      const primaryKeywords = ['primary', 'rendah', 'sr', 'primary school', 'sekolah rendah', 'pr', 'primary school', 'sd', 'darjah', 'sk'];
+      const secondaryKeywords = ['secondary', 'menengah', 'sm', 'secondary school', 'sekolah menengah', 'smk', 'high school', 'sma'];
+      const youthKeywords = ['youth', 'belia', 'university', 'college', 'higher', 'diploma', 'degree', 'pre-u'];
+      
+      // Function to check if education level belongs to a category
+      const matchesEducationCategory = (level: string, keywords: string[]): boolean => {
+        const lowerLevel = level.toLowerCase().trim();
+        return keywords.some(keyword => lowerLevel.includes(keyword));
+      };
+      
+      filtered = filtered.filter(contestant => {
+        // Handle case where contestant has no education level
+        if (!contestant.educationLevel) {
+          return false;
+        }
+        
+        // Get normalized education level
+        const contestantLevel = contestant.educationLevel.toLowerCase().trim();
+        
+        // Log for debugging
+        console.log(`Checking education level for ${contestant.name}: "${contestantLevel}" against filter ${educationFilter}`);
+      
+        // Check if the contestant's education level matches the selected filter
+        let isMatch = false;
+        
+        switch(educationFilter) {
+          case 'primary':
+            isMatch = matchesEducationCategory(contestantLevel, primaryKeywords);
+            break;
+            
+          case 'secondary':
+            isMatch = matchesEducationCategory(contestantLevel, secondaryKeywords);
+            break;
+            
+          case 'youth':
+            isMatch = matchesEducationCategory(contestantLevel, youthKeywords);
+            break;
+            
+          default:
+            // Default exact match
+            isMatch = contestantLevel === educationFilter.toLowerCase().trim();
+        }
+        
+        console.log(`Match result for ${contestant.name}: ${isMatch}`);
+        return isMatch;
+      });
+      
+      console.log(`After filtering by '${educationFilter}': ${filtered.length} contestants remain`);
     }
     
-    // Apply target group filtering based on contest criteria
-    // Filter by education level from target group
-    if (team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0) {
+    // Apply target group filtering based on contest criteria ONLY if user hasn't selected a specific filter
+    // This ensures we don't double-filter and override the user's selection
+    if (educationFilter === "all" && team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0) {
+      console.log('Applying contest target group filter (since user selected "all")');
+      console.log('Available target group levels:', team.targetGroup.educationLevels);
+      
+      // Use the same education level keywords as the user filter
+      const primaryKeywords = ['primary', 'rendah', 'sr', 'primary school', 'sekolah rendah', 'pr', 'primary school', 'sd', 'darjah', 'sk'];
+      const secondaryKeywords = ['secondary', 'menengah', 'sm', 'secondary school', 'sekolah menengah', 'smk', 'high school', 'sma'];
+      const youthKeywords = ['youth', 'belia', 'university', 'college', 'higher', 'diploma', 'degree', 'pre-u'];
+      
+      // Function to check if education level belongs to a category (same as above)
+      const matchesEducationCategory = (level: string, keywords: string[]): boolean => {
+        const lowerLevel = level.toLowerCase().trim();
+        return keywords.some(keyword => lowerLevel.includes(keyword));
+      };
+      
       filtered = filtered.filter(contestant => {
         // Skip filtering if contestant doesn't have education level
-        if (!contestant.educationLevel) return true;
+        if (!contestant.educationLevel) return false;
         
-        return team.targetGroup?.educationLevels?.some(level => 
-          level.toLowerCase() === contestant.educationLevel?.toLowerCase()
-        );
+        const contestantLevel = contestant.educationLevel.toLowerCase().trim();
+        
+        // Check if contestant level matches any of the target group levels
+        const isMatch = team.targetGroup?.educationLevels?.some(targetLevel => {
+          // Convert target level to lowercase for comparison
+          const normalizedTargetLevel = targetLevel.toLowerCase().trim();
+          
+          // Use our keyword matching function
+          if (normalizedTargetLevel === 'primary' || primaryKeywords.includes(normalizedTargetLevel)) {
+            return matchesEducationCategory(contestantLevel, primaryKeywords);
+          }
+          else if (normalizedTargetLevel === 'secondary' || secondaryKeywords.includes(normalizedTargetLevel)) {
+            return matchesEducationCategory(contestantLevel, secondaryKeywords);
+          }
+          else if (normalizedTargetLevel === 'youth' || youthKeywords.includes(normalizedTargetLevel)) {
+            return matchesEducationCategory(contestantLevel, youthKeywords);
+          }
+          else {
+            // Default to exact match
+            return contestantLevel === normalizedTargetLevel;
+          }
+        });
+        
+        if (!isMatch) {
+          console.log(`Excluding contestant by target group filter: ${contestant.name} (${contestantLevel})`);
+        }
+        
+        return isMatch;
       });
+      
+      console.log(`After target group filtering: ${filtered.length} contestants remain`);
     }
     
     // Filter by gender if specified in target group
@@ -333,10 +485,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         )
       );
       
-      toast.success("Contestant added to team successfully");
+      toast.success(t('team.members.add_success'));
     } catch (error: any) {
       console.error("Error adding contestant to team:", error);
-      toast.error(error.message || "Failed to add contestant to team");
+      toast.error(error.message || t('team.members.add_error'));
     } finally {
       setIsAddingMember(false);
     }
@@ -375,11 +527,11 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         )
       );
       
-      toast.success("Contestant removed from team successfully");
+      toast.success(t('team.members.remove_success'));
       setConfirmRemoveDialogOpen(false);
     } catch (error: any) {
       console.error("Error removing contestant from team:", error);
-      toast.error(error.message || "Failed to remove contestant from team");
+      toast.error(error.message || t('team.members.remove_error'));
     } finally {
       setIsRemoving(false);
     }
@@ -529,10 +681,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         <Button variant="outline" size="sm" asChild className="mr-4">
           <Link href={`/participants/teams/${params.id}`}>
             <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Team
+            {t('team.members.back_to_team')}
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Manage Team Members</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t('team.members.title')}</h1>
       </div>
       
       {isLoading ? (
@@ -545,13 +697,13 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Info className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Team not found</h3>
+            <h3 className="text-lg font-medium">{t('team.members.not_found')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              The team you're looking for doesn't exist or you don't have permission to view it.
+              {t('team.members.not_found_description')}
             </p>
             <Button asChild>
               <Link href="/participants/teams">
-                Return to Teams
+                {t('team.members.return_to_teams')}
               </Link>
             </Button>
           </CardContent>
@@ -560,13 +712,13 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium">Permission Denied</h3>
+            <h3 className="text-lg font-medium">{t('team.members.permission_denied')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md">
-              You don't have permission to manage members for this team. Only team owners and contingent managers can add or remove members.
+              {t('team.members.permission_denied_description')}
             </p>
             <Button asChild>
               <Link href={`/participants/teams/${params.id}`}>
-                Return to Team Details
+                {t('team.members.return_to_details')}
               </Link>
             </Button>
           </CardContent>
@@ -577,9 +729,9 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             <CardHeader className="pb-2">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <CardTitle>Team Members</CardTitle>
+                  <CardTitle>{t('team.members.section_title')}</CardTitle>
                   <CardDescription>
-                    Current members in {team.name}
+                    {t('team.members.current_members_in')} {team.name}
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -592,7 +744,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   {team.members.length < (team.contestMaxMembers || team.maxMembers) && (team.isOwner || team.isManager) && (
                     <Button size="sm" onClick={() => setAddMemberDialogOpen(true)}>
                       <Plus className="h-4 w-4 mr-1" />
-                      Add Member
+                      {t('team.members.add_member')}
                     </Button>
                   )}
                 </div>
@@ -603,9 +755,9 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
               {team.members.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <User className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-medium">No members yet</h3>
+                  <h3 className="text-lg font-medium">{t('team.members.no_members_yet')}</h3>
                   <p className="text-muted-foreground mb-6 max-w-md">
-                    This team doesn't have any members yet. Add contestants to your team to participate in the competition.
+                    {t('team.members.no_members_description')}
                   </p>
                 </div>
               ) : (
@@ -613,10 +765,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[40%]">Name</TableHead>
-                        <TableHead className="w-[30%]">Class</TableHead>
-                        <TableHead className="w-[15%]">Gender</TableHead>
-                        <TableHead className="w-[15%] text-right">Action</TableHead>
+                        <TableHead className="w-[40%]">{t('team.members.name')}</TableHead>
+                        <TableHead className="w-[30%]">{t('team.members.class')}</TableHead>
+                        <TableHead className="w-[15%]">{t('team.members.gender')}</TableHead>
+                        <TableHead className="w-[15%] text-right">{t('team.members.action')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -669,19 +821,19 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
           <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
             <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
               <DialogHeader>
-                <DialogTitle>Add Team Members</DialogTitle>
+                <DialogTitle>{t('team.members.add_dialog_title')}</DialogTitle>
                 <DialogDescription>
-                  Select contestants to add to your team
+                  {t('team.members.add_dialog_description')}
                   {team && (team.minAge || team.maxAge) && (
                     <span className="text-xs text-amber-600 mt-1 inline-block">
                       <AlertCircle className="h-3 w-3 inline mr-1" />
-                      Age restrictions: 
+                      {t('team.members.age_restrictions')}: 
                       {team.minAge !== undefined && team.maxAge !== undefined ? (
-                        ` ${team.minAge} to ${team.maxAge} years old`
+                        ` ${team.minAge} ${t('team.members.to')} ${team.maxAge} ${t('team.members.years_old')}`
                       ) : team.minAge !== undefined ? (
-                        ` Minimum ${team.minAge} years old`
+                        ` ${t('team.members.minimum')} ${team.minAge} ${t('team.members.years_old')}`
                       ) : team.maxAge !== undefined ? (
-                        ` Maximum ${team.maxAge} years old`
+                        ` ${t('team.members.maximum')} ${team.maxAge} ${t('team.members.years_old')}`
                       ) : ''
                       }
                     </span>
@@ -694,7 +846,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="Search contestants..."
+                    placeholder={t('team.members.search_placeholder')}
                     className="pl-8 w-full"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -706,13 +858,16 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   onValueChange={setEducationFilter}
                 >
                   <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by level" />
+                    <SelectValue placeholder={t('team.members.filter_by_level')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="sekolah rendah">Primary School</SelectItem>
-                    <SelectItem value="sekolah menengah">Secondary School</SelectItem>
-                    <SelectItem value="belia">Youth</SelectItem>
+                    <SelectItem value="all">{t('team.members.all_levels')}</SelectItem>
+                    {/* ONLY include these three specific options with lowercase values */}
+                    {/* Remove any unexpected options and force only these three */}
+                    
+                    <SelectItem value="primary">{t('team.members.primary_school')}</SelectItem>
+                    <SelectItem value="secondary">{t('team.members.secondary_school')}</SelectItem>
+                    <SelectItem value="youth">{t('team.members.youth')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -722,25 +877,25 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   <div className="bg-blue-50 p-3 rounded-md text-blue-800 text-sm flex items-start mb-4">
                     <Info className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
                     <div>
-                      <p className="font-medium">Filtered by contest requirements:</p>
+                      <p className="font-medium">{t('team.members.filtered_by_requirements')}</p>
                       <ul className="list-disc list-inside mt-1">
                         {team.minAge && team.maxAge && (
-                          <li>Age range: {team.minAge} to {team.maxAge} years</li>
+                          <li>{t('team.members.age_range')}: {team.minAge} {t('team.members.to')} {team.maxAge} {t('team.members.years')}</li>
                         )}
                         {team.minAge && !team.maxAge && (
-                          <li>Minimum age: {team.minAge} years</li>
+                          <li>{t('team.members.minimum_age')}: {team.minAge} {t('team.members.years')}</li>
                         )}
                         {!team.minAge && team.maxAge && (
-                          <li>Maximum age: {team.maxAge} years</li>
+                          <li>{t('team.members.maximum_age')}: {team.maxAge} {t('team.members.years')}</li>
                         )}
                         {team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0 && (
-                          <li>Education levels: {team.targetGroup.educationLevels.join(', ')}</li>
+                          <li>{t('team.members.education_levels')}: {team.targetGroup.educationLevels.join(', ')}</li>
                         )}
                         {team.targetGroup?.genders && team.targetGroup.genders.length > 0 && (
-                          <li>Gender: {team.targetGroup.genders.join(', ')}</li>
+                          <li>{t('team.members.gender')}: {team.targetGroup.genders.join(', ')}</li>
                         )}
                       </ul>
-                      <p className="mt-1">Only eligible contestants are shown.</p>
+                      <p className="mt-1">{t('team.members.only_eligible_shown')}</p>
                     </div>
                   </div>
                 )}
@@ -748,17 +903,17 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                 {filteredContestants.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Search className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <h3 className="text-lg font-medium">No contestants found</h3>
+                    <h3 className="text-lg font-medium">{t('team.members.no_contestants_found')}</h3>
                     <p className="text-muted-foreground mb-6 max-w-md">
                       {contestants.length === 0
-                        ? "You haven't created any contestants yet. Create contestants first to add them to your team."
-                        : "No contestants match your search criteria. Try a different search term or filter."}
+                        ? t('team.members.no_contestants_created')
+                        : t('team.members.no_contestants_match')}
                     </p>
                     {contestants.length === 0 && (
                       <Button asChild onClick={() => setAddMemberDialogOpen(false)}>
                         <Link href="/participants/contestants/new">
                           <Plus className="mr-2 h-4 w-4" />
-                          Create Contestant
+                          {t('team.members.create_contestant')}
                         </Link>
                       </Button>
                     )}
@@ -769,8 +924,8 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                       <Table>
                         <TableHeader className="sticky top-0 bg-background z-10">
                           <TableRow>
-                            <TableHead className="w-[60%]">Name</TableHead>
-                            <TableHead className="w-[40%] text-right">Action</TableHead>
+                            <TableHead className="w-[60%]">{t('team.members.name')}</TableHead>
+                            <TableHead className="w-[40%] text-right">{t('team.members.action')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -779,7 +934,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                               <TableCell>
                                 <div className="font-medium">{contestant.name || "—"}</div>
                                 <div className="text-xs text-muted-foreground">
-                                  {contestant.age ? `Age: ${contestant.age}` : ''}
+                                  {contestant.age ? `${t('team.members.age')}: ${contestant.age}` : ''}
                                   {contestant.age && (contestant.class_grade || contestant.class_name) ? ' | ' : ''}
                                   {contestant.class_grade ? `${contestant.class_grade}` : ''}
                                   {contestant.class_grade && contestant.class_name ? ' - ' : ''}
@@ -792,7 +947,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                                 {contestant.inTeam ? (
                                   <Badge variant="outline" className="bg-green-50">
                                     <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
-                                    Added
+                                    {t('team.members.added')}
                                   </Badge>
                                 ) : (
                                   <Button
@@ -823,8 +978,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   <div className="bg-amber-50 p-3 rounded-md text-amber-800 text-sm flex items-start w-full">
                     <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-amber-500" />
                     <p>
-                      You've reached the maximum team size ({team.contestMaxMembers || team.maxMembers} members). 
-                      Remove existing members before adding new ones.
+                      {t('team.members.max_size_reached').replace('{maxMembers}', String(team.contestMaxMembers || team.maxMembers))}
                     </p>
                   </div>
                 </div>
@@ -832,10 +986,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
               
               <DialogFooter className="space-x-2 mt-4">
                 <div className="mr-auto text-sm text-muted-foreground">
-                  {filteredContestants.length} of {contestants.length} contestants shown
+                  {t('team.members.contestants_shown').replace('{shown}', String(filteredContestants.length)).replace('{total}', String(contestants.length))}
                 </div>
                 <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
-                  Close
+                  {t('team.members.close')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -845,9 +999,9 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
           <Dialog open={confirmRemoveDialogOpen} onOpenChange={setConfirmRemoveDialogOpen}>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Remove Team Member</DialogTitle>
+                <DialogTitle>{t('team.members.remove_dialog_title')}</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to remove this contestant from the team?
+                  {t('team.members.remove_dialog_description')}
                 </DialogDescription>
               </DialogHeader>
               
@@ -860,10 +1014,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                     <div className="space-y-1">
                       <p className="text-sm font-medium leading-none">{memberToRemove.contestantName}</p>
                       <p className="text-sm text-muted-foreground">
-                        {memberToRemove.icNumber || "No IC Number"}
+                        {memberToRemove.icNumber || t('team.members.no_ic')}
                       </p>
                       <Badge className={getGenderColor(memberToRemove.gender)} variant="outline">
-                        {memberToRemove.gender || "Gender not specified"}
+                        {memberToRemove.gender || t('team.members.no_gender')}
                       </Badge>
                     </div>
                   </div>
@@ -872,7 +1026,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
               
               <DialogFooter>
                 <Button variant="outline" onClick={() => setConfirmRemoveDialogOpen(false)}>
-                  Cancel
+                  {t('team.members.cancel')}
                 </Button>
                 <Button 
                   variant="destructive" 
@@ -882,10 +1036,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   {isRemoving ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Removing...
+                      {t('team.members.removing')}
                     </>
                   ) : (
-                    "Remove"
+                    t('team.members.remove')
                   )}
                 </Button>
               </DialogFooter>

@@ -51,6 +51,35 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// Define properties for nested objects
+interface ContestantData {
+  id?: number;
+  name?: string;
+  gender?: string;
+  age?: number;
+  educationLevel?: string;
+}
+
+interface ParticipantData {
+  id?: number;
+  name?: string; 
+  gender?: string;
+}
+
+interface TeamMember {
+  id: number;
+  contestantId: number;
+  contestantName?: string;
+  status: string;
+  gender?: string;
+  age?: number;
+  educationLevel?: string;
+  // Add properties that might exist in different API response formats
+  name?: string;
+  contestant?: ContestantData;
+  participant?: ParticipantData;
+}
+
 interface Team {
   id: number;
   name: string;
@@ -67,6 +96,7 @@ interface Team {
   isOwner: boolean;
   createdAt: string;
   updatedAt: string;
+  members: TeamMember[];
 }
 
 export default function TeamsPage() {
@@ -90,6 +120,7 @@ export default function TeamsPage() {
         setIsLoading(true);
         
         const participantId = session.user.id;
+        // Get teams data
         const response = await fetch(`/api/participants/teams?participantId=${participantId}&t=${Date.now()}`, {
           cache: 'no-store',
           headers: {
@@ -102,8 +133,41 @@ export default function TeamsPage() {
           throw new Error("Failed to fetch teams");
         }
         
-        const data = await response.json();
-        setTeams(data);
+        const teamsData = await response.json();
+        
+        // Fetch detailed information for each team, including members
+        const teamsWithMembers = await Promise.all(teamsData.map(async (team: Team) => {
+          try {
+            // Get detailed team data (which includes members)
+            // This uses the same endpoint as the members page
+            const detailedTeamResponse = await fetch(`/api/participants/teams/${team.id}`, {
+              headers: {
+                'Pragma': 'no-cache',
+                'Cache-Control': 'no-cache'
+              }
+            });
+            
+            if (detailedTeamResponse.ok) {
+              const detailedTeamData = await detailedTeamResponse.json();
+              
+              // Return team with real member data
+              return {
+                ...team,
+                members: detailedTeamData.members || []
+              };
+            }
+          } catch (error) {
+            console.error(`Error fetching detailed data for team ${team.id}:`, error);
+          }
+          
+          // Fallback to an empty members array if the fetch fails
+          return {
+            ...team,
+            members: []
+          };
+        }));
+        
+        setTeams(teamsWithMembers);
       } catch (error) {
         console.error("Error fetching teams:", error);
         toast.error("Failed to load your teams");
@@ -392,10 +456,67 @@ export default function TeamsPage() {
                           {/* Members count */}
                           <div className="flex items-start gap-2">
                             <Users className="h-4 w-4 text-muted-foreground mt-0.5" />
-                            <div>
+                            <div className="w-full">
                               <div className="text-sm">
                                 <span className="font-medium">{team.memberCount}</span> of <span className="font-medium">{team.contestMaxMembers}</span> {t('team.members_count')}
                               </div>
+                              
+                              {/* Team Members List */}
+                              {team.members && team.members.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {team.members.map((member, index) => {
+                                    // Handle different property naming in API responses
+                                    let name = '';
+                                    // Try different property names that might contain the contestant name
+                                    if (member.contestantName) {
+                                      name = member.contestantName;
+                                    } else if (member.contestant && member.contestant.name) {
+                                      name = member.contestant.name;
+                                    } else if (member.name) {
+                                      name = member.name;
+                                    }
+                                    
+                                    // If we still don't have a name, check for participant data
+                                    if (!name && member.participant && member.participant.name) {
+                                      name = member.participant.name;
+                                    }
+                                    
+                                    // Same for gender - check different possible locations
+                                    let gender = 'male';
+                                    if (member.gender) {
+                                      gender = member.gender;
+                                    } else if (member.contestant && member.contestant.gender) {
+                                      gender = member.contestant.gender;
+                                    }
+                                    
+                                    const memberId = member.id || member.contestantId || index;
+                                    
+                                    return (
+                                      <div key={memberId} className="flex items-center gap-1.5 text-sm">
+                                        {/* Gender icon */}
+                                        {gender?.toLowerCase() === 'female' ? (
+                                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-pink-100 dark:bg-pink-900/30">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-3 h-3 text-pink-500 dark:text-pink-300">
+                                              <circle cx="12" cy="8" r="5" />
+                                              <path d="M12 13v8M9 18h6" />
+                                            </svg>
+                                          </span>
+                                        ) : (
+                                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-3 h-3 text-blue-500 dark:text-blue-300">
+                                              <circle cx="12" cy="8" r="5" />
+                                              <path d="M20 20l-3.5-3.5M13.5 13.5L17 17M6 20l3.5-3.5M10.5 13.5L7 17" />
+                                            </svg>
+                                          </span>
+                                        )}
+                                        
+                                        {/* Member name */}
+                                        <span className="truncate">{name}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           </div>
                           
@@ -425,30 +546,54 @@ export default function TeamsPage() {
                           </Button>
                           
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm">
+                            <DropdownMenuTrigger>
+                              <button 
+                                className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 py-1"
+                                title={t('team.more_actions')}
+                              >
                                 <MoreHorizontal className="h-4 w-4" />
-                              </Button>
+                              </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                                {t('team.team_actions')}
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem asChild>
-                                <Link href={`/participants/teams/${team.id}/edit`}>
+                                <Link href={`/participants/teams/${team.id}/edit`} className="w-full cursor-pointer">
                                   <Edit className="h-4 w-4 mr-2" />
                                   {t('team.edit')}
                                 </Link>
                               </DropdownMenuItem>
+
+                              <DropdownMenuItem asChild>
+                                <Link href={`/participants/teams/${team.id}`} className="w-full cursor-pointer">
+                                  <EyeIcon className="h-4 w-4 mr-2" />
+                                  {t('team.view_details')}
+                                </Link>
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem asChild>
+                                <Link href={`/participants/teams/${team.id}/members`} className="w-full cursor-pointer">
+                                  <Users className="h-4 w-4 mr-2" />
+                                  {t('team.manage_members')}
+                                </Link>
+                              </DropdownMenuItem>
                               
                               {team.isOwner && (
-                                <DropdownMenuItem
-                                  className="text-red-600 focus:bg-red-50 focus:text-red-700"
-                                  onClick={() => {
-                                    setTeamToDelete(team);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  {t('team.delete')}
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-red-600 focus:bg-red-50 focus:text-red-700 cursor-pointer"
+                                    onClick={() => {
+                                      setTeamToDelete(team);
+                                      setDeleteDialogOpen(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    {t('team.delete')}
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
