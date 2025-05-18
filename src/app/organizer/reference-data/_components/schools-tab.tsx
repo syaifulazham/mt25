@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { schoolApi, stateApi } from "@/lib/api-client";
 import { Loader2, Upload, FileText, Info } from "lucide-react";
@@ -89,8 +90,10 @@ const schoolCategories = [
   "SJKT",
   "SK",
   "SK KHAS",
+  "SK TAHFIZ",
   "SM KHAS",
   "SM SABK",
+  "SM TAHFIZ",
   "SMK",
   "SMKA",
   "SMT",
@@ -1035,11 +1038,13 @@ export function SchoolsTab() {
                       <SelectValue placeholder="Select school category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {schoolCategories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
+                      <ScrollArea className="h-[200px]">
+                        {schoolCategories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </ScrollArea>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1177,11 +1182,13 @@ export function SchoolsTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {schoolCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
+                  <ScrollArea className="h-[200px]">
+                    {schoolCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </ScrollArea>
                 </SelectContent>
               </Select>
             </div>
