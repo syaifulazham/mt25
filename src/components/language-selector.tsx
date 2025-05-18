@@ -7,6 +7,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { useLanguage, Language } from "@/lib/i18n/language-context";
 import { setCookie, getCookie } from "@/lib/i18n/cookies";
@@ -15,10 +16,10 @@ import { useRouter } from "next/navigation";
 const languages: { code: Language; name: string; flag: string }[] = [
   { code: "en", name: "English", flag: "🇬🇧" },
   { code: "my", name: "Bahasa Melayu", flag: "🇲🇾" },
-  { code: "ib", name: "Bahasa Iban", flag: "🇮🇧" },
   { code: "zh", name: "中文", flag: "🇨🇳" },
   { code: "fil", name: "Filipino", flag: "🇵🇭" },
   { code: "th", name: "ไทย", flag: "🇹🇭" },
+  { code: "ja", name: "日本語", flag: "🇯🇵" },
 ];
 
 interface LanguageSelectorProps {
@@ -52,11 +53,8 @@ export function LanguageSelector({ variant = "full", className = "" }: LanguageS
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={`flex items-center gap-2 font-normal ${className}`}
+      <DropdownMenuTrigger>
+        <div className={`flex items-center gap-2 font-normal ${className} cursor-pointer px-3 py-1.5 rounded hover:bg-accent hover:bg-opacity-20 transition-colors`}
           data-testid="language-selector"
         >
           {variant === "full" && currentLanguage ? (
@@ -67,23 +65,30 @@ export function LanguageSelector({ variant = "full", className = "" }: LanguageS
           ) : (
             <Globe className="h-4 w-4" />
           )}
-        </Button>
+        </div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {languages.map((lang) => (
-          <DropdownMenuItem
-            key={lang.code}
-            onClick={() => handleLanguageChange(lang.code)}
-            className="flex items-center justify-between"
-          >
-            <span className="flex items-center gap-2">
-              <span>{lang.flag}</span>
-              <span>{lang.name}</span>
-            </span>
-            {language === lang.code && <Check className="h-4 w-4 ml-2" />}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
+      <DropdownMenuPortal>
+        <DropdownMenuContent 
+          align="end" 
+          sideOffset={5} 
+          className="z-[60] w-[180px] animate-in fade-in-20 data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1" 
+          forceMount
+        >
+          {languages.map((lang) => (
+            <DropdownMenuItem
+              key={lang.code}
+              onClick={() => handleLanguageChange(lang.code)}
+              className="flex items-center justify-between"
+            >
+              <span className="flex items-center gap-2">
+                <span>{lang.flag}</span>
+                <span>{lang.name}</span>
+              </span>
+              {language === lang.code && <Check className="h-4 w-4 ml-2" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenuPortal>
     </DropdownMenu>
   );
 }

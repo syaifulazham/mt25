@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCookie, setCookie } from './cookies';
 
 // Define language options
-export type Language = 'en' | 'my' | 'zh' | 'fil' | 'th' | 'ib';
+export type Language = 'en' | 'my' | 'zh' | 'fil' | 'th' | 'ja';
 
 // Create context with default values
 type LanguageContextType = {
@@ -37,7 +37,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     try {
       // Try to get language from cookie
       const savedLang = getCookie('language') as Language;
-      if (savedLang && (savedLang === 'en' || savedLang === 'my' || savedLang === 'zh' || savedLang === 'fil' || savedLang === 'th' || savedLang === 'ib')) {
+      if (savedLang && (savedLang === 'en' || savedLang === 'my' || savedLang === 'zh' || savedLang === 'fil' || savedLang === 'th' || savedLang === 'ja')) {
         // If we have a valid cookie, just use it without setting a new cookie
         setLanguageState(savedLang);
         console.log(`Loaded language from cookie: ${savedLang}`);
