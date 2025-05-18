@@ -78,7 +78,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
   const searchTerm = searchParams.search || '';
   
   // Use prismaExecute to get contingent data with pagination and proper connection management
-  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents } = await prismaExecute(async (prisma) => {
+  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents, independentContingents } = await prismaExecute(async (prisma) => {
     // Build where clause for searching
     const whereClause = searchTerm ? {
       OR: [
@@ -220,13 +220,35 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       }
     });
     
+    // Get independent contingents (neither school nor higher institution associated)
+    const independentContingents = await prisma.contingent.findMany({
+      where: {
+        ...whereClause,
+        schoolId: null,
+        higherInstId: null
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: pageSize,
+      skip,
+      include: {
+        _count: {
+          select: {
+            contestants: true
+          }
+        }
+      }
+    });
+    
     // Return all contingent data objects
     return {
       contingents: contingentsWithDetails,
       totalContingents,
       contingentsWithoutContestants,
       schoolContingents,
-      higherInstContingents
+      higherInstContingents,
+      independentContingents
     };
   });
   
@@ -304,6 +326,12 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
           <TabsTrigger value="all">All Contingents</TabsTrigger>
           <TabsTrigger value="schools">Schools</TabsTrigger>
           <TabsTrigger value="higher">Higher Institutions</TabsTrigger>
+          <TabsTrigger value="independent">
+            <div className="flex items-center gap-1">
+              <UserRound className="h-3.5 w-3.5" />
+              Independent
+            </div>
+          </TabsTrigger>
           <TabsTrigger value="no-contestants">No Contestants</TabsTrigger>
         </TabsList>
         
@@ -467,6 +495,62 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                 <p className="text-muted-foreground">There are no higher institution contingents registered yet.</p>
                 <Button className="mt-4">
                   <Plus className="h-4 w-4 mr-1" /> Create Higher Institution Contingent
+                </Button>
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="independent" className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {independentContingents.map((contingent: any) => (
+              <Card key={contingent.id} className="overflow-hidden">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-1 mb-1">
+                        <UserRound className="h-4 w-4 text-indigo-500" />
+                        <CardTitle className="text-base">{contingent.name}</CardTitle>
+                      </div>
+                      <CardDescription>
+                        Independent Group (Parents/Youth)
+                      </CardDescription>
+                    </div>
+                    <Badge className="flex items-center gap-1 bg-indigo-100 text-indigo-600 hover:bg-indigo-200 border-indigo-200">
+                      <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3" />
+                      <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                    </div>
+                    <Link 
+                      href={`/organizer/contingents/${contingent.id}`} 
+                      className="text-xs text-primary hover:underline"
+                    >
+                      View Details →
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {independentContingents.length > 0 && (
+            <div className="text-center mt-6">
+              <Button variant="outline">View All Independent Contingents</Button>
+            </div>
+          )}
+          {independentContingents.length === 0 && (
+            <Card className="p-8 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <UserRound className="h-8 w-8 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">No Independent Contingents Found</h3>
+                <p className="text-muted-foreground">There are no independent (parent/youth group) contingents registered yet.</p>
+                <Button className="mt-4">
+                  <Plus className="h-4 w-4 mr-1" /> Create Independent Contingent
                 </Button>
               </div>
             </Card>

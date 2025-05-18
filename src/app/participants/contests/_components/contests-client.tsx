@@ -8,10 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Users, ArrowRight, Loader2, Trophy, Award } from "lucide-react";
 import { toast } from "sonner";
-import contestsApi, { ContestGroupedByTarget, Contest } from "./contests-api";
+import contestsApi, { ContestGroupedByTarget, Contest, TargetGroup } from "./contests-api";
 import { useLanguage } from "@/lib/i18n/language-context";
 import Link from "next/link";
 import Image from "next/image";
+
+// Interface for contests grouped by school level
+interface ContestsBySchoolLevel {
+  schoolLevel: string;
+  contests: Contest[];
+}
 
 // Default theme color
 const DEFAULT_THEME_COLOR = "#0070f3";
@@ -20,7 +26,7 @@ export default function ContestsClient() {
   const router = useRouter();
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(true);
-  const [contestGroups, setContestGroups] = useState<ContestGroupedByTarget[]>([]);
+  const [contestsByLevel, setContestsByLevel] = useState<ContestsBySchoolLevel[]>([]);
 
   useEffect(() => {
     loadContests();
@@ -31,11 +37,45 @@ export default function ContestsClient() {
     return contest.theme?.color || DEFAULT_THEME_COLOR;
   };
 
+  // Helper function to get the display name for a school level
+  const getSchoolLevelDisplayName = (level: string): string => {
+    switch(level.toLowerCase()) {
+      case 'primary': return 'Primary School';
+      case 'secondary': return 'Secondary School';
+      case 'higher': return 'Higher Education';
+      default: return level;
+    }
+  };
+
   const loadContests = async () => {
     try {
       setIsLoading(true);
       const data = await contestsApi.getContests();
-      setContestGroups(data);
+      
+      // Create a map to hold contests grouped by school level
+      const contestMap: Record<string, Contest[]> = {};
+      
+      // Process all contest groups and regroup by schoolLevel
+      data.forEach((group: ContestGroupedByTarget) => {
+        const schoolLevel = group.targetGroup.schoolLevel.toLowerCase();
+        group.contests.forEach(contest => {
+          if (!contestMap[schoolLevel]) {
+            contestMap[schoolLevel] = [];
+          }
+          contestMap[schoolLevel].push(contest);
+        });
+      });
+      
+      // Convert the map to an array with the specified order: primary, secondary, higher
+      const orderedLevels = ['primary', 'secondary', 'higher'];
+      const groupedByLevel = orderedLevels
+        .filter(level => contestMap[level] && contestMap[level].length > 0)
+        .map(level => ({
+          schoolLevel: level,
+          contests: contestMap[level]
+        }));
+      
+      setContestsByLevel(groupedByLevel);
     } catch (error) {
       console.error("Error loading contests:", error);
       toast.error("Failed to load contests");
@@ -52,7 +92,7 @@ export default function ContestsClient() {
     );
   }
 
-  if (contestGroups.length === 0) {
+  if (contestsByLevel.length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-10 text-center">
@@ -78,17 +118,17 @@ export default function ContestsClient() {
       </div>
 
       <div className="space-y-6">
-        {contestGroups.map(group => (
-          <div key={group.targetGroup.id} className="space-y-4 mb-6">
+        {contestsByLevel.map(levelGroup => (
+          <div key={levelGroup.schoolLevel} className="space-y-4 mb-6">
             <div className="flex items-center gap-2 border-l-4 border-primary pl-3 py-1">
-              <h2 className="text-lg font-medium">{group.targetGroup.name}</h2>
+              <h2 className="text-lg font-medium">{getSchoolLevelDisplayName(levelGroup.schoolLevel)}</h2>
               <Badge variant="outline" className="ml-auto">
-                {group.targetGroup.schoolLevel}
+                {levelGroup.contests.length} Competitions
               </Badge>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {group.contests.map((contest) => (
+              {levelGroup.contests.map((contest: Contest) => (
                 <Card 
                   key={contest.id} 
                   className="overflow-hidden border border-muted hover:border-primary/50 transition-colors relative"
