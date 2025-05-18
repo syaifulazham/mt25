@@ -77,15 +77,46 @@ export default function ContestsClient() {
         </div>
       </div>
 
-      <div className="space-y-6">
-        {contestGroups.map(group => (
-          <div key={group.targetGroup.id} className="space-y-4 mb-6">
-            <div className="flex items-center gap-2 border-l-4 border-primary pl-3 py-1">
-              <h2 className="text-lg font-medium">{group.targetGroup.name}</h2>
-              <Badge variant="outline" className="ml-auto">
-                {group.targetGroup.schoolLevel}
-              </Badge>
-            </div>
+      <div className="space-y-8">
+        {contestGroups.map(group => {
+          // Set icon and color based on education level
+          let iconComponent;
+          let borderColor;
+          let bgColor;
+          
+          switch(group.targetGroup.schoolLevel) {
+            case 'primary':
+              iconComponent = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10.5V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v4.5" /><path d="M1 10.5h22" /><path d="M4 10.5V20a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9.5" /><path d="M12 17v-6" /><path d="M8 17v-5" /><path d="M16 17v-5" /></svg>;
+              borderColor = "border-amber-500";
+              bgColor = "bg-amber-50";
+              break;
+            case 'secondary':
+              iconComponent = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 10v1a2 2 0 0 1-2 2h-1" /><path d="M5 10v1a2 2 0 0 0 2 2h1" /><path d="M19 12V3H5v9" /><path d="M7 16h10" /><path d="M9 16v4" /><path d="M15 16v4" /><path d="M3 19a18.651 18.651 0 0 1 18 0" /></svg>;
+              borderColor = "border-blue-500";
+              bgColor = "bg-blue-50";
+              break;
+            case 'higher':
+              iconComponent = <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 9l10 7 10-7-10-7z" /><path d="M20 11v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6" /><path d="M12 16v4" /><path d="M8 16v1" /><path d="M16 16v1" /></svg>;
+              borderColor = "border-purple-500";
+              bgColor = "bg-purple-50";
+              break;
+            default:
+              iconComponent = <Trophy className="h-5 w-5" />;
+              borderColor = "border-primary";
+              bgColor = "bg-primary/5";
+          }
+          
+          return (
+            <div key={group.targetGroup.id} className="space-y-4 mb-8">
+              <div className={`rounded-md ${bgColor} p-3 shadow-sm`}>
+                <div className={`flex items-center gap-3 border-l-4 ${borderColor} pl-3 py-1`}>
+                  {iconComponent}
+                  <h2 className="text-lg font-semibold">{t(`contests.educationLevel.${group.targetGroup.schoolLevel}`) || group.targetGroup.name}</h2>
+                  <Badge variant="outline" className="ml-auto uppercase text-xs">
+                    {group.contests.length} {t('contests.available')}
+                  </Badge>
+                </div>
+              </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {group.contests.map((contest) => (
@@ -107,7 +138,21 @@ export default function ContestsClient() {
                   
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-start">
-                      <CardTitle className="text-base">{contest.name}</CardTitle>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Badge 
+                            className="text-xs py-0 px-1.5 h-5 font-mono border-0" 
+                            style={{ 
+                              backgroundColor: `${getThemeColor(contest)}15`,
+                              color: getThemeColor(contest),
+                              fontWeight: 600
+                            }}
+                          >
+                            {contest.code}
+                          </Badge>
+                          <CardTitle className="text-base">{contest.name}</CardTitle>
+                        </div>
+                      </div>
                     </div>
                     <Badge 
                       className="mt-2 border-0" 
@@ -136,7 +181,7 @@ export default function ContestsClient() {
             </div>
             <Separator className="mt-6" />
           </div>
-        ))}
+        );})}
       </div>
     </div>
   );

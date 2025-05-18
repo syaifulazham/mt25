@@ -297,6 +297,11 @@
   "contingent.independent": "Independyente",
   "contingent.independent_desc": "Lumikha ng independyenteng kontingente para sa mga magulang na namamahala ng mga bata o mga grupo ng kabataan na hindi kaanib ng anumang paaralan o institusyon.",
   "contingent.independent_saved": "Naka-save na ang mga detalye ng independyenteng kontingente. I-click ang Lumikha ng Contingent para magpatuloy.",
+
+  "contests.educationLevel.primary": "Paaralang Elementarya",
+  "contests.educationLevel.secondary": "Paaralang Sekundarya",
+  "contests.educationLevel.higher": "Mataas na Edukasyon",
+  "contests.available": "Mga Pagkontestang Maaaring Salihan",
   
   "independent.name": "Pangalan",
   "independent.name_placeholder": "Ilagay ang pangalan ng contingent",

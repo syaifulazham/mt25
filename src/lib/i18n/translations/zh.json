@@ -297,6 +297,11 @@
   "contingent.independent": "独立",
   "contingent.independent_desc": "为管理儿童的家长或非附属于任何学校或机构的青年团体创建独立队伍。",
   "contingent.independent_saved": "独立队伍详情已保存。点击创建队伍继续。",
+
+  "contests.educationLevel.primary": "小学",
+  "contests.educationLevel.secondary": "中学",
+  "contests.educationLevel.higher": "高等教育",
+  "contests.available": "可参加的比赛",
   
   "independent.name": "名称",
   "independent.name_placeholder": "输入队伍名称",

@@ -297,6 +297,11 @@
   "contingent.independent_category": "Bebas",
   "contingent.independent_desc": "Cipta kontinjen bebas untuk ibu bapa yang menguruskan anak-anak atau kumpulan belia yang tidak bergabung dengan mana-mana sekolah atau institusi.",
   "contingent.independent_saved": "Butiran kontinjen bebas disimpan. Klik Cipta Kontinjen untuk meneruskan.",
+
+  "contests.educationLevel.primary": "Sekolah Rendah",
+  "contests.educationLevel.secondary": "Sekolah Menengah",
+  "contests.educationLevel.higher": "Pendidikan Tinggi",
+  "contests.available": "Pertandingan Tersedia",
   
   "independent.name": "Nama",
   "independent.name_placeholder": "Masukkan nama kontinjen",

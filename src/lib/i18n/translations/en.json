@@ -297,6 +297,11 @@
   "contingent.independent_category": "Independent",
   "contingent.independent_desc": "Create an independent contingent for parents managing children or youth groups not affiliated with any school or institution.",
   "contingent.independent_saved": "Independent contingent details saved. Click Create Contingent to continue.",
+
+  "contests.educationLevel.primary": "Primary School",
+  "contests.educationLevel.secondary": "Secondary School",
+  "contests.educationLevel.higher": "Higher Education",
+  "contests.available": "Contests Available",
   
   "independent.name": "Name",
   "independent.name_placeholder": "Enter contingent name",

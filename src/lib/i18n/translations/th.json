@@ -297,6 +297,11 @@
   "contingent.independent": "อิสระ",
   "contingent.independent_desc": "สร้างทีมอิสระสำหรับผู้ปกครองที่ดูแลเด็กหรือกลุ่มเยาวชนที่ไม่สังกัดโรงเรียนหรือสถาบันใด",
   "contingent.independent_saved": "บันทึกรายละเอียดทีมอิสระแล้ว คลิกสร้างทีมเพื่อดำเนินการต่อ",
+
+  "contests.educationLevel.primary": "โรงเรียนประถมศึกษา",
+  "contests.educationLevel.secondary": "โรงเรียนมัธยมศึกษา",
+  "contests.educationLevel.higher": "อุดมศึกษา",
+  "contests.available": "การแข่งขันที่พร้อมให้เข้าร่วม",
   
   "independent.name": "ชื่อ",
   "independent.name_placeholder": "ใส่ชื่อทีม",
