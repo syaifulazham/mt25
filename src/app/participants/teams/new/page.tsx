@@ -308,9 +308,9 @@ export default function NewTeamPage() {
                     <div className="flex flex-wrap gap-2">
                       {/* Toggle buttons for education level filters */}
                       {[
-                        { id: 'primary', label: t('team.new.primary_school') },
-                        { id: 'secondary', label: t('team.new.secondary_school') },
-                        { id: 'higher', label: t('team.new.higher_education') }
+                        { id: 'primary', label: t('team.new.kids') },
+                        { id: 'secondary', label: t('team.new.teen') },
+                        { id: 'higher', label: t('team.new.youth') }
                       ].map((level) => {
                         const isActive = eduLevelFilters.includes(level.id);
                         return (
@@ -381,9 +381,9 @@ export default function NewTeamPage() {
                           
                           // Map of allowed school levels for each filter value
                           const schoolLevelMap: Record<string, string[]> = {
-                            'primary': ['Primary'],
-                            'secondary': ['Secondary'],
-                            'higher': ['Higher Education', 'Higher'] 
+                            'primary': ['Primary'], // Maps 'Kids' filter to 'Primary' school level in API
+                            'secondary': ['Secondary'], // Maps 'Teen' filter to 'Secondary' school level in API
+                            'higher': ['Higher Education', 'Higher'] // Maps 'Youth' filter to 'Higher Education' school level in API
                           };
                           
                           // Filter contests based on selected education level(s)
@@ -423,11 +423,11 @@ export default function NewTeamPage() {
                                 const level = contest.targetgroup[0].schoolLevel;
                                 
                                 if (level === 'Primary') {
-                                  groupName = 'Primary';
+                                  groupName = 'primary';
                                 } else if (level === 'Secondary') {
-                                  groupName = 'Secondary';
+                                  groupName = 'secondary';
                                 } else if (level && level.includes('Higher')) {
-                                  groupName = 'Higher';
+                                  groupName = 'higher';
                                 }
                               }
                               
@@ -442,9 +442,18 @@ export default function NewTeamPage() {
                           } 
                           // For specific filters, show all matching contests based on selected filters
                           else {
-                            // Create a group name based on selected filters (e.g., "primary, secondary")
-                            const groupName = eduLevelFilters.join(', ');
-                            groups[groupName] = filteredContests;
+                            // Instead of joining filters, create a group for each filter so translations apply
+                            eduLevelFilters.forEach(filter => {
+                              groups[filter] = filteredContests.filter(contest => {
+                                if (!contest.targetgroup || !Array.isArray(contest.targetgroup)) {
+                                  return false;
+                                }
+                                const allowedLevels = schoolLevelMap[filter] || [];
+                                return contest.targetgroup.some((tg: any) => 
+                                  allowedLevels.includes(tg.schoolLevel)
+                                );
+                              });
+                            });
                           }
                           
                           // Get group names in preferred order
@@ -481,9 +490,9 @@ export default function NewTeamPage() {
                           return orderedGroups.map(group => {
                             // Get display name for the group
                             let displayName = group;
-                            if (group === 'primary') displayName = t('team.new.primary_school');
-                            else if (group === 'secondary') displayName = t('team.new.secondary_school');
-                            else if (group === 'higher') displayName = t('team.new.higher_education');
+                            if (group === 'primary') displayName = t('team.new.kids');
+                            else if (group === 'secondary') displayName = t('team.new.teen');
+                            else if (group === 'higher') displayName = t('team.new.youth');
                             
                             return (
                               <SelectGroup key={group}>

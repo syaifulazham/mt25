@@ -111,7 +111,12 @@ export default function ContestsClient() {
               <div className={`rounded-md ${bgColor} p-3 shadow-sm`}>
                 <div className={`flex items-center gap-3 border-l-4 ${borderColor} pl-3 py-1`}>
                   {iconComponent}
-                  <h2 className="text-lg font-semibold">{t(`contests.educationLevel.${group.targetGroup.schoolLevel}`) || group.targetGroup.name}</h2>
+                  <h2 className="text-lg font-semibold">
+                    {group.targetGroup.schoolLevel === 'primary' ? t('team.new.kids') :
+                     group.targetGroup.schoolLevel === 'secondary' ? t('team.new.teen') :
+                     group.targetGroup.schoolLevel === 'higher' ? t('team.new.youth') :
+                     t(`contests.educationLevel.${group.targetGroup.schoolLevel}`) || group.targetGroup.name}
+                  </h2>
                   <Badge variant="outline" className="ml-auto uppercase text-xs">
                     {group.contests.length} {t('contests.available')}
                   </Badge>
