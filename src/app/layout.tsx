@@ -16,7 +16,8 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "Malaysia Techlympics 2025",
-  description: "Luar Biasa, Global, Inklusif",
+  description: "Extraordinary, Global, Inclusive. Malaysia Techlympics is a vital initiative that promotes the enculturation of Science, Technology, and Innovation (STI) across the nation. The annual Techlympics not only sparks interest in STI fields but also embeds the importance of innovation in the minds of young Malaysians. An initiative under the Ministry of Science, Technology and Innovation (MOSTI)",
+  keywords: "techlympics, malaysia, stem, robotic, csi, ez rover, metaverse, robot tempur, quizathon, kampung angkat, redbrick, ez bot, maicy, techlympian, g-rover, kereta roket, skytech, cetakan 3d, bioekonomi, liga dron, innovathon",
   icons: {
     icon: [
       { url: '/favicon.ico' },
