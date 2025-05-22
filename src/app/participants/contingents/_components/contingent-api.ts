@@ -253,6 +253,9 @@ export interface School {
   category: string;
   state?: {
     name: string;
+    zone?: {
+      name: string;
+    };
   };
 }
 
@@ -262,6 +265,9 @@ export interface HigherInstitution {
   code: string;
   state?: {
     name: string;
+    zone?: {
+      name: string;
+    };
   };
 }
 
@@ -276,6 +282,9 @@ export interface Independent {
   type: 'PARENT' | 'YOUTH_GROUP';
   state?: {
     name: string;
+    zone?: {
+      name: string;
+    };
   };
 }
 

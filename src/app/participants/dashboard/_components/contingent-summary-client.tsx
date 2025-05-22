@@ -34,6 +34,8 @@ interface ContingentSummaryClientProps {
     logoUrl?: string;
     isManager: boolean;
     membersCount: number;
+    state?: string;
+    zone?: string;
     institution?: {
       name: string;
       type: string;
@@ -117,7 +119,23 @@ export default function ContingentSummaryClient({
               </div>
             )}
             
+            {contingent.state && (
+              <div className="flex justify-between items-center py-1 border-b">
+                <span className="text-muted-foreground">{t('contingent.state') || 'State'}:</span>
+                <span className="font-medium truncate max-w-[150px]" title={contingent.state}>
+                  {contingent.state}
+                </span>
+              </div>
+            )}
             
+            {contingent.zone && (
+              <div className="flex justify-between items-center py-1 border-b">
+                <span className="text-muted-foreground">{t('contingent.zone') || 'Zone'}:</span>
+                <span className="font-medium truncate max-w-[150px]" title={contingent.zone}>
+                  {contingent.zone}
+                </span>
+              </div>
+            )}
             
             <div className="flex justify-between items-center py-1 border-b">
               <span className="text-muted-foreground flex items-center gap-1.5">

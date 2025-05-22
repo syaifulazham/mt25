@@ -20,16 +20,34 @@ interface Contingent {
   description: string;
   short_name?: string;
   logoUrl?: string;
+  contingentType?: 'SCHOOL' | 'HIGHER_INST' | 'INDEPENDENT';
   school: {
     name: string;
     state: {
       name: string;
+      zone?: {
+        name: string;
+      };
     };
   } | null;
   higherInstitution: {
     name: string;
     state: {
       name: string;
+      zone?: {
+        name: string;
+      };
+    };
+  } | null;
+  independent?: {
+    id: number;
+    name: string;
+    stateId: number;
+    state?: {
+      name: string;
+      zone?: {
+        name: string;
+      };
     };
   } | null;
   isManager: boolean;
@@ -196,6 +214,20 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
   if (contingents.length > 0) {
     const contingent = contingents[0]; // Get the first contingent (most relevant one)
     
+    // Determine state and zone based on contingent type
+    let state = '';
+    let zone = '';
+    
+    if (contingent.contingentType === 'INDEPENDENT' && contingent.independent?.state) {
+      // For INDEPENDENT contingents, get state from independent table
+      state = contingent.independent.state.name || '';
+      zone = contingent.independent.state.zone?.name || '';
+    } else {
+      // For SCHOOL or HIGHER_INST contingents, get state from respective tables
+      state = contingent.school?.state?.name || contingent.higherInstitution?.state?.name || '';
+      zone = contingent.school?.state?.zone?.name || contingent.higherInstitution?.state?.zone?.name || '';
+    }
+    
     clientContingent = {
       id: contingent.id,
       name: contingent.name,
@@ -203,6 +235,8 @@ export default function ContingentSummary({ participantId, userId }: ContingentS
       logoUrl: contingent.logoUrl,
       isManager: contingent.isManager,
       membersCount: contingent.memberCount,
+      state,
+      zone,
       institution: contingent.school || contingent.higherInstitution ? {
         name: contingent.school?.name || contingent.higherInstitution?.name || '',
         type: contingent.school ? 'school' : 'higher'

@@ -80,8 +80,9 @@ export async function GET(request: NextRequest) {
           ]
         },
         include: {
-          school: { include: { state: true } },
-          higherInstitution: { include: { state: true } },
+          school: { include: { state: { include: { zone: true } } } },
+          higherInstitution: { include: { state: { include: { zone: true } } } },
+          independent: { include: { state: { include: { zone: true } } } },
           managers: { where: { participantId } },
           _count: { select: { contestants: true, managers: true } }
         }
@@ -97,8 +98,10 @@ export async function GET(request: NextRequest) {
           short_name: c.short_name || "",
           logoUrl: c.logoUrl || "",
           description: c.description || "",
+          contingentType: c.contingentType,
           school: c.school,
           higherInstitution: c.higherInstitution,
+          independent: c.independent,
           isManager: true,
           isOwner: c.managers.length > 0 ? c.managers[0].isOwner : true,
           managedByParticipant: c.managedByParticipant,

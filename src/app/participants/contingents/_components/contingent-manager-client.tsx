@@ -271,7 +271,39 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                         {selectedContingent.school?.name || selectedContingent.higherInstitution?.name}
                       </span>
                     </div>
-                    <div className="mt-1">
+                    
+                    {/* Highlighted Zone and State information */}
+                    <div className="flex flex-col space-y-1 mt-2">
+                      {/* State information */}
+                      {(selectedContingent.school?.state?.name || 
+                        selectedContingent.higherInstitution?.state?.name || 
+                        selectedContingent.independent?.state?.name) && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 px-2 py-1">
+                            <span className="font-semibold mr-1">{t('contingent.state') || 'State'}:</span>
+                            {selectedContingent.school?.state?.name || 
+                             selectedContingent.higherInstitution?.state?.name || 
+                             selectedContingent.independent?.state?.name}
+                          </Badge>
+                        </div>
+                      )}
+                      
+                      {/* Zone information */}
+                      {(selectedContingent.school?.state?.zone?.name || 
+                        selectedContingent.higherInstitution?.state?.zone?.name || 
+                        selectedContingent.independent?.state?.zone?.name) && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 px-2 py-1">
+                            <span className="font-semibold mr-1">{t('contingent.zone') || 'Zone'}:</span>
+                            {selectedContingent.school?.state?.zone?.name || 
+                             selectedContingent.higherInstitution?.state?.zone?.name || 
+                             selectedContingent.independent?.state?.zone?.name}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-3">
                       {selectedContingent.description || t('contingent.no_description')}
                     </div>
                   </CardDescription>

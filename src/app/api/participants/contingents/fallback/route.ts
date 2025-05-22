@@ -96,8 +96,8 @@ export async function GET(request: NextRequest) {
       // Also get contingents where the participant is a member
       const memberContingentsQuery = `
         SELECT 
-          c.id, c.name, c.description, c.schoolId, c.higherInstId,
-          c.managedByParticipant, c.participantId
+          c.id, c.name, c.description, c.schoolId, c.higherInstId, c.independentId,
+          c.contingentType, c.managedByParticipant, c.participantId
         FROM contingent c
         WHERE c.participantId = ${participantId}
         AND c.id NOT IN (
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
       const pendingRequestsQuery = `
         SELECT 
           cr.id as requestId, cr.status,
-          c.id, c.name, c.description, c.schoolId, c.higherInstId
+          c.id, c.name, c.description, c.schoolId, c.higherInstId, c.independentId, c.contingentType
         FROM contingentRequest cr
         JOIN contingent c ON cr.contingentId = c.id
         WHERE cr.participantId = ${participantId} AND cr.status = 'PENDING'
@@ -133,12 +133,13 @@ export async function GET(request: NextRequest) {
         for (const contingent of managedContingents) {
           let school = null;
           let higherInstitution = null;
+          let independent = null;
           
           if (contingent.schoolId) {
             try {
               const schoolData = await prisma.school.findUnique({
                 where: { id: contingent.schoolId },
-                include: { state: true }
+                include: { state: { include: { zone: true } } }
               });
               if (schoolData) school = schoolData;
             } catch (error) {
@@ -150,7 +151,7 @@ export async function GET(request: NextRequest) {
             try {
               const higherInstData = await prisma.higherinstitution.findUnique({
                 where: { id: contingent.higherInstId },
-                include: { state: true }
+                include: { state: { include: { zone: true } } }
               });
               if (higherInstData) higherInstitution = higherInstData;
             } catch (error) {
@@ -158,12 +159,26 @@ export async function GET(request: NextRequest) {
             }
           }
           
+          if (contingent.independentId) {
+            try {
+              const independentData = await prisma.independent.findUnique({
+                where: { id: contingent.independentId },
+                include: { state: { include: { zone: true } } }
+              });
+              if (independentData) independent = independentData;
+            } catch (error) {
+              console.error(`Fallback API: Error fetching independent ${contingent.independentId}:`, error);
+            }
+          }
+          
           processedContingents.push({
             id: Number(contingent.id),
             name: String(contingent.name),
             description: String(contingent.description || ""),
+            contingentType: contingent.contingentType || 'SCHOOL',
             school,
             higherInstitution,
+            independent,
             isManager: true,
             isOwner: Boolean(contingent.managedByParticipant && contingent.participantId === participantId),
             status: "ACTIVE",
@@ -178,12 +193,13 @@ export async function GET(request: NextRequest) {
         for (const contingent of memberContingents) {
           let school = null;
           let higherInstitution = null;
+          let independent = null;
           
           if (contingent.schoolId) {
             try {
               const schoolData = await prisma.school.findUnique({
                 where: { id: contingent.schoolId },
-                include: { state: true }
+                include: { state: { include: { zone: true } } }
               });
               if (schoolData) school = schoolData;
             } catch (error) {
@@ -195,7 +211,7 @@ export async function GET(request: NextRequest) {
             try {
               const higherInstData = await prisma.higherinstitution.findUnique({
                 where: { id: contingent.higherInstId },
-                include: { state: true }
+                include: { state: { include: { zone: true } } }
               });
               if (higherInstData) higherInstitution = higherInstData;
             } catch (error) {
@@ -203,12 +219,26 @@ export async function GET(request: NextRequest) {
             }
           }
           
+          if (contingent.independentId) {
+            try {
+              const independentData = await prisma.independent.findUnique({
+                where: { id: contingent.independentId },
+                include: { state: { include: { zone: true } } }
+              });
+              if (independentData) independent = independentData;
+            } catch (error) {
+              console.error(`Fallback API: Error fetching independent ${contingent.independentId}:`, error);
+            }
+          }
+          
           processedContingents.push({
             id: Number(contingent.id),
             name: String(contingent.name),
             description: String(contingent.description || ""),
+            contingentType: contingent.contingentType || 'SCHOOL',
             school,
             higherInstitution,
+            independent,
             isManager: false,
             isOwner: false,
             status: "ACTIVE",
@@ -223,12 +253,13 @@ export async function GET(request: NextRequest) {
         for (const request of pendingRequests) {
           let school = null;
           let higherInstitution = null;
+          let independent = null;
           
           if (request.schoolId) {
             try {
               const schoolData = await prisma.school.findUnique({
                 where: { id: request.schoolId },
-                include: { state: true }
+                include: { state: { include: { zone: true } } }
               });
               if (schoolData) school = schoolData;
             } catch (error) {
@@ -240,7 +271,7 @@ export async function GET(request: NextRequest) {
             try {
               const higherInstData = await prisma.higherinstitution.findUnique({
                 where: { id: request.higherInstId },
-                include: { state: true }
+                include: { state: { include: { zone: true } } }
               });
               if (higherInstData) higherInstitution = higherInstData;
             } catch (error) {
@@ -248,12 +279,26 @@ export async function GET(request: NextRequest) {
             }
           }
           
+          if (request.independentId) {
+            try {
+              const independentData = await prisma.independent.findUnique({
+                where: { id: request.independentId },
+                include: { state: { include: { zone: true } } }
+              });
+              if (independentData) independent = independentData;
+            } catch (error) {
+              console.error(`Fallback API: Error fetching independent ${request.independentId}:`, error);
+            }
+          }
+          
           processedContingents.push({
             id: Number(request.id),
             name: String(request.name),
             description: String(request.description || ""),
+            contingentType: request.contingentType || 'SCHOOL',
             school,
             higherInstitution,
+            independent,
             isManager: false,
             isOwner: false,
             status: "PENDING",
