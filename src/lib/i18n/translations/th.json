@@ -853,7 +853,7 @@
   "teams.select_team_priority": "เลือกลำดับความสำคัญของทีม",
   "teams.withdraw": "ถอนตัว",
   "teams.max_teams_per_contingent": "ทีมสูงสุด: {count} ต่อคณะผู้แทน",
-  "teams.no_available_events": "ไม่มีกิจกรรมที่มีให้ใช้งาน",
+  "teams.no_available_events": "การลงทะเบียนสำหรับระดับโซนจะเปิดให้บริการเร็วๆ นี้",
   "teams.no_available_events_description": "ขณะนี้ยังไม่มีกิจกรรมใดที่ทีมของคุณสามารถลงทะเบียนได้ในการแข่งขันนี้",
   "teams.join_event": "ลงทะเบียน",
   "team.join_event": "ลงทะเบียน",

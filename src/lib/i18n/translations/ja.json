@@ -946,7 +946,7 @@
   "teams.select_team_priority": "チーム優先度を選択",
   "teams.withdraw": "取下げる",
   "teams.max_teams_per_contingent": "最大チーム数: 代表団ごとに{count}チーム",
-  "teams.no_available_events": "利用可能なイベントがありません",
+  "teams.no_available_events": "ゾーンレベルの登録はまもなく利用可能になります",
   "teams.no_available_events_description": "現在、このコンテストでチームが登録できるイベントがありません。",
   "teams.join_event": "登録",
   "team.join_event": "登録",

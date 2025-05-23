@@ -852,7 +852,7 @@
   "teams.select_team_priority": "Piliin ang Priyoridad ng Koponan",
   "teams.withdraw": "Umatras",
   "teams.max_teams_per_contingent": "Maximum na Koponan: {count} bawat kontinente",
-  "teams.no_available_events": "Walang Available na Kaganapan",
+  "teams.no_available_events": "Ang pagpaparehistro para sa antas ng zone ay magiging available sa lalong madaling panahon",
   "teams.no_available_events_description": "Sa kasalukuyan ay walang available na kaganapan para sa iyong koponan na maaaring irehistro sa kompetisyong ito.",
   "teams.join_event": "Magparehistro",
   "team.join_event": "Magparehistro",
