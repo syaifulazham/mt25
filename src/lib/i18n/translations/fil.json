@@ -838,5 +838,24 @@
   "common.close": "Isara",
   "common.save": "I-save",
   "common.saving": "Nag-se-save...",
-  "contestant.assign_contests": "Italaga ang Kompetisyon"
+  "contestant.assign_contests": "Italaga ang Kompetisyon",
+
+  "teams.update_team": "I-update ang Koponan",
+  "teams.error_fetch_details": "Hindi nakuha ang detalye ng koponan",
+  "teams.error_load_details": "Hindi na-load ang detalye ng koponan",
+  "teams.error_update": "Hindi na-update ang koponan",
+  "teams.update_success": "Matagumpay na na-update ang koponan",
+  
+  "teams.event_registrations": "Mga Pagpaparehistro sa Kaganapan",
+  "teams.event_registrations_description": "Irehistro ang iyong koponan para sa mga available na kaganapan sa kompetisyong ito",
+  "teams.event_priorities": "Priyoridad ng Koponan",
+  "teams.select_team_priority": "Piliin ang Priyoridad ng Koponan",
+  "teams.withdraw": "Umatras",
+  "teams.max_teams_per_contingent": "Maximum na Koponan: {count} bawat kontinente",
+  "teams.no_available_events": "Walang Available na Kaganapan",
+  "teams.no_available_events_description": "Sa kasalukuyan ay walang available na kaganapan para sa iyong koponan na maaaring irehistro sa kompetisyong ito.",
+  "teams.join_event": "Magparehistro",
+  "team.join_event": "Magparehistro",
+  "team.event_joined_success": "Matagumpay na sumali sa kaganapan!",
+  "team.event_joined_error": "Hindi nakapagparehistro sa kaganapan. Pakisubukang muli."
 }

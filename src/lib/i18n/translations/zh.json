@@ -911,5 +911,24 @@
   "common.back": "返回",
   "common.close": "关闭",
   "common.save": "保存",
-  "common.saving": "保存中..."
+  "common.saving": "保存中...",
+
+  "teams.update_team": "更新队伍",
+  "teams.error_fetch_details": "获取队伍详情失败",
+  "teams.error_load_details": "加载队伍详情失败",
+  "teams.error_update": "更新队伍失败",
+  "teams.update_success": "队伍更新成功",
+  
+  "teams.event_registrations": "赛事注册",
+  "teams.event_registrations_description": "为您的队伍注册本比赛中可用的赛事",
+  "teams.event_priorities": "队伍优先级",
+  "teams.select_team_priority": "选择队伍优先级",
+  "teams.withdraw": "退出",
+  "teams.max_teams_per_contingent": "最多队伍数: 每代表团{count}支",
+  "teams.no_available_events": "没有可用的赛事",
+  "teams.no_available_events_description": "目前没有您的队伍可以注册的赛事。",
+  "teams.join_event": "报名",
+  "team.join_event": "报名",
+  "team.event_joined_success": "成功加入赛事！",
+  "team.event_joined_error": "加入赛事失败。请重试。"
 }

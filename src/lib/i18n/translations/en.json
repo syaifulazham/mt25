@@ -940,5 +940,19 @@
   "teams.error_fetch_details": "Failed to fetch team details",
   "teams.error_load_details": "Failed to load team details",
   "teams.error_update": "Failed to update team",
-  "teams.update_success": "Team updated successfully"
+  "teams.update_success": "Team updated successfully",
+  
+  "teams.event_registrations": "Event Registrations",
+  "teams.event_registrations_description": "Register your team for available events in this contest",
+  "teams.event_priorities": "Team Priority",
+  "teams.select_team_priority": "Select Team Priority",
+  "teams.withdraw": "Withdraw",
+  "teams.max_teams_per_contingent": "Max Teams: {count} team(s) per contingent",
+  "teams.no_available_events": "No Available Events",
+  "teams.no_available_events_description": "There are currently no events available for your team to register for in this contest.",
+  "teams.join_event": "Register",
+  "teams.maximum_exceeded": "Maximum team exceeded",
+  "team.join_event": "Register",
+  "team.event_joined_success": "Successfully joined the event!",
+  "team.event_joined_error": "Failed to join the event. Please try again."
 }

@@ -205,10 +205,25 @@ model eventcontest {
   contest  contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
   teams    team[]   // Teams assigned to this event contest
   judges   eventcontestjudge[] // Judges assigned to this event contest
+  eventcontestteam eventcontestteam[] // Relation to team registrations
 
   @@unique([eventId, contestId]) // Prevent duplicate contest assignments to events
   @@index([eventId])
   @@index([contestId])
+}
+
+model eventcontestteam {
+  id             Int          @id @default(autoincrement())
+  eventcontestId Int
+  teamId         Int
+  teamPriority   Int          @default(0) // Priority of the team in contingent
+  status         String       @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relations
+  eventcontest eventcontest @relation(fields: [eventcontestId], references: [id], onDelete: Cascade)
+  team         team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
 }
 
 // Event Contest Judge association model
@@ -771,6 +786,7 @@ model team {
   members              teamMember[]
   managers             teamManager[]
   independentManagers  manager[]
+  eventcontestteam     eventcontestteam[] // Team registrations for event contests
 
   @@index([contestId])
   @@index([contingentId])

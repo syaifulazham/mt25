@@ -839,5 +839,24 @@
   "common.back": "ย้อนกลับ",
   "common.close": "ปิด",
   "common.save": "บันทึก",
-  "common.saving": "กำลังบันทึก..."
+  "common.saving": "กำลังบันทึก...",
+
+  "teams.update_team": "อัปเดตทีม",
+  "teams.error_fetch_details": "ไม่สามารถดึงรายละเอียดทีมได้",
+  "teams.error_load_details": "ไม่สามารถโหลดรายละเอียดทีมได้",
+  "teams.error_update": "ไม่สามารถอัปเดตทีมได้",
+  "teams.update_success": "อัปเดตทีมสำเร็จ",
+  
+  "teams.event_registrations": "การลงทะเบียนกิจกรรม",
+  "teams.event_registrations_description": "ลงทะเบียนทีมของคุณสำหรับกิจกรรมที่มีอยู่ในการแข่งขันนี้",
+  "teams.event_priorities": "ลำดับความสำคัญของทีม",
+  "teams.select_team_priority": "เลือกลำดับความสำคัญของทีม",
+  "teams.withdraw": "ถอนตัว",
+  "teams.max_teams_per_contingent": "ทีมสูงสุด: {count} ต่อคณะผู้แทน",
+  "teams.no_available_events": "ไม่มีกิจกรรมที่มีให้ใช้งาน",
+  "teams.no_available_events_description": "ขณะนี้ยังไม่มีกิจกรรมใดที่ทีมของคุณสามารถลงทะเบียนได้ในการแข่งขันนี้",
+  "teams.join_event": "ลงทะเบียน",
+  "team.join_event": "ลงทะเบียน",
+  "team.event_joined_success": "เข้าร่วมกิจกรรมสำเร็จ!",
+  "team.event_joined_error": "ไม่สามารถเข้าร่วมกิจกรรมได้ โปรดลองอีกครั้ง"
 }

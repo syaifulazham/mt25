@@ -22,7 +22,8 @@ import {
   Trash2,
   User,
   Clock,
-  EyeIcon
+  EyeIcon,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -80,6 +81,22 @@ interface TeamMember {
   participant?: ParticipantData;
 }
 
+interface EventRegistration {
+  id: number;
+  eventId: number;
+  eventName: string;
+  contestId: number;
+  contestName: string;
+  teamPriority?: number; // Make this optional as it might be used for backward compatibility
+  status?: string;
+  isRegistered: boolean;
+  registration?: {
+    id: number;
+    teamPriority: number;
+    status: string;
+  } | null;
+}
+
 interface Team {
   id: number;
   name: string;
@@ -97,6 +114,7 @@ interface Team {
   createdAt: string;
   updatedAt: string;
   members: TeamMember[];
+  eventRegistrations?: EventRegistration[];
 }
 
 export default function TeamsPage() {
@@ -110,6 +128,7 @@ export default function TeamsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [joiningEvent, setJoiningEvent] = useState<{teamId: number, eventId: number} | null>(null);
   
   // Fetch the user's teams
   useEffect(() => {
@@ -135,8 +154,8 @@ export default function TeamsPage() {
         
         const teamsData = await response.json();
         
-        // Fetch detailed information for each team, including members
-        const teamsWithMembers = await Promise.all(teamsData.map(async (team: Team) => {
+        // Fetch detailed information for each team, including members and event registrations
+        const teamsWithDetails = await Promise.all(teamsData.map(async (team: Team) => {
           try {
             // Get detailed team data (which includes members)
             // This uses the same endpoint as the members page
@@ -147,27 +166,49 @@ export default function TeamsPage() {
               }
             });
             
+            // Fetch event registrations for this team
+            const eventRegistrationsResponse = await fetch(`/api/participants/teams/${team.id}/available-events?t=${Date.now()}`, {
+              headers: {
+                'Pragma': 'no-cache',
+                'Cache-Control': 'no-store, must-revalidate',
+                'Cache': 'no-cache'
+              },
+              cache: 'no-store'
+            });
+            
+            let members = [];
+            let eventRegistrations = [];
+            
             if (detailedTeamResponse.ok) {
               const detailedTeamData = await detailedTeamResponse.json();
-              
-              // Return team with real member data
-              return {
-                ...team,
-                members: detailedTeamData.members || []
-              };
+              members = detailedTeamData.members || [];
             }
+            
+            if (eventRegistrationsResponse.ok) {
+              const eventsData = await eventRegistrationsResponse.json();
+              // Include all events (both registered and available to join)
+              eventRegistrations = eventsData || [];
+            }
+            
+            // Return team with member data and event registrations
+            return {
+              ...team,
+              members,
+              eventRegistrations
+            };
           } catch (error) {
             console.error(`Error fetching detailed data for team ${team.id}:`, error);
           }
           
-          // Fallback to an empty members array if the fetch fails
+          // Fallback to empty arrays if the fetch fails
           return {
             ...team,
-            members: []
+            members: [],
+            eventRegistrations: []
           };
         }));
         
-        setTeams(teamsWithMembers);
+        setTeams(teamsWithDetails);
       } catch (error) {
         console.error("Error fetching teams:", error);
         toast.error("Failed to load your teams");
@@ -185,6 +226,69 @@ export default function TeamsPage() {
     team.hashcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
     team.contestName.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  // Handle joining an event
+  const handleJoinEvent = async (teamId: number, eventcontestId: number) => {
+    try {
+      setJoiningEvent({ teamId, eventId: eventcontestId });
+      
+      const response = await fetch(`/api/participants/teams/${teamId}/event-registrations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventcontestId
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to join event");
+      }
+      
+      // Get the response data which includes the teamPriority from the database
+      const data = await response.json();
+      
+      // Update the teams list
+      setTeams(prevTeams => {
+        return prevTeams.map(team => {
+          if (team.id === teamId && team.eventRegistrations) {
+            // Update the isRegistered property for the joined event
+            // Make sure eventRegistrations exists before mapping
+            const updatedRegistrations = team.eventRegistrations?.map(event => {
+              if (event.id === eventcontestId) {
+                return {
+                  ...event,
+                  isRegistered: true,
+                  // Store the registration data in the same structure as the API returns it
+                  registration: {
+                    id: data.registration.id,
+                    teamPriority: data.registration.teamPriority,
+                    status: data.registration.status
+                  }
+                };
+              }
+              return event;
+            });
+            
+            return {
+              ...team,
+              eventRegistrations: updatedRegistrations || []
+            };
+          }
+          return team;
+        });
+      });
+      
+      toast.success(t('team.event_joined_success'));
+    } catch (error: any) {
+      console.error("Error joining event:", error);
+      toast.error(error.message || t('team.event_joined_error'));
+    } finally {
+      setJoiningEvent(null);
+    }
+  };
   
   // Handle team deletion
   const handleDeleteTeam = async () => {
@@ -527,6 +631,81 @@ export default function TeamsPage() {
                               {t('team.created_on')} {formatDate(team.createdAt)}
                             </div>
                           </div>
+                          
+                          {/* Event Priorities Summary */}
+                          {team.eventRegistrations && team.eventRegistrations.filter(event => event.isRegistered).length > 0 && (
+                            <div className="flex items-start gap-2">
+                              <Trophy className="h-4 w-4 text-muted-foreground mt-0.5" />
+                              <div className="text-sm">
+                                <div className="font-medium">{t('teams.event_priorities')}:</div>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {team.eventRegistrations.filter(event => event.isRegistered).map(event => (
+                                    <Badge 
+                                      key={event.id} 
+                                      className="bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 flex items-center gap-1"
+                                    >
+                                      <span className="truncate max-w-[100px]" title={event.eventName}>{event.eventName}</span>
+                                      <span className="font-bold">#{event.registration && event.registration.teamPriority !== undefined ? event.registration.teamPriority : 1}</span>
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Event Registrations */}
+                          {team.eventRegistrations && (
+                            <div className="mt-3 w-full">
+                              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 pb-1">
+                                <h4 className="text-sm font-medium mb-2">{t('teams.event_registrations')}</h4>
+                                
+                                {/* Joined Events */}
+                                {team.eventRegistrations?.filter(event => event.isRegistered)?.map(event => (
+                                  <div 
+                                    key={event.id}
+                                    className="p-2 mb-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/50 flex justify-between items-center"
+                                  >
+                                    <div className="flex-grow">
+                                      <span className="font-medium text-sm">{event.eventName}</span>
+                                    </div>
+                                    <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800">
+                                      #{event.registration && event.registration.teamPriority !== undefined ? event.registration.teamPriority : 1}
+                                    </Badge>
+                                  </div>
+                                ))}
+                                
+                                {/* Available Events Not Joined */}
+                                {team.eventRegistrations?.filter(event => !event.isRegistered)?.map(event => (
+                                  <div 
+                                    key={event.id}
+                                    className="p-2 mb-2 rounded-md bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex justify-between items-center"
+                                  >
+                                    <div className="flex-grow">
+                                      <span className="font-medium text-sm">{event.eventName}</span>
+                                    </div>
+                                    <Button 
+                                      variant="destructive" 
+                                      size="sm"
+                                      onClick={() => handleJoinEvent(team.id, event.id)}
+                                      disabled={joiningEvent?.teamId === team.id && joiningEvent?.eventId === event.id}
+                                    >
+                                      {joiningEvent?.teamId === team.id && joiningEvent?.eventId === event.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                      ) : null}
+                                      {t('team.join_event')}
+                                    </Button>
+                                  </div>
+                                ))}
+                                
+                                {/* No Available Events */}
+                                {(team.eventRegistrations?.length === 0 || !team.eventRegistrations) && (
+                                  <div className="text-center p-4 text-muted-foreground">
+                                    {t('teams.no_available_events')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         
                         {/* Actions */}

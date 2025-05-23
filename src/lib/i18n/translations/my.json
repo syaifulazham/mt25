@@ -939,5 +939,18 @@
   "teams.error_fetch_details": "Gagal mendapatkan butiran pasukan",
   "teams.error_load_details": "Gagal memuatkan butiran pasukan",
   "teams.error_update": "Gagal mengemaskini pasukan",
-  "teams.update_success": "Pasukan berjaya dikemaskini"
+  "teams.update_success": "Pasukan berjaya dikemaskini",
+  
+  "teams.event_registrations": "Pendaftaran Acara",
+  "teams.event_registrations_description": "Daftarkan pasukan anda untuk acara yang tersedia dalam pertandingan ini",
+  "teams.event_priorities": "Keutamaan Pasukan",
+  "teams.select_team_priority": "Pilih Keutamaan Pasukan",
+  "teams.withdraw": "Tarik Diri",
+  "teams.max_teams_per_contingent": "Maksimum Pasukan: {count} pasukan setiap kontinjen",
+  "teams.no_available_events": "Tiada Acara Tersedia",
+  "teams.no_available_events_description": "Tiada acara yang boleh didaftarkan untuk pasukan anda dalam pertandingan ini buat masa ini.",
+  "teams.join_event": "Daftar",
+  "team.join_event": "Daftar",
+  "team.event_joined_success": "Berjaya menyertai acara!",
+  "team.event_joined_error": "Gagal menyertai acara. Sila cuba lagi."
 }

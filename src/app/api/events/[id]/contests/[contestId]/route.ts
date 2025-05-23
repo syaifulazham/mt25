@@ -101,6 +101,8 @@ export async function PATCH(
   { params }: { params: { id: string; contestId: string } }
 ) {
   try {
+    console.log(`PATCH request for event contest: Event ID ${params.id}, Contest ID ${params.contestId}`);
+    
     // Check if user is authenticated and has required role
     const user = await getCurrentUser();
     if (!user) {
@@ -111,33 +113,18 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Parse the event ID and contest ID parameters
     const eventId = parseInt(params.id);
-    const contestId = parseInt(params.contestId);
+    const contestIdParam = parseInt(params.contestId);
+    console.log(`Parsed IDs: Event ID ${eventId}, Contest ID param ${contestIdParam}`);
 
-    if (isNaN(eventId) || isNaN(contestId)) {
+    if (isNaN(eventId) || isNaN(contestIdParam)) {
       return NextResponse.json(
         { error: 'Invalid ID parameters' },
         { status: 400 }
       );
     }
-
-    // Check if event contest exists
-    const existingEventContest = await prisma.eventcontest.findUnique({
-      where: {
-        eventId_contestId: {
-          eventId,
-          contestId
-        }
-      }
-    });
-
-    if (!existingEventContest) {
-      return NextResponse.json(
-        { error: 'Event contest not found' },
-        { status: 404 }
-      );
-    }
-
+    
     // Define validation schema for request body
     const updateEventContestSchema = z.object({
       maxteampercontingent: z.number().min(1).optional(),
@@ -152,31 +139,134 @@ export async function PATCH(
     
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Invalid request body', details: validationResult.error.issues },
+        { error: 'Invalid request body', details: validationResult.error.format() },
         { status: 400 }
       );
     }
 
-    // Update event contest
-    const updatedEventContest = await prisma.eventcontest.update({
-      where: {
-        eventId_contestId: {
-          eventId,
-          contestId
+    // There could be confusion in how IDs are being used
+    // The contestId parameter might be eventcontest.id instead of contest.id
+    try {
+      // First, log all event contests for debugging
+      const listQuery = `
+        SELECT ec.id, ec.eventId, ec.contestId, e.name as eventName, c.name as contestName 
+        FROM eventcontest ec
+        JOIN event e ON ec.eventId = e.id
+        JOIN contest c ON ec.contestId = c.id
+        WHERE ec.eventId = ? OR ec.id = ? OR ec.contestId = ?
+        LIMIT 10
+      `;
+      
+      const eventContests = await prisma.$queryRawUnsafe(listQuery, eventId, contestIdParam, contestIdParam);
+      console.log('Available event contests:', JSON.stringify(eventContests, null, 2));
+      
+      // Try to find the event contest by different combinations of IDs
+      let targetEventContest: any = null;
+      let foundById = false;
+      
+      if (Array.isArray(eventContests)) {
+        // First try exact match of eventId and contestId
+        targetEventContest = eventContests.find((ec: any) => 
+          ec.eventId === eventId && ec.contestId === contestIdParam);
+        
+        // If not found, try to find by eventcontestId (the id might be passed as contestId)
+        if (!targetEventContest) {
+          const byId = eventContests.find((ec: any) => ec.id === contestIdParam);
+          if (byId) {
+            targetEventContest = byId;
+            foundById = true;
+            console.log(`Found event contest by its ID: ${contestIdParam}`);
+          }
         }
-      },
-      data: validationResult.data,
-      include: {
-        contest: true,
-        event: true
       }
-    });
-
-    return NextResponse.json(updatedEventContest);
-  } catch (error) {
-    console.error('Error updating event contest:', error);
+      
+      if (!targetEventContest) {
+        console.error(`Event contest not found for event ${eventId} and contest ${contestIdParam}`);
+        return NextResponse.json(
+          { 
+            error: 'Event contest not found', 
+            requestParams: { eventId, contestId: contestIdParam },
+            availableEventContests: eventContests 
+          },
+          { status: 404 }
+        );
+      }
+      
+      console.log(`Found event contest:`, JSON.stringify(targetEventContest, null, 2));
+      
+      // Extract the validated data
+      const data = validationResult.data;
+      
+      // Build update query parameters
+      const updateParts = [];
+      const params = [];
+      
+      if (data.maxteampercontingent !== undefined) {
+        updateParts.push('maxteampercontingent = ?');
+        params.push(data.maxteampercontingent);
+      }
+      
+      if (data.person_incharge !== undefined) {
+        updateParts.push('person_incharge = ?');
+        params.push(data.person_incharge);
+      }
+      
+      if (data.person_incharge_phone !== undefined) {
+        updateParts.push('person_incharge_phone = ?');
+        params.push(data.person_incharge_phone);
+      }
+      
+      if (data.isActive !== undefined) {
+        updateParts.push('isActive = ?');
+        params.push(data.isActive);
+      }
+      
+      // Always update the timestamp
+      updateParts.push('updatedAt = NOW()');
+      
+      // No fields to update
+      if (updateParts.length === 1) { // Only the timestamp
+        return NextResponse.json({ message: 'No fields to update' });
+      }
+      
+      // Add the ID parameter for the WHERE clause
+      params.push(targetEventContest.id);
+      
+      // Construct and execute the update query
+      const updateQuery = `
+        UPDATE eventcontest 
+        SET ${updateParts.join(', ')} 
+        WHERE id = ?
+      `;
+      
+      await prisma.$queryRawUnsafe(updateQuery, ...params);
+      console.log(`Updated event contest ID ${targetEventContest.id}`);
+      
+      // Fetch the updated record
+      const fetchQuery = `
+        SELECT ec.*, e.name as eventName, c.name as contestName 
+        FROM eventcontest ec
+        JOIN event e ON ec.eventId = e.id
+        JOIN contest c ON ec.contestId = c.id
+        WHERE ec.id = ?
+      `;
+      
+      const updatedResult = await prisma.$queryRawUnsafe(fetchQuery, targetEventContest.id);
+      const updatedRecord = Array.isArray(updatedResult) && updatedResult.length > 0 ? 
+        updatedResult[0] : null;
+      
+      return NextResponse.json(updatedRecord);
+    } catch (dbError: any) {
+      console.error('Database error updating event contest:', dbError);
+      return NextResponse.json(
+        { error: `Database error: ${dbError?.message || 'Unknown error'}` },
+        { status: 500 }
+      );
+    }
+  } catch (error: any) {
+    console.error('General error in PATCH handler:', error);
     return NextResponse.json(
-      { error: 'Failed to update event contest' },
+      { error: `Failed to update event contest: ${error?.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
