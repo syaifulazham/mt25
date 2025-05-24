@@ -118,6 +118,7 @@
   "profile.no_phone": "ไม่มีโทรศัพท์",
   "profile.no_institution": "ไม่มีสถาบัน",
   "profile.description": "จัดการข้อมูลส่วนตัวของคุณ",
+  "profile.card_title": "โปรไฟล์ของฉัน",
   "profile.personal_info.title": "ข้อมูลส่วนตัว",
   "profile.personal_info.description": "รายละเอียดส่วนตัวและข้อมูลบัญชีของคุณ",
   "profile.edit_button": "แก้ไขโปรไฟล์",
@@ -203,6 +204,7 @@
   "contingent.short_name": "ชื่อย่อ",
   "contingent.short_name_desc": "ชื่อย่อของทีมผู้แข่งขันของคุณ (เช่น USM)",
   "contingent.institution": "สถาบัน",
+  "contingent.zone": "โซน",
   "contingent.members": "สมาชิก",
   "contingent.school": "โรงเรียน",
   "contingent.independent": "อิสระ",
@@ -858,5 +860,6 @@
   "teams.join_event": "ลงทะเบียน",
   "team.join_event": "ลงทะเบียน",
   "team.event_joined_success": "เข้าร่วมกิจกรรมสำเร็จ!",
-  "team.event_joined_error": "ไม่สามารถเข้าร่วมกิจกรรมได้ โปรดลองอีกครั้ง"
+  "team.event_joined_error": "ไม่สามารถเข้าร่วมกิจกรรมได้ โปรดลองอีกครั้ง",
+  "videos.no_videos_available": "ไม่มีวิดีโอที่พร้อมใช้งาน"
 }

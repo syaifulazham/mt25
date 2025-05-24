@@ -118,6 +118,7 @@
   "profile.no_phone": "Tiada telefon",
   "profile.no_institution": "Tiada institusi",
   "profile.description": "Urus maklumat peribadi anda",
+  "profile.card_title": "Profil Saya",
   "profile.personal_info.title": "Maklumat Peribadi",
   "profile.personal_info.description": "Butiran peribadi dan maklumat akaun anda",
   "profile.edit_button": "Edit Profil",
@@ -203,6 +204,7 @@
   "contingent.short_name": "Nama Pendek",
   "contingent.short_name_desc": "Versi singkat nama kontinjen anda (cth., USM)",
   "contingent.institution": "Institusi",
+  "contingent.zone": "Zon",
   "contingent.members": "Ahli-ahli",
   "contingent.school": "Sekolah",
   "contingent.independent_status": "Bebas",
@@ -952,5 +954,6 @@
   "teams.join_event": "Daftar",
   "team.join_event": "Daftar",
   "team.event_joined_success": "Berjaya menyertai acara!",
-  "team.event_joined_error": "Gagal menyertai acara. Sila cuba lagi."
+  "team.event_joined_error": "Gagal menyertai acara. Sila cuba lagi.",
+  "videos.no_videos_available": "Tiada video tersedia"
 }

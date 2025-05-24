@@ -118,6 +118,7 @@
   "profile.no_phone": "Walang telepono",
   "profile.no_institution": "Walang institusyon",
   "profile.description": "Pamahalaan ang iyong personal na impormasyon",
+  "profile.card_title": "Aking Profile",
   "profile.personal_info.title": "Personal na Impormasyon",
   "profile.personal_info.description": "Ang iyong mga personal na detalye at impormasyon ng account",
   "profile.edit_button": "I-edit ang Profile",
@@ -203,6 +204,7 @@
   "contingent.short_name": "Maikling Pangalan",
   "contingent.short_name_desc": "Ang maikling bersyon ng pangalan ng iyong kontingente (hal., USM)",
   "contingent.institution": "Institusyon",
+  "contingent.zone": "Zone",
   "contingent.members": "Mga Miyembro",
   "contingent.school": "Paaralan",
   "contingent.independent": "Independiyente",
@@ -857,5 +859,6 @@
   "teams.join_event": "Magparehistro",
   "team.join_event": "Magparehistro",
   "team.event_joined_success": "Matagumpay na sumali sa kaganapan!",
-  "team.event_joined_error": "Hindi nakapagparehistro sa kaganapan. Pakisubukang muli."
+  "team.event_joined_error": "Hindi nakapagparehistro sa kaganapan. Pakisubukang muli.",
+  "videos.no_videos_available": "Walang mga video na available"
 }

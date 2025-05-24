@@ -113,6 +113,7 @@
   
   "profile.title": "マイプロフィール",
   "profile.description": "個人情報を管理",
+  "profile.card_title": "マイプロフィール",
   "profile.complete": "完了",
   "profile.user": "ユーザー",
   "profile.no_email": "メールなし",
@@ -203,6 +204,7 @@
   "contingent.short_name": "略称",
   "contingent.short_name_desc": "代表団名の短いバージョン（例：USM）",
   "contingent.institution": "機関",
+  "contingent.zone": "ゾーン",
   "contingent.members": "メンバー",
   "contingent.school": "学校",
   "contingent.independent": "独立",
@@ -954,5 +956,6 @@
   "team.event_joined_error": "イベントに参加できませんでした。もう一度お試しください。",
   "requests.error_fetching": "要求の取得エラー",
   "requests.error_found": "管理者が見つかりません",
-  "manager.none_found": "管理者が見つかりません"
+  "manager.none_found": "管理者が見つかりません",
+  "videos.no_videos_available": "利用可能なビデオがありません"
 }

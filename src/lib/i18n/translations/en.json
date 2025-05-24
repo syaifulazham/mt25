@@ -113,6 +113,7 @@
   
   "profile.title": "My Profile",
   "profile.description": "Manage your personal information",
+  "profile.card_title": "My Profile",
   "profile.complete": "Complete",
   "profile.user": "User",
   "profile.no_email": "No email",
@@ -203,6 +204,7 @@
   "contingent.short_name": "Short Name",
   "contingent.short_name_desc": "A shorter version of your contingent name (e.g., USM)",
   "contingent.institution": "Institution",
+  "contingent.zone": "Zone",
   "contingent.members": "Members",
   "contingent.school": "School",
   "contingent.independent": "Independent",
@@ -954,5 +956,6 @@
   "teams.maximum_exceeded": "Maximum team exceeded",
   "team.join_event": "Register",
   "team.event_joined_success": "Successfully joined the event!",
-  "team.event_joined_error": "Failed to join the event. Please try again."
+  "team.event_joined_error": "Failed to join the event. Please try again.",
+  "videos.no_videos_available": "No videos available"
 }

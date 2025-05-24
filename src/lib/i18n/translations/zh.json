@@ -118,6 +118,7 @@
   "profile.no_phone": "无电话",
   "profile.no_institution": "无机构",
   "profile.description": "管理您的个人信息",
+  "profile.card_title": "我的个人资料",
   "profile.personal_info.title": "个人信息",
   "profile.personal_info.description": "您的个人详细信息和账户信息",
   "profile.edit_button": "编辑资料",
@@ -203,6 +204,7 @@
   "contingent.short_name": "简称",
   "contingent.short_name_desc": "代表团名称的缩写版本（例如，USM）",
   "contingent.institution": "机构",
+  "contingent.zone": "区域",
   "contingent.members": "成员",
   "contingent.school": "学校",
   "contingent.independent": "独立",
@@ -930,5 +932,6 @@
   "teams.join_event": "报名",
   "team.join_event": "报名",
   "team.event_joined_success": "成功加入赛事！",
-  "team.event_joined_error": "加入赛事失败。请重试。"
+  "team.event_joined_error": "加入赛事失败。请重试。",
+  "videos.no_videos_available": "没有可用的视频"
 }
