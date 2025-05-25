@@ -823,6 +823,7 @@
   "videos.video3_description": "How to register and participate in contests",
   
   "requests.pending_requests_title": "Pending Requests",
+  "requests.pending_requests": "Pending Requests",
   "requests.requires_attention": "These contingent join requests require your approval",
   "requests.view_all": "View All",
   "requests.approve": "Approve",

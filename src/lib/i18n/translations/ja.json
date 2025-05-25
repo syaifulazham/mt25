@@ -822,6 +822,7 @@
   "videos.video3_description": "コンテストに登録して参加する方法",
   
   "requests.pending_requests_title": "保留中の要求",
+  "requests.pending_requests": "保留中の要求",
   "requests.requires_attention": "これらの代表団参加要求にはあなたの承認が必要です",
   "requests.view_all": "すべて表示",
   "requests.approve": "承認",
