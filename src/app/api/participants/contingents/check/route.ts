@@ -38,16 +38,32 @@ export async function GET(request: NextRequest) {
 
     console.log(`Checking if contingent exists for ${institutionType} with ID ${institutionId}`);
 
-    // Check if a contingent exists for this institution
+    // Check if a contingent exists for this institution with manager information
     let existingContingent;
     
     if (institutionType === "SCHOOL") {
       existingContingent = await prisma.contingent.findFirst({
-        where: { schoolId: institutionId }
+        where: { schoolId: institutionId },
+        include: {
+          // Get managers information
+          managers: {
+            include: {
+              participant: true
+            }
+          }
+        }
       });
     } else if (institutionType === "HIGHER_INSTITUTION") {
       existingContingent = await prisma.contingent.findFirst({
-        where: { higherInstId: institutionId }
+        where: { higherInstId: institutionId },
+        include: {
+          // Get managers information
+          managers: {
+            include: {
+              participant: true
+            }
+          }
+        }
       });
     } else {
       return NextResponse.json(
@@ -55,11 +71,39 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Find the primary manager (owner) and other managers for the contingent
+    let primaryManager: any = null;
+    let otherManagers: Array<any> = [];
+    
+    if (existingContingent && existingContingent.managers && existingContingent.managers.length > 0) {
+      // Find the primary manager (owner) - explicit null checks
+      const ownerManager = existingContingent.managers.find(manager => manager.isOwner);
+      primaryManager = ownerManager && ownerManager.participant ? ownerManager.participant : null;
+      
+      // Get other managers that aren't the primary owner
+      otherManagers = existingContingent.managers
+        .filter(manager => !manager.isOwner && manager.participant)
+        .map(manager => manager.participant);
+    }
 
-    // Return result
+    // Return result with manager information
     return NextResponse.json({
       exists: !!existingContingent,
-      contingentId: existingContingent?.id || null
+      contingentId: existingContingent?.id || null,
+      contingentName: existingContingent?.name || null,
+      primaryManager: primaryManager ? {
+        id: primaryManager.id,
+        name: primaryManager.name,
+        email: primaryManager.email,
+        phoneNumber: primaryManager.phoneNumber || null
+      } : null,
+      otherManagers: otherManagers.map(manager => ({
+        id: manager.id,
+        name: manager.name,
+        email: manager.email,
+        phoneNumber: manager.phoneNumber || null
+      }))
     });
   } catch (error) {
     console.error("Error checking contingent existence:", error);

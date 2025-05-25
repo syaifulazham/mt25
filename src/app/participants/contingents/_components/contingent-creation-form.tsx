@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,8 +32,73 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   const [contingentDescription, setContingentDescription] = useState("");
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [existingContingent, setExistingContingent] = useState<boolean>(false);
+  const [pendingJoinRequest, setPendingJoinRequest] = useState<{
+    hasPendingRequest: boolean;
+    requestId?: number;
+    contingentId?: number;
+    contingentName?: string;
+    contingentType?: string;
+    institutionName?: string;
+    primaryManager?: {
+      id: number;
+      name: string;
+      email: string;
+      phoneNumber: string | null;
+    } | null;
+  } | null>(null);
+  const [contingentManagerInfo, setContingentManagerInfo] = useState<{
+    contingentName?: string;
+    primaryManager?: {
+      id: number;
+      name: string;
+      email: string;
+      phoneNumber: string | null;
+    } | null;
+    otherManagers?: Array<{
+      id: number;
+      name: string;
+      email: string;
+      phoneNumber: string | null;
+    }> | null;
+  } | null>(null);
   const [checkingExistingContingent, setCheckingExistingContingent] = useState<boolean>(false);
+  const [cancellingRequest, setCancellingRequest] = useState<boolean>(false);
   const [independentData, setIndependentData] = useState<any>(null);
+
+  // Check for pending join requests on component mount
+  useEffect(() => {
+    const checkPendingJoinRequests = async () => {
+      try {
+        const response = await contingentApi.checkPendingJoinRequest(userId);
+        setPendingJoinRequest(response);
+      } catch (error) {
+        console.error('Error checking pending join requests:', error);
+        // Don't show error toast as this is a background check
+      }
+    };
+
+    checkPendingJoinRequests();
+  }, [userId]);
+
+  // Cancel a pending join request
+  const handleCancelJoinRequest = async () => {
+    if (!pendingJoinRequest?.requestId) {
+      toast.error(t('contingent.error_no_request_id'));
+      return;
+    }
+
+    try {
+      setCancellingRequest(true);
+      await contingentApi.cancelJoinRequest(pendingJoinRequest.requestId);
+      toast.success(t('contingent.cancel_request_success'));
+      setPendingJoinRequest(null);
+    } catch (error: any) {
+      console.error('Error cancelling join request:', error);
+      toast.error(error.message || t('contingent.cancel_request_error'));
+    } finally {
+      setCancellingRequest(false);
+    }
+  };
 
   // Handle search
   const handleSearch = async () => {
@@ -57,11 +122,11 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   };
 
   // Check if a contingent already exists for the institution
-  const checkExistingContingent = async (institution: School | HigherInstitution, type: "school" | "higher" | "independent") => {
+  const checkExistingContingent = async (institution: School | HigherInstitution) => {
     try {
       setCheckingExistingContingent(true);
       const institutionId = institution.id;
-      const institutionType = type === "school" ? "SCHOOL" : "HIGHER_INSTITUTION";
+      const institutionType = "SCHOOL";
       
       // Use the API to check if a contingent exists
       const response = await fetch(
@@ -75,6 +140,16 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
       
       const data = await response.json();
       setExistingContingent(data.exists);
+      
+      if (data.exists) {
+        setContingentManagerInfo({
+          contingentName: data.contingentName,
+          primaryManager: data.primaryManager,
+          otherManagers: data.otherManagers
+        });
+      } else {
+        setContingentManagerInfo(null);
+      }
     } catch (error) {
       console.error("Error checking existing contingent:", error);
       // Default to false if error
@@ -92,7 +167,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
     setContingentName(`${institution.name} Contingent`);
     
     // Check if a contingent already exists for this institution
-    await checkExistingContingent(institution, institutionType);
+    await checkExistingContingent(institution);
   };
 
   // Handle contingent creation
@@ -106,7 +181,7 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
       toast.error(t('contingent.error_no_name'));
       return;
     }
-
+    
     if (institutionType === 'independent' && !independentData) {
       toast.error('Please complete the independent contingent form');
       return;
@@ -116,54 +191,30 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
       setIsLoading(true);
       
       // Create data object based on contingent type
-      let data = {};
+      let payload: any = {};
       
       if (institutionType === 'independent') {
-        data = {
+        payload = {
           name: independentData.name,
           description: contingentDescription,
           participantId: userId,
-          managedByParticipant: true,
-          contingentType: 'INDEPENDENT',
-          independentData: {
-            ...independentData,
-            stateId: parseInt(independentData.stateId, 10)
-          }
+          type: "INDEPENDENT",
+          independentData
         };
       } else {
-        data = {
+        payload = {
           name: contingentName,
           description: contingentDescription,
           participantId: userId,
-          managedByParticipant: true,
-          contingentType: institutionType === "school" ? "SCHOOL" : "HIGHER_INST",
-          [institutionType === "school" ? "schoolId" : "higherInstId"]: selectedInstitution?.id,
-          managerIds: []
+          institutionId: selectedInstitution!.id,
+          type: "SCHOOL"
         };
       }
 
-      // Create the contingent
-      await fetch('/api/participants/contingents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      }).then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to create contingent');
-        }
-        return response.json();
-      });
-      
+      await contingentApi.createContingent(payload);
       toast.success(t('contingent.create_success'));
-      
-      // Add a small delay before fetching contingents to ensure database consistency
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Reload contingents
       await onContingentCreated();
-      
+      router.push("/participants/contingents");
     } catch (error: any) {
       console.error("Error creating contingent:", error);
       toast.error(error.message || t('contingent.create_error'));
@@ -172,7 +223,6 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
     }
   };
 
-  // Handle request to join contingent
   const handleJoinContingent = async () => {
     if (!selectedInstitution) {
       toast.error(t('contingent.error_no_institution'));
@@ -181,18 +231,13 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
 
     try {
       setIsLoading(true);
-      const data = {
-        participantId: userId, // Use the participantId parameter required by the API schema
-        institutionType: institutionType === "school" ? "SCHOOL" : "HIGHER_INSTITUTION",
-        institutionId: selectedInstitution.id
-      };
-      
-      await contingentApi.requestToJoinContingent(data);
+      await contingentApi.requestJoinContingent({
+        participantId: userId,
+        institutionId: selectedInstitution.id,
+        type: "SCHOOL",
+      });
       toast.success(t('contingent.join_request_success'));
-      
-      // Reload contingents
-      await onContingentCreated();
-      
+      router.push("/participants/contingents");
     } catch (error: any) {
       console.error("Error requesting to join contingent:", error);
       toast.error(error.message || t('contingent.join_request_error'));
@@ -204,138 +249,193 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>{t('contingent.independent_type')}</CardTitle>
+        <CardTitle>
+          {pendingJoinRequest?.hasPendingRequest 
+            ? t('contingent.pending_request_title') 
+            : t('contingent.independent_type')}
+        </CardTitle>
         <CardDescription>
-          {t('contingent.select_institution_desc')}
+          {pendingJoinRequest?.hasPendingRequest 
+            ? t('contingent.pending_request_desc')
+            : t('contingent.select_institution_desc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="flex flex-col space-y-2">
-          <Label className="text-sm font-medium">{t('contingent.select_type')}</Label>
-          <div className="flex space-x-4">
-            <Button 
-              type="button"
-              variant={institutionType === 'school' ? "default" : "outline"}
-              className={`flex-1 justify-start py-6 ${institutionType === 'school' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
-              onClick={() => {
-                setInstitutionType("school");
-                setSelectedInstitution(null);
-                setContingentName("");
-              }}
-            >
-              <div className="flex flex-col items-center w-full">
-                <SchoolIcon className={`h-6 w-6 mb-2 ${institutionType === 'school' ? 'text-white' : 'text-blue-600'}`} />
-                <span className={`${institutionType === 'school' ? 'text-white' : ''}`}>{t('contingent.school')}</span>
+        {pendingJoinRequest?.hasPendingRequest ? (
+          <div className="space-y-5">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-md text-left">
+              <h4 className="font-medium text-amber-800 mb-2">
+                {t('contingent.pending_request_for')} {pendingJoinRequest.contingentName}
+              </h4>
+              
+              <div className="mb-3">
+                <h5 className="text-sm font-semibold text-amber-700">{t('contingent.institution')}:</h5>
+                <p className="pl-2 border-l-2 border-amber-300 ml-1 mt-1 text-sm">
+                  {pendingJoinRequest.institutionName}
+                </p>
               </div>
-            </Button>
-            <Button 
-              type="button"
-              variant={institutionType === 'independent' ? "default" : "outline"}
-              className={`flex-1 justify-start py-6 ${institutionType === 'independent' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-              onClick={() => {
-                setInstitutionType("independent");
-                setSelectedInstitution(null);
-                setContingentName("");
-              }}
-            >
-              <div className="flex flex-col items-center w-full">
-                <Users className={`h-6 w-6 mb-2 ${institutionType === 'independent' ? 'text-white' : 'text-green-600'}`} />
-                <span className={`${institutionType === 'independent' ? 'text-white' : ''}`}>{t('contingent.independent')}</span>
+              
+              {pendingJoinRequest.primaryManager && (
+                <div className="mb-3">
+                  <h5 className="text-sm font-semibold text-amber-700">{t('contingent.primary_manager')}:</h5>
+                  <div className="pl-2 border-l-2 border-amber-300 ml-1 mt-1">
+                    <p className="text-sm font-medium">{pendingJoinRequest.primaryManager.name}</p>
+                    <p className="text-xs text-gray-600">{pendingJoinRequest.primaryManager.email}</p>
+                    {pendingJoinRequest.primaryManager.phoneNumber && (
+                      <p className="text-xs text-gray-600">{pendingJoinRequest.primaryManager.phoneNumber}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-sm text-amber-600 mt-4">
+                {t('contingent.pending_request_info')}
               </div>
-            </Button>
-          </div>
-        </div>
-        
-        <Separator className="my-4" />
-        
-        {institutionType === 'school' && (
-          <>
-            <div className="flex gap-2">
-              <Input
-                placeholder={t('contingent.search_placeholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSearch();
-                  }
-                }}
-              />
-              <Button type="button" onClick={handleSearch} disabled={isLoading}>
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {t('contingent.search')}
+            </div>
+            
+            <div className="flex justify-center">
+              <Button 
+                variant="destructive" 
+                onClick={handleCancelJoinRequest} 
+                disabled={cancellingRequest}
+              >
+                {cancellingRequest ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {t('contingent.cancelling')}
+                  </>
+                ) : t('contingent.cancel_request')}
               </Button>
             </div>
-
-            {selectedInstitution && (
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col space-y-2">
+              <Label className="text-sm font-medium">{t('contingent.select_type')}</Label>
+              <div className="flex space-x-4">
+                <Button 
+                  type="button"
+                  variant={institutionType === 'school' ? "default" : "outline"}
+                  className={`flex-1 justify-start py-6 ${institutionType === 'school' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                  onClick={() => {
+                    setInstitutionType("school");
+                    setSelectedInstitution(null);
+                    setContingentName("");
+                  }}
+                >
+                  <div className="flex flex-col items-center w-full">
+                    <SchoolIcon className={`h-6 w-6 mb-2 ${institutionType === 'school' ? 'text-white' : 'text-blue-600'}`} />
+                    <span className={`${institutionType === 'school' ? 'text-white' : ''}`}>{t('contingent.school')}</span>
+                  </div>
+                </Button>
+                <Button 
+                  type="button"
+                  variant={institutionType === 'independent' ? "default" : "outline"}
+                  className={`flex-1 justify-start py-6 ${institutionType === 'independent' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                  onClick={() => {
+                    setInstitutionType("independent");
+                    setSelectedInstitution(null);
+                    setContingentName("");
+                  }}
+                >
+                  <div className="flex flex-col items-center w-full">
+                    <Users className={`h-6 w-6 mb-2 ${institutionType === 'independent' ? 'text-white' : 'text-green-600'}`} />
+                    <span className={`${institutionType === 'independent' ? 'text-white' : ''}`}>{t('contingent.independent')}</span>
+                  </div>
+                </Button>
+              </div>
+            </div>
+            
+            <Separator className="my-4" />
+            
+            {institutionType === 'school' && (
               <>
-                <div className="p-4 border rounded-md bg-muted">
-                  <h3 className="font-medium mb-1">
-                    {t('contingent.selected_school')}
-                  </h3>
-                  <p className="text-lg">{selectedInstitution.name}</p>
-                  {'ppd' in selectedInstitution && selectedInstitution.ppd ? (
-                    <p className="text-sm text-muted-foreground">{String(selectedInstitution.ppd)}</p>
-                  ) : null}
-                  <p className="text-sm text-muted-foreground">
-                    {'state' in selectedInstitution && selectedInstitution.state ? 
-                      String(selectedInstitution.state.name) : ''}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder={t('contingent.search_placeholder')}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearch();
+                      }
+                    }}
+                  />
+                  <Button type="button" onClick={handleSearch} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    {t('contingent.search')}
+                  </Button>
+                </div>
+
+                {selectedInstitution && (
+                  <>
+                    <div className="p-4 border rounded-md bg-muted">
+                      <h3 className="font-medium mb-1">
+                        {t('contingent.selected_school')}
+                      </h3>
+                      <p className="text-lg">{selectedInstitution.name}</p>
+                      {'ppd' in selectedInstitution && selectedInstitution.ppd ? (
+                        <p className="text-sm text-muted-foreground">{String(selectedInstitution.ppd)}</p>
+                      ) : null}
+                      <p className="text-sm text-muted-foreground">
+                        {'state' in selectedInstitution && selectedInstitution.state ? 
+                          String(selectedInstitution.state.name) : ''}
+                      </p>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="contingentName">{t('contingent.name')}</Label>
+                        <Input
+                          id="contingentName"
+                          value={contingentName}
+                          onChange={(e) => setContingentName(e.target.value)}
+                          placeholder={t('contingent.name_placeholder')}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="contingentDescription">{t('contingent.description')}</Label>
+                        <Input
+                          id="contingentDescription"
+                          value={contingentDescription}
+                          onChange={(e) => setContingentDescription(e.target.value)}
+                          placeholder={t('contingent.description_placeholder')}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {institutionType === 'independent' && (
+              <>
+                <div className="mb-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {t('contingent.independent_desc')}
                   </p>
                 </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="contingentName">{t('contingent.name')}</Label>
-                    <Input
-                      id="contingentName"
-                      value={contingentName}
-                      onChange={(e) => setContingentName(e.target.value)}
-                      placeholder={t('contingent.name_placeholder')}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="contingentDescription">{t('contingent.description')}</Label>
-                    <Input
-                      id="contingentDescription"
-                      value={contingentDescription}
-                      onChange={(e) => setContingentDescription(e.target.value)}
-                      placeholder={t('contingent.description_placeholder')}
-                    />
-                  </div>
-                </div>
+                <IndependentForm 
+                  onSubmit={(data) => {
+                    setIndependentData(data);
+                    setContingentName(data.name);
+                    toast.success(t('contingent.independent_saved'));
+                  }} 
+                  isLoading={isLoading} 
+                  initialData={independentData as any} 
+                />
               </>
             )}
           </>
         )}
-
-        {institutionType === 'independent' && (
-          <>
-            <div className="mb-4">
-              <p className="text-sm text-muted-foreground mb-2">
-                {t('contingent.independent_desc')}
-              </p>
-            </div>
-            <IndependentForm 
-              onSubmit={(data) => {
-                setIndependentData(data);
-                setContingentName(data.name);
-                toast.success(t('contingent.independent_saved'));
-              }} 
-              isLoading={isLoading} 
-              initialData={independentData as any} 
-            />
-          </>
-        )}
-
-        {/* Second set of name/description fields removed to prevent duplication */}
       </CardContent>
       
       {/* Card footer for independent form */}
-      {institutionType === 'independent' && independentData && (
+      {institutionType === 'independent' && independentData && !pendingJoinRequest?.hasPendingRequest && (
         <CardFooter className="flex justify-end">
           <Button onClick={handleCreateContingent} disabled={isLoading}>
             {isLoading ? (
@@ -346,10 +446,10 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
       )}
       
       {/* Card footer for school form */}
-      {selectedInstitution && (
+      {selectedInstitution && !pendingJoinRequest?.hasPendingRequest && (
         <CardFooter className="flex flex-col space-y-4">
-          <div className="flex justify-between w-full">
-            <Button variant="outline" onClick={() => setSelectedInstitution(null)}>
+          <div className={`${existingContingent ? 'flex flex-col' : 'flex justify-between'} w-full`}>
+            <Button variant="outline" onClick={() => setSelectedInstitution(null)} className={existingContingent ? 'mb-4' : ''}>
               {t('contingent.clear_selection')}
             </Button>
             
@@ -360,11 +460,48 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
                   {t('contingent.checking')}
                 </Button>
               ) : existingContingent ? (
-                <div className="text-right space-y-2">
-                  <div className="text-sm text-amber-500 font-medium">
+                <div className="space-y-3 w-full">
+                  <div className="text-sm text-amber-500 font-medium text-center font-bold mb-2">
                     {t('contingent.already_exists')}
                   </div>
-                  <Button onClick={handleJoinContingent} disabled={isLoading} className="w-full">
+                  
+                  {contingentManagerInfo && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-md text-left">
+                      <h4 className="font-medium text-amber-800 mb-2">Contingent: {contingentManagerInfo.contingentName}</h4>
+                      
+                      {contingentManagerInfo.primaryManager && (
+                        <div className="mb-3">
+                          <h5 className="text-sm font-semibold text-amber-700">Primary Manager:</h5>
+                          <div className="pl-2 border-l-2 border-amber-300 ml-1 mt-1">
+                            <p className="text-sm font-medium">{contingentManagerInfo.primaryManager.name}</p>
+                            <p className="text-xs text-gray-600">{contingentManagerInfo.primaryManager.email}</p>
+                            {contingentManagerInfo.primaryManager.phoneNumber && (
+                              <p className="text-xs text-gray-600">{contingentManagerInfo.primaryManager.phoneNumber}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {contingentManagerInfo.otherManagers && contingentManagerInfo.otherManagers.length > 0 && (
+                        <div>
+                          <h5 className="text-sm font-semibold text-amber-700">Other Contacts:</h5>
+                          <div className="pl-2 border-l-2 border-amber-300 ml-1 mt-1 space-y-2">
+                            {contingentManagerInfo.otherManagers.map((manager) => (
+                              <div key={manager.id} className="text-sm">
+                                <p className="font-medium">{manager.name}</p>
+                                <p className="text-xs text-gray-600">{manager.email}</p>
+                                {manager.phoneNumber && (
+                                  <p className="text-xs text-gray-600">{manager.phoneNumber}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <Button onClick={handleJoinContingent} disabled={isLoading} className="w-full mt-2">
                     {isLoading ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : t('contingent.join_existing')}
@@ -424,11 +561,6 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
               ))
             )}
           </div>
-          <DialogFooter className="sm:justify-start">
-            <Button variant="outline" onClick={() => setShowSearchDialog(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

@@ -2,6 +2,7 @@ import React from "react";
 import { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
+import BulkAssignContestsButton from "./_components/bulk-assign-contests-button";
 
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -258,10 +259,9 @@ const statsCards: StatsCard[] = [
               <thead className="bg-muted">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Contingent</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Institution</th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Contestants</th>
                   <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Created</th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Action</th>
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-muted-foreground uppercase tracking-wider">Action</th>
                 </tr>
               </thead>
               <tbody className="bg-card divide-y divide-border">
@@ -269,7 +269,7 @@ const statsCards: StatsCard[] = [
                   <tr key={contingent.id} className="hover:bg-muted/50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div>
+                        <div className="w-full">
                           <div className="text-sm font-medium">{contingent.name}</div>
                           <div className="text-xs text-muted-foreground flex flex-col space-y-1 mt-1">
                             <div className="flex items-center">
@@ -285,12 +285,12 @@ const statsCards: StatsCard[] = [
                                 <span className="font-semibold mr-1">Phone:</span> {contingent.managerPhone}
                               </div>
                             )}
+                            <div className="flex items-center">
+                              <span className="font-semibold mr-1">School:</span> {contingent.schoolName || contingent.higherName || "Unknown"}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">{contingent.schoolName || contingent.higherName || "Unknown"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col items-center justify-center">
@@ -301,10 +301,33 @@ const statsCards: StatsCard[] = [
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-center text-muted-foreground">
                       {format(new Date(contingent.createdAt), "MMM d, yyyy")}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <Link href={`/organizer/contingents/${contingent.id}`}>
-                        <Button size="sm" variant="outline">View Details</Button>
-                      </Link>
+                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                      <div className="flex justify-center space-x-4">
+                        <div className="group relative">
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                            Assign Contests
+                          </div>
+                          <BulkAssignContestsButton
+                            contingentId={contingent.id}
+                            contingentName={contingent.name}
+                            contestantCount={contingent.contestantCount}
+                          />
+                        </div>
+                        
+                        <div className="group relative">
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+                            View Details
+                          </div>
+                          <Link href={`/organizer/contingents/${contingent.id}`}>
+                            <Button size="icon" variant="outline" className="h-9 w-9">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                              </svg>
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}
