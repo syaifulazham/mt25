@@ -13,6 +13,35 @@ const nextConfig = {
     // During build time, only warn about ESLint errors without failing the build
     ignoreDuringBuilds: true,
   },
+  // Configure static file serving
+  publicRuntimeConfig: {
+    staticFolder: '/uploads',
+  },
+  // Add rewrites to ensure uploaded files are properly served
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: '/uploads/:path*',
+      },
+    ];
+  },
+  // Ensure images from uploads can be optimized
+  images: {
+    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
+        pathname: '/uploads/**',
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

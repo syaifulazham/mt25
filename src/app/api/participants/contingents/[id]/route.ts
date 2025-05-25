@@ -287,22 +287,37 @@ export async function PATCH(
           const fileExtension = logoFile.name.split(".").pop() || "png";
           const fileName = `contingent_${contingentId}_${Date.now()}.${fileExtension}`;
           
-          // Create upload directory if it doesn't exist
-          const uploadDir = join(process.cwd(), "public", "uploads", "contingents");
-          await mkdir(uploadDir, { recursive: true });
+          // Create upload directory path that works in both development and production
+          // For production builds, we need to ensure correct permissions
+          const publicDir = join(process.cwd(), 'public');
+          const uploadDir = join(publicDir, 'uploads', 'contingents');
+          console.log('Upload directory:', uploadDir);
           
-          const filePath = join(uploadDir, fileName);
-          
-          // Write the file
-          await writeFile(filePath, buffer);
-          
-          // Create a URL-friendly path for the file
-          const fileUrl = `/uploads/contingents/${fileName}`;
-          
-          // Add logo URL to update data
-          updateData.logoUrl = fileUrl;
-          
-          console.log('Logo file uploaded successfully:', fileUrl);
+          try {
+            // Ensure directory exists with proper permissions
+            await mkdir(uploadDir, { recursive: true });
+            
+            const filePath = join(uploadDir, fileName);
+            console.log('Full file path:', filePath);
+            
+            // Write the file
+            await writeFile(filePath, buffer);
+            console.log('File written successfully');
+            
+            // Create a URL-friendly path for the file
+            // In Next.js, files in /public are served from the root
+            const fileUrl = `/uploads/contingents/${fileName}`;
+            console.log('File URL for database:', fileUrl);
+            
+            // Add logo URL to update data
+            updateData.logoUrl = fileUrl;
+          } catch (dirError) {
+            console.error('Directory/file error:', dirError);
+            return NextResponse.json(
+              { error: "Failed to save logo file" },
+              { status: 500 }
+            );
+          }
         } catch (error) {
           console.error('Error processing logo file:', error);
           return NextResponse.json(
