@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import prisma from "@/lib/prisma";
+import { join } from "path";
+import { writeFile, mkdir } from "fs/promises";
 
 // GET handler - Get a specific contingent by ID
 export async function GET(
@@ -257,12 +259,57 @@ export async function PATCH(
       // Handle file upload if present
       const logoFile = formData.get('logoFile') as File;
       if (logoFile && logoFile.size > 0) {
-        // Process file upload logic here
-        // This would typically involve storing the file in a storage service
-        // For simplicity, we'll just acknowledge it was received
-        console.log('Logo file received, size:', logoFile.size);
-        // In a real implementation, you would upload this file to your storage
-        // and set updateData.logoUrl to the resulting URL
+        // Check file size (2MB limit)
+        const fileSize = logoFile.size / (1024 * 1024); // Convert to MB
+        if (fileSize > 2) {
+          return NextResponse.json(
+            { error: "File size exceeds the 2MB limit" },
+            { status: 400 }
+          );
+        }
+        
+        // Check file type
+        const fileType = logoFile.type;
+        if (!fileType.startsWith("image/")) {
+          return NextResponse.json(
+            { error: "Only image files are allowed" },
+            { status: 400 }
+          );
+        }
+
+        try {
+          // Create a buffer from the file
+          const bytes = await logoFile.arrayBuffer();
+          const buffer = Buffer.from(bytes);
+          
+          // Create a file path for the uploaded file
+          // Use format contingent_[id]_[timestamp].[extension]
+          const fileExtension = logoFile.name.split(".").pop() || "png";
+          const fileName = `contingent_${contingentId}_${Date.now()}.${fileExtension}`;
+          
+          // Create upload directory if it doesn't exist
+          const uploadDir = join(process.cwd(), "public", "uploads", "contingents");
+          await mkdir(uploadDir, { recursive: true });
+          
+          const filePath = join(uploadDir, fileName);
+          
+          // Write the file
+          await writeFile(filePath, buffer);
+          
+          // Create a URL-friendly path for the file
+          const fileUrl = `/uploads/contingents/${fileName}`;
+          
+          // Add logo URL to update data
+          updateData.logoUrl = fileUrl;
+          
+          console.log('Logo file uploaded successfully:', fileUrl);
+        } catch (error) {
+          console.error('Error processing logo file:', error);
+          return NextResponse.json(
+            { error: "Failed to process logo file" },
+            { status: 500 }
+          );
+        }
       }
     } else {
       // Process JSON

@@ -35,7 +35,7 @@ model contest {
   id                 Int                       @id @default(autoincrement())
   name               String
   code               String                    @unique(map: "Contest_code_key")
-  description        String?
+  description        String?                   @db.Text
   contestType        contest_contestType
   method             contest_method
   judgingMethod      contest_judgingMethod
@@ -43,25 +43,25 @@ model contest {
   startDate          DateTime
   endDate            DateTime
   accessibility      Boolean                   @default(false)
-  minAge             Int? // Minimum age for contestants
-  maxAge             Int? // Maximum age for contestants
-  maxMembersPerTeam  Int?                      @default(1) // Maximum number of contestants per team
+  minAge             Int?
+  maxAge             Int?
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
   themeId            Int?
   judgingTemplateId  Int?
+  eventId            Int?
+  maxMembersPerTeam  Int?                      @default(1)
+  event              event?                    @relation("eventToContest", fields: [eventId], references: [id], map: "Contest_eventId_fkey")
   judgingtemplate    judgingtemplate?          @relation(fields: [judgingTemplateId], references: [id], map: "Contest_judgingTemplateId_fkey")
   theme              theme?                    @relation(fields: [themeId], references: [id], map: "Contest_themeId_fkey")
-  eventId            Int? // New field for event relation
-  event              event?                    @relation("eventToContest", fields: [eventId], references: [id], map: "Contest_eventId_fkey")
-  contestants        contestParticipation[] // Direct relation to contestants through participation table
+  contestants        contestParticipation[]
+  eventcontests      eventcontest[]
   judging            judging[]
+  quizzes            quiz[]
   result             result[]
   submission         submission[]
+  teams              team[]
   targetgroup        targetgroup[]             @relation("contesttotargetgroup")
-  quizzes            quiz[] // Added relation to quizzes for QUIZ contest type
-  teams              team[] // Teams participating in this contest
-  eventcontests      eventcontest[] // New relation to eventcontest join table
 
   @@index([judgingTemplateId], map: "Contest_judgingTemplateId_fkey")
   @@index([themeId], map: "Contest_themeId_fkey")
@@ -69,20 +69,18 @@ model contest {
 }
 
 model independent {
-  id          Int      @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   name        String
   address     String?
   town        String?
   postcode    String?
   stateId     Int
-  institution String? // Optional field for affiliation
-  type        String // PARENT or YOUTH_GROUP
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  state       state        @relation(fields: [stateId], references: [id])
+  institution String?
+  type        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   contingents contingent[]
+  state       state        @relation(fields: [stateId], references: [id])
 
   @@index([stateId])
 }
@@ -90,25 +88,25 @@ model independent {
 model contingent {
   id                   Int                 @id @default(autoincrement())
   name                 String
-  short_name           String? // Added short name field
-  logoUrl              String? // Added logo URL field
   schoolId             Int?
   higherInstId         Int?
-  independentId        Int? // New field for independent contingent reference
-  contingentType       String              @default("SCHOOL") // SCHOOL, HIGHER_INST, INDEPENDENT
   createdAt            DateTime            @default(now())
   description          String?
   updatedAt            DateTime
+  participantId        Int?
+  managedByParticipant Boolean             @default(true)
+  logoUrl              String?
+  short_name           String?
+  contingentType       String              @default("SCHOOL")
+  independentId        Int?
+  contestants          contestant[]
   school               school?             @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
   higherInstitution    higherinstitution?  @relation(fields: [higherInstId], references: [id])
   independent          independent?        @relation(fields: [independentId], references: [id])
-  contestants          contestant[]
-  teams                team[]
-  participantId        Int?
   participant          user_participant?   @relation(fields: [participantId], references: [id])
+  managers             contingentManager[]
   requests             contingentRequest[]
-  managedByParticipant Boolean             @default(true)
-  managers             contingentManager[] // New relation to contingent managers
+  teams                team[]
 
   @@index([schoolId], map: "Contingent_schoolId_fkey")
   @@index([participantId])
@@ -117,7 +115,7 @@ model contingent {
 }
 
 model contestant {
-  id           Int       @id @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
   name         String
   ic           String?
   email        String?
@@ -128,86 +126,83 @@ model contestant {
   edu_level    String
   class_grade  String?
   class_name   String?
-  hashcode     String?   @unique
-  status       String    @default("ACTIVE")
-  is_ppki      Boolean   @default(false)
+  hashcode     String?                @unique
+  status       String                 @default("ACTIVE")
   contingentId Int
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   createdById  Int?
   updatedById  Int?
-
-  // Relations
+  is_ppki      Boolean                @default(false)
+  contests     contestParticipation[]
   contingent   contingent             @relation(fields: [contingentId], references: [id], onDelete: Cascade)
   quizAttempts quiz_attempt[]
-  teamMembers  teamMember[]
   submissions  submission[]
-  contests     contestParticipation[]
+  teamMembers  teamMember[]
+
+  @@index([contingentId], map: "contestant_contingentId_fkey")
 }
 
 model contestParticipation {
-  id           Int      @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   contestId    Int
   contestantId Int
-  registeredAt DateTime @default(now())
-  status       String   @default("REGISTERED") // REGISTERED, CONFIRMED, WITHDRAWN
+  registeredAt DateTime   @default(now())
+  status       String     @default("REGISTERED")
   notes        String?
+  contest      contest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
 
-  contest    contest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  contestant contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
-
-  @@unique([contestId, contestantId]) // Prevent duplicate registrations
+  @@unique([contestId, contestantId])
   @@index([contestId])
   @@index([contestantId])
 }
 
 model event {
-  id           Int        @id @default(autoincrement())
-  name         String
-  scopeArea    scope_area @default(OPEN)
-  code         String     @unique(map: "Event_code_key")
-  description  String?
-  startDate    DateTime
-  endDate      DateTime
-  venue        String?
-  address      String?
-  city         String?
-  addressState String?
-  zoneId       Int?
-  stateId      Int?
-  latitude     Float?
-  longitude    Float?
-  isActive     Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id            Int            @id @default(autoincrement())
+  name          String
+  scopeArea     scope_area     @default(OPEN)
+  code          String         @unique(map: "Event_code_key")
+  description   String?
+  startDate     DateTime
+  endDate       DateTime
+  venue         String?
+  address       String?
+  city          String?
+  addressState  String?
+  zoneId        Int?
+  stateId       Int?
+  latitude      Float?
+  longitude     Float?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  contests      contest[]      @relation("eventToContest")
+  state         state?         @relation(fields: [stateId], references: [id])
+  zone          zone?          @relation(fields: [zoneId], references: [id])
+  eventcontests eventcontest[]
 
-  // Relations
-  contests     contest[]      @relation("eventToContest")
-  eventcontests eventcontest[] // New relation to event contests
-  zone         zone?          @relation(fields: [zoneId], references: [id])
-  state        state?         @relation(fields: [stateId], references: [id])
+  @@index([stateId], map: "event_stateId_fkey")
+  @@index([zoneId], map: "event_zoneId_fkey")
 }
 
-// EventContest join table model
 model eventcontest {
-  id                   Int      @id @default(autoincrement())
-  eventId              Int
-  contestId            Int
-  maxteampercontingent Int      @default(1)   // Maximum teams per contingent allowed for this contest in this event
-  person_incharge      String?  // Person responsible for this contest in this event
-  person_incharge_phone String? // Contact number for the person in charge
-  isActive             Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                    Int                 @id @default(autoincrement())
+  eventId               Int
+  contestId             Int
+  maxteampercontingent  Int                 @default(1)
+  person_incharge       String?
+  person_incharge_phone String?
+  isActive              Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  contest               contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  event                 event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judges                eventcontestjudge[]
+  eventcontestteam      eventcontestteam[]
+  teams                 team[]
 
-  // Relations
-  event    event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  contest  contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  teams    team[]   // Teams assigned to this event contest
-  judges   eventcontestjudge[] // Judges assigned to this event contest
-  eventcontestteam eventcontestteam[] // Relation to team registrations
-
-  @@unique([eventId, contestId]) // Prevent duplicate contest assignments to events
+  @@unique([eventId, contestId])
   @@index([eventId])
   @@index([contestId])
 }
@@ -216,31 +211,30 @@ model eventcontestteam {
   id             Int          @id @default(autoincrement())
   eventcontestId Int
   teamId         Int
-  teamPriority   Int          @default(0) // Priority of the team in contingent
-  status         String       @default("PENDING") // PENDING, APPROVED, REJECTED
+  teamPriority   Int          @default(0)
+  status         String       @default("PENDING")
   createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  updatedAt      DateTime     @default(now()) @updatedAt
+  eventcontest   eventcontest @relation(fields: [eventcontestId], references: [id], onDelete: Cascade)
+  team           team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
-  // Relations
-  eventcontest eventcontest @relation(fields: [eventcontestId], references: [id], onDelete: Cascade)
-  team         team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  @@index([eventcontestId])
+  @@index([eventcontestId, teamId], map: "eventcontestteam_eventcontest_team_idx")
+  @@index([teamId])
 }
 
-// Event Contest Judge association model
 model eventcontestjudge {
   id             Int          @id @default(autoincrement())
   eventcontestId Int
-  userId         Int          // Judge user ID
-  isChiefJudge   Boolean      @default(false) // Whether this judge is the chief judge
+  userId         Int
+  isChiefJudge   Boolean      @default(false)
   notes          String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-
-  // Relations
   eventcontest   eventcontest @relation(fields: [eventcontestId], references: [id], onDelete: Cascade)
   user           user         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([eventcontestId, userId]) // Prevent duplicate judge assignments
+  @@unique([eventcontestId, userId])
   @@index([eventcontestId])
   @@index([userId])
 }
@@ -256,9 +250,9 @@ model higherinstitution {
   latitude     Float?
   longitude    Float?
   createdAt    DateTime           @default(now())
+  contingents  contingent[]
   state        state              @relation(fields: [stateId], references: [id], map: "HigherInstitution_stateId_fkey")
   participants user_participant[]
-  contingents  contingent[]
 
   @@index([stateId], map: "HigherInstitution_stateId_fkey")
 }
@@ -353,25 +347,25 @@ model photogallery {
   description String?  @db.Text
   coverPhoto  String?
   isPublished Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(dbgenerated("(now(3))"))
   updatedAt   DateTime @updatedAt
   userId      Int
-  user        user     @relation(fields: [userId], references: [id], map: "PhotoGallery_userId_fkey")
   photos      photo[]
+  user        user     @relation(fields: [userId], references: [id], map: "PhotoGallery_userId_fkey")
 
   @@index([userId], map: "PhotoGallery_userId_fkey")
 }
 
 model photo {
   id          Int          @id @default(autoincrement())
-  path        String // URL or path to the photo
+  path        String
   title       String?
   description String?      @db.Text
   sortOrder   Int          @default(0)
   galleryId   Int
-  gallery     photogallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime     @default(dbgenerated("(now(3))"))
   updatedAt   DateTime     @updatedAt
+  gallery     photogallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
 
   @@index([galleryId])
 }
@@ -423,7 +417,7 @@ model school {
   name         String
   ppd          String?
   code         String             @unique(map: "School_code_key")
-  address      String?
+  address      String?            @db.Text
   city         String?
   postcode     String?
   stateId      Int
@@ -443,10 +437,10 @@ model state {
   id                Int                 @id @default(autoincrement())
   name              String              @unique(map: "State_name_key")
   zoneId            Int
-  higherinstitution higherinstitution[]
-  school            school[]
   events            event[]
-  independents      independent[] // Relation to independent entities
+  higherinstitution higherinstitution[]
+  independents      independent[]
+  school            school[]
   zone              zone                @relation(fields: [zoneId], references: [id], map: "State_zoneId_fkey")
 
   @@index([zoneId], map: "State_zoneId_fkey")
@@ -458,16 +452,16 @@ model submission {
   userId        Int?
   submittedAt   DateTime          @default(now())
   status        submission_status @default(PENDING)
-  judging       judging[]
   metadata      Json?
+  participantId Int?
+  contestantId  Int?
+  judging       judging[]
+  quiz_attempts quiz_attempt[]
   result        result[]
   contest       contest           @relation(fields: [contestId], references: [id], map: "Submission_contestId_fkey")
   user          user?             @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
-  participantId Int?
   contestant    contestant?       @relation(fields: [contestantId], references: [id])
-  contestantId  Int?
   participant   user_participant? @relation(fields: [participantId], references: [id])
-  quiz_attempts quiz_attempt[] // Added for quiz contest submissions, onDelete: SetNull)
 
   @@index([contestId], map: "Submission_contestId_fkey")
   @@index([userId], map: "Submission_userId_fkey")
@@ -498,58 +492,262 @@ model theme {
 }
 
 model user {
-  id             Int                 @id @default(autoincrement())
-  name           String?
-  email          String              @unique(map: "User_email_key")
-  password       String?
-  role           user_role           @default(ADMIN)
-  username       String              @unique(map: "User_username_key")
-  isActive       Boolean             @default(true)
-  lastLogin      DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime
-  announcement   announcement[]
-  judging        judging[]
-  news           news[]
-  notification   notification[]
-  submission     submission[]
-  photogalleries photogallery[]
-  eventcontestjudges eventcontestjudge[] // Added relation to event contest judges
+  id                 Int                 @id @default(autoincrement())
+  name               String?
+  email              String              @unique(map: "User_email_key")
+  password           String?
+  role               user_role           @default(ADMIN)
+  username           String              @unique(map: "User_username_key")
+  isActive           Boolean             @default(true)
+  lastLogin          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime
+  announcement       announcement[]
+  eventcontestjudges eventcontestjudge[]
+  judging            judging[]
+  news               news[]
+  notification       notification[]
+  photogalleries     photogallery[]
+  submission         submission[]
 }
 
 model user_participant {
-  id           Int       @id @default(autoincrement())
-  name         String
-  email        String    @unique
-  password     String?
-  username     String    @unique
-  ic           String? // IC number for Malaysian participants
-  phoneNumber  String?
-  gender       String?
-  dateOfBirth  DateTime?
-  schoolId     Int?
-  higherInstId Int?
-  isActive     Boolean   @default(true)
-  lastLogin    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  // Relations
-  school             school?             @relation(fields: [schoolId], references: [id])
-  higherInstitution  higherinstitution?  @relation(fields: [higherInstId], references: [id])
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  email              String              @unique
+  password           String?
+  username           String              @unique
+  ic                 String?
+  phoneNumber        String?
+  gender             String?
+  dateOfBirth        DateTime?
+  schoolId           Int?
+  higherInstId       Int?
+  isActive           Boolean             @default(true)
+  lastLogin          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   contingents        contingent[]
-  submissions        submission[]
+  managedContingents contingentManager[]
   contingentRequests contingentRequest[]
-  managedContingents contingentManager[] // Added relation to managed contingents
-  teamManagers       teamManager[] // Relation to teams managed by this participant
-  createdManagers    manager[] // Relation to independent managers created by this participant
+  createdManagers    manager[]
+  submissions        submission[]
+  teamManagers       teamManager[]
+  higherInstitution  higherinstitution?  @relation(fields: [higherInstId], references: [id])
+  school             school?             @relation(fields: [schoolId], references: [id])
+
+  @@index([higherInstId], map: "user_participant_higherInstId_fkey")
+  @@index([schoolId], map: "user_participant_schoolId_fkey")
 }
 
 model zone {
   id     Int     @id @default(autoincrement())
   name   String  @unique(map: "Zone_name_key")
-  state  state[]
   events event[]
+  state  state[]
+}
+
+model question_bank {
+  id              Int             @id @default(autoincrement())
+  target_group    String
+  knowledge_field String
+  question        String          @db.Text
+  question_image  String?
+  answer_type     String
+  answer_options  Json
+  answer_correct  String
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  quiz_questions  quiz_question[]
+
+  @@index([knowledge_field])
+  @@index([target_group])
+}
+
+model quiz {
+  id             Int             @id @default(autoincrement())
+  target_group   String
+  quiz_name      String
+  description    String?         @db.Text
+  time_limit     Int?
+  publishedAt    DateTime?
+  status         String
+  createdBy      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  contestId      Int?
+  contest        contest?        @relation(fields: [contestId], references: [id])
+  quiz_attempts  quiz_attempt[]
+  quiz_questions quiz_question[]
+
+  @@index([status])
+  @@index([target_group])
+  @@index([contestId], map: "quiz_contestId_fkey")
+}
+
+model quiz_question {
+  id         Int           @id @default(autoincrement())
+  quizId     Int
+  questionId Int
+  order      Int
+  points     Int           @default(1)
+  question   question_bank @relation(fields: [questionId], references: [id])
+  quiz       quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionId])
+  @@index([quizId])
+  @@index([questionId])
+}
+
+model quiz_attempt {
+  id           Int           @id @default(autoincrement())
+  quizId       Int
+  contestantId Int
+  status       String
+  score        Int?
+  start_time   DateTime
+  end_time     DateTime?
+  time_taken   Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  submissionId Int?
+  answers      quiz_answer[]
+  contestant   contestant    @relation(fields: [contestantId], references: [id])
+  quiz         quiz          @relation(fields: [quizId], references: [id])
+  submission   submission?   @relation(fields: [submissionId], references: [id])
+
+  @@index([contestantId])
+  @@index([quizId])
+  @@index([submissionId])
+}
+
+model quiz_answer {
+  id               Int          @id @default(autoincrement())
+  attemptId        Int
+  questionId       Int
+  selected_options Json
+  is_correct       Boolean
+  points_earned    Int
+  createdAt        DateTime     @default(now())
+  attempt          quiz_attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId], map: "quiz_answer_attemptId_fkey")
+}
+
+model contingentRequest {
+  id            Int              @id @default(autoincrement())
+  contingentId  Int
+  participantId Int
+  status        String           @default("PENDING")
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  contingent    contingent       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  participant   user_participant @relation(fields: [participantId], references: [id])
+
+  @@index([contingentId])
+  @@index([participantId])
+}
+
+model contingentManager {
+  id            Int              @id @default(autoincrement())
+  participantId Int
+  contingentId  Int
+  isOwner       Boolean          @default(false)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  contingent    contingent       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  participant   user_participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, contingentId])
+  @@index([participantId])
+  @@index([contingentId])
+}
+
+model video {
+  id                Int      @id @default(autoincrement())
+  group_name        String
+  title             String
+  video_description String?  @db.Text
+  video_link        String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  isActive          Boolean  @default(true)
+}
+
+model team {
+  id                     Int                @id @default(autoincrement())
+  name                   String
+  hashcode               String             @unique
+  description            String?            @db.Text
+  contestId              Int
+  contingentId           Int
+  status                 String             @default("ACTIVE")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  maxMembers             Int                @default(4)
+  eventcontestId         Int?
+  team_email             String?            @db.VarChar(255)
+  evidence_doc           String?            @db.Text
+  evidence_submitteddate DateTime?          @db.DateTime(0)
+  eventcontestteam       eventcontestteam[]
+  independentManagers    manager[]
+  contest                contest            @relation(fields: [contestId], references: [id])
+  contingent             contingent         @relation(fields: [contingentId], references: [id])
+  eventcontest           eventcontest?      @relation(fields: [eventcontestId], references: [id])
+  managers               teamManager[]
+  members                teamMember[]
+
+  @@index([contestId])
+  @@index([contingentId])
+  @@index([eventcontestId])
+}
+
+model teamManager {
+  id            Int              @id @default(autoincrement())
+  teamId        Int
+  participantId Int
+  isOwner       Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  participant   user_participant @relation(fields: [participantId], references: [id])
+  team          team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, participantId])
+  @@index([teamId])
+  @@index([participantId])
+}
+
+model teamMember {
+  id           Int        @id @default(autoincrement())
+  teamId       Int
+  contestantId Int
+  role         String?
+  joinedAt     DateTime   @default(now())
+  contestant   contestant @relation(fields: [contestantId], references: [id])
+  team         team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, contestantId])
+  @@index([teamId])
+  @@index([contestantId])
+}
+
+model manager {
+  id          Int              @id @default(autoincrement())
+  name        String
+  ic          String
+  hashcode    String           @unique
+  teamId      Int?
+  createdAt   DateTime         @default(dbgenerated("(now(3))"))
+  updatedAt   DateTime         @updatedAt
+  createdBy   Int
+  email       String?
+  phoneNumber String?
+  creator     user_participant @relation(fields: [createdBy], references: [id])
+  team        team?            @relation(fields: [teamId], references: [id])
+
+  @@index([teamId])
+  @@index([createdBy])
 }
 
 enum contest_contestType {
@@ -622,229 +820,4 @@ enum scope_area {
   ZONE
   STATE
   OPEN
-}
-
-// target_group model removed to avoid schema conflicts with existing targetgroup model
-
-model question_bank {
-  id              Int      @id @default(autoincrement())
-  target_group    String // Target group name (e.g. PRIMARY, SECONDARY, HIGHER)
-  knowledge_field String // E.g., general science, robotics, AI, physics, math, etc.
-  question        String   @db.Text
-  question_image  String? // URL to image if exists
-  answer_type     String // single_selection, multiple_selection, binary
-  answer_options  Json // JSON array of option objects
-  answer_correct  String // Correct option(s) like "A" or "A,C" for multiple
-  createdBy       String? // Username or email of creator (optional string instead of foreign key)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  quiz_questions quiz_question[] // Questions can be used in multiple quizzes
-
-  @@index([knowledge_field])
-  @@index([target_group]) // Keep index for performance
-}
-
-model quiz {
-  id           Int       @id @default(autoincrement())
-  target_group String // Target group name (e.g. PRIMARY, SECONDARY, HIGHER)
-  quiz_name    String // Name/title of the quiz
-  description  String?   @db.Text
-  time_limit   Int? // Time limit in minutes, null for no limit
-  publishedAt  DateTime? // When quiz was published
-  status       String // created, published, retracted, ended
-  createdBy    String? // Creator name or email (string instead of foreign key)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  contestId    Int? // Optional reference to contest if this quiz is part of a contest
-
-  // Relations
-  contest        contest?        @relation(fields: [contestId], references: [id])
-  quiz_questions quiz_question[] // Questions assigned to this quiz
-  quiz_attempts  quiz_attempt[]
-
-  @@index([status])
-  @@index([target_group]) // Keep index for performance
-}
-
-model quiz_question {
-  id         Int @id @default(autoincrement())
-  quizId     Int
-  questionId Int
-  order      Int // Order of question in the quiz
-  points     Int @default(1) // Points for this question
-
-  // Relations
-  quiz     quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  question question_bank @relation(fields: [questionId], references: [id])
-
-  @@unique([quizId, questionId]) // A question can only be assigned once to a quiz
-  @@index([quizId])
-  @@index([questionId])
-}
-
-model quiz_attempt {
-  id           Int       @id @default(autoincrement())
-  quizId       Int
-  contestantId Int // Changed from participantId to contestantId
-  status       String // started, completed, abandoned
-  score        Int? // Total score earned
-  start_time   DateTime
-  end_time     DateTime?
-  time_taken   Int? // Time taken in seconds
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  submissionId Int? // Reference to submission record if this attempt is part of a contest
-
-  quiz       quiz          @relation(fields: [quizId], references: [id])
-  contestant contestant    @relation(fields: [contestantId], references: [id])
-  submission submission?   @relation(fields: [submissionId], references: [id])
-  answers    quiz_answer[]
-
-  @@index([contestantId])
-  @@index([quizId])
-  @@index([submissionId])
-}
-
-model quiz_answer {
-  id               Int      @id @default(autoincrement())
-  attemptId        Int
-  questionId       Int // ID of the quiz_question
-  selected_options Json // Array of selected option codes
-  is_correct       Boolean
-  points_earned    Int
-  createdAt        DateTime @default(now())
-
-  attempt quiz_attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-}
-
-model contingentRequest {
-  id            Int      @id @default(autoincrement())
-  contingentId  Int
-  participantId Int
-  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  contingent  contingent       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
-  participant user_participant @relation(fields: [participantId], references: [id])
-
-  @@index([contingentId])
-  @@index([participantId])
-}
-
-// Join table for many-to-many relationship between participants and contingents
-model contingentManager {
-  id            Int      @id @default(autoincrement())
-  participantId Int // Changed from userId to participantId
-  contingentId  Int
-  isOwner       Boolean  @default(false) // Indicates if this participant is the primary owner of the contingent
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  participant user_participant @relation(fields: [participantId], references: [id], onDelete: Cascade) // Changed relation to user_participant
-  contingent  contingent       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
-
-  @@unique([participantId, contingentId]) // Prevent duplicate manager entries
-  @@index([participantId])
-  @@index([contingentId])
-}
-
-model video {
-  id                Int      @id @default(autoincrement())
-  group_name        String // Category or group name for the video
-  title             String
-  video_description String?  @db.Text
-  video_link        String // Google Drive file ID or full URL
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  isActive          Boolean  @default(true)
-}
-
-// Team model for contest participation
-model team {
-  id            Int      @id @default(autoincrement())
-  name          String
-  hashcode      String   @unique // Unique code for team identification
-  description   String?  @db.Text
-  team_email    String? // Team contact email
-  evidence_doc  String? // Document reference or URL for submitted evidence
-  evidence_submitteddate DateTime? // Date when evidence was submitted
-  contestId     Int // Required contest association
-  contingentId  Int // Required contingent association
-  eventcontestId Int? // Link to the specific event contest
-  status        String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  maxMembers    Int      @default(4) // Maximum number of contestants in the team
-
-  // Relations
-  contest              contest       @relation(fields: [contestId], references: [id])
-  contingent           contingent    @relation(fields: [contingentId], references: [id])
-  eventcontest         eventcontest? @relation(fields: [eventcontestId], references: [id])
-  members              teamMember[]
-  managers             teamManager[]
-  independentManagers  manager[]
-  eventcontestteam     eventcontestteam[] // Team registrations for event contests
-
-  @@index([contestId])
-  @@index([contingentId])
-  @@index([eventcontestId])
-}
-
-// Team manager model (initially limited to 1 manager per team)
-model teamManager {
-  id            Int      @id @default(autoincrement())
-  teamId        Int
-  participantId Int
-  isOwner       Boolean  @default(true) // Indicates primary manager/owner
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  team        team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  participant user_participant @relation(fields: [participantId], references: [id])
-
-  @@unique([teamId, participantId]) // Prevent duplicate manager entries
-  @@index([teamId])
-  @@index([participantId])
-}
-
-// Team member model for tracking contestants in teams
-model teamMember {
-  id           Int      @id @default(autoincrement())
-  teamId       Int
-  contestantId Int
-  role         String? // Optional role within team
-  joinedAt     DateTime @default(now())
-
-  // Relations
-  team       team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  contestant contestant @relation(fields: [contestantId], references: [id])
-
-  @@unique([teamId, contestantId]) // Prevent duplicate member entries
-  @@index([teamId])
-  @@index([contestantId])
-}
-
-// Independent manager model (not tied to user or user_participant)
-model manager {
-  id          Int      @id @default(autoincrement())
-  name        String
-  ic          String // Malaysian IC number
-  email       String? // Optional email address
-  phoneNumber String? // Optional phone number
-  hashcode    String   @unique // Unique identifier code
-  teamId      Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdBy   Int // ID of the user_participant who created this manager
-
-  // Relations
-  team    team?            @relation(fields: [teamId], references: [id])
-  creator user_participant @relation(fields: [createdBy], references: [id])
-
-  @@index([teamId])
-  @@index([createdBy])
 }

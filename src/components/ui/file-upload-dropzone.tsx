@@ -92,7 +92,7 @@ export function FileUploadDropzone({
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      e.preventDefault();
+      // Note: preventDefault() is not needed for change events
       if (e.target.files && e.target.files[0]) {
         processFile(e.target.files[0]);
       }
