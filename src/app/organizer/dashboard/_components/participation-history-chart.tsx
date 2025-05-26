@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import {
   ResponsiveContainer,
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -34,6 +35,8 @@ export default function ParticipationHistoryChart({ data }: ParticipationByDayPr
         day: 'numeric' 
       }),
       count: item.count,
+      // Initialize average property
+      average: null as number | null,
       // Store the original date for tooltips
       fullDate: new Date(item.date).toLocaleDateString(undefined, {
         year: 'numeric',
@@ -107,7 +110,7 @@ export default function ParticipationHistoryChart({ data }: ParticipationByDayPr
       </CardHeader>
       <CardContent className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
+          <ComposedChart
             data={chartData}
             margin={{
               top: 5,
@@ -140,8 +143,17 @@ export default function ParticipationHistoryChart({ data }: ParticipationByDayPr
             <Legend verticalAlign="top" />
             <ReferenceLine y={avgParticipations} stroke="#8884d8" strokeDasharray="3 3" label={{ value: 'Avg', position: 'left' }} />
             <Bar dataKey="count" name="Daily Registrations" fill="#3b82f6" barSize={chartData.length > 60 ? 3 : 10} />
-            <Bar dataKey="average" name="7-day average" fill="#6366f1" barSize={chartData.length > 60 ? 2 : 5} />
-          </BarChart>
+            <Line 
+              dataKey="average" 
+              name="7-day average" 
+              stroke="#6366f1" 
+              strokeDasharray="3 3" 
+              dot={{ r: 3, fill: "#6366f1" }} 
+              activeDot={{ r: 5 }} 
+              connectNulls={true} 
+              type="monotone" 
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

@@ -905,30 +905,7 @@ export default async function DashboardPage() {
         recentLogins={recentLogins}
       />
       
-      {/* Quick Actions */}
-      <div>
-        <h2 className="text-lg font-medium mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button asChild variant="outline" className="h-auto py-4 flex flex-col items-center justify-center gap-2 rounded-lg">
-            <Link href="/organizer/contests/new">
-              <Trophy className="h-6 w-6" />
-              <div>Create New Contest</div>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-auto py-4 flex flex-col items-center justify-center gap-2 rounded-lg">
-            <Link href="/organizer/users/new">
-              <Users className="h-6 w-6" />
-              <div>Add New User</div>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-auto py-4 flex flex-col items-center justify-center gap-2 rounded-lg">
-            <Link href="/organizer/schools">
-              <Database className="h-6 w-6" />
-              <div>Manage Institutions</div>
-            </Link>
-          </Button>
-        </div>
-      </div>
+      {/* Quick Actions section has been removed */}
     </div>
   );
 }

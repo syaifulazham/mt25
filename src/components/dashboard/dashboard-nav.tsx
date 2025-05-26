@@ -196,23 +196,32 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
       {/* Navigation */}
       <nav className="mt-6 px-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-start"} px-4 py-2 text-sm font-medium rounded-md ${
-                isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-              }`}
-            >
-              <span className="flex-shrink-0">{item.icon}</span>
-              {!isCollapsed && <span className="hidden lg:inline ml-3">{item.title}</span>}
-            </Link>
-          );
-        })}
+        {navItems
+          .filter(item => {
+            // For VIEWER role, only show Dashboard
+            if (user.role === 'VIEWER') {
+              return item.title === 'Dashboard';
+            }
+            // For ADMIN and OPERATOR roles, show all menu items
+            return true;
+          })
+          .map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-start"} px-4 py-2 text-sm font-medium rounded-md ${
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                }`}
+              >
+                <span className="flex-shrink-0">{item.icon}</span>
+                {!isCollapsed && <span className="hidden lg:inline ml-3">{item.title}</span>}
+              </Link>
+            );
+          })}
       </nav>
 
       {/* Logout button */}
