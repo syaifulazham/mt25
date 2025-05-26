@@ -33,7 +33,14 @@ export function ContingentDetailsForm({
   handleUpdateContingent,
   updateSuccess
 }: ContingentDetailsFormProps) {
-  const logoUrl = selectedContingent.logoUrl || '/images/__logo__.png';
+  // Make sure the logo URL has the proper format for Next.js to locate it
+  const logoUrl = selectedContingent.logoUrl 
+    ? (selectedContingent.logoUrl.startsWith('http') 
+      ? selectedContingent.logoUrl 
+      : selectedContingent.logoUrl.startsWith('/') 
+        ? selectedContingent.logoUrl 
+        : `/${selectedContingent.logoUrl}`)
+    : '/images/__logo__.png';
   const { t } = useLanguage();
   
   return (
