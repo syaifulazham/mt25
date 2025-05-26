@@ -842,6 +842,9 @@
   "requests.approved": "Diluluskan",
   "requests.rejected": "Ditolak",
   
+  "common.error": "Ralat",
+  "common.search": "Cari",
+  
   "sidebar.explorer": "Penjelajah",
   "sidebar.dashboard": "Papan Pemuka",
   "sidebar.profile": "Profil",

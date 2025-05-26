@@ -141,7 +141,7 @@ export default function ContestantsPage() {
     }
   };
   
-  // Fetch contestants with filters and pagination
+  // Fetch contestants with filters, search query and pagination
   const fetchContestants = async (page = currentPage) => {
     if (!session?.user?.email) return;
     
@@ -153,6 +153,15 @@ export default function ContestantsPage() {
       const params = new URLSearchParams();
       params.append('page', page.toString());
       params.append('limit', limit.toString());
+      
+      // Add search query to API parameters for server-side searching
+      if (searchQuery && searchQuery.trim() !== '') {
+        params.append('search', searchQuery.trim());
+      }
+      
+      if (eduLevelFilter && eduLevelFilter !== 'all') {
+        params.append('edu_level', eduLevelFilter);
+      }
       
       if (classGradeFilter && classGradeFilter !== 'all') {
         params.append('class_grade', classGradeFilter);
@@ -166,7 +175,7 @@ export default function ContestantsPage() {
         params.append('age', ageFilter);
       }
       
-      // Fetch contestants with filters and pagination
+      // Fetch contestants with search, filters and pagination
       const contestantsResponse = await fetch(`/api/participants/contestants?${params.toString()}`);
       
       if (!contestantsResponse.ok) {
@@ -199,19 +208,23 @@ export default function ContestantsPage() {
     }
   }, [session]);
   
-  // Filter contestants based on search query and education level (client-side filtering for the search box only)
-  const filteredContestants = contestants.filter(contestant => {
-    const matchesSearch = 
-      searchQuery === "" || 
-      contestant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contestant.ic.includes(searchQuery);
+  // Use server-side filtering now (all filtering is done via API)
+  const filteredContestants = contestants;
+  
+  // Handle search query changes with debounce
+  useEffect(() => {
+    // Use debounce to avoid excessive API calls while typing
+    const timer = setTimeout(() => {
+      fetchContestants(1); // Reset to first page when search query changes
+    }, 500); // 500ms debounce
     
-    const matchesEduLevel = 
-      eduLevelFilter === "all" || 
-      contestant.edu_level === eduLevelFilter;
-    
-    return matchesSearch && matchesEduLevel;
-  });
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Handle education level filter changes
+  useEffect(() => {
+    fetchContestants(1); // Reset to first page when edu level filter changes
+  }, [eduLevelFilter]);
   
   // Handle filter apply
   const handleFilterApply = () => {
@@ -220,6 +233,8 @@ export default function ContestantsPage() {
   
   // Handle filter reset
   const handleFilterReset = () => {
+    setSearchQuery(""); // Also reset search query
+    setEduLevelFilter("all"); // Reset education level filter
     setClassGradeFilter("");
     setClassNameFilter("");
     setAgeFilter("");
@@ -570,16 +585,28 @@ export default function ContestantsPage() {
       
       <div className="space-y-4">
         {/* Search and filter controls */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
+        <form 
+          className="flex flex-col sm:flex-row gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchContestants(1); // Reset to first page when searching
+          }}
+        >
+          <div className="relative flex-1 flex">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder={t('contestant.search_placeholder')}
-              className="pl-8"
+              className="pl-8 rounded-r-none"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <Button 
+              type="submit" 
+              className="rounded-l-none"
+            >
+              {t('common.search') || 'Search'}
+            </Button>
           </div>
           
           <div className="flex flex-row gap-2">
@@ -594,7 +621,7 @@ export default function ContestantsPage() {
               <option value="belia">{t('contestant.youth')}</option>
             </select>
           </div>
-        </div>
+        </form>
         
         {/* Advanced Filters */}
         <ContestantsFilters

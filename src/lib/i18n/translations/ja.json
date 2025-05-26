@@ -369,6 +369,8 @@
   "contestant.action.edit_contestant": "競技者を編集",
   "contestant.action.view": "表示",
   "contestant.action.export": "エクスポート",
+  "contestant.export": "エクスポート",
+  "contestant.export_docx": "DOCXとしてエクスポート",
   "contestant.no_contestants_found": "競技者が見つかりません。",
   "contestant.add_contestant": "競技者を追加",
   "contestant.showing": "表示中",
@@ -841,6 +843,7 @@
   
   "common.loading": "読み込み中...",
   "common.error": "エラー",
+  "common.search": "検索",
   "common.save": "保存",
   "common.confirmationPrompt": "よろしいですか？",
   "common.confirm": "確認",

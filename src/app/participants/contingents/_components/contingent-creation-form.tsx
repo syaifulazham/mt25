@@ -231,10 +231,10 @@ export function ContingentCreationForm({ userId, onContingentCreated }: Continge
 
     try {
       setIsLoading(true);
-      await contingentApi.requestJoinContingent({
+      await contingentApi.requestToJoinContingent({
         participantId: userId,
         institutionId: selectedInstitution.id,
-        type: "SCHOOL",
+        institutionType: institutionType === "school" ? "SCHOOL" : "HIGHER_INST",
       });
       toast.success(t('contingent.join_request_success'));
       router.push("/participants/contingents");
