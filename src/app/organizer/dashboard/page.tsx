@@ -905,7 +905,7 @@ export default async function DashboardPage() {
         recentLogins={recentLogins}
       />
       
-      {/* Quick Actions section has been removed */}
+
     </div>
   );
 }

@@ -97,8 +97,6 @@ export async function GET(request: NextRequest) {
       const class_grade = searchParams.get("class_grade");
       const class_name = searchParams.get("class_name");
       const age = searchParams.get("age") ? parseInt(searchParams.get("age")!) : undefined;
-      const search = searchParams.get("search");
-      const edu_level = searchParams.get("edu_level");
       
       // Calculate pagination values
       const skip = (page - 1) * limit;
@@ -125,148 +123,49 @@ export async function GET(request: NextRequest) {
         where.age = age;
       }
       
-      // Add search functionality for name or IC
-      if (search && search.trim() !== '') {
-        // Using LIKE for case-insensitive search instead of Prisma's mode: 'insensitive'
-        const searchTerm = `%${search.trim()}%`;
-        where.OR = [
-          { name: { contains: searchTerm } },
-          { ic: { contains: searchTerm } }
-        ];
-      }
+      // Get total count for pagination
+      const totalCount = await prismaExecute(prisma => prisma.contestant.count({
+        where
+      }));
       
-      // Filter by education level if provided
-      if (edu_level && edu_level !== 'all') {
-        where.edu_level = edu_level;
-      }
-      
-      try {
-        console.log('Executing raw SQL query for contestants search');
-        
-        // Build the base condition for contingent IDs
-        const contingentIdCondition = `c.contingentId IN (${contingentIds.join(',')})`;  
-        
-        // Build additional filter conditions
-        let conditions: string[] = [];
-        conditions.push(contingentIdCondition);
-        
-        if (class_grade) {
-          conditions.push(`c.class_grade = '${class_grade}'`);
-        }
-        
-        if (class_name) {
-          conditions.push(`c.class_name LIKE '%${class_name}%'`);
-        }
-        
-        if (age) {
-          conditions.push(`c.age = ${age}`);
-        }
-        
-        if (edu_level && edu_level !== 'all') {
-          conditions.push(`c.edu_level = '${edu_level}'`);
-        }
-        
-        // Add search condition if provided
-        if (search && search.trim() !== '') {
-          const searchTerm = `%${search.trim()}%`;
-          conditions.push(`(c.name LIKE '${searchTerm}' OR c.ic LIKE '${searchTerm}')`);
-        }
-        
-        // Combine all conditions
-        const whereClause = conditions.join(' AND ');
-        
-        // Get total count for pagination using raw SQL
-        const countQuery = `
-          SELECT COUNT(*) as total
-          FROM contestant c
-          WHERE ${whereClause}
-        `;
-        
-        const countResult: any[] = await prismaExecute(prisma => 
-          prisma.$queryRawUnsafe(countQuery)
-        );
-        
-        // Convert BigInt total count to regular number
-        const totalCount = typeof countResult[0]?.total === 'bigint' 
-          ? Number(countResult[0]?.total) 
-          : (countResult[0]?.total || 0);
-        
-        // Get contestants with filters and pagination using raw SQL
-        const contestantsQuery = `
-          SELECT 
-            c.*,
-            cont.id as contingent_id,
-            cont.name as contingent_name,
-            s.name as school_name,
-            h.name as higher_institution_name
-          FROM contestant c
-          LEFT JOIN contingent cont ON c.contingentId = cont.id
-          LEFT JOIN school s ON cont.schoolId = s.id
-          LEFT JOIN higherinstitution h ON cont.higherInstId = h.id
-          WHERE ${whereClause}
-          ORDER BY c.name ASC
-          LIMIT ${limit} OFFSET ${skip}
-        `;
-        
-        const contestants: any[] = await prismaExecute(prisma => 
-          prisma.$queryRawUnsafe(contestantsQuery)
-        );
-        
-        // Convert BigInt values to regular numbers to avoid JSON serialization issues
-        const safeToInt = (value: any) => {
-          if (typeof value === 'bigint') {
-            return Number(value);
-          }
-          return value;
-        };
-        
-        // Format the result to match the expected structure with BigInt conversions
-        const formattedContestants = contestants.map((c: any) => ({
-          id: safeToInt(c.id),
-          name: c.name,
-          ic: c.ic || '',
-          email: c.email || '',
-          phoneNumber: c.phoneNumber || '',
-          gender: c.gender || '',
-          birthdate: c.birthdate,
-          age: safeToInt(c.age),
-          edu_level: c.edu_level,
-          class_grade: c.class_grade || '',
-          class_name: c.class_name || '',
-          hashcode: c.hashcode,
-          status: c.status,
-          contingentId: safeToInt(c.contingentId),
-          is_ppki: Boolean(c.is_ppki),
-          createdAt: c.createdAt instanceof Date ? c.createdAt : new Date(c.createdAt),
-          updatedAt: c.updatedAt instanceof Date ? c.updatedAt : new Date(c.updatedAt),
+      // Get contestants for all managed contingents with filters and pagination
+      const contestants = await prismaExecute(prisma => prisma.contestant.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          name: 'asc'
+        },
+        include: {
           contingent: {
-            id: safeToInt(c.contingent_id),
-            name: c.contingent_name,
-            school: c.school_name ? { name: c.school_name } : null,
-            higherInstitution: c.higher_institution_name ? { name: c.higher_institution_name } : null
+            select: {
+              id: true,
+              name: true,
+              school: {
+                select: {
+                  name: true
+                }
+              },
+              higherInstitution: {
+                select: {
+                  name: true
+                }
+              }
+            }
           }
-        }));
-        
-        // Return contestants with pagination metadata
-        return NextResponse.json({
-          data: formattedContestants,
-          pagination: {
-            total: totalCount,
-            page,
-            limit,
-            totalPages: Math.ceil(totalCount / limit)
-          }
-        });
-      } catch (error) {
-        console.error("Error with raw SQL query:", error);
-        // Fall back to simpler query if the raw SQL approach fails
-        return NextResponse.json({
-          error: "Failed to fetch contestants",
-          details: error instanceof Error ? error.message : String(error)
-        }, { status: 500 });
-      }
+        }
+      }));
       
-      // This section is now handled in the try/catch block above
+      // Return contestants with pagination metadata
+      return NextResponse.json({
+        data: contestants,
+        pagination: {
+          total: totalCount,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
     }
     
     // If contingentId is provided, check if participant is a manager of this contingent

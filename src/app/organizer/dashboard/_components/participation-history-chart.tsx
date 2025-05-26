@@ -23,26 +23,33 @@ interface ParticipationByDayProps {
 }
 
 export default function ParticipationHistoryChart({ data }: ParticipationByDayProps) {
-  const [chartData, setChartData] = useState<any[]>([]);
+  // Define the chart data type including the average property
+  interface ChartDataItem {
+    date: string;
+    count: number;
+    fullDate: string;
+    average?: number; // Make average optional since it's not available for first 6 days
+  }
+  
+  const [chartData, setChartData] = useState<ChartDataItem[]>([]);
   
   useEffect(() => {
     if (!data || data.length === 0) return;
     
     // Format data for the chart with better date display
-    const formattedData = data.map(item => ({
+    const formattedData: ChartDataItem[] = data.map(item => ({
       date: new Date(item.date).toLocaleDateString(undefined, { 
         month: 'short', 
         day: 'numeric' 
       }),
       count: item.count,
-      // Initialize average property
-      average: null as number | null,
       // Store the original date for tooltips
       fullDate: new Date(item.date).toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
-      })
+      }),
+      average: undefined // Initialize as undefined, will be set for relevant entries
     }));
     
     // Calculate 7-day moving average
@@ -147,11 +154,11 @@ export default function ParticipationHistoryChart({ data }: ParticipationByDayPr
               dataKey="average" 
               name="7-day average" 
               stroke="#6366f1" 
-              strokeDasharray="3 3" 
-              dot={{ r: 3, fill: "#6366f1" }} 
-              activeDot={{ r: 5 }} 
-              connectNulls={true} 
-              type="monotone" 
+              strokeWidth={2}
+              strokeDasharray="5 5" 
+              dot={{ r: 3, fill: "#6366f1" }}
+              activeDot={{ r: 5, strokeWidth: 1 }}
+              type="monotone"
             />
           </ComposedChart>
         </ResponsiveContainer>

@@ -55,24 +55,34 @@ export function MobileMenu({ user }: MobileMenuProps) {
           </div>
           
           <div className="mt-2">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  className={`flex items-center px-4 py-2 text-sm font-medium ${
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <span className="mr-3">{item.icon}</span>
-                  <span>{item.title}</span>
-                </Link>
-              );
-            })}
+            {navItems
+              .filter(item => {
+                // If user is VIEWER, only show Dashboard
+                if (user.role === 'VIEWER') {
+                  return item.title === 'Dashboard';
+                }
+                // For ADMIN and OPERATOR roles, show all menu items
+                return true;
+              })
+              .map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center px-4 py-2 text-sm font-medium ${
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <span className="mr-3">{item.icon}</span>
+                    <span>{item.title}</span>
+                  </Link>
+                );
+              })
+            }
           </div>
           
           <div className="border-t border-sidebar-border mt-2 pt-2 px-4">

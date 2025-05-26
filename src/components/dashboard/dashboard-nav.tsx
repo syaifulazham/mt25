@@ -196,9 +196,10 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
       {/* Navigation */}
       <nav className="mt-6 px-4 space-y-1">
+        {/* Filter navItems based on user role - VIEWER users only see Dashboard */}
         {navItems
           .filter(item => {
-            // For VIEWER role, only show Dashboard
+            // If user is VIEWER, only show Dashboard
             if (user.role === 'VIEWER') {
               return item.title === 'Dashboard';
             }
@@ -221,7 +222,8 @@ export function DashboardNav({ user }: DashboardNavProps) {
                 {!isCollapsed && <span className="hidden lg:inline ml-3">{item.title}</span>}
               </Link>
             );
-          })}
+          })
+        }
       </nav>
 
       {/* Logout button */}

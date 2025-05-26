@@ -151,6 +151,10 @@ async function AuthenticatedContent({
       return redirect(`${loginPath}?message=You+do+not+have+permission+to+access+the+organizer+portal`);
     }
     
+    // Note: We're only restricting navigation menu for VIEWER users, not enforcing page access restrictions
+    // VIEWER users will only see the Dashboard in the menu, but can technically access other pages if they know the URL
+    console.log("User role is", role, "- menu restrictions will be applied in the component");
+    
     // User is authenticated and has correct role
     const dashboardUser = {
       id: user.id,
@@ -190,7 +194,41 @@ async function AuthenticatedContent({
       </div>
     );
   } catch (error) {
-    // Show error UI for authentication failures
+    // Check if the error is a Next.js redirect
+    const isRedirectError = 
+      error instanceof Error && 
+      (error.message === 'NEXT_REDIRECT' || error.message.includes('redirect'));
+    
+    // If it's a redirect error, handle it differently
+    if (isRedirectError) {
+      // For redirect errors, just show a simple message with links to safe pages
+      return (
+        <div className="flex min-h-screen">
+          <main className="flex-1 bg-background flex items-center justify-center">
+            <div className="text-center p-8 max-w-md mx-auto bg-white rounded-lg shadow-md border-orange-500 border-2">
+              <h1 className="text-2xl font-bold mb-4 text-orange-600">Access Restricted</h1>
+              <p className="mb-6">You don't have permission to access this section.</p>
+              <div className="flex flex-col md:flex-row gap-4 justify-center">
+                <a 
+                  href="/organizer/dashboard"
+                  className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Go to Dashboard
+                </a>
+                <a 
+                  href="/"
+                  className="inline-block px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                >
+                  Return to Home
+                </a>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    }
+    
+    // For other errors, show detailed error information
     return (
       <div className="flex min-h-screen">
         <main className="flex-1 bg-background flex items-center justify-center">
@@ -200,12 +238,20 @@ async function AuthenticatedContent({
             <p className="text-sm text-gray-600 mb-4">
               Error details: {error instanceof Error ? error.message : 'Unknown error'}
             </p>
-            <a 
-              href="/"
-              className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Go to Home
-            </a>
+            <div className="flex flex-col md:flex-row gap-4 justify-center">
+              <a 
+                href="/organizer/dashboard"
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Try Dashboard
+              </a>
+              <a 
+                href="/"
+                className="inline-block px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Go to Home
+              </a>
+            </div>
           </div>
         </main>
       </div>

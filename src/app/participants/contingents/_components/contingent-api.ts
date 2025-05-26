@@ -182,59 +182,35 @@ const contingentApi = {
   // Get pending requests for a contingent
   async getContingentRequests(contingentId: number) {
     try {
-      const response = await fetch(`/api/participants/contingents/${contingentId}/requests`);
-      
+      const response = await fetch(`/api/participants/contingent-requests?contingentId=${contingentId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch contingent requests');
       }
-      
       return response.json();
     } catch (error) {
       console.error('Error fetching contingent requests:', error);
       throw error;
     }
   },
-
-  // Check if participant has a pending join request
-  async checkPendingJoinRequest(participantId: number) {
+  
+  // Check if a user has pending contingent join requests
+  async getUserPendingRequests(participantId: number) {
     try {
-      const response = await fetch(`/api/participants/contingent-requests/check?participantId=${participantId}`, {
+      const response = await fetch(`/api/participants/contingent-requests/user/${participantId}?status=PENDING`, {
+        // Add cache: 'no-store' to prevent caching issues
         cache: 'no-store',
+        // Add cache control headers to bypass cache
         headers: {
           'Pragma': 'no-cache',
           'Cache-Control': 'no-cache'
         }
       });
-      
       if (!response.ok) {
-        throw new Error('Failed to check pending join requests');
+        throw new Error('Failed to fetch user contingent requests');
       }
-      
       return response.json();
     } catch (error) {
-      console.error('Error checking pending join requests:', error);
-      throw error;
-    }
-  },
-
-  // Cancel a join request
-  async cancelJoinRequest(requestId: number) {
-    try {
-      const response = await fetch(`/api/participants/contingent-requests/cancel?requestId=${requestId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to cancel join request');
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error('Error cancelling join request:', error);
+      console.error('Error fetching user contingent requests:', error);
       throw error;
     }
   },
