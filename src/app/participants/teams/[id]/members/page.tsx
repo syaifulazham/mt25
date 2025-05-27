@@ -130,14 +130,245 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   const [team, setTeam] = useState<Team | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [targetGroups, setTargetGroups] = useState<{id: number|string, name: string}[]>([]);
   const [contestants, setContestants] = useState<Contestant[]>([]);
   const [filteredContestants, setFilteredContestants] = useState<Contestant[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [educationFilter, setEducationFilter] = useState("all");
+  const [educationFilter, setEducationFilter] = useState<string>("all");
+  const [targetGroupFilter, setTargetGroupFilter] = useState<string>("all");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingContestants, setIsLoadingContestants] = useState(false);
+  const [contestantsPagination, setContestantsPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    totalContestants: 0,
+    hasMore: false,
+  });
   const [confirmRemoveDialogOpen, setConfirmRemoveDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // 500ms debounce delay
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+  
+  // Function to fetch contestants with pagination and search
+  const fetchContestants = async (options: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    educationLevel?: string;
+    targetGroup?: string;
+  } = {}) => {
+    const {
+      page = 1,
+      limit = 100,
+      search = "",
+      educationLevel = "all",
+      targetGroup = "all"
+    } = options;
+    
+    try {
+      setIsLoadingContestants(true);
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append("page", page.toString());
+      queryParams.append("limit", limit.toString());
+      
+      if (search) {
+        queryParams.append("search", search);
+      }
+      
+      if (educationLevel && educationLevel !== "all") {
+        queryParams.append("educationLevel", educationLevel);
+      }
+      
+      if (targetGroup && targetGroup !== "all") {
+        queryParams.append("targetGroup", targetGroup);
+      }
+      
+      // Add contest ID if available to filter by age
+      if (team?.contestId) {
+        queryParams.append("contestId", team.contestId.toString());
+      }
+      
+      const url = `/api/participants/contestants?${queryParams.toString()}`;
+      console.log(`Fetching contestants with: ${url}`);
+      
+      const contestantsResponse = await fetch(url, {
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!contestantsResponse.ok) {
+        throw new Error("Failed to fetch contestants");
+      }
+      
+      const contestantsData = await contestantsResponse.json();
+      
+      // Handle both response formats (array or paginated object)
+      let contestantsArray = [];
+      let paginationInfo = {
+        page,
+        totalPages: 1,
+        totalContestants: 0,
+        hasMore: false,
+      };
+      
+      if (Array.isArray(contestantsData)) {
+        contestantsArray = contestantsData;
+        paginationInfo.totalContestants = contestantsArray.length;
+      } else {
+        contestantsArray = contestantsData.data || [];
+        paginationInfo.totalPages = contestantsData.totalPages || 1;
+        paginationInfo.totalContestants = contestantsData.totalItems || contestantsArray.length;
+        paginationInfo.hasMore = page < paginationInfo.totalPages;
+      }
+      
+      console.log(`Loaded ${contestantsArray.length} contestants (page ${page}/${paginationInfo.totalPages}, total: ${paginationInfo.totalContestants})`);
+      
+      // Mark contestants who are already in a team
+      const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
+        ...contestant,
+        inTeam: team?.members.some((member: TeamMember) => member.contestantId === contestant.id) || false,
+      }));
+      
+      return { contestants: enhancedContestants, pagination: paginationInfo };
+    } catch (error) {
+      console.error("Error fetching contestants:", error);
+      toast.error(t('team.members.error_fetch_contestants'));
+      return { 
+        contestants: [], 
+        pagination: {
+          page,
+          totalPages: 1,
+          totalContestants: 0,
+          hasMore: false,
+        } 
+      };
+    } finally {
+      setIsLoadingContestants(false);
+    }
+  };
+  
+  // Load more contestants when scrolling
+  const loadMoreContestants = async () => {
+    if (isLoadingContestants || !contestantsPagination.hasMore) return;
+    
+    const nextPage = contestantsPagination.page + 1;
+    const { contestants: newContestants, pagination } = await fetchContestants({
+      page: nextPage,
+      search: debouncedSearchTerm,
+      educationLevel: educationFilter,
+      targetGroup: targetGroupFilter
+    });
+    
+    setContestants(prev => [...prev, ...newContestants]);
+    setFilteredContestants(prev => [...prev, ...newContestants]);
+    setContestantsPagination(pagination);
+  };
+  
+  // Function to load all contestants (used when search doesn't return expected results)
+  const loadAllContestantsForSearch = async () => {
+    console.log("Loading all contestants for client-side search");
+    setIsSearching(true);
+    
+    // Load a large batch initially
+    const { contestants: initialBatch, pagination } = await fetchContestants({
+      page: 1,
+      limit: 500, // Load more initially for better search
+      // Don't include search term as we'll filter client-side
+      educationLevel: educationFilter,
+      targetGroup: targetGroupFilter
+    });
+    
+    let allContestants = [...initialBatch];
+    let currentPage = 1;
+    let hasMore = pagination.hasMore;
+    
+    // Load additional pages if needed (up to 5 pages total = 2500 contestants)
+    while (hasMore && currentPage < 5) {
+      currentPage++;
+      const { contestants: nextBatch, pagination: nextPagination } = await fetchContestants({
+        page: currentPage,
+        limit: 500,
+        educationLevel: educationFilter,
+        targetGroup: targetGroupFilter
+      });
+      
+      allContestants = [...allContestants, ...nextBatch];
+      hasMore = nextPagination.hasMore;
+    }
+    
+    console.log(`Loaded ${allContestants.length} contestants for client-side search`);
+    
+    // Apply client-side search
+    const filteredResults = allContestants.filter(contestant => {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      return (
+        contestant.name?.toLowerCase().includes(searchLower) ||
+        contestant.icNumber?.toLowerCase().includes(searchLower) ||
+        contestant.email?.toLowerCase().includes(searchLower)
+      );
+    });
+    
+    setContestants(allContestants);
+    setFilteredContestants(filteredResults);
+    setContestantsPagination({
+      page: 1,
+      totalPages: 1,
+      totalContestants: allContestants.length,
+      hasMore: false
+    });
+    setIsSearching(false);
+  };
+  
+  // Effect to handle search and filter changes - using client-side filtering
+  useEffect(() => {
+    if (!contestants.length) return;
+    
+    setIsSearching(true);
+    
+    // Filter the already loaded contestants client-side
+    const filtered = contestants.filter(contestant => {
+      // Apply search filter
+      const matchesSearch = !debouncedSearchTerm || 
+        contestant.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        contestant.icNumber?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        contestant.email?.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      // Apply education level filter
+      const matchesEducation = educationFilter === 'all' || 
+        contestant.educationLevel?.toLowerCase() === educationFilter.toLowerCase() ||
+        (educationFilter === 'primary' && contestant.educationLevel?.toLowerCase().includes('rendah')) ||
+        (educationFilter === 'secondary' && contestant.educationLevel?.toLowerCase().includes('menengah')) ||
+        (educationFilter === 'youth' && contestant.educationLevel?.toLowerCase().includes('belia'));
+      
+      // We're not using target group filtering anymore since the API doesn't exist
+      const matchesTargetGroup = true; // Always match since we're not filtering by target group
+      
+      return matchesSearch && matchesEducation && matchesTargetGroup;
+    });
+    
+    setFilteredContestants(filtered);
+    setIsSearching(false);
+    
+  }, [debouncedSearchTerm, educationFilter, targetGroupFilter, contestants, team]);
+  
+  // Function for the search input field
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
   
   // Fetch the team details and available contestants
   useEffect(() => {
@@ -222,35 +453,62 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
         
         setTeam(teamData);
         
-        // Fetch available contestants with a large limit to get all contestants
-        const contestantsResponse = await fetch(`/api/participants/contestants?limit=1000`, {
-          headers: {
-            'Pragma': 'no-cache',
-            'Cache-Control': 'no-cache'
+        // Initial fetch of contestants with first page
+        // Skip fetching target groups as the endpoints don't exist
+        // Setting a default empty array for target groups to avoid UI errors
+        setTargetGroups([]);
+        
+        // Load all contestants at once with a very high limit to ensure we get all of them
+        try {
+          setIsLoadingContestants(true);
+          const contestantsResponse = await fetch(`/api/participants/contestants?limit=10000`, {
+            headers: {
+              'Pragma': 'no-cache',
+              'Cache-Control': 'no-cache'
+            }
+          });
+          
+          if (!contestantsResponse.ok) {
+            throw new Error("Failed to fetch contestants");
           }
-        });
-        
-        if (!contestantsResponse.ok) {
-          throw new Error("Failed to fetch contestants");
+          
+          const contestantsData = await contestantsResponse.json();
+          
+          // Handle both response formats (array or paginated object)
+          const contestantsArray = Array.isArray(contestantsData) 
+            ? contestantsData 
+            : contestantsData.data || [];
+          
+          console.log('Total contestants loaded:', contestantsArray.length);
+          
+          // Mark contestants who are already in a team
+          const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
+            ...contestant,
+            inTeam: teamData.members.some((member: TeamMember) => member.contestantId === contestant.id)
+          }));
+          
+          setContestants(enhancedContestants);
+          setFilteredContestants(enhancedContestants);
+          setContestantsPagination({
+            page: 1,
+            totalPages: 1,
+            totalContestants: enhancedContestants.length,
+            hasMore: false
+          });
+        } catch (error) {
+          console.error("Error loading all contestants:", error);
+          // If loading all at once fails, fall back to the original pagination approach
+          const { contestants: initialContestants, pagination } = await fetchContestants({ 
+            page: 1,
+            limit: 1000 // Still use a higher limit than before
+          });
+          
+          setContestants(initialContestants);
+          setFilteredContestants(initialContestants);
+          setContestantsPagination(pagination);
+        } finally {
+          setIsLoadingContestants(false);
         }
-        
-        const contestantsData = await contestantsResponse.json();
-        
-        // Handle both response formats (array or paginated object)
-        const contestantsArray = Array.isArray(contestantsData) 
-          ? contestantsData 
-          : contestantsData.data || [];
-        
-        console.log('Contestants loaded:', contestantsArray.length);
-        
-        // Mark contestants who are already in a team
-        const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
-          ...contestant,
-          inTeam: teamData.members.some((member: TeamMember) => member.contestantId === contestant.id)
-        }));
-        
-        setContestants(enhancedContestants);
-        setFilteredContestants(enhancedContestants);
       } catch (error: any) {
         console.error("Error fetching data:", error);
         // Show more specific error message
@@ -841,36 +1099,23 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="flex items-center gap-2 mb-4 pt-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <div className="flex mb-4">
+                <div className="flex-1">
                   <Input
-                    type="search"
                     placeholder={t('team.members.search_placeholder')}
-                    className="pl-8 w-full"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={handleSearchChange}
+                    className="w-full"
                   />
                 </div>
-                
-                <Select
-                  value={educationFilter}
-                  onValueChange={setEducationFilter}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder={t('team.members.filter_by_level')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('team.members.all_levels')}</SelectItem>
-                    {/* ONLY include these three specific options with lowercase values */}
-                    {/* Remove any unexpected options and force only these three */}
-                    
-                    <SelectItem value="primary">{t('team.members.primary_school')}</SelectItem>
-                    <SelectItem value="secondary">{t('team.members.secondary_school')}</SelectItem>
-                    <SelectItem value="youth">{t('team.members.youth')}</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
+              
+              {(isSearching || isLoadingContestants) && (
+                <div className="flex justify-center items-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                  <span>{isSearching ? t('common.searching') : t('common.loading')}</span>
+                </div>
+              )}
               
               <div className="flex-1 overflow-hidden">
                 {team && (team.minAge || team.maxAge || team.targetGroup) && (
@@ -920,7 +1165,15 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                   </div>
                 ) : (
                   <div className="border rounded-md overflow-hidden h-[400px]">
-                    <ScrollArea className="h-full">
+                    <ScrollArea className="h-full" onScroll={(e) => {
+                      const target = e.target as HTMLDivElement;
+                      const { scrollTop, scrollHeight, clientHeight } = target;
+                      
+                      // Load more when scrolled to bottom (with a small buffer)
+                      if (scrollHeight - scrollTop - clientHeight < 100 && !isLoadingContestants && contestantsPagination.hasMore) {
+                        loadMoreContestants();
+                      }
+                    }}>
                       <Table>
                         <TableHeader className="sticky top-0 bg-background z-10">
                           <TableRow>
@@ -986,8 +1239,19 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
               
               <DialogFooter className="space-x-2 mt-4">
                 <div className="mr-auto text-sm text-muted-foreground">
-                  {t('team.members.contestants_shown').replace('{shown}', String(filteredContestants.length)).replace('{total}', String(contestants.length))}
+                  {t('team.members.contestants_shown')
+                    .replace('{shown}', String(filteredContestants.length))
+                    .replace('{total}', String(contestantsPagination.totalContestants))}
                 </div>
+                {contestantsPagination.hasMore && !isLoadingContestants && (
+                  <Button 
+                    variant="link" 
+                    onClick={loadMoreContestants}
+                    className="ml-2 p-0 h-auto"
+                  >
+                    {t('common.load_more')}
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
                   {t('team.members.close')}
                 </Button>
