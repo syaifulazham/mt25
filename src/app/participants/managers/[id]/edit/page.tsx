@@ -40,7 +40,7 @@ const formSchema = z.object({
     .regex(/^\d+$/, "IC number must contain only digits"),
   email: z.string().email("Invalid email format").optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
-  teamId: z.string().optional(),
+  teamIds: z.array(z.string()).default([]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -48,6 +48,9 @@ type FormValues = z.infer<typeof formSchema>;
 interface Team {
   id: number;
   name: string;
+  contestId?: number;
+  contestName?: string;
+  contestCode?: string;
 }
 
 interface ManagerData {
@@ -57,7 +60,11 @@ interface ManagerData {
   email: string | null;
   phoneNumber: string | null;
   hashcode: string;
-  teamId: number | null;
+  teamId: number | null; // For backward compatibility
+  teams?: Array<{
+    id: number;
+    name: string;
+  }>;
 }
 
 export default function EditManagerPage({ params }: { params: { id: string } }) {
@@ -75,7 +82,9 @@ export default function EditManagerPage({ params }: { params: { id: string } }) 
     defaultValues: {
       name: "",
       ic: "",
-      teamId: undefined,
+      email: "",
+      phoneNumber: "",
+      teamIds: [],
     },
   });
 
@@ -90,12 +99,37 @@ export default function EditManagerPage({ params }: { params: { id: string } }) 
         const data = await response.json();
         setManager(data);
         
+        // Fetch the manager's team assignments
+        const teamsResponse = await fetch(`/api/participants/managers/${params.id}/teams`);
+        if (teamsResponse.ok) {
+          const teamsData = await teamsResponse.json();
+          data.teams = teamsData;
+        }
+        
         // Set form values
         form.setValue("name", data.name);
         form.setValue("ic", data.ic);
         form.setValue("email", data.email || '');
         form.setValue("phoneNumber", data.phoneNumber || '');
-        form.setValue("teamId", data.teamId ? data.teamId.toString() : 'none');
+        
+        // Set team IDs - combine legacy teamId with any teams from the junction table
+        const selectedTeamIds: string[] = [];
+        
+        // Add the legacy teamId if it exists
+        if (data.teamId) {
+          selectedTeamIds.push(data.teamId.toString());
+        }
+        
+        // Add team IDs from the teams array if it exists
+        if (data.teams && data.teams.length > 0) {
+          data.teams.forEach((team: { id: number; name: string }) => {
+            if (!selectedTeamIds.includes(team.id.toString())) {
+              selectedTeamIds.push(team.id.toString());
+            }
+          });
+        }
+        
+        form.setValue("teamIds", selectedTeamIds);
       } catch (error) {
         console.error("Error fetching manager:", error);
         toast.error("Failed to load manager details");
@@ -143,8 +177,8 @@ export default function EditManagerPage({ params }: { params: { id: string } }) 
     try {
       const payload = {
         ...values,
-        // Handle 'none' value explicitly and convert other values to integers
-        teamId: values.teamId && values.teamId !== 'none' ? parseInt(values.teamId) : null,
+        // Convert team IDs to integers
+        teamIds: values.teamIds?.map(id => parseInt(id)) || [],
       };
       
       const response = await fetch(`/api/participants/managers/${params.id}`, {
@@ -182,9 +216,9 @@ export default function EditManagerPage({ params }: { params: { id: string } }) 
     <div className="container px-4 py-8 mx-auto space-y-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/participants/managers/${params.id}`}>
+          <Link href="/participants/managers">
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Manager Details
+            Back to Managers
           </Link>
         </Button>
       </div>
@@ -291,34 +325,75 @@ export default function EditManagerPage({ params }: { params: { id: string } }) 
                   )}
                 />
                 
-                {/* Team Selection */}
+                {/* Team Selection - Multiple */}
                 <FormField
                   control={form.control}
-                  name="teamId"
+                  name="teamIds"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Assign to Team (Optional)</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                        disabled={isLoadingTeams}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a team (optional)" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">None (No team assignment)</SelectItem>
-                          {teams.map((team) => (
-                            <SelectItem key={team.id} value={team.id.toString()}>
-                              {team.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Assign to Teams</FormLabel>
+                      <div className="space-y-2">
+                        {isLoadingTeams ? (
+                          <div className="flex items-center space-x-2 py-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm text-muted-foreground">Loading teams...</span>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {teams.map((team) => (
+                              <div key={team.id} className="flex items-start space-x-2 mb-2 p-2 hover:bg-slate-50 rounded-md transition-colors">
+                                <div className="pt-0.5">
+                                  <input
+                                    type="checkbox"
+                                    id={`team-${team.id}`}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    value={team.id.toString()}
+                                    checked={field.value?.includes(team.id.toString())}
+                                    onChange={(e) => {
+                                      const teamId = team.id.toString();
+                                      const newValue = [...(field.value || [])];
+                                      
+                                      if (e.target.checked) {
+                                        if (!newValue.includes(teamId)) {
+                                          newValue.push(teamId);
+                                        }
+                                      } else {
+                                        const index = newValue.indexOf(teamId);
+                                        if (index !== -1) {
+                                          newValue.splice(index, 1);
+                                        }
+                                      }
+                                      
+                                      field.onChange(newValue);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex flex-col">
+                                  <label
+                                    htmlFor={`team-${team.id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {team.name}
+                                  </label>
+                                  
+                                  {(team.contestName || team.contestCode) && (
+                                    <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                                      <span className="font-medium">{team.contestName}</span>
+                                      {team.contestCode && (
+                                        <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                                          {team.contestCode}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <FormDescription>
-                        Optionally assign this manager to an existing team
+                        Select all teams this manager should have access to
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

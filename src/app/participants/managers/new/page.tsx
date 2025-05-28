@@ -40,7 +40,7 @@ const createFormSchema = (t: (key: string) => string) => z.object({
     .regex(/^\d+$/, t('manager.new.error_ic_format')),
   email: z.string().email(t('manager.new.error_email')).optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
-  teamId: z.string().optional(),
+  teamIds: z.array(z.string()).optional().default([]),
 });
 
 // Using ReturnType to get the schema type from our function
@@ -67,7 +67,7 @@ export default function NewManagerPage() {
       ic: "",
       email: "",
       phoneNumber: "",
-      teamId: undefined,
+      teamIds: [],
     },
   });
 
@@ -112,7 +112,7 @@ export default function NewManagerPage() {
       const payload = {
         ...values,
         hashcode,
-        teamId: values.teamId ? parseInt(values.teamId) : null,
+        teamIds: values.teamIds?.map(id => parseInt(id)) || [],
       };
       
       const response = await fetch("/api/participants/managers", {
@@ -250,33 +250,60 @@ export default function NewManagerPage() {
                 )}
               />
               
-              {/* Team Selection */}
+              {/* Team Selection - Multiple */}
               <FormField
                 control={form.control}
-                name="teamId"
+                name="teamIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('manager.new.team')}</FormLabel>
-                    <Select 
-                      onValueChange={field.onChange} 
-                      value={field.value}
-                      disabled={isLoadingTeams}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('manager.new.team_placeholder')} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id.toString()}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>{t('manager.new.teams')}</FormLabel>
+                    <div className="space-y-2">
+                      {isLoadingTeams ? (
+                        <div className="flex items-center space-x-2 py-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">{t('manager.new.loading_teams')}</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {teams.map((team) => (
+                            <div key={team.id} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id={`team-${team.id}`}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                value={team.id.toString()}
+                                checked={field.value?.includes(team.id.toString())}
+                                onChange={(e) => {
+                                  const teamId = team.id.toString();
+                                  const newValue = [...(field.value || [])];
+                                  
+                                  if (e.target.checked) {
+                                    if (!newValue.includes(teamId)) {
+                                      newValue.push(teamId);
+                                    }
+                                  } else {
+                                    const index = newValue.indexOf(teamId);
+                                    if (index !== -1) {
+                                      newValue.splice(index, 1);
+                                    }
+                                  }
+                                  
+                                  field.onChange(newValue);
+                                }}
+                              />
+                              <label
+                                htmlFor={`team-${team.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {team.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <FormDescription>
-                      {t('manager.new.team_description')}
+                      {t('manager.new.teams_description') || "Select all teams this manager should have access to"}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Users,
   Plus,
@@ -23,6 +24,9 @@ import {
   FileText,
   Mail,
   Phone,
+  Loader2,
+  X,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -51,6 +55,17 @@ import {
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+interface Team {
+  id: number;
+  name: string;
+  hashcode?: string;
+  contingentId?: number;
+  contingentName?: string;
+  contestId?: number;
+  contestName?: string;
+  contestCode?: string;
+}
+
 interface Manager {
   id: number;
   name: string;
@@ -58,8 +73,9 @@ interface Manager {
   email: string | null;
   phoneNumber: string | null;
   hashcode: string;
-  teamId: number;
+  teamId: number | null;
   teamName?: string;
+  teams?: Team[];
   createdAt: string;
 }
 
@@ -75,6 +91,14 @@ export default function ManagersPage() {
   const [managerToDelete, setManagerToDelete] = useState<Manager | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Team assignment modal states
+  const [teamsModalOpen, setTeamsModalOpen] = useState(false);
+  const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
+  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const [selectedTeamIds, setSelectedTeamIds] = useState<number[]>([]);
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
+  const [isSavingTeams, setIsSavingTeams] = useState(false);
 
   // Fetch managers
   useEffect(() => {
@@ -102,9 +126,20 @@ export default function ManagersPage() {
           console.log('First manager data:', JSON.stringify(data[0]));
         }
         
-        // Force data transformation to ensure email and phoneNumber are ALWAYS defined
-        const processedData = data.map((manager: any) => {
-          console.log('Processing manager:', manager.name, 'Email:', manager.email, 'Phone:', manager.phoneNumber);
+        // Force data transformation and fetch team data for each manager
+        const processedData = await Promise.all(data.map(async (manager: any) => {
+          console.log('Processing manager:', manager.name);
+          
+          // Fetch teams for this manager
+          let teams = [];
+          try {
+            const teamsResponse = await fetch(`/api/participants/managers/${manager.id}/teams`);
+            if (teamsResponse.ok) {
+              teams = await teamsResponse.json();
+            }
+          } catch (error) {
+            console.error(`Error fetching teams for manager ${manager.id}:`, error);
+          }
           
           return {
             id: manager.id,
@@ -116,9 +151,10 @@ export default function ManagersPage() {
             hashcode: manager.hashcode,
             teamId: manager.teamId,
             teamName: manager.teamName,
+            teams: teams,
             createdAt: manager.createdAt
           };
-        });
+        }));
         
         setManagers(processedData);
         setFilteredManagers(processedData);
@@ -159,6 +195,118 @@ export default function ManagersPage() {
       return `${ic.substring(0, 6)}-XX-${ic.substring(10, 12)}`;
     }
     return ic;
+  };
+
+  // Open team assignment modal for a manager
+  const openTeamAssignmentModal = async (manager: Manager) => {
+    setSelectedManager(manager);
+    
+    // Initialize selected teams from manager's current teams
+    const currentTeamIds = manager.teams?.map(team => team.id) || [];
+    setSelectedTeamIds(currentTeamIds);
+    
+    // Fetch all available teams
+    setIsLoadingTeams(true);
+    try {
+      // Add timestamp to force cache refresh and avoid stale data
+      const timestamp = new Date().getTime();
+      // This is a special API call to get all teams that a manager can be assigned to
+      const response = await fetch(`/api/participants/all-teams?_=${timestamp}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch teams');
+      }
+      const data = await response.json();
+      setAvailableTeams(data);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+      toast.error(t('manager.error_teams'));
+    } finally {
+      setIsLoadingTeams(false);
+    }
+    
+    setTeamsModalOpen(true);
+  };
+  
+  // Toggle team selection
+  const toggleTeamSelection = (teamId: number) => {
+    setSelectedTeamIds(prevIds => {
+      if (prevIds.includes(teamId)) {
+        return prevIds.filter(id => id !== teamId);
+      } else {
+        return [...prevIds, teamId];
+      }
+    });
+  };
+  
+  // Save team assignments
+  const saveTeamAssignments = async () => {
+    if (!selectedManager) return;
+    
+    setIsSavingTeams(true);
+    try {
+      const response = await fetch(`/api/participants/managers/${selectedManager.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          // Include all required fields from the manager
+          name: selectedManager.name,
+          ic: selectedManager.ic,
+          email: selectedManager.email,
+          phoneNumber: selectedManager.phoneNumber,
+          teamIds: selectedTeamIds,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update team assignments');
+      }
+      
+      // Update local state
+      const updatedManagers = managers.map(manager => {
+        if (manager.id === selectedManager.id) {
+          // Find team objects from selected IDs
+          const assignedTeams = availableTeams.filter(team => 
+            selectedTeamIds.includes(team.id)
+          );
+          
+          return {
+            ...manager,
+            teams: assignedTeams,
+          };
+        }
+        return manager;
+      });
+      
+      setManagers(updatedManagers);
+      setFilteredManagers(
+        searchQuery.trim() === "" 
+          ? updatedManagers 
+          : updatedManagers.filter(manager => {
+              const query = searchQuery.toLowerCase();
+              return (
+                manager.name.toLowerCase().includes(query) ||
+                manager.hashcode.toLowerCase().includes(query) ||
+                manager.ic.includes(query) ||
+                (manager.teamName && manager.teamName.toLowerCase().includes(query))
+              );
+            })
+      );
+      
+      toast.success(t('manager.teams_updated'));
+      setTeamsModalOpen(false);
+    } catch (error) {
+      console.error('Error updating team assignments:', error);
+      toast.error(t('manager.error_updating_teams'));
+    } finally {
+      setIsSavingTeams(false);
+    }
   };
 
   // Handle delete manager
@@ -263,9 +411,7 @@ export default function ManagersPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('manager.table.name')}</TableHead>
-                    <TableHead>{t('manager.table.ic')}</TableHead>
                     <TableHead>{t('manager.table.contact')}</TableHead>
-                    <TableHead>{t('manager.table.hashcode')}</TableHead>
                     <TableHead>{t('manager.table.team')}</TableHead>
                     <TableHead className="text-right">{t('manager.table.actions')}</TableHead>
                   </TableRow>
@@ -278,9 +424,6 @@ export default function ManagersPage() {
                           <User className="h-4 w-4 text-muted-foreground" />
                           <span>{manager.name}</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-mono text-sm">{formatIC(manager.ic)}</div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1 text-sm">
@@ -306,22 +449,57 @@ export default function ManagersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono">
-                          {manager.hashcode}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {manager.teamName ? (
-                          <Link 
-                            href={`/participants/teams/${manager.teamId}`}
-                            className="text-blue-600 hover:underline flex items-center gap-1"
-                          >
-                            <Users className="h-3 w-3" />
-                            <span>{manager.teamName}</span>
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">{t('manager.not_assigned')}</span>
-                        )}
+                        <div 
+                          className="group relative cursor-pointer p-1 -m-1 rounded-md hover:bg-muted transition-colors"
+                          onClick={() => openTeamAssignmentModal(manager)}
+                          title={t('manager.click_to_assign_teams')}
+                        >
+                          {manager.teams && manager.teams.length > 0 ? (
+                            manager.teams.length === 1 ? (
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  <span className="text-blue-600">{manager.teams[0].name}</span>
+                                </div>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                  <Users className="h-3 w-3 text-muted-foreground" />
+                                  <div className="flex items-center gap-1">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {manager.teams.length}
+                                    </Badge>
+                                    <span className="text-xs text-muted-foreground">{t('manager.teams')}</span>
+                                  </div>
+                                </div>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )
+                          ) : manager.teamName && manager.teamId ? (
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                <span className="text-blue-600">{manager.teamName}</span>
+                              </div>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground text-sm">{t('manager.not_assigned')}</span>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -366,7 +544,9 @@ export default function ManagersPage() {
           <DialogHeader>
             <DialogTitle>{t('manager.delete')}</DialogTitle>
             <DialogDescription>
-              {t('manager.delete_confirm', { name: managerToDelete?.name || '' })}
+              {managerToDelete?.name ? 
+                t('manager.delete_confirm').replace('{name}', managerToDelete.name) : 
+                t('manager.delete_confirm').replace('{name}', '')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -392,6 +572,100 @@ export default function ManagersPage() {
                 </>
               ) : (
                 <>{t('manager.delete')}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Team assignment modal */}
+      <Dialog open={teamsModalOpen} onOpenChange={(open) => {
+        if (!isSavingTeams) setTeamsModalOpen(open);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('manager.assign_teams')}</DialogTitle>
+            <DialogDescription>
+              {selectedManager && t('manager.assign_teams_description').replace('{name}', selectedManager.name)}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isLoadingTeams ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">{t('manager.loading_teams')}</span>
+            </div>
+          ) : (
+            <div className="py-4">
+              {availableTeams.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  {t('manager.no_teams')}
+                </div>
+              ) : (
+                <ScrollArea className="h-[300px] pr-4">
+                  <div className="space-y-4">
+                    {availableTeams.map(team => (
+                      <div key={team.id} className="flex items-start space-x-3 p-2 hover:bg-muted rounded-md transition-colors">
+                        <Checkbox 
+                          id={`team-${team.id}`} 
+                          checked={selectedTeamIds.includes(team.id)}
+                          onCheckedChange={() => toggleTeamSelection(team.id)}
+                        />
+                        <div className="space-y-1 w-full">
+                          <div className="flex items-center justify-between">
+                            <label 
+                              htmlFor={`team-${team.id}`}
+                              className="font-medium cursor-pointer text-sm"
+                            >
+                              {team.name}
+                            </label>
+                            {team.contestCode && (
+                              <span className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                                {team.contestCode}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {team.contestName && (
+                              <p className="text-xs text-blue-600">
+                                {team.contestName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter className="flex justify-between sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setTeamsModalOpen(false)}
+              disabled={isSavingTeams}
+              className="mt-2 sm:mt-0"
+            >
+              {t('manager.cancel')}
+            </Button>
+            
+            <Button 
+              onClick={saveTeamAssignments} 
+              disabled={isLoadingTeams || isSavingTeams || availableTeams.length === 0}
+              className="mt-2 sm:mt-0"
+            >
+              {isSavingTeams ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('manager.saving')}
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  {t('manager.save_teams')}
+                </>
               )}
             </Button>
           </DialogFooter>

@@ -44,7 +44,8 @@ const managerSchema = z.object({
     .regex(/^\d+$/, "IC number must contain only digits"),
   email: z.string().email("Invalid email format").optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
-  teamId: z.number().optional().nullable(),
+  teamId: z.number().optional().nullable(), // For backwards compatibility
+  teamIds: z.array(z.number()).optional().default([]),
   hashcode: z.string().optional(),
 });
 
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
             const userId = parseInt(user.id.toString());
             const teamId = validatedData.teamId || null;
             
-            // Execute the insert query
+            // Execute the insert query for the manager (without teamId)
             await prisma.$executeRawUnsafe(
               query, 
               validatedData.name, 
@@ -244,7 +245,7 @@ export async function POST(request: NextRequest) {
               validatedData.email || null, 
               validatedData.phoneNumber || null,
               hashcode, 
-              teamId, 
+              null, // Set teamId to null since we'll use manager_team table
               userId, 
               now,
               now
@@ -257,6 +258,43 @@ export async function POST(request: NextRequest) {
             // Use the first result if it's an array
             const manager = Array.isArray(createdManagers) ? createdManagers[0] : createdManagers;
             
+            // Handle teamIds assignment - prefer the teamIds array if available, fall back to single teamId
+            const teamsToAssign = validatedData.teamIds && validatedData.teamIds.length > 0 
+              ? validatedData.teamIds 
+              : (validatedData.teamId ? [validatedData.teamId] : []);
+              
+            console.log("Teams to assign:", teamsToAssign);
+            
+            // Create manager-team relationships for each team
+            if (teamsToAssign.length > 0) {
+              // Create a manager_team table if it doesn't exist
+              await prisma.$executeRawUnsafe(`
+                CREATE TABLE IF NOT EXISTS manager_team (
+                  id INT AUTO_INCREMENT PRIMARY KEY,
+                  managerId INT NOT NULL,
+                  teamId INT NOT NULL,
+                  createdAt DATETIME NOT NULL,
+                  updatedAt DATETIME NOT NULL,
+                  UNIQUE KEY manager_team_unique (managerId, teamId),
+                  FOREIGN KEY (managerId) REFERENCES manager(id) ON DELETE CASCADE,
+                  FOREIGN KEY (teamId) REFERENCES team(id) ON DELETE CASCADE
+                )
+              `);
+              
+              // Insert relationships for each team
+              for (const teamId of teamsToAssign) {
+                try {
+                  await prisma.$executeRawUnsafe(`
+                    INSERT INTO manager_team (managerId, teamId, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?)
+                  `, manager.id, teamId, now, now);
+                  console.log(`Added manager ${manager.id} to team ${teamId}`);
+                } catch (teamAssignError) {
+                  console.error(`Error assigning manager to team ${teamId}:`, teamAssignError);
+                }
+              }
+            }
+            
             console.log("Manager created successfully with SQL:", manager);
             
             return NextResponse.json({
@@ -264,7 +302,7 @@ export async function POST(request: NextRequest) {
               name: manager.name,
               ic: manager.ic,
               hashcode: manager.hashcode,
-              teamId: manager.teamId,
+              teams: teamsToAssign,
               createdAt: now.toISOString(),
               message: "Manager created successfully"
             });

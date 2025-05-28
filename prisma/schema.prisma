@@ -691,7 +691,8 @@ model team {
   evidence_doc           String?            @db.Text
   evidence_submitteddate DateTime?          @db.DateTime(0)
   eventcontestteam       eventcontestteam[]
-  independentManagers    manager[]
+  independentManagers    manager[]          @relation("SingleTeam") // Old relation maintained for compatibility
+  managerTeams           manager_team[]     // New many-to-many relation
   contest                contest            @relation(fields: [contestId], references: [id])
   contingent             contingent         @relation(fields: [contingentId], references: [id])
   eventcontest           eventcontest?      @relation(fields: [eventcontestId], references: [id])
@@ -737,17 +738,32 @@ model manager {
   name        String
   ic          String
   hashcode    String           @unique
-  teamId      Int?
+  teamId      Int?             // Keeping for backward compatibility
   createdAt   DateTime         @default(dbgenerated("(now(3))"))
   updatedAt   DateTime         @updatedAt
   createdBy   Int
   email       String?
   phoneNumber String?
   creator     user_participant @relation(fields: [createdBy], references: [id])
-  team        team?            @relation(fields: [teamId], references: [id])
+  team        team?            @relation("SingleTeam", fields: [teamId], references: [id])
+  teams       manager_team[]   // Relation to manager_team junction table
 
   @@index([teamId])
   @@index([createdBy])
+}
+
+model manager_team {
+  id        Int      @id @default(autoincrement())
+  managerId Int
+  teamId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  manager   manager  @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  team      team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([managerId, teamId])
+  @@index([managerId])
+  @@index([teamId])
 }
 
 enum contest_contestType {

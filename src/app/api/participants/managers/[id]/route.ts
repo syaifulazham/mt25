@@ -49,7 +49,8 @@ const managerUpdateSchema = z.object({
     .regex(/^\d+$/, "IC number must contain only digits"),
   email: z.string().email("Invalid email format").optional().nullable(),
   phoneNumber: z.string().optional().nullable(),
-  teamId: z.number().optional().nullable(),
+  teamId: z.number().optional().nullable(), // For backward compatibility
+  teamIds: z.array(z.number()).optional().default([]),
 });
 
 // GET /api/participants/managers/[id]
@@ -233,7 +234,7 @@ export async function PATCH(
         }
       }
       
-      // Update the manager
+      // Update the manager's basic info first
       const updatedManager = await (prisma as any).manager.update({
         where: {
           id: managerId,
@@ -243,10 +244,93 @@ export async function PATCH(
           ic: validatedData.ic,
           email: validatedData.email,
           phoneNumber: validatedData.phoneNumber,
-          teamId: validatedData.teamId,
+          // Set teamId to null if we're using the new team assignments approach
+          teamId: validatedData.teamIds && validatedData.teamIds.length > 0 ? null : validatedData.teamId,
           updatedAt: new Date(), // Ensure update timestamp is refreshed
         },
       }) as Manager;
+      
+      // Handle team assignments if teamIds is provided
+      if (validatedData.teamIds && validatedData.teamIds.length > 0) {
+        try {
+          const now = new Date();
+          
+          // Create the manager_team table if it doesn't exist
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS manager_team (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              managerId INT NOT NULL,
+              teamId INT NOT NULL,
+              createdAt DATETIME NOT NULL,
+              updatedAt DATETIME NOT NULL,
+              UNIQUE KEY manager_team_unique (managerId, teamId),
+              FOREIGN KEY (managerId) REFERENCES manager(id) ON DELETE CASCADE,
+              FOREIGN KEY (teamId) REFERENCES team(id) ON DELETE CASCADE
+            )
+          `);
+          
+          // Remove existing team assignments
+          await prisma.$executeRawUnsafe(`
+            DELETE FROM manager_team
+            WHERE managerId = ?
+          `, managerId);
+          
+          // Add new team assignments
+          for (const teamId of validatedData.teamIds) {
+            try {
+              await prisma.$executeRawUnsafe(`
+                INSERT INTO manager_team (managerId, teamId, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?)
+              `, managerId, teamId, now, now);
+              console.log(`Updated manager ${managerId} assignment to team ${teamId}`);
+            } catch (teamAssignError) {
+              console.error(`Error assigning manager to team ${teamId}:`, teamAssignError);
+            }
+          }
+        } catch (error) {
+          console.error("Error updating manager team assignments:", error);
+          // Continue with the response even if team assignments failed
+        }
+      }
+      
+      // Fetch the updated teams to include in the response
+      let teams: any[] = [];
+      try {
+        // Check if the manager_team table exists
+        const tableExists = await prisma.$queryRaw`
+          SELECT COUNT(*) as count 
+          FROM information_schema.tables 
+          WHERE table_schema = DATABASE() 
+          AND table_name = 'manager_team'
+        `;
+        
+        if (Array.isArray(tableExists) && tableExists[0].count > 0) {
+          teams = await prisma.$queryRaw`
+            SELECT t.id, t.name, t.hashcode 
+            FROM team t
+            JOIN manager_team mt ON t.id = mt.teamId
+            WHERE mt.managerId = ${managerId}
+          `;
+        } else if (updatedManager.teamId) {
+          // If using legacy teamId
+          const team = await prisma.team.findUnique({
+            where: {
+              id: updatedManager.teamId,
+            },
+            select: {
+              id: true,
+              name: true,
+              hashcode: true,
+            },
+          });
+          
+          if (team) {
+            teams = [team];
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching manager teams for response:", error);
+      }
       
       // Return a consistent format with explicit handling for email and phoneNumber
       return NextResponse.json({
@@ -257,6 +341,7 @@ export async function PATCH(
         phoneNumber: updatedManager.phoneNumber || '',
         hashcode: updatedManager.hashcode,
         teamId: updatedManager.teamId || null,
+        teams: teams,
         updatedAt: updatedManager.updatedAt.toISOString(),
         message: "Manager updated successfully"
       });
