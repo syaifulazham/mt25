@@ -22,10 +22,12 @@ import {
   Building,
   ShieldCheck,
   ShieldAlert,
-  Building2
+  Building2,
+  LayoutGrid,
+  Table as TableIcon
 } from "lucide-react";
 import { prismaExecute } from "@/lib/prisma";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StateFormatter } from "./_components/state-formatter";
@@ -70,21 +72,22 @@ interface ContingentData {
   };
 }
 
-export default async function ContingentsPage({ searchParams }: { searchParams: { page?: string, search?: string } }) {
+export default async function ContingentsPage({ searchParams }: { searchParams: { page?: string, search?: string, view?: string } }) {
   // Get the current page from the query params or default to 1
   const currentPage = parseInt(searchParams.page || '1', 10);
   const pageSize = 12; // Number of contingents per page
   const skip = (currentPage - 1) * pageSize;
   const searchTerm = searchParams.search || '';
+  const viewMode = searchParams.view === 'table' ? 'table' : 'card'; // Default to card view
   
   // Use prismaExecute to get contingent data with pagination and proper connection management
   const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents, independentContingents } = await prismaExecute(async (prisma) => {
     // Build where clause for searching
     const whereClause = searchTerm ? {
       OR: [
-        { name: { contains: searchTerm, mode: 'insensitive' } },
-        { school: { name: { contains: searchTerm, mode: 'insensitive' } } },
-        { higherInstitution: { name: { contains: searchTerm, mode: 'insensitive' } } }
+        { name: { contains: searchTerm } },
+        { school: { name: { contains: searchTerm } } },
+        { higherInstitution: { name: { contains: searchTerm } } }
       ]
     } : {};
     
@@ -313,7 +316,22 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
               className="pl-8 bg-white" 
             />
             <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="view" value={viewMode} />
           </form>
+        </div>
+        <div className="flex gap-2">
+          <Link 
+            href={`/organizer/contingents?page=${currentPage}${searchTerm ? `&search=${searchTerm}` : ''}&view=card`}
+            className={`${buttonVariants({ variant: viewMode === 'card' ? 'default' : 'outline', size: 'sm' })} flex items-center gap-1`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Link>
+          <Link 
+            href={`/organizer/contingents?page=${currentPage}${searchTerm ? `&search=${searchTerm}` : ''}&view=table`}
+            className={`${buttonVariants({ variant: viewMode === 'table' ? 'default' : 'outline', size: 'sm' })} flex items-center gap-1`}
+          >
+            <TableIcon className="h-4 w-4" />
+          </Link>
         </div>
         <div className="text-sm text-muted-foreground">
           Showing <strong>{showingFrom}</strong> to <strong>{showingTo}</strong> of <strong>{totalContingents}</strong> contingents
@@ -336,95 +354,182 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
         </TabsList>
         
         <TabsContent value="all" className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {contingents.map((contingent: any) => (
-              <Card key={contingent.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-base">{contingent.name}</CardTitle>
-                      <CardDescription>
-                        {contingent.school?.name || contingent.higherInstitution?.name || 'No institution'}
-                        {((contingent.school?.state && typeof contingent.school.state === 'string') || (contingent.higherInstitution?.state && typeof contingent.higherInstitution.state === 'string')) && (
-                          <span className="ml-1 text-xs">
-                            ({formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')})
-                          </span>
+          {viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {contingents.map((contingent: any) => (
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        <CardDescription>
+                          {contingent.school?.name || contingent.higherInstitution?.name || 'No institution'}
+                          {((contingent.school?.state && typeof contingent.school.state === 'string') || (contingent.higherInstitution?.state && typeof contingent.higherInstitution.state === 'string')) && (
+                            <span className="ml-1 text-xs">
+                              ({formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')})
+                            </span>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-0.5 -space-x-2">
+                        {contingent.contestants.slice(0, 5).map((contestant: any, i: number) => (
+                          <Avatar key={i} className="h-6 w-6 border-2 border-white">
+                            <AvatarFallback className="text-[10px]">{contestant.name?.substring(0, 2) || "?"}</AvatarFallback>
+                          </Avatar>
+                        ))}
+                        {contingent._count.contestants > 5 && (
+                          <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs">
+                            +{contingent._count.contestants - 5}
+                          </div>
                         )}
-                      </CardDescription>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
                     </div>
-                    <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
-                      <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-0.5 -space-x-2">
-                      {contingent.contestants.slice(0, 5).map((contestant: any, i: number) => (
-                        <Avatar key={i} className="h-6 w-6 border-2 border-white">
-                          <AvatarFallback className="text-[10px]">{contestant.name?.substring(0, 2) || "?"}</AvatarFallback>
-                        </Avatar>
-                      ))}
-                      {contingent._count.contestants > 5 && (
-                        <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs">
-                          +{contingent._count.contestants - 5}
-                        </div>
-                      )}
-                    </div>
-                    <Link 
-                      href={`/organizer/contingents/${contingent.id}`} 
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View Details →
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Name</th>
+                    <th className="p-2 text-left font-medium">Institution</th>
+                    <th className="p-2 text-left font-medium">State</th>
+                    <th className="p-2 text-left font-medium">Contestants</th>
+                    <th className="p-2 text-left font-medium">Created</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contingents.map((contingent: any, i: number) => (
+                    <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="p-2">
+                        <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                      </td>
+                      <td className="p-2">{contingent.school?.name || contingent.higherInstitution?.name || 'Independent'}</td>
+                      <td className="p-2">{formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')}</td>
+                      <td className="p-2">
+                        <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                          <Users className="h-3 w-3" /> {contingent._count.contestants}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-muted-foreground">{format(new Date(contingent.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <Link 
+                          href={`/organizer/contingents/${contingent.id}`} 
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="text-center mt-6">
             <Button variant="outline">Load More Contingents</Button>
           </div>
         </TabsContent>
         
         <TabsContent value="schools" className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {schoolContingents?.map((contingent: any) => (
-              <Card key={contingent.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <School className="h-4 w-4 text-amber-500" />
-                        <CardTitle className="text-base">{contingent.name}</CardTitle>
+          {viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {schoolContingents?.map((contingent: any) => (
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <School className="h-4 w-4 text-amber-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {contingent.school?.name || 'Unknown School'}
+                          <StateFormatter state={contingent.school?.state} />
+                        </CardDescription>
                       </div>
-                      <CardDescription>
-                        {contingent.school?.name || 'Unknown School'}
-                        <StateFormatter state={contingent.school?.state} />
-                      </CardDescription>
+                      <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
                     </div>
-                    <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
-                      <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
                     </div>
-                    <Link 
-                      href={`/organizer/contingents/${contingent.id}`} 
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View Details →
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">School Contingent</th>
+                    <th className="p-2 text-left font-medium">School Name</th>
+                    <th className="p-2 text-left font-medium">State</th>
+                    <th className="p-2 text-left font-medium">Contestants</th>
+                    <th className="p-2 text-left font-medium">Created</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schoolContingents.map((contingent: any, i: number) => (
+                    <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="p-2">
+                        <div className="flex items-center gap-1">
+                          <School className="h-4 w-4 text-amber-500" />
+                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        </div>
+                      </td>
+                      <td className="p-2">{contingent.school?.name || 'Unknown School'}</td>
+                      <td className="p-2">{formatStateName(contingent.school?.state || '')}</td>
+                      <td className="p-2">
+                        <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                          <Users className="h-3 w-3" /> {contingent._count.contestants}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-muted-foreground">{format(new Date(contingent.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <Link 
+                          href={`/organizer/contingents/${contingent.id}`} 
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {schoolContingents.length > 0 && (
             <div className="text-center mt-6">
               <Button variant="outline">View All School Contingents</Button>
@@ -445,43 +550,88 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
         </TabsContent>
         
         <TabsContent value="higher" className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {higherInstContingents?.map((contingent: any) => (
-              <Card key={contingent.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <Building2 className="h-4 w-4 text-purple-500" />
-                        <CardTitle className="text-base">{contingent.name}</CardTitle>
+          {viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {higherInstContingents?.map((contingent: any) => (
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <Building2 className="h-4 w-4 text-purple-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {contingent.higherInstitution?.name || 'Unknown Institution'}
+                          <StateFormatter state={contingent.higherInstitution?.state} />
+                        </CardDescription>
                       </div>
-                      <CardDescription>
-                        {contingent.higherInstitution?.name || 'Unknown Institution'}
-                        <StateFormatter state={contingent.higherInstitution?.state} />
-                      </CardDescription>
+                      <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
                     </div>
-                    <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
-                      <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
                     </div>
-                    <Link 
-                      href={`/organizer/contingents/${contingent.id}`} 
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View Details →
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Contingent</th>
+                    <th className="p-2 text-left font-medium">Institution</th>
+                    <th className="p-2 text-left font-medium">State</th>
+                    <th className="p-2 text-left font-medium">Contestants</th>
+                    <th className="p-2 text-left font-medium">Created</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {higherInstContingents.map((contingent: any, i: number) => (
+                    <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="p-2">
+                        <div className="flex items-center gap-1">
+                          <Building2 className="h-4 w-4 text-purple-500" />
+                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        </div>
+                      </td>
+                      <td className="p-2">{contingent.higherInstitution?.name || 'Unknown Institution'}</td>
+                      <td className="p-2">{formatStateName(contingent.higherInstitution?.state || '')}</td>
+                      <td className="p-2">
+                        <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                          <Users className="h-3 w-3" /> {contingent._count.contestants}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-muted-foreground">{format(new Date(contingent.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <Link 
+                          href={`/organizer/contingents/${contingent.id}`} 
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {higherInstContingents.length > 0 && (
             <div className="text-center mt-6">
               <Button variant="outline">View All Higher Institution Contingents</Button>
@@ -502,42 +652,85 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
         </TabsContent>
         
         <TabsContent value="independent" className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {independentContingents.map((contingent: any) => (
-              <Card key={contingent.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <UserRound className="h-4 w-4 text-indigo-500" />
-                        <CardTitle className="text-base">{contingent.name}</CardTitle>
+          {viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {independentContingents.map((contingent: any) => (
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <UserRound className="h-4 w-4 text-indigo-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          Independent Group (Parents/Youth)
+                        </CardDescription>
                       </div>
-                      <CardDescription>
-                        Independent Group (Parents/Youth)
-                      </CardDescription>
+                      <Badge className="flex items-center gap-1 bg-indigo-100 text-indigo-600 hover:bg-indigo-200 border-indigo-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
                     </div>
-                    <Badge className="flex items-center gap-1 bg-indigo-100 text-indigo-600 hover:bg-indigo-200 border-indigo-200">
-                      <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
                     </div>
-                    <Link 
-                      href={`/organizer/contingents/${contingent.id}`} 
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View Details →
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Independent Contingent</th>
+                    <th className="p-2 text-left font-medium">Type</th>
+                    <th className="p-2 text-left font-medium">Contestants</th>
+                    <th className="p-2 text-left font-medium">Created</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {independentContingents.map((contingent: any, i: number) => (
+                    <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="p-2">
+                        <div className="flex items-center gap-1">
+                          <UserRound className="h-4 w-4 text-indigo-500" />
+                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        </div>
+                      </td>
+                      <td className="p-2">Independent (Parents/Youth)</td>
+                      <td className="p-2">
+                        <Badge className="flex w-10 justify-center items-center gap-1 bg-indigo-100 text-indigo-600 hover:bg-indigo-200 border-indigo-200">
+                          <Users className="h-3 w-3" /> {contingent._count.contestants}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-muted-foreground">{format(new Date(contingent.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <Link 
+                          href={`/organizer/contingents/${contingent.id}`} 
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {independentContingents.length > 0 && (
             <div className="text-center mt-6">
               <Button variant="outline">View All Independent Contingents</Button>
@@ -558,47 +751,92 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
         </TabsContent>
         
         <TabsContent value="no-contestants" className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {contingentsWithoutContestants.map((contingent: any) => (
-              <Card key={contingent.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-1 mb-1">
-                        <ShieldAlert className="h-4 w-4 text-red-500" />
-                        <CardTitle className="text-base">{contingent.name}</CardTitle>
+          {viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {contingentsWithoutContestants.map((contingent: any) => (
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <ShieldAlert className="h-4 w-4 text-red-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {contingent.school?.name || contingent.higherInstitution?.name || 'No institution'}
+                          {((contingent.school?.state && typeof contingent.school.state === 'string') || (contingent.higherInstitution?.state && typeof contingent.higherInstitution.state === 'string')) && (
+                            <span className="ml-1 text-xs">
+                              ({formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')})
+                            </span>
+                          )}
+                        </CardDescription>
                       </div>
-                      <CardDescription>
-                        {contingent.school?.name || contingent.higherInstitution?.name || 'No institution'}
-                        {((contingent.school?.state && typeof contingent.school.state === 'string') || (contingent.higherInstitution?.state && typeof contingent.higherInstitution.state === 'string')) && (
-                          <span className="ml-1 text-xs">
-                            ({formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')})
-                          </span>
-                        )}
-                      </CardDescription>
+                      <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-100">
+                        <AlertCircle className="h-3.5 w-3.5" /> No Contestants
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-100">
-                      <AlertCircle className="h-3.5 w-3.5" /> No Contestants
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
                     </div>
-                    <Link 
-                      href={`/organizer/contingents/${contingent.id}`} 
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View Details →
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Empty Contingent</th>
+                    <th className="p-2 text-left font-medium">Institution</th>
+                    <th className="p-2 text-left font-medium">State</th>
+                    <th className="p-2 text-left font-medium">Status</th>
+                    <th className="p-2 text-left font-medium">Created</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contingentsWithoutContestants.map((contingent: any, i: number) => (
+                    <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="p-2">
+                        <div className="flex items-center gap-1">
+                          <ShieldAlert className="h-4 w-4 text-red-500" />
+                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        </div>
+                      </td>
+                      <td className="p-2">{contingent.school?.name || contingent.higherInstitution?.name || 'Independent'}</td>
+                      <td className="p-2">{formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')}</td>
+                      <td className="p-2">
+                        <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-100">
+                          <AlertCircle className="h-3 w-3" /> No Contestants
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-muted-foreground">{format(new Date(contingent.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <Link 
+                          href={`/organizer/contingents/${contingent.id}`} 
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {contingentsWithoutContestants.length > 0 && (
             <div className="text-center mt-6">
               <Button variant="outline">View All Empty Contingents</Button>
