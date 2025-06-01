@@ -904,6 +904,7 @@
   "lms.auth_google": "Google Authentication",
   "lms.auth_manual": "Email/Password Authentication",
   "lms.password": "Password",
+  "lms.password_requirements": "Ang password ay dapat na hindi bababa sa 8 character at kailangang kasama ang kombinasyon ng uppercase, lowercase, mga numero, at mga espesyal na character para sa mas mahusay na seguridad.",
   "lms.confirm_password": "Kumpirmahin ang Password",
   "lms.back": "Bumalik",
   "lms.confirm_registration": "Kumpirmahin ang Rehistrasyon",

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/language-context";
 
 interface PasswordFormProps {
   onSubmit: (password: string) => void;
@@ -13,6 +14,7 @@ interface PasswordFormProps {
 }
 
 export function SimplePasswordForm({ onSubmit, onCancel, isSubmitting }: PasswordFormProps) {
+  const { t } = useLanguage();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -65,6 +67,9 @@ export function SimplePasswordForm({ onSubmit, onCancel, isSubmitting }: Passwor
             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {t('lms.password_requirements') || "Password must be at least 8 characters and include a mix of uppercase, lowercase, numbers, and special characters for better security."}
+        </p>
       </div>
       
       <div>

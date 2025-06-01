@@ -878,6 +878,7 @@
   "lms.auth_google": "Google認証",
   "lms.auth_manual": "メール/パスワード認証",
   "lms.password": "パスワード",
+  "lms.password_requirements": "パスワードは少なくとも8文字で、セキュリティ向上のために大文字、小文字、数字、特殊文字を含む必要があります。",
   "lms.password_required": "パスワードが必要です",
   "lms.confirm_password": "パスワードの確認",
   "lms.back": "戻る",

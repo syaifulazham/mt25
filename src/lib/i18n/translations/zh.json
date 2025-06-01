@@ -395,6 +395,7 @@
   "lms.auth_google": "Google认证",
   "lms.auth_manual": "电子邮件/密码认证",
   "lms.password": "密码",
+  "lms.password_requirements": "密码必须至少8个字符，并包含大写字母、小写字母、数字和特殊字符，以提高安全性。",
   "lms.password_required": "密码为必填项",
   "lms.confirm_password": "确认密码",
   "lms.back": "返回",

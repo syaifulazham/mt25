@@ -873,6 +873,7 @@
 "lms.auth_google": "Pengesahan Google",
 "lms.auth_manual": "Pengesahan E-mel/Kata Laluan",
 "lms.password": "Kata Laluan",
+"lms.password_requirements": "Kata laluan mestilah sekurang-kurangnya 8 aksara dan merangkumi gabungan huruf besar, huruf kecil, nombor, dan aksara khas untuk keselamatan yang lebih baik.",
 "lms.password_required": "Kata laluan diperlukan",
 "lms.confirm_password": "Sahkan Kata Laluan",
 "lms.back": "Kembali",
