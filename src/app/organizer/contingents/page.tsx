@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   Building2,
   LayoutGrid,
+  MapPin,
   Table as TableIcon
 } from "lucide-react";
 import { prismaExecute } from "@/lib/prisma";
@@ -72,24 +73,78 @@ interface ContingentData {
   };
 }
 
-export default async function ContingentsPage({ searchParams }: { searchParams: { page?: string, search?: string, view?: string } }) {
+export default async function ContingentsPage({ searchParams }: { searchParams: { page?: string, search?: string, view?: string, state?: string } }) {
   // Get the current page from the query params or default to 1
   const currentPage = parseInt(searchParams.page || '1', 10);
-  const pageSize = 12; // Number of contingents per page
+  const pageSize = 50; // Number of contingents per page
   const skip = (currentPage - 1) * pageSize;
   const searchTerm = searchParams.search || '';
+  const stateFilter = searchParams.state || '';
   const viewMode = searchParams.view === 'table' ? 'table' : 'card'; // Default to card view
   
   // Use prismaExecute to get contingent data with pagination and proper connection management
-  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents, independentContingents } = await prismaExecute(async (prisma) => {
-    // Build where clause for searching
-    const whereClause = searchTerm ? {
-      OR: [
+  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents, independentContingents, availableStates } = await prismaExecute(async (prisma) => {
+    // Build where clause for searching and state filtering
+    let whereClause: any = {};
+    
+    if (searchTerm) {
+      whereClause.OR = [
         { name: { contains: searchTerm } },
         { school: { name: { contains: searchTerm } } },
         { higherInstitution: { name: { contains: searchTerm } } }
-      ]
-    } : {};
+      ];
+    }
+    
+    // Add state filter if provided
+    if (stateFilter) {
+      const stateId = parseInt(stateFilter, 10);
+      if (!isNaN(stateId)) {
+        // If we have a state filter, we need to modify our OR clauses
+        // to ensure they also match the state ID
+        if (searchTerm) {
+          // If we also have a search term, we need a more complex query
+          whereClause = {
+            OR: [
+              {
+                name: { contains: searchTerm },
+                OR: [
+                  { school: { stateId } },
+                  { higherInstitution: { stateId } },
+                  { independent: { stateId } }
+                ]
+              },
+              {
+                school: { 
+                  name: { contains: searchTerm },
+                  stateId 
+                }
+              },
+              {
+                higherInstitution: { 
+                  name: { contains: searchTerm },
+                  stateId 
+                }
+              },
+              {
+                independent: {
+                  name: { contains: searchTerm },
+                  stateId
+                }
+              }
+            ]
+          };
+        } else {
+          // If we only have state filter, simpler query
+          whereClause = {
+            OR: [
+              { school: { stateId } },
+              { higherInstitution: { stateId } },
+              { independent: { stateId } }
+            ]
+          };
+        }
+      }
+    }
     
     // Get total count for pagination
     const totalContingents = await prisma.contingent.count({
@@ -116,6 +171,24 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             name: true,
             state: true
           }
+        },
+        independent: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        managers: {
+          include: {
+            participant: {
+              select: {
+                name: true,
+                email: true,
+                phoneNumber: true
+              }
+            }
+          },
+          take: 1 // Get the primary contact
         },
         contestants: {
           select: {
@@ -154,6 +227,12 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
           }
         },
         higherInstitution: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        independent: {
           select: {
             name: true,
             state: true
@@ -223,12 +302,15 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       }
     });
     
-    // Get independent contingents (neither school nor higher institution associated)
+    // Get independent contingents
     const independentContingents = await prisma.contingent.findMany({
       where: {
         ...whereClause,
         schoolId: null,
-        higherInstId: null
+        higherInstId: null,
+        independentId: {
+          not: null
+        }
       },
       orderBy: {
         createdAt: 'desc'
@@ -236,6 +318,12 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       take: pageSize,
       skip,
       include: {
+        independent: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
         _count: {
           select: {
             contestants: true
@@ -245,13 +333,31 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
     });
     
     // Return all contingent data objects
+    // Get all states for the filter dropdown
+    const states = await prisma.state.findMany({
+      select: {
+        id: true,
+        name: true
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+    
+    // Create an array of available states from the query
+    const availableStates = states.map(state => ({
+      id: state.id,
+      name: state.name
+    }));
+    
     return {
       contingents: contingentsWithDetails,
       totalContingents,
       contingentsWithoutContestants,
       schoolContingents,
       higherInstContingents,
-      independentContingents
+      independentContingents,
+      availableStates
     };
   });
   
@@ -261,6 +367,21 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
   // Calculate showing range for pagination display
   const showingFrom = totalContingents === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const showingTo = Math.min(currentPage * pageSize, totalContingents);
+
+  // Helper function to get institution name for any contingent type
+  const getInstitutionName = (contingent: any): string => {
+    return contingent.school?.name || contingent.higherInstitution?.name || contingent.independent?.name || 'No institution';
+  };
+
+  // Helper function to get state for any contingent type
+  const getContingentState = (contingent: any): string | StateObject | null | undefined => {
+    return contingent.school?.state || contingent.higherInstitution?.state || contingent.independent?.state || '';
+  };
+
+  // Helper function to check if a contingent has state information
+  const hasStateInfo = (contingent: any): boolean => {
+    return !!(contingent.school?.state || contingent.higherInstitution?.state || contingent.independent?.state);
+  };
 
   // Format state names for display
   const formatStateName = (stateName: string | StateObject | null | undefined): string => {
@@ -307,27 +428,47 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       <div className="flex flex-wrap gap-3 items-center mb-6">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <form method="get">
-            <Input 
-              type="search" 
-              name="search" 
-              defaultValue={searchTerm}
-              placeholder="Search contingents..." 
-              className="pl-8 bg-white" 
-            />
+          <form method="get" className="flex gap-2 items-center w-full">
+            <div className="relative flex-1">
+              <Input 
+                type="search" 
+                name="search" 
+                defaultValue={searchTerm}
+                placeholder="Search contingents..." 
+                className="pl-8 bg-white w-full" 
+              />
+            </div>
+            
+            <div className="relative min-w-[180px]">
+              <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <select 
+                name="state" 
+                defaultValue={stateFilter}
+                className="h-10 w-full rounded-md border border-input bg-white px-8 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">All States</option>
+                {availableStates.map((state) => (
+                  <option key={state.id} value={state.id}>{formatStateName(state.name)}</option>
+                ))}
+              </select>
+            </div>
+            
             <input type="hidden" name="page" value="1" />
             <input type="hidden" name="view" value={viewMode} />
+            <Button type="submit" size="sm" className="ml-2">
+              Filter
+            </Button>
           </form>
         </div>
         <div className="flex gap-2">
           <Link 
-            href={`/organizer/contingents?page=${currentPage}${searchTerm ? `&search=${searchTerm}` : ''}&view=card`}
+            href={`/organizer/contingents?page=${currentPage}${searchTerm ? `&search=${searchTerm}` : ''}${stateFilter ? `&state=${stateFilter}` : ''}&view=card`}
             className={`${buttonVariants({ variant: viewMode === 'card' ? 'default' : 'outline', size: 'sm' })} flex items-center gap-1`}
           >
             <LayoutGrid className="h-4 w-4" />
           </Link>
           <Link 
-            href={`/organizer/contingents?page=${currentPage}${searchTerm ? `&search=${searchTerm}` : ''}&view=table`}
+            href={`/organizer/contingents?page=${currentPage}${searchTerm ? `&search=${searchTerm}` : ''}${stateFilter ? `&state=${stateFilter}` : ''}&view=table`}
             className={`${buttonVariants({ variant: viewMode === 'table' ? 'default' : 'outline', size: 'sm' })} flex items-center gap-1`}
           >
             <TableIcon className="h-4 w-4" />
@@ -376,8 +517,29 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex items-center justify-between">
+                  <CardContent className="pt-0 space-y-3">
+                    {/* State Badge */}
+                    {hasStateInfo(contingent) && (
+                      <div className="flex items-center">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {formatStateName(getContingentState(contingent))}
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Contact Info */}
+                    {contingent.managers && contingent.managers[0] && (
+                      <div className="text-xs space-y-1 border-t pt-2">
+                        <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                        <div className="text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                        {contingent.managers[0].participant.phoneNumber && (
+                          <div>{contingent.managers[0].participant.phoneNumber}</div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between border-t pt-2">
                       <div className="flex gap-0.5 -space-x-2">
                         {contingent.contestants.slice(0, 5).map((contestant: any, i: number) => (
                           <Avatar key={i} className="h-6 w-6 border-2 border-white">
@@ -407,7 +569,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="p-2 text-left font-medium">Name</th>
-                    <th className="p-2 text-left font-medium">Institution</th>
+                    <th className="p-2 text-left font-medium">Contacts</th>
                     <th className="p-2 text-left font-medium">State</th>
                     <th className="p-2 text-left font-medium">Contestants</th>
                     <th className="p-2 text-left font-medium">Created</th>
@@ -418,10 +580,25 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                   {contingents.map((contingent: any, i: number) => (
                     <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
                       <td className="p-2">
-                        <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        <div className="space-y-1">
+                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline block">{contingent.name}</Link>
+                          <div className="text-xs text-muted-foreground">{getInstitutionName(contingent)}</div>
+                        </div>
                       </td>
-                      <td className="p-2">{contingent.school?.name || contingent.higherInstitution?.name || 'Independent'}</td>
-                      <td className="p-2">{formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')}</td>
+                      <td className="p-2">
+                        {contingent.managers && contingent.managers[0] ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                            <div className="text-xs text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                            {contingent.managers[0].participant.phoneNumber && (
+                              <div className="text-xs">{contingent.managers[0].participant.phoneNumber}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No contact info</span>
+                        )}
+                      </td>
+                      <td className="p-2">{hasStateInfo(contingent) ? formatStateName(getContingentState(contingent)) : '-'}</td>
                       <td className="p-2">
                         <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
                           <Users className="h-3 w-3" /> {contingent._count.contestants}
@@ -492,7 +669,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="p-2 text-left font-medium">School Contingent</th>
-                    <th className="p-2 text-left font-medium">School Name</th>
+                    <th className="p-2 text-left font-medium">Contacts</th>
                     <th className="p-2 text-left font-medium">State</th>
                     <th className="p-2 text-left font-medium">Contestants</th>
                     <th className="p-2 text-left font-medium">Created</th>
@@ -503,13 +680,28 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                   {schoolContingents.map((contingent: any, i: number) => (
                     <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
                       <td className="p-2">
-                        <div className="flex items-center gap-1">
-                          <School className="h-4 w-4 text-amber-500" />
-                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <School className="h-4 w-4 text-amber-500" />
+                            <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground pl-5">{contingent.school?.name || 'Unknown School'}</div>
                         </div>
                       </td>
-                      <td className="p-2">{contingent.school?.name || 'Unknown School'}</td>
-                      <td className="p-2">{formatStateName(contingent.school?.state || '')}</td>
+                      <td className="p-2">
+                        {contingent.managers && contingent.managers[0] ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                            <div className="text-xs text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                            {contingent.managers[0].participant.phoneNumber && (
+                              <div className="text-xs">{contingent.managers[0].participant.phoneNumber}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No contact info</span>
+                        )}
+                      </td>
+                      <td className="p-2">{hasStateInfo(contingent) ? formatStateName(getContingentState(contingent)) : '-'}</td>
                       <td className="p-2">
                         <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
                           <Users className="h-3 w-3" /> {contingent._count.contestants}
@@ -594,7 +786,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="p-2 text-left font-medium">Contingent</th>
-                    <th className="p-2 text-left font-medium">Institution</th>
+                    <th className="p-2 text-left font-medium">Contacts</th>
                     <th className="p-2 text-left font-medium">State</th>
                     <th className="p-2 text-left font-medium">Contestants</th>
                     <th className="p-2 text-left font-medium">Created</th>
@@ -605,13 +797,28 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                   {higherInstContingents.map((contingent: any, i: number) => (
                     <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
                       <td className="p-2">
-                        <div className="flex items-center gap-1">
-                          <Building2 className="h-4 w-4 text-purple-500" />
-                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-4 w-4 text-purple-500" />
+                            <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground pl-5">{contingent.higherInstitution?.name || 'Unknown Institution'}</div>
                         </div>
                       </td>
-                      <td className="p-2">{contingent.higherInstitution?.name || 'Unknown Institution'}</td>
-                      <td className="p-2">{formatStateName(contingent.higherInstitution?.state || '')}</td>
+                      <td className="p-2">
+                        {contingent.managers && contingent.managers[0] ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                            <div className="text-xs text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                            {contingent.managers[0].participant.phoneNumber && (
+                              <div className="text-xs">{contingent.managers[0].participant.phoneNumber}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No contact info</span>
+                        )}
+                      </td>
+                      <td className="p-2">{hasStateInfo(contingent) ? formatStateName(getContingentState(contingent)) : '-'}</td>
                       <td className="p-2">
                         <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
                           <Users className="h-3 w-3" /> {contingent._count.contestants}
@@ -695,7 +902,8 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="p-2 text-left font-medium">Independent Contingent</th>
-                    <th className="p-2 text-left font-medium">Type</th>
+                    <th className="p-2 text-left font-medium">Contacts</th>
+                    <th className="p-2 text-left font-medium">State</th>
                     <th className="p-2 text-left font-medium">Contestants</th>
                     <th className="p-2 text-left font-medium">Created</th>
                     <th className="p-2 text-left font-medium">Actions</th>
@@ -705,12 +913,28 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                   {independentContingents.map((contingent: any, i: number) => (
                     <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
                       <td className="p-2">
-                        <div className="flex items-center gap-1">
-                          <UserRound className="h-4 w-4 text-indigo-500" />
-                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <UserRound className="h-4 w-4 text-indigo-500" />
+                            <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground pl-5">Independent (Parents/Youth)</div>
                         </div>
                       </td>
-                      <td className="p-2">Independent (Parents/Youth)</td>
+                      <td className="p-2">
+                        {contingent.managers && contingent.managers[0] ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                            <div className="text-xs text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                            {contingent.managers[0].participant.phoneNumber && (
+                              <div className="text-xs">{contingent.managers[0].participant.phoneNumber}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No contact info</span>
+                        )}
+                      </td>
+                      <td className="p-2">{hasStateInfo(contingent) ? formatStateName(getContingentState(contingent)) : '-'}</td>
                       <td className="p-2">
                         <Badge className="flex w-10 justify-center items-center gap-1 bg-indigo-100 text-indigo-600 hover:bg-indigo-200 border-indigo-200">
                           <Users className="h-3 w-3" /> {contingent._count.contestants}
@@ -799,7 +1023,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                 <thead>
                   <tr className="bg-muted/50">
                     <th className="p-2 text-left font-medium">Empty Contingent</th>
-                    <th className="p-2 text-left font-medium">Institution</th>
+                    <th className="p-2 text-left font-medium">Contacts</th>
                     <th className="p-2 text-left font-medium">State</th>
                     <th className="p-2 text-left font-medium">Status</th>
                     <th className="p-2 text-left font-medium">Created</th>
@@ -810,13 +1034,28 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                   {contingentsWithoutContestants.map((contingent: any, i: number) => (
                     <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
                       <td className="p-2">
-                        <div className="flex items-center gap-1">
-                          <ShieldAlert className="h-4 w-4 text-red-500" />
-                          <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <ShieldAlert className="h-4 w-4 text-red-500" />
+                            <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground pl-5">{getInstitutionName(contingent)}</div>
                         </div>
                       </td>
-                      <td className="p-2">{contingent.school?.name || contingent.higherInstitution?.name || 'Independent'}</td>
-                      <td className="p-2">{formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')}</td>
+                      <td className="p-2">
+                        {contingent.managers && contingent.managers[0] ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                            <div className="text-xs text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                            {contingent.managers[0].participant.phoneNumber && (
+                              <div className="text-xs">{contingent.managers[0].participant.phoneNumber}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No contact info</span>
+                        )}
+                      </td>
+                      <td className="p-2">{hasStateInfo(contingent) ? formatStateName(getContingentState(contingent)) : '-'}</td>
                       <td className="p-2">
                         <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-100">
                           <AlertCircle className="h-3 w-3" /> No Contestants
