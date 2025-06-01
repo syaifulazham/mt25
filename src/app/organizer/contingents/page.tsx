@@ -25,8 +25,10 @@ import {
   Building2,
   LayoutGrid,
   MapPin,
-  Table as TableIcon
+  Table as TableIcon,
+  LayoutList
 } from "lucide-react";
+import { FilterControls } from "./_components/FilterControls";
 import { prismaExecute } from "@/lib/prisma";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -427,38 +429,12 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       {/* Search and filter controls */}
       <div className="flex flex-wrap gap-3 items-center mb-6">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <form method="get" className="flex gap-2 items-center w-full">
-            <div className="relative flex-1">
-              <Input 
-                type="search" 
-                name="search" 
-                defaultValue={searchTerm}
-                placeholder="Search contingents..." 
-                className="pl-8 bg-white w-full" 
-              />
-            </div>
-            
-            <div className="relative min-w-[180px]">
-              <Filter className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <select 
-                name="state" 
-                defaultValue={stateFilter}
-                className="h-10 w-full rounded-md border border-input bg-white px-8 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">All States</option>
-                {availableStates.map((state) => (
-                  <option key={state.id} value={state.id}>{formatStateName(state.name)}</option>
-                ))}
-              </select>
-            </div>
-            
-            <input type="hidden" name="page" value="1" />
-            <input type="hidden" name="view" value={viewMode} />
-            <Button type="submit" size="sm" className="ml-2">
-              Filter
-            </Button>
-          </form>
+          <FilterControls 
+            searchTerm={searchTerm} 
+            stateFilter={stateFilter} 
+            viewMode={viewMode} 
+            availableStates={availableStates} 
+          />
         </div>
         <div className="flex gap-2">
           <Link 
@@ -1101,7 +1077,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             disabled={currentPage <= 1}
             asChild
           >
-            <Link href={`/organizer/contingents?page=${currentPage - 1}${searchTerm ? `&search=${searchTerm}` : ''}`}>
+            <Link href={`/organizer/contingents?page=${currentPage - 1}${searchTerm ? `&search=${searchTerm}` : ''}${stateFilter ? `&state=${stateFilter}` : ''}&view=${viewMode}`}>
               Previous
             </Link>
           </Button>
@@ -1125,7 +1101,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
                     size="sm"
                     asChild
                   >
-                    <Link href={`/organizer/contingents?page=${page}${searchTerm ? `&search=${searchTerm}` : ''}`}>
+                    <Link href={`/organizer/contingents?page=${page}${searchTerm ? `&search=${searchTerm}` : ''}${stateFilter ? `&state=${stateFilter}` : ''}&view=${viewMode}`}>
                       {page}
                     </Link>
                   </Button>
@@ -1145,7 +1121,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             disabled={currentPage >= totalPages}
             asChild
           >
-            <Link href={`/organizer/contingents?page=${currentPage + 1}${searchTerm ? `&search=${searchTerm}` : ''}`}>
+            <Link href={`/organizer/contingents?page=${currentPage + 1}${searchTerm ? `&search=${searchTerm}` : ''}${stateFilter ? `&state=${stateFilter}` : ''}&view=${viewMode}`}>
               Next
             </Link>
           </Button>
