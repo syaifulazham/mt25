@@ -26,6 +26,7 @@ export function DownloadButton({
   const handleDownload = () => {
     // Generate CSV content
     const headers = [
+      "No.",
       "Name", 
       "Institution", 
       "State",
@@ -56,7 +57,7 @@ export function DownloadButton({
     }
     
     // Map contingent data to CSV rows
-    const rows = contingentsToExport.map((contingent: any) => {
+    const rows = contingentsToExport.map((contingent: any, index: number) => {
       // Determine institution name based on contingent type
       const institution = 
         contingent.school?.name || 
@@ -88,6 +89,7 @@ export function DownloadButton({
       const createdDate = new Date(contingent.createdAt).toLocaleDateString();
       
       return [
+        (index + 1).toString(), // Record number starting from 1
         contingent.name,
         institution,
         state,
