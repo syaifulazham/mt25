@@ -29,9 +29,6 @@ import {
   LayoutList
 } from "lucide-react";
 import { FilterControls } from "./_components/FilterControls";
-import { ContingentCard } from "./_components/ContingentCard";
-import { DownloadButton } from "./_components/DownloadButton";
-import { TabSelector } from "./_components/TabSelector";
 import { prismaExecute } from "@/lib/prisma";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +85,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
   const viewMode = searchParams.view === 'table' ? 'table' : 'card'; // Default to card view
   
   // Use prismaExecute to get contingent data with pagination and proper connection management
-  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, independentContingents, availableStates } = await prismaExecute(async (prisma) => {
+  const { contingents, totalContingents, contingentsWithoutContestants, schoolContingents, higherInstContingents, independentContingents, availableStates } = await prismaExecute(async (prisma) => {
     // Build where clause for searching and state filtering
     let whereClause: any = {};
     
@@ -243,18 +240,6 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             state: true
           }
         },
-        managers: {
-          include: {
-            participant: {
-              select: {
-                name: true,
-                email: true,
-                phoneNumber: true
-              }
-            }
-          },
-          take: 1 // Get the primary contact
-        },
         _count: {
           select: {
             contestants: true
@@ -283,18 +268,6 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             state: true
           }
         },
-        managers: {
-          include: {
-            participant: {
-              select: {
-                name: true,
-                email: true,
-                phoneNumber: true
-              }
-            }
-          },
-          take: 1 // Get the primary contact
-        },
         _count: {
           select: {
             contestants: true
@@ -303,7 +276,33 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       }
     });
 
-    // Higher institution contingents query removed
+    // Get higher institution contingents
+    const higherInstContingents = await prisma.contingent.findMany({
+      where: {
+        ...whereClause,
+        higherInstId: {
+          not: null
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: pageSize,
+      skip,
+      include: {
+        higherInstitution: {
+          select: {
+            name: true,
+            state: true
+          }
+        },
+        _count: {
+          select: {
+            contestants: true
+          }
+        }
+      }
+    });
     
     // Get independent contingents
     const independentContingents = await prisma.contingent.findMany({
@@ -326,18 +325,6 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             name: true,
             state: true
           }
-        },
-        managers: {
-          include: {
-            participant: {
-              select: {
-                name: true,
-                email: true,
-                phoneNumber: true
-              }
-            }
-          },
-          take: 1 // Get the primary contact
         },
         _count: {
           select: {
@@ -370,6 +357,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
       totalContingents,
       contingentsWithoutContestants,
       schoolContingents,
+      higherInstContingents,
       independentContingents,
       availableStates
     };
@@ -423,6 +411,21 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
 
   return (
     <div className="container mx-auto py-10">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Contingents</h1>
+          <p className="text-muted-foreground">
+            Manage all contingents participating in Techlympics 2025
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/organizer/contingents/register" className="gap-1">
+            <Plus className="h-4 w-4" />
+            Add New Contingent
+          </Link>
+        </Button>
+      </div>
+
       {/* Search and filter controls */}
       <div className="flex flex-wrap gap-3 items-center mb-6">
         <div className="relative flex-1 min-w-[200px]">
@@ -452,15 +455,20 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
         </div>
       </div>
 
-      {/* Contingent type tabs with integrated download button */}
-      <TabSelector
-        allContingents={contingents}
-        schoolContingents={schoolContingents}
-        independentContingents={independentContingents}
-        contingentsWithoutContestants={contingentsWithoutContestants}
-        searchTerm={searchTerm}
-        stateFilter={stateFilter}
-      >
+      {/* Contingent type tabs */}
+      <Tabs defaultValue="all">
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">All Contingents</TabsTrigger>
+          <TabsTrigger value="schools">Schools</TabsTrigger>
+          <TabsTrigger value="higher">Higher Institutions</TabsTrigger>
+          <TabsTrigger value="independent">
+            <div className="flex items-center gap-1">
+              <UserRound className="h-3.5 w-3.5" />
+              Independent
+            </div>
+          </TabsTrigger>
+          <TabsTrigger value="no-contestants">No Contestants</TabsTrigger>
+        </TabsList>
         
         <TabsContent value="all" className="space-y-4">
           {viewMode === 'card' ? (
@@ -596,11 +604,39 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
           {viewMode === 'card' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {schoolContingents?.map((contingent: any) => (
-                <ContingentCard 
-                  key={contingent.id}
-                  contingent={contingent}
-                  type="school"
-                />
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <School className="h-4 w-4 text-amber-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {contingent.school?.name || 'Unknown School'}
+                          <StateFormatter state={contingent.school?.state} />
+                        </CardDescription>
+                      </div>
+                      <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           ) : (
@@ -681,16 +717,159 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
           )}
         </TabsContent>
         
-
+        <TabsContent value="higher" className="space-y-4">
+          {viewMode === 'card' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {higherInstContingents?.map((contingent: any) => (
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <Building2 className="h-4 w-4 text-purple-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {contingent.higherInstitution?.name || 'Unknown Institution'}
+                          <StateFormatter state={contingent.higherInstitution?.state} />
+                        </CardDescription>
+                      </div>
+                      <Badge className="flex items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="p-2 text-left font-medium">Contingent</th>
+                    <th className="p-2 text-left font-medium">Contacts</th>
+                    <th className="p-2 text-left font-medium">State</th>
+                    <th className="p-2 text-left font-medium">Contestants</th>
+                    <th className="p-2 text-left font-medium">Created</th>
+                    <th className="p-2 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {higherInstContingents.map((contingent: any, i: number) => (
+                    <tr key={contingent.id} className={i % 2 ? 'bg-muted/20' : ''}>
+                      <td className="p-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-4 w-4 text-purple-500" />
+                            <Link href={`/organizer/contingents/${contingent.id}`} className="font-medium hover:underline">{contingent.name}</Link>
+                          </div>
+                          <div className="text-xs text-muted-foreground pl-5">{contingent.higherInstitution?.name || 'Unknown Institution'}</div>
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        {contingent.managers && contingent.managers[0] ? (
+                          <div className="space-y-1">
+                            <div className="font-medium">{contingent.managers[0].participant.name}</div>
+                            <div className="text-xs text-muted-foreground">{contingent.managers[0].participant.email}</div>
+                            {contingent.managers[0].participant.phoneNumber && (
+                              <div className="text-xs">{contingent.managers[0].participant.phoneNumber}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No contact info</span>
+                        )}
+                      </td>
+                      <td className="p-2">{hasStateInfo(contingent) ? formatStateName(getContingentState(contingent)) : '-'}</td>
+                      <td className="p-2">
+                        <Badge className="flex w-10 justify-center items-center gap-1 bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-200">
+                          <Users className="h-3 w-3" /> {contingent._count.contestants}
+                        </Badge>
+                      </td>
+                      <td className="p-2 text-muted-foreground">{format(new Date(contingent.createdAt), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <Link 
+                          href={`/organizer/contingents/${contingent.id}`} 
+                          className="text-xs text-primary hover:underline"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {higherInstContingents.length > 0 && (
+            <div className="text-center mt-6">
+              <Button variant="outline">View All Higher Institution Contingents</Button>
+            </div>
+          )}
+          {higherInstContingents.length === 0 && (
+            <Card className="p-8 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <Building2 className="h-8 w-8 text-muted-foreground" />
+                <h3 className="text-lg font-semibold">No Higher Institution Contingents Found</h3>
+                <p className="text-muted-foreground">There are no higher institution contingents registered yet.</p>
+                <Button className="mt-4">
+                  <Plus className="h-4 w-4 mr-1" /> Create Higher Institution Contingent
+                </Button>
+              </div>
+            </Card>
+          )}
+        </TabsContent>
+        
         <TabsContent value="independent" className="space-y-4">
           {viewMode === 'card' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {independentContingents.map((contingent: any) => (
-                <ContingentCard 
-                  key={contingent.id}
-                  contingent={contingent}
-                  type="independent"
-                />
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <UserRound className="h-4 w-4 text-indigo-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          Independent Group (Parents/Youth)
+                        </CardDescription>
+                      </div>
+                      <Badge className="flex items-center gap-1 bg-indigo-100 text-indigo-600 hover:bg-indigo-200 border-indigo-200">
+                        <Users className="h-3.5 w-3.5" /> {contingent._count.contestants}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           ) : (
@@ -775,11 +954,43 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
           {viewMode === 'card' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {contingentsWithoutContestants.map((contingent: any) => (
-                <ContingentCard 
-                  key={contingent.id}
-                  contingent={contingent}
-                  type="empty"
-                />
+                <Card key={contingent.id} className="overflow-hidden">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <ShieldAlert className="h-4 w-4 text-red-500" />
+                          <CardTitle className="text-base">{contingent.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {contingent.school?.name || contingent.higherInstitution?.name || 'No institution'}
+                          {((contingent.school?.state && typeof contingent.school.state === 'string') || (contingent.higherInstitution?.state && typeof contingent.higherInstitution.state === 'string')) && (
+                            <span className="ml-1 text-xs">
+                              ({formatStateName(contingent.school?.state || contingent.higherInstitution?.state || '')})
+                            </span>
+                          )}
+                        </CardDescription>
+                      </div>
+                      <Badge variant="outline" className="flex items-center gap-1 text-red-600 bg-red-100">
+                        <AlertCircle className="h-3.5 w-3.5" /> No Contestants
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CalendarIcon className="h-3 w-3" />
+                        <span>{format(new Date(contingent.createdAt), 'PPP')}</span>
+                      </div>
+                      <Link 
+                        href={`/organizer/contingents/${contingent.id}`} 
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View Details →
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           ) : (
@@ -856,7 +1067,7 @@ export default async function ContingentsPage({ searchParams }: { searchParams: 
             </Card>
           )}
         </TabsContent>
-      </TabSelector>
+      </Tabs>
       
       {/* Pagination Controls */}
       {totalPages > 1 && (
