@@ -106,6 +106,15 @@ export const navItems = [
       </svg>
     ),
   },
+  {
+    title: "Survey",
+    href: "/organizer/survey",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
 ];
 
 type DashboardNavProps = {
@@ -137,7 +146,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
   };
 
   return (
-    <aside className={`hidden sm:block ${isCollapsed ? "w-20" : "lg:w-64 md:w-20"} bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out`}>
+    <aside className={`hidden min-h-screen sm:block ${isCollapsed ? "w-20" : "lg:w-64 md:w-20"} bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out`}>
       <div className="flex items-center justify-between p-6">
         <Link href="/organizer/dashboard" className={`flex items-center ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-start"}`}>
           {!isCollapsed ? (

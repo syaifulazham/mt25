@@ -139,6 +139,9 @@ model contestant {
   quizAttempts quiz_attempt[]
   submissions  submission[]
   teamMembers  teamMember[]
+  surveyAnswers survey_answer[]
+  surveyCompositions survey_contestants_composition[]
+  surveySubmissionStatus survey_submission_status[]
 
   @@index([contingentId], map: "contestant_contingentId_fkey")
 }
@@ -766,6 +769,87 @@ model manager_team {
   @@index([teamId])
 }
 
+
+model survey {
+  id                     Int                           @id @default(autoincrement())
+  name                   String
+  description            String?                       @db.Text
+  status                 String                        @default("draft")
+  startDate              DateTime?
+  endDate                DateTime?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  questions              survey_question[]
+  contestantsComposition survey_contestants_composition[]
+  answers                survey_answer[]
+  submissionStatus       survey_submission_status[]
+
+  @@index([status])
+}
+
+model survey_question {
+  id           Int             @id @default(autoincrement())
+  surveyId     Int
+  question     String          @db.Text
+  questionType String          @default("text")
+  options      Json?
+  isRequired   Boolean         @default(true)
+  displayOrder Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  survey       survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  answers      survey_answer[]
+
+  @@index([surveyId])
+  @@index([surveyId, displayOrder])
+}
+
+model survey_contestants_composition {
+  id           Int        @id @default(autoincrement())
+  surveyId     Int
+  contestantId Int
+  survey       survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, contestantId])
+  @@index([surveyId])
+  @@index([contestantId])
+}
+
+model survey_answer {
+  id           Int             @id @default(autoincrement())
+  surveyId     Int
+  questionId   Int
+  contestantId Int
+  answer       Json?
+  submittedAt  DateTime        @default(now())
+  survey       survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  question     survey_question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  contestant   contestant      @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId])
+  @@index([questionId])
+  @@index([contestantId])
+  @@index([surveyId, contestantId])
+}
+
+model survey_submission_status {
+  id            Int        @id @default(autoincrement())
+  surveyId      Int
+  contestantId  Int
+  status        String     @default("not_started")
+  startedAt     DateTime?
+  completedAt   DateTime?
+  lastUpdatedAt DateTime   @default(now())
+  survey        survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  contestant    contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, contestantId])
+  @@index([surveyId])
+  @@index([contestantId])
+  @@index([status])
+}
+
 enum contest_contestType {
   QUIZ
   CODING
@@ -836,4 +920,5 @@ enum scope_area {
   ZONE
   STATE
   OPEN
+  DISTRICT
 }

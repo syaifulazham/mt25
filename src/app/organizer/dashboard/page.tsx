@@ -156,11 +156,21 @@ export default async function DashboardPage() {
   
   try {
     // Query contingents and join related tables to get state information
-    // Using the relationship: contingent -> schoolid -> school -> stateid -> state
+    // Using all three relationships: contingent -> school/higherinstitution/independent -> state
     const contingentsWithState = await prismaExecute(prisma => {
       return prisma.contingent.findMany({
         include: {
           school: {
+            include: {
+              state: true
+            }
+          },
+          higherInstitution: {
+            include: {
+              state: true
+            }
+          },
+          independent: {
             include: {
               state: true
             }
@@ -175,10 +185,16 @@ export default async function DashboardPage() {
     const stateCountMap = new Map<string, number>();
     
     contingentsWithState.forEach(contingent => {
-      // Skip if school or state is null
-      if (!contingent.school || !contingent.school.state) return;
+      // Get state name based on contingent type
+      let stateName = null;
+      if (contingent.school?.state) {
+        stateName = contingent.school.state.name;
+      } else if (contingent.higherInstitution?.state) {
+        stateName = contingent.higherInstitution.state.name;
+      } else if (contingent.independent?.state) {
+        stateName = contingent.independent.state.name;
+      }
       
-      const stateName = contingent.school.state.name;
       if (!stateName) return; // Skip if state name is empty
       
       const currentCount = stateCountMap.get(stateName) || 0;
@@ -230,20 +246,43 @@ export default async function DashboardPage() {
   let participationStateData: Array<{state: string, MALE: number, FEMALE: number}> = [];
   
   try {
+    // Define types to help with processing
+    type ContestantWithContests = {
+      id: number;
+      contests: Array<{ id: number; contestId: number }>;
+      contingent: {
+        id: number;
+        school?: { state?: { name: string } | null } | null;
+        higherInstitution?: { state?: { name: string } | null } | null;
+        independent?: { state?: { name: string } | null } | null;
+      };
+      gender: string;
+    };
+    
     // Query contestants with their contest participations, contingent, school, and state information
     const contestants = await prismaExecute(prisma => {
       return prisma.contestant.findMany({
         include: {
+          contests: true,  // This is the proper relation name for contestParticipations
           contingent: {
             include: {
               school: {
                 include: {
                   state: true
                 }
+              },
+              higherInstitution: {
+                include: {
+                  state: true
+                }
+              },
+              independent: {
+                include: {
+                  state: true
+                }
               }
             }
-          },
-          contests: true  // Include contest participations
+          }
         },
         where: {
           contests: {
@@ -259,14 +298,23 @@ export default async function DashboardPage() {
     const stateGenderMap = new Map<string, { MALE: number, FEMALE: number }>();
     
     // Process each contestant who has contest participations
-    contestants.forEach(contestant => {
-      // Skip if contests is missing
+    contestants.forEach((contestant: ContestantWithContests) => {
+      // Skip if no contest participation
       if (!contestant.contests || contestant.contests.length === 0) return;
       
-      // Skip if contingent, school, or state is missing
-      if (!contestant.contingent || !contestant.contingent.school || !contestant.contingent.school.state) return;
+      // Skip if contingent is missing
+      if (!contestant.contingent) return;
       
-      const stateName = contestant.contingent.school.state.name;
+      // Get state name based on contingent type (school, higher institution, or independent)
+      let stateName = null;
+      if (contestant.contingent.school?.state) {
+        stateName = contestant.contingent.school.state.name;
+      } else if (contestant.contingent.higherInstitution?.state) {
+        stateName = contestant.contingent.higherInstitution.state.name;
+      } else if (contestant.contingent.independent?.state) {
+        stateName = contestant.contingent.independent.state.name;
+      }
+      
       if (!stateName) return; // Skip if state name is missing
       
       // Get gender (default to 'UNKNOWN' if missing)
@@ -309,23 +357,37 @@ export default async function DashboardPage() {
           }
         });
         
-        // Get all contingents with their school info
-        const contingents = await prisma.contingent.findMany({
+        // Get all higher institutions with their state info
+        const higherInstitutions = await prisma.higherinstitution.findMany({
           select: {
             id: true,
-            schoolId: true
-          },
-          where: {
-            schoolId: {
-              not: null
-            }
+            stateId: true
           }
         });
         
-        return { states, schools, contingents };
+        // Get all independent entities with their state info
+        const independents = await prisma.independent.findMany({
+          select: {
+            id: true,
+            stateId: true
+          }
+        });
+        
+        // Get all contingents with their related info
+        const contingents = await prisma.contingent.findMany({
+          select: {
+            id: true,
+            schoolId: true,
+            higherInstId: true,
+            independentId: true,
+            contingentType: true
+          }
+        });
+        
+        return { states, schools, higherInstitutions, independents, contingents };
       });
       
-      const { states, schools, contingents } = mappingData;
+      const { states, schools, higherInstitutions, independents, contingents } = mappingData;
       
       // Create a map of state ID to state name
       const stateIdToName = new Map<number, string>();
@@ -335,7 +397,7 @@ export default async function DashboardPage() {
         }
       });
       
-      // Create a map of school ID to state name
+      // Create a map of school/higher institution/independent ID to state name
       const schoolToState = new Map<number, string>();
       schools.forEach(school => {
         if (school.stateId) {
@@ -346,14 +408,41 @@ export default async function DashboardPage() {
         }
       });
       
+      const higherInstToState = new Map<number, string>();
+      higherInstitutions.forEach((inst: { id: number; stateId: number | null }) => {
+        if (inst.stateId) {
+          const stateName = stateIdToName.get(inst.stateId);
+          if (stateName) {
+            higherInstToState.set(inst.id, stateName);
+          }
+        }
+      });
+      
+      const independentToState = new Map<number, string>();
+      independents.forEach((ind: { id: number; stateId: number | null }) => {
+        if (ind.stateId) {
+          const stateName = stateIdToName.get(ind.stateId);
+          if (stateName) {
+            independentToState.set(ind.id, stateName);
+          }
+        }
+      });
+      
       // Create a map of contingent ID to state name
       const contingentToState = new Map<number, string>();
       contingents.forEach(contingent => {
-        if (contingent.schoolId) {
-          const stateName = schoolToState.get(contingent.schoolId);
-          if (stateName) {
-            contingentToState.set(contingent.id, stateName);
-          }
+        // Check the appropriate relation based on contingent type
+        let stateName = null;
+        if (contingent.contingentType === 'SCHOOL' && contingent.schoolId) {
+          stateName = schoolToState.get(contingent.schoolId);
+        } else if (contingent.contingentType === 'HIGHER_INST' && contingent.higherInstId) {
+          stateName = higherInstToState.get(contingent.higherInstId);
+        } else if (contingent.contingentType === 'INDEPENDENT' && contingent.independentId) {
+          stateName = independentToState.get(contingent.independentId);
+        }
+        
+        if (stateName) {
+          contingentToState.set(contingent.id, stateName);
         }
       });
       
