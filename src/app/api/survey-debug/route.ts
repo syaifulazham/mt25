@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getSessionUser } from "@/lib/session";
 
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+
 const prisma = new PrismaClient();
 
 // GET /api/survey-debug - Diagnostic endpoint for survey debugging

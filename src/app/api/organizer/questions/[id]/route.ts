@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+
 // GET /api/organizer/questions/[id]
 // Get a single question by ID
 export async function GET(
