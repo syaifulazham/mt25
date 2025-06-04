@@ -9,12 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   ChevronLeft,
@@ -88,7 +83,26 @@ interface SurveyStatus {
 interface SurveyQuestion {
   id: number;
   question: string;
-  type: "text" | "choice" | "multiple_choice" | "rating";
+  type: "text" | "choice" | "rating";
+  options?: string[];
+  required: boolean;
+  answer?: string;
+}
+
+// Survey interface
+interface Survey {
+  id: number;
+  name: string;
+  description?: string;
+  status: "draft" | "active" | "completed";
+  questions: SurveyQuestion[];
+}
+
+// Survey question interface
+interface SurveyQuestion {
+  id: number;
+  question: string;
+  type: "text" | "choice" | "rating";
   options?: string[];
   required: boolean;
   answer?: string;
@@ -181,8 +195,6 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   });
   const [confirmRemoveDialogOpen, setConfirmRemoveDialogOpen] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
-  const [isRemoving, setIsRemoving] = useState(false);
-  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   
   // Survey status states
   const [surveyStatuses, setSurveyStatuses] = useState<Record<number, SurveyStatus[]>>({});
@@ -193,9 +205,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   const [selectedContestant, setSelectedContestant] = useState<TeamMember | null>(null);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionnaireOpen, setQuestionnaireOpen] = useState(false);
-  const [surveyAnswers, setSurveyAnswers] = useState<Record<number, string | string[]>>({});
+  const [surveyAnswers, setSurveyAnswers] = useState<Record<number, string>>({});
   const [submittingAnswers, setSubmittingAnswers] = useState(false);
-  const [currentQuestionStep, setCurrentQuestionStep] = useState(0);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
   
   // Debounce search term to avoid too many API calls
   useEffect(() => {
@@ -417,6 +430,75 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     setSearchTerm(e.target.value);
   };
   
+  // Fetch survey statuses for team members
+  const fetchSurveyStatuses = async (teamMembers: TeamMember[]) => {
+    setLoadingSurveys(true);
+    try {
+      console.log('Fetching survey statuses for team members:', teamMembers.map(m => ({ id: m.contestantId, name: m.contestantName })));
+      const statuses: Record<number, SurveyStatus[]> = {};
+      
+      // Fetch survey status for each member in parallel
+      await Promise.all(teamMembers.map(async (member) => {
+        try {
+          const url = `/api/survey-status/contestant?contestantId=${member.contestantId}`;
+          console.log(`Fetching survey status from: ${url}`);
+          
+          const response = await fetch(url, {
+            credentials: 'include', // Include authentication cookies
+            headers: {
+              'Content-Type': 'application/json',
+              // Add cache-busting header to avoid stale data
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          });
+          
+          console.log(`Survey API response for ${member.contestantName} (${member.contestantId}):`, {
+            status: response.status,
+            ok: response.ok,
+            statusText: response.statusText
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Survey data for ${member.contestantName}:`, data);
+            
+            // Extract surveys array from the response
+            if (data && data.surveys) {
+              statuses[member.contestantId] = data.surveys;
+            } else {
+              console.warn(`No surveys array found in response for ${member.contestantName}:`, data);
+            }
+          } else {
+            let errorDetail = '';
+            try {
+              const errorText = await response.text();
+              errorDetail = errorText.substring(0, 200); // Limit text length
+              console.error(`API error response for ${member.contestantName}:`, errorDetail);
+            } catch (e) {
+              console.error('Failed to read error response', e);
+            }
+            
+            // Use toast for user-friendly error notification only for non-auth errors
+            if (response.status !== 401) {
+              toast.error(`Error loading survey data: ${response.status} ${errorDetail ? '- ' + errorDetail : ''}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching survey status for contestant ${member.contestantId}:`, error);
+        }
+      }));
+      
+      console.log('Final survey statuses object:', statuses);
+      setSurveyStatuses(statuses);
+    } catch (error) {
+      console.error('Error fetching survey statuses:', error);
+      toast.error(`Failed to load survey data: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingSurveys(false);
+    }
+  };
+
   // Fetch the team details and available contestants
   useEffect(() => {
     const fetchData = async () => {
@@ -446,6 +528,11 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
           isManager: teamData.isManager,
           contestId: teamData.contestId,
         });
+        
+        // Fetch survey statuses for team members
+        if (teamData.members && teamData.members.length > 0) {
+          fetchSurveyStatuses(teamData.members);
+        }
         
         // Fetch contest details to get target group information if not already included
         if (teamData.contestId && (!teamData.targetGroup || !teamData.minAge)) {
@@ -589,14 +676,6 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       })));
     }
   }, [contestants]);
-  
-  // Fetch survey statuses when team members are loaded
-  useEffect(() => {
-    if (team?.members && team.members.length > 0) {
-      console.log('Fetching survey statuses for team members...');
-      fetchSurveyStatuses(team.members);
-    }
-  }, [team?.members]);
   
   // Filter contestants based on search term, education level, and age criteria
   useEffect(() => {
@@ -970,257 +1049,240 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   // Original education level formatter for the contestants list
   const getEducationLevelText = (level: string) => {
     if (!level) return '—';
-    return level;
-  };
-
-  // Fetch survey statuses for team members
-  const fetchSurveyStatuses = async (teamMembers: TeamMember[], forceRefresh = false) => {
-    setLoadingSurveys(true);
-    try {
-      console.log('Fetching survey statuses for team members:', teamMembers.map(m => ({ id: m.contestantId, name: m.contestantName })));
-      const statuses: Record<number, SurveyStatus[]> = {};
-      
-      // Fetch survey status for each member in parallel
-      await Promise.all(teamMembers.map(async (member) => {
-        try {
-          // Add timestamp to URL for aggressive cache busting
-          const timestamp = new Date().getTime();
-          const url = `/api/survey-status/contestant?contestantId=${member.contestantId}&_t=${timestamp}`;
-          console.log(`Fetching survey status from: ${url}`);
-          
-          const response = await fetch(url, {
-            credentials: 'include', // Include authentication cookies
-            headers: {
-              'Content-Type': 'application/json',
-              // Add cache-busting header to avoid stale data
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
-            },
-            // Force reload from server, not cache
-            cache: forceRefresh ? 'reload' : 'default'
-          });
-          
-          console.log(`Survey API response for ${member.contestantName} (${member.contestantId}):`, {
-            status: response.status,
-            ok: response.ok,
-            statusText: response.statusText
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Survey data for ${member.contestantName}:`, data);
-            if (data && data.surveys) {
-              statuses[member.contestantId] = data.surveys;
-            }
-          }
-        } catch (error) {
-          console.error(`Error fetching survey status for ${member.contestantName}:`, error);
-        }
-      }));
-      
-      setSurveyStatuses(statuses);
-    } catch (error) {
-      console.error('Error fetching survey statuses:', error);
-      toast.error(`Failed to load survey data: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setLoadingSurveys(false);
+    
+    switch (level?.toLowerCase()) {
+      case 'sekolah rendah':
+        return 'Primary School';
+      case 'sekolah menengah':
+        return 'Secondary School';
+      case 'belia':
+        return 'Youth';
+      default:
+        return level;
     }
   };
-
-  // Handler for opening the questionnaire modal
-  const handleOpenQuestionnaire = async (survey: Survey, member: TeamMember) => {
-    setSelectedSurvey(survey);
+  
+  // Handler to open questionnaire modal
+  const handleOpenQuestionnaire = async (survey: SurveyStatus, member: TeamMember) => {
     setSelectedContestant(member);
-    setQuestionnaireOpen(true);
     setQuestionsLoading(true);
-    setSurveyAnswers({});
-    setCurrentQuestionStep(0);
+    setQuestionnaireOpen(true);
     
     try {
-      // Fetch questions with existing answers if any
-      // Log debugging information
-      console.log(`Opening questionnaire for survey ID ${survey.id} and contestant ID ${member.contestantId}`);
-      
-      const response = await fetch(`/api/survey/${survey.id}?contestantId=${member.contestantId}`, {
+      // Fetch survey questions
+      const response = await fetch(`/api/survey/${survey.id}/questions?contestantId=${member.contestantId}`, {
+        credentials: 'include',
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        },
-        credentials: 'include'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Error fetching questions: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Debug questions and options structure
-      console.log('Survey questions data:', data.questions);
-      if (data.questions && data.questions.length > 0) {
-        data.questions.forEach((q: any) => {
-          console.log(`Question ${q.id} (${q.type}):`, q.question);
-          // Handle options for both choice and multiple_choice types
-          if (q.type === 'choice' || q.type === 'multiple_choice') {
-            console.log(`Options for question ${q.id}:`, q.options);
-            // Handle options in string format (parse JSON if needed)
-            if (typeof q.options === 'string') {
-              try {
-                q.options = JSON.parse(q.options);
-                console.log(`Parsed options for question ${q.id}:`, q.options);
-              } catch (e) {
-                console.error(`Failed to parse options for question ${q.id}:`, e);
-              }
-            }
-          }
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Survey questions fetched:', data);
+        
+        setSelectedSurvey({
+          id: survey.id,
+          name: survey.name,
+          status: 'active',
+          questions: data.questions || [],
         });
-      }
-      
-      // Map API response fields to match our component's expected structure
-      const mappedQuestions = data.questions.map((q: any) => ({
-        ...q,
-        // Map questionType to type and standardize single_choice to choice
-        type: q.questionType === 'single_choice' ? 'choice' : (q.questionType || q.type || 'text'),
-        // Ensure options is correctly formatted
-        options: q.options
-      }));
-      
-      console.log('Mapped questions:', mappedQuestions);
-      
-      // Update survey with mapped questions
-      setSelectedSurvey({
-        ...survey,
-        questions: mappedQuestions
-      });
-      
-      // Pre-fill existing answers if any
-      if (data.answers && Object.keys(data.answers).length > 0) {
-        setSurveyAnswers(data.answers);
+        
+        // Pre-fill existing answers if available
+        if (data.answers) {
+          const answerMap: Record<number, string> = {};
+          data.answers.forEach((answer: { questionId: number, answer: string }) => {
+            answerMap[answer.questionId] = answer.answer;
+          });
+          setSurveyAnswers(answerMap);
+        } else {
+          setSurveyAnswers({});
+        }
+        
+      } else {
+        console.error('Failed to fetch survey questions:', response.statusText);
+        toast.error(`Could not load survey questions: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error loading survey questions:', error);
-      toast.error('Failed to load survey questions. Please try again.');
+      console.error('Error fetching survey questions:', error);
+      toast.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setQuestionsLoading(false);
     }
   };
-
-  // Handler for answer changes in the questionnaire
-  const handleAnswerChange = (questionId: number, value: string, isMultipleChoice: boolean = false) => {
-    if (isMultipleChoice) {
-      setSurveyAnswers(prev => {
-        // Handle array values for multiple choice questions
-        const currentAnswers = prev[questionId] ? 
-          (Array.isArray(prev[questionId]) ? prev[questionId] : [prev[questionId]]) : 
-          [];
-        
-        // Toggle the value - add if not present, remove if already selected
-        const updatedAnswers = currentAnswers.includes(value) ?
-          currentAnswers.filter(item => item !== value) :
-          [...currentAnswers, value];
-        
-        return {
-          ...prev,
-          [questionId]: updatedAnswers
-        };
-      });
-    } else {
-      // Original behavior for single choice/text/rating questions
-      setSurveyAnswers(prev => ({
-        ...prev,
-        [questionId]: value
-      }));
-    }
+  
+  // Handle answer changes
+  const handleAnswerChange = (questionId: number, value: string) => {
+    setSurveyAnswers(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
   };
-
-  // Handler for submitting the questionnaire answers
+  
+  // Submit survey answers
   const handleSubmitAnswers = async () => {
     if (!selectedSurvey || !selectedContestant) return;
     
     setSubmittingAnswers(true);
     
     try {
-      console.log('Submitting survey answers:', {
-        surveyId: selectedSurvey.id,
-        contestantId: selectedContestant.contestantId,
-        answers: surveyAnswers
-      });
+      const answers = Object.entries(surveyAnswers).map(([questionId, answer]) => ({
+        questionId: Number(questionId),
+        answer
+      }));
       
-      // Use /api/survey/submit-answers endpoint instead
-      const response = await fetch(`/api/survey/submit-answers`, {
+      const response = await fetch(`/api/survey/${selectedSurvey.id}/submit`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({
-          surveyId: selectedSurvey.id,
           contestantId: selectedContestant.contestantId,
-          answers: surveyAnswers
+          answers
         })
       });
       
-      // Safely handle the response
       if (response.ok) {
-        toast.success('Survey answers submitted successfully!');
+        toast.success('Survey answers submitted successfully');
         setQuestionnaireOpen(false);
         
-        // Clear current answers
-        setSurveyAnswers({});
-        
-        // Force update the survey completion status in the database
-        try {
-          const forceUpdateResponse = await fetch(`/api/survey/force-update-status`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              surveyId: selectedSurvey.id,
-              contestantId: selectedContestant.contestantId,
-            })
-          });
-          console.log('Force update status response:', await forceUpdateResponse.json());
-        } catch (error) {
-          console.error('Error forcing status update:', error);
-        }
-        
-        // Refresh survey statuses for the team with multiple attempts
+        // Refresh survey status for this contestant
         if (team?.members) {
-          // Immediate update with force refresh to clear cache
-          fetchSurveyStatuses(team.members, true);
-          
-          // Staggered refreshes to ensure we catch the updated status
-          const refreshIntervals = [1000, 2000, 4000];
-          refreshIntervals.forEach(delay => {
-            setTimeout(() => {
-              fetchSurveyStatuses(team.members, true); // Force refresh on each attempt
-            }, delay);
-          });
+          // Only refetch for the current contestant to save API calls
+          const contestantToRefresh = team.members.filter(m => m.contestantId === selectedContestant.contestantId);
+          if (contestantToRefresh.length > 0) {
+            fetchSurveyStatuses(contestantToRefresh);
+          }
         }
       } else {
-        // Safely parse the error response
-        let errorMessage = response.statusText;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error('Could not parse error response:', parseError);
-        }
-        toast.error(`Failed to submit: ${errorMessage}`);
       }
-    } catch (error) {
-      console.error('Error submitting survey answers:', error);
-      toast.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setSubmittingAnswers(false);
+    } else {
+      const errorData = await response.json();
+      toast.error(`Failed to submit: ${errorData.error || response.statusText}`);
     }
-  };
+  } catch (error) {
+    console.error('Error submitting survey answers:', error);
+    toast.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    setSubmittingAnswers(false);
+  }
+};
+
+useEffect(() => {
+  if (status === "authenticated") {
+    fetchTeam();
+    loadTargetGroups();
+  } else if (status === "unauthenticated") {
+    router.push(`/login?callbackUrl=${encodeURIComponent(router.asPath)}`);
+  }
+}, [status, router, params.id]);
+
+// Questionnaire modal handlers
+const handleOpenQuestionnaireModal = async (survey: Survey, member: TeamMember) => {
+  setSelectedSurvey(survey);
+  setSelectedContestant(member);
+  setQuestionnaireOpen(true);
+  setQuestionsLoading(true);
+  setSurveyAnswers({});
   
-  return (
-    <div className="container mx-auto py-6 max-w-7xl">
-      <div className="flex items-center mb-6">
+  try {
+    // Fetch questions with existing answers if any
+    const response = await fetch(`/api/survey/${survey.id}/questions?contestantId=${member.id}`, {
+      headers: {
+        'Authorization': `Bearer ${session?.accessToken}`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching questions: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    // Update survey with questions
+    setSelectedSurvey({
+      ...survey,
+      questions: data.questions
+    });
+    
+    // Pre-fill existing answers if any
+    if (data.answers && Object.keys(data.answers).length > 0) {
+      setSurveyAnswers(data.answers);
+    }
+  } catch (error) {
+    console.error('Error loading survey questions:', error);
+    toast.error('Failed to load survey questions. Please try again.');
+  } finally {
+    setQuestionsLoading(false);
+  }
+};
+
+const handleAnswerChangeModal = (questionId: number, value: string) => {
+  setSurveyAnswers(prev => ({
+    ...prev,
+    [questionId]: value
+  }));
+};
+
+const handleSubmitAnswersModal = async () => {
+  if (!selectedSurvey || !selectedContestant) return;
+  
+  setSubmittingAnswers(true);
+  
+  try {
+    const response = await fetch(`/api/survey/${selectedSurvey.id}/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.accessToken}`,
+      },
+      body: JSON.stringify({
+        contestantId: selectedContestant.id,
+        answers: surveyAnswers
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error submitting answers: ${response.status}`);
+    }
+    
+    // Close modal and refresh survey statuses
+    toast.success('Survey answers submitted successfully!');
+    setQuestionnaireOpen(false);
+    fetchSurveyStatuses(selectedSurvey.id, selectedContestant.id);
+  } catch (error) {
+    console.error('Error submitting survey answers:', error);
+    toast.error('Failed to submit answers. Please try again.');
+  } finally {
+    setSubmittingAnswers(false);
+  }
+};
+
+if (status === "unauthenticated") {
+  router.push('/participants/auth/login');
+  return null;
+}
+
+return (
+  <div className="container mx-auto py-6 max-w-7xl">
+    <div className="flex items-center mb-6">
+      <Button variant="outline" size="sm" asChild className="mr-4">
+        <Link href={`/participants/teams/${params.id}`}>
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          {t('team.members.back_to_team')}
+        </Link>
+      </Button>
+      <h1 className="text-2xl font-bold tracking-tight">{t('team.members.title')}</h1>
+    </div>
+    
+    {isLoading ? (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-48 w-full" />
         <Button variant="outline" size="sm" asChild className="mr-4">
           <Link href={`/participants/teams/${params.id}`}>
             <ChevronLeft className="mr-2 h-4 w-4" />
@@ -1309,9 +1371,8 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[40%]">{t('team.members.name')}</TableHead>
-                        <TableHead className="w-[20%]">{t('team.members.class')}</TableHead>
+                        <TableHead className="w-[30%]">{t('team.members.class')}</TableHead>
                         <TableHead className="w-[15%]">{t('team.members.gender')}</TableHead>
-                        <TableHead className="w-[10%]">{t('team.members.surveys')}</TableHead>
                         <TableHead className="w-[15%] text-right">{t('team.members.action')}</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1319,13 +1380,61 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                       {team.members.map((member) => (
                         <TableRow key={member.id}>
                           <TableCell>
-                            <div className="font-medium">{member.contestantName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {member.classGrade ? member.classGrade : ''}
-                              {member.classGrade && member.className ? ' - ' : ''}
-                              {member.className ? member.className : ''}
-                              {(member.classGrade || member.className) && member.email ? ' | ' : ''}
-                              {member.email ? `${member.email}` : ''}
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <div className="font-medium">{member.contestantName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {member.classGrade ? member.classGrade : ''}
+                                  {member.classGrade && member.className ? ' - ' : ''}
+                                  {member.className ? member.className : ''}
+                                  {(member.classGrade || member.className) && member.email ? ' | ' : ''}
+                                  {member.email ? `${member.email}` : ''}
+                                </div>
+                              </div>
+                              
+                              {/* Survey status buttons */}
+                              <div className="flex gap-1">
+                                {loadingSurveys ? (
+                                  <div className="flex items-center gap-1">
+                                    <Skeleton className="h-5 w-5 rounded" />
+                                    <Skeleton className="h-5 w-5 rounded" />
+                                  </div>
+                                ) : surveyStatuses && surveyStatuses[member.contestantId]?.length > 0 ? (
+                                  <TooltipProvider>
+                                    {surveyStatuses[member.contestantId].map((survey) => {
+                                      let buttonColor = "bg-gray-200 hover:bg-gray-300";
+                                      let tooltipText = `${survey.name}: Not started (0/${survey.totalQuestions})`;
+                                      let label = `S${survey.id}`;
+                                      
+                                      if (survey.status === "partial") {
+                                        buttonColor = "bg-yellow-200 hover:bg-yellow-300";
+                                        tooltipText = `${survey.name}: In progress (${survey.answeredQuestions}/${survey.totalQuestions})`;
+                                      } else if (survey.status === "completed") {
+                                        buttonColor = "bg-green-200 hover:bg-green-300";
+                                        tooltipText = `${survey.name}: Completed (${survey.answeredQuestions}/${survey.totalQuestions})`;
+                                      }
+                                      
+                                      return (
+                                        <Tooltip key={survey.id}>
+                                          <TooltipTrigger asChild>
+                                            <div
+                                              className={`inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium cursor-pointer ${buttonColor}`}
+                                              aria-label={`Survey status: ${tooltipText}`}
+                                              onClick={() => handleOpenQuestionnaire(survey, member)}
+                                            >
+                                              {label}
+                                            </div>
+                                          </TooltipTrigger>
+                                        </Tooltip>
+                                      );
+                                    })}
+                                  </TooltipProvider>
+                                ) : (
+                                  <div className="inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium text-gray-500 bg-gray-100">
+                                    No surveys
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>{formatClassInfo(member)}</TableCell>
@@ -1338,78 +1447,6 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                               "—"
                             )}
                           </TableCell>
-                          <TableCell>
-                            {/* Survey status buttons */}
-                            {loadingSurveys ? (
-                              <div className="flex items-center gap-1">
-                                <Skeleton className="h-5 w-5 rounded" />
-                                <Skeleton className="h-5 w-5 rounded" />
-                              </div>
-                            ) : surveyStatuses && surveyStatuses[member.contestantId]?.length > 0 ? (
-                              <TooltipProvider>
-                                <div className="flex gap-1">
-                                  {surveyStatuses[member.contestantId].map((survey) => {
-                                    console.log('Survey status for member', member.contestantName, 'survey', survey.id, ':', { 
-                                      status: survey.status,
-                                      answered: survey.answeredQuestions,
-                                      total: survey.totalQuestions 
-                                    });
-                                    
-                                    let buttonColor = "bg-gray-200 hover:bg-gray-300";
-                                    let tooltipText = `${survey.name}: Not started (0/${survey.totalQuestions})`;
-                                    let label = `S${survey.id}`;
-                                    
-                                    // CRITICAL: Survey can only be completed if there are answers
-                                    // Even if backend says completed, we verify actual answer count
-                                    const hasAnswers = survey.answeredQuestions > 0;
-                                    const allQuestionsAnswered = 
-                                      survey.totalQuestions > 0 && 
-                                      survey.answeredQuestions >= survey.totalQuestions;
-                                    
-                                    // Only mark as complete if BOTH conditions are met:
-                                    // 1. All questions are answered
-                                    // 2. There is at least one answer (> 0)
-                                    const isActuallyComplete = hasAnswers && allQuestionsAnswered;
-                                    
-                                    if (isActuallyComplete) {
-                                      buttonColor = "bg-green-200 hover:bg-green-300";
-                                      tooltipText = `${survey.name}: Completed (${survey.answeredQuestions}/${survey.totalQuestions})`;
-                                    } else if (survey.answeredQuestions > 0) {
-                                      buttonColor = "bg-yellow-200 hover:bg-yellow-300";
-                                      tooltipText = `${survey.name}: In progress (${survey.answeredQuestions}/${survey.totalQuestions})`;
-                                    }
-                                    
-                                    return (
-                                      <Tooltip key={survey.id}>
-                                        <TooltipTrigger asChild>
-                                          <div
-                                            className={`inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium cursor-pointer ${buttonColor}`}
-                                            aria-label={`Survey status: ${tooltipText}`}
-                                            onClick={() => handleOpenQuestionnaire({
-                                              id: survey.id,
-                                              name: survey.name,
-                                              description: '',
-                                              status: 'active',
-                                              questions: []
-                                            }, member)}
-                                          >
-                                            {label}
-                                          </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>{tooltipText}</p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    );
-                                  })}
-                                </div>
-                              </TooltipProvider>
-                            ) : (
-                              <div className="inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium text-gray-500 bg-gray-100">
-                                No surveys
-                              </div>
-                            )}
-                          </TableCell>
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
@@ -1420,27 +1457,66 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                               }}
                               className="text-red-500 hover:text-red-700 hover:bg-red-50"
                             >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Remove</span>
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Remove
                             </Button>
                           </TableCell>
                         </TableRow>
                       ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Add Member Dialog */}
-          <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
-            <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
-              <DialogHeader>
-                <DialogTitle>{t('team.members.add_dialog_title')}</DialogTitle>
-                <DialogDescription>
-                  {t('team.members.add_dialog_description')}
-                  {team && (team.minAge || team.maxAge) && (
+                      </TableBody>
+                      
+                      {/* Contestants Table */}
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t('team.members.contestant')}</TableHead>
+                            <TableHead className="text-right">{t('team.members.actions')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredContestants.map((contestant) => (
+                          <TableRow key={contestant.id}>
+                            <TableCell>
+                              <div className="font-medium">{contestant.name || "—"}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {contestant.age ? `${t('team.members.age')}: ${contestant.age}` : ''}
+                                {contestant.age && (contestant.class_grade || contestant.class_name) ? ' | ' : ''}
+                                {contestant.class_grade ? `${contestant.class_grade}` : ''}
+                                {contestant.class_grade && contestant.class_name ? ' - ' : ''}
+                                {contestant.class_name ? `${contestant.class_name}` : ''}
+                                {((contestant.class_grade || contestant.class_name) && contestant.email) ? ' | ' : ''}
+                                {contestant.email ? `${contestant.email}` : ''}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {contestant.inTeam ? (
+                                <Badge variant="outline" className="bg-green-50">
+                                  <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
+                                  {t('team.members.added')}
+                                </Badge>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAddMember(contestant.id)}
+                                  disabled={isAddingMember || team.members.length >= (team.contestMaxMembers || team.maxMembers)}
+                                >
+                                  {isAddingMember ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Plus className="h-4 w-4 mr-1" />
+                                  )}
+                                  Add
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                      </Table>
+                      
+                      <DialogDescription>
+                        {t('team.members.add_dialog_description')}
+                        {team && (team.minAge || team.maxAge) && (
                     <span className="text-xs text-amber-600 mt-1 inline-block">
                       <AlertCircle className="h-3 w-3 inline mr-1" />
                       {t('team.members.age_restrictions')}: 
@@ -1668,202 +1744,103 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             </DialogContent>
           </Dialog>
           
-          {/* Questionnaire Dialog */}
-          <Dialog open={questionnaireOpen} onOpenChange={setQuestionnaireOpen}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {selectedSurvey ? selectedSurvey.name : 'Survey'}
-                  {selectedContestant && ` - ${selectedContestant.contestantName}`}
-                </DialogTitle>
-              </DialogHeader>
-              
-              {questionsLoading ? (
-                <div className="flex justify-center items-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2">Loading questions...</span>
-                </div>
-              ) : selectedSurvey && selectedSurvey.questions && selectedSurvey.questions.length > 0 ? (
-                <div className="space-y-6 py-4">
-                  {/* Progress indicator */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="text-sm text-muted-foreground">
-                      Question {currentQuestionStep + 1} of {selectedSurvey.questions.length}
-                    </div>
-                    <div className="w-1/2 bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-primary h-2.5 rounded-full" 
-                        style={{
-                          width: `${((currentQuestionStep + 1) / selectedSurvey.questions.length) * 100}%`
-                        }}
-                      ></div>
-                    </div>
+          </CardContent>
+        </Card>
+      </div>
+      )}
+      
+      {/* Questionnaire Dialog */}
+      <Dialog open={questionnaireOpen} onOpenChange={setQuestionnaireOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedSurvey ? selectedSurvey.name : 'Survey'}
+              {selectedContestant && ` - ${selectedContestant.contestantName}`}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {questionsLoading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2">Loading questions...</span>
+            </div>
+          ) : selectedSurvey && selectedSurvey.questions && selectedSurvey.questions.length > 0 ? (
+            <div className="space-y-6 py-4">
+              {selectedSurvey.questions.map((question: any) => (
+                <div key={question.id} className="space-y-2">
+                  <div className="font-medium">
+                    {question.question}
+                    {question.required && <span className="text-red-500 ml-1">*</span>}
                   </div>
                   
-                  {/* Current question */}
-                  {selectedSurvey.questions[currentQuestionStep] && (
-                    <div key={selectedSurvey.questions[currentQuestionStep].id} className="space-y-2">
-                      <div className="font-medium">
-                        {selectedSurvey.questions[currentQuestionStep].question}
-                        {selectedSurvey.questions[currentQuestionStep].required && <span className="text-red-500 ml-1">*</span>}
-                      </div>
-                      
-                      {selectedSurvey.questions[currentQuestionStep].type === 'text' && (
-                        <Input 
-                          placeholder="Enter your answer" 
-                          value={surveyAnswers[selectedSurvey.questions[currentQuestionStep].id] || ''}
-                          onChange={(e) => handleAnswerChange(selectedSurvey.questions[currentQuestionStep].id, e.target.value)}
-                        />
-                      )}
-                      
-                      {selectedSurvey.questions[currentQuestionStep].type === 'choice' && (
-                        <div className="space-y-2">
-                          {/* Handle options regardless of format (array or string that needs parsing) */}
-                          {(() => {
-                            const question = selectedSurvey.questions[currentQuestionStep];
-                            let optionsArray = [];
-                            if (Array.isArray(question.options)) {
-                              optionsArray = question.options;
-                            } else if (typeof question.options === 'string') {
-                              try {
-                                optionsArray = JSON.parse(question.options);
-                              } catch (e) {
-                                console.error(`Failed to parse options for question ${question.id}:`, e);
-                                return <div className="text-red-500">Error loading options</div>;
-                              }
-                            }
-                            
-                            return optionsArray.map((option: any, index: number) => (
-                              <div key={index} className="flex items-center">
-                                <input 
-                                  type="radio" 
-                                  id={`question-${question.id}-option-${index}`}
-                                  name={`question-${question.id}`}
-                                  className="mr-2 h-4 w-4"
-                                  checked={surveyAnswers[question.id] === option}
-                                  onChange={() => handleAnswerChange(question.id, option)}
-                                />
-                                <label htmlFor={`question-${question.id}-option-${index}`}>{option}</label>
-                              </div>
-                            ));
-                          })()} 
+                  {question.type === 'text' && (
+                    <Input 
+                      placeholder="Enter your answer" 
+                      value={surveyAnswers[question.id] || ''}
+                      onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                    />
+                  )}
+                  
+                  {question.type === 'choice' && question.options && (
+                    <div className="flex flex-col space-y-2">
+                      {question.options.map((option: any, index: number) => (
+                        <div key={index} className="flex items-center">
+                          <input 
+                            type="radio" 
+                            id={`question-${question.id}-option-${index}`}
+                            name={`question-${question.id}`}
+                            className="mr-2 h-4 w-4"
+                            checked={surveyAnswers[question.id] === option}
+                            onChange={() => handleAnswerChange(question.id, option)}
+                          />
+                          <label htmlFor={`question-${question.id}-option-${index}`}>{option}</label>
                         </div>
-                      )}
-                      
-                      {selectedSurvey.questions[currentQuestionStep].type === 'multiple_choice' && (
-                        <div className="space-y-2">
-                          {/* Handle options regardless of format (array or string that needs parsing) */}
-                          {(() => {
-                            const question = selectedSurvey.questions[currentQuestionStep];
-                            let optionsArray = [];
-                            if (Array.isArray(question.options)) {
-                              optionsArray = question.options;
-                            } else if (typeof question.options === 'string') {
-                              try {
-                                optionsArray = JSON.parse(question.options);
-                              } catch (e) {
-                                console.error(`Failed to parse options for question ${question.id}:`, e);
-                                return <div className="text-red-500">Error loading options</div>;
-                              }
-                            }
-                            
-                            // Convert answer to array for checked state comparison
-                            const answerArray = surveyAnswers[question.id] 
-                              ? (Array.isArray(surveyAnswers[question.id]) ? surveyAnswers[question.id] : [surveyAnswers[question.id]]) 
-                              : [];
-                            
-                            return optionsArray.map((option: any, index: number) => (
-                              <div key={index} className="flex items-center">
-                                <input 
-                                  type="checkbox" 
-                                  id={`question-${question.id}-option-${index}`}
-                                  className="mr-2 h-4 w-4"
-                                  checked={answerArray.includes(option)}
-                                  onChange={() => handleAnswerChange(question.id, option, true)}
-                                />
-                                <label htmlFor={`question-${question.id}-option-${index}`}>{option}</label>
-                              </div>
-                            ));
-                          })()} 
-                        </div>
-                      )}
-                      
-                      {selectedSurvey.questions[currentQuestionStep].type === 'rating' && (
-                        <div className="flex space-x-2">
-                          {[1, 2, 3, 4, 5].map((rating) => (
-                            <Button
-                              key={rating}
-                              type="button"
-                              variant={surveyAnswers[selectedSurvey.questions[currentQuestionStep].id] === String(rating) ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handleAnswerChange(selectedSurvey.questions[currentQuestionStep].id, String(rating))}
-                            >
-                              {rating}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
+                      ))}
                     </div>
                   )}
                   
-                  {/* Question navigation indicator */}
-                  <div className="text-center text-sm text-muted-foreground mt-4">
-                    {selectedSurvey.questions.length > 1 && (
-                      <span>
-                        {currentQuestionStep + 1} of {selectedSurvey.questions.length} questions
-                      </span>
-                    )}
-                  </div>
+                  {question.type === 'rating' && (
+                    <div className="flex space-x-2">
+                      {[1, 2, 3, 4, 5].map((rating) => (
+                        <Button
+                          key={rating}
+                          type="button"
+                          variant={surveyAnswers[question.id] === String(rating) ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleAnswerChange(question.id, String(rating))}
+                        >
+                          {rating}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-4 text-center text-muted-foreground">
+              No questions available for this survey.
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuestionnaireOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSubmitAnswers} 
+              disabled={submittingAnswers || questionsLoading}
+            >
+              {submittingAnswers ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
               ) : (
-                <div className="py-4 text-center text-muted-foreground">
-                  No questions available for this survey.
-                </div>
+                'Submit Answers'
               )}
-              
-              <DialogFooter className="flex justify-between">
-                {selectedSurvey && selectedSurvey.questions && selectedSurvey.questions.length > 0 ? (
-                  <div className="flex w-full justify-between">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setCurrentQuestionStep(prev => Math.max(0, prev - 1))}
-                      disabled={currentQuestionStep === 0}
-                    >
-                      Previous
-                    </Button>
-                    
-                    {currentQuestionStep < selectedSurvey.questions.length - 1 ? (
-                      <Button 
-                        onClick={() => setCurrentQuestionStep(prev => Math.min(selectedSurvey.questions.length - 1, prev + 1))}
-                      >
-                        Next
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={handleSubmitAnswers} 
-                        disabled={submittingAnswers || questionsLoading}
-                      >
-                        {submittingAnswers ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          'Submit Answers'
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex w-full justify-end">
-                    <Button variant="outline" onClick={() => setQuestionnaireOpen(false)}>Close</Button>
-                  </div>
-                )}
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

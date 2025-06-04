@@ -8,6 +8,7 @@ interface SurveyBase {
   id: number;
   name: string;
   description: string | null;
+  status: string;
   createdAt: Date;
   updatedAt: Date;
   questionCount: number;
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
         s.id, 
         s.name, 
         s.description, 
+        s.status,
         s.createdAt, 
         s.updatedAt,
         COUNT(DISTINCT sq.id) as questionCount,
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
         id: survey.id,
         name: survey.name,
         description: survey.description,
+        status: survey.status,
         createdAt: survey.createdAt,
         updatedAt: survey.updatedAt,
         questionCount: Number(survey.questionCount),

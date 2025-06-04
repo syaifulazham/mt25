@@ -79,6 +79,7 @@ const ContestantsList: React.FC<ContestantsListProps> = ({ contingentId }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [contestantMenuStates, setContestantMenuStates] = useState<Record<number, boolean>>({});
   
   // Handle search
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,31 +241,73 @@ const ContestantsList: React.FC<ContestantsListProps> = ({ contingentId }) => {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                        <div className="relative inline-block text-left">
+                          <div>
+                            <div 
+                              onClick={() => {
+                                const newContestantMenuStates = {...contestantMenuStates};
+                                newContestantMenuStates[contestant.id] = !contestantMenuStates[contestant.id];
+                                setContestantMenuStates(newContestantMenuStates);
+                              }}
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-secondary cursor-pointer"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Open menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleEditContestant(contestant)}>
-                              <FileEdit className="h-4 w-4 mr-2" />
-                              Edit Contestant
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteContestant(contestant)}>
-                              <Trash className="h-4 w-4 mr-2" />
-                              Delete Contestant
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <UserCog className="h-4 w-4 mr-2" />
-                              Manage Teams
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                            </div>
+                          </div>
+                          {contestantMenuStates[contestant.id] && (
+                            <div className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                                 role="menu"
+                                 aria-orientation="vertical"
+                                 aria-labelledby="menu-button">
+                              <div className="py-1" role="none">
+                                <div className="px-3 py-2 text-xs font-medium text-gray-500">Actions</div>
+                                <div className="h-px bg-gray-200 my-1"></div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    handleEditContestant(contestant);
+                                    const newContestantMenuStates = {...contestantMenuStates};
+                                    newContestantMenuStates[contestant.id] = false;
+                                    setContestantMenuStates(newContestantMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <FileEdit className="h-4 w-4 mr-2" />
+                                  Edit Contestant
+                                </div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    handleDeleteContestant(contestant);
+                                    const newContestantMenuStates = {...contestantMenuStates};
+                                    newContestantMenuStates[contestant.id] = false;
+                                    setContestantMenuStates(newContestantMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <Trash className="h-4 w-4 mr-2" />
+                                  Delete Contestant
+                                </div>
+                                
+                                <div className="h-px bg-gray-200 my-1"></div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    // Handle manage teams action here
+                                    const newContestantMenuStates = {...contestantMenuStates};
+                                    newContestantMenuStates[contestant.id] = false;
+                                    setContestantMenuStates(newContestantMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <UserCog className="h-4 w-4 mr-2" />
+                                  Manage Teams
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

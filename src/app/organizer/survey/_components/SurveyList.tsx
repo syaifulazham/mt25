@@ -27,7 +27,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, File, Users, LineChart, Pencil, Trash } from "lucide-react";
+import { MoreHorizontal, File, LineChart, Pencil, Trash, EyeOff, Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "@/components/ui/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { SurveyForm } from "./SurveyForm";
 
@@ -37,18 +40,28 @@ interface SurveyCardProps {
   onDelete: (survey: Survey) => void;
   onAssign: (survey: Survey) => void;
   onViewResults: (survey: Survey) => void;
+  onStatusToggle: (survey: Survey) => void;
 }
 
-function SurveyCard({ survey, onEdit, onDelete, onAssign, onViewResults }: SurveyCardProps) {
+function SurveyCard({ survey, onEdit, onDelete, onAssign, onViewResults, onStatusToggle }: SurveyCardProps) {
+  const isActive = survey.status === 'active';
+  
   return (
-    <Card>
+    <Card className={isActive ? 'bg-green-50' : ''}>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="text-lg">{survey.name}</CardTitle>
-            <CardDescription className="text-sm mt-1 line-clamp-2">
-              {survey.description || "No description provided"}
-            </CardDescription>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg">{survey.name}</CardTitle>
+                <Badge variant={isActive ? "outline" : "secondary"} className={`ml-1 ${isActive ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}`}>
+                  {isActive ? "Active" : "Draft"}
+                </Badge>
+              </div>
+              <CardDescription className="text-sm mt-1 line-clamp-2">
+                {survey.description || "No description provided"}
+              </CardDescription>
+            </div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -60,8 +73,16 @@ function SurveyCard({ survey, onEdit, onDelete, onAssign, onViewResults }: Surve
               <DropdownMenuItem onClick={() => onEdit(survey)}>
                 <Pencil className="mr-2 h-4 w-4" /> Edit Survey
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onAssign(survey)}>
-                <Users className="mr-2 h-4 w-4" /> Assign to Contestants
+              <DropdownMenuItem onClick={() => onStatusToggle(survey)}>
+                {isActive ? (
+                  <>
+                    <EyeOff className="mr-2 h-4 w-4" /> Set as Draft
+                  </>
+                ) : (
+                  <>
+                    <Eye className="mr-2 h-4 w-4" /> Activate Survey
+                  </>
+                )}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onViewResults(survey)}>
                 <LineChart className="mr-2 h-4 w-4" /> View Results
@@ -116,41 +137,78 @@ export function SurveyList({
 }: SurveyListProps) {
   const { surveys: allSurveys, loading, error, refreshSurveys } = useSurvey();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [surveyToDelete, setSurveyToDelete] = useState<Survey | null>(null);
-  
+  const [confirmDelete, setConfirmDelete] = useState<Survey | null>(null);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const router = useRouter();
+
   // Filter surveys based on status if provided
   const surveys = filterStatus 
     ? allSurveys.filter(survey => {
-        if (filterStatus === 'active') {
-          return (survey._count?.contestantsComposition || 0) > 0;
-        } else if (filterStatus === 'draft') {
-          return (survey._count?.contestantsComposition || 0) === 0;
-        } else if (filterStatus === 'completed') {
-          return (survey._count?.answers || 0) > 0 && 
-                 (survey._count?.answers || 0) >= (survey._count?.contestantsComposition || 0);
+        switch (filterStatus) {
+          case 'active':
+            return survey.status === 'active'; 
+          case 'draft':
+            return survey.status === 'draft';
+          case 'completed':
+            return survey._count?.answers && survey._count.answers > 0;
+          default:
+            return true;
         }
-        return true;
       })
     : allSurveys;
 
   const handleDelete = async () => {
-    if (!surveyToDelete) return;
-
+    if (!confirmDelete) return;
     try {
-      const response = await fetch(`/api/survey/${surveyToDelete.id}`, {
-        method: 'DELETE',
+      const response = await fetch(`/api/survey/${confirmDelete.id}`, {
+        method: "DELETE",
       });
-
+      
       if (!response.ok) {
-        throw new Error('Failed to delete survey');
+        throw new Error("Failed to delete survey");
       }
-
+      
+      await refreshSurveys();
+      setConfirmDelete(null);
+      setDeleteConfirmOpen(false);
+    } catch (error) {
+      console.error("Error deleting survey:", error);
+    }
+  };
+  
+  const handleToggleStatus = async (survey: Survey) => {
+    setIsTogglingStatus(true);
+    try {
+      const response = await fetch(`/api/survey-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: survey.id }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update survey status");
+      }
+      
+      const data = await response.json();
+      toast({
+        title: "Survey status updated",
+        description: `Survey is now ${data.status === 'active' ? 'active' : 'in draft mode'}`,
+        variant: "default",
+      });
+      
       await refreshSurveys();
     } catch (error) {
-      console.error('Error deleting survey:', error);
+      console.error("Error toggling survey status:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update survey status",
+        variant: "destructive",
+      });
     } finally {
-      setSurveyToDelete(null);
-      setDeleteConfirmOpen(false);
+      setIsTogglingStatus(false);
     }
   };
 
@@ -167,11 +225,9 @@ export function SurveyList({
   };
 
   const handleConfirmDelete = (survey: Survey) => {
-    setSurveyToDelete(survey);
+    setConfirmDelete(survey);
     setDeleteConfirmOpen(true);
   };
-
-
 
   if (loading) {
     return (
@@ -219,10 +275,11 @@ export function SurveyList({
             <SurveyCard
               key={survey.id}
               survey={survey}
-              onEdit={handleEdit}
-              onDelete={handleConfirmDelete}
-              onAssign={handleAssign}
-              onViewResults={handleViewResults}
+              onEdit={onEditSurvey}
+              onDelete={(survey) => setConfirmDelete(survey)}
+              onAssign={onAssignSurvey}
+              onViewResults={onViewResults}
+              onStatusToggle={handleToggleStatus}
             />
           ))}
         </div>
@@ -231,15 +288,14 @@ export function SurveyList({
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure you want to delete this survey?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the survey &quot;{surveyToDelete?.name}&quot; and all associated data.
-              This action cannot be undone.
+              This action cannot be undone. This will permanently delete the survey and all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogCancel onClick={() => setConfirmDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -18,6 +18,13 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +58,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { 
   MoreHorizontal, 
   UserPlus,
@@ -65,6 +71,14 @@ import {
 import { toast } from "sonner";
 import { format } from 'date-fns';
 import { useContingent, Contestant } from './contingent-context';
+
+interface SurveyStatus {
+  id: number;
+  name: string;
+  status: "not_started" | "partial" | "completed";
+  totalQuestions: number;
+  answeredQuestions: number;
+}
 
 interface TeamMember {
   id: number;
@@ -89,6 +103,10 @@ const TeamDetailsDialog: React.FC<TeamDetailsProps> = ({ team, onClose }) => {
   const [isRemovingMember, setIsRemovingMember] = useState(false);
   const [selectedContestantId, setSelectedContestantId] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<string>("Member");
+  
+  // Survey status state variables
+  const [surveyStatuses, setSurveyStatuses] = useState<Record<number, SurveyStatus[]>>({});
+  const [loadingSurveys, setLoadingSurveys] = useState<boolean>(false);
 
   // Fetch team members
   const fetchTeamMembers = async () => {
@@ -102,11 +120,80 @@ const TeamDetailsDialog: React.FC<TeamDetailsProps> = ({ team, onClose }) => {
       
       const data = await response.json();
       setMembers(data);
+      
+      // After fetching members, get their survey statuses
+      await fetchSurveyStatuses(data);
+      
     } catch (err) {
       console.error("Error fetching team members:", err);
       toast.error("Failed to load team members");
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Fetch survey statuses for team members
+  const fetchSurveyStatuses = async (teamMembers: TeamMember[]) => {
+    setLoadingSurveys(true);
+    try {
+      // Debug: Log team members
+      console.log("DEBUG: Fetching survey statuses for members:", teamMembers.map(m => m.contestantId));
+      
+      const statuses: Record<number, SurveyStatus[]> = {};
+      
+      // Fetch survey status for each member in parallel
+      await Promise.all(teamMembers.map(async (member) => {
+        try {
+          console.log(`DEBUG: Fetching survey status for contestant ${member.contestantId}`);
+          const response = await fetch(`/api/survey-status/contestant?contestantId=${member.contestantId}`, {
+            credentials: 'include', // Include authentication cookies
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          console.log(`DEBUG: Survey API response for ${member.contestantId}:`, response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`DEBUG: Survey data for ${member.contestantId}:`, data);
+            
+            // Extract surveys array from the response
+            if (data && data.surveys) {
+              statuses[member.contestantId] = data.surveys;
+              console.log(`DEBUG: Found ${data.surveys.length} surveys for contestant ${member.contestantId}`);
+            } else {
+              console.log(`DEBUG: No surveys array found in response for contestant ${member.contestantId}`);
+            }
+          } else {
+            const errorText = await response.text();
+            console.error(`DEBUG: Error response for ${member.contestantId}:`, response.status, errorText);
+            // Use toast for user-friendly error notification only for non-auth errors
+            if (response.status !== 401) {
+              toast.error(`Error loading survey data: ${response.status}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching survey status for contestant ${member.contestantId}:`, error);
+        }
+      }));
+      
+      setSurveyStatuses(statuses);
+      console.log('FINAL SURVEY STATUSES OBJECT:', statuses);
+      console.log('Is the object empty?', Object.keys(statuses).length === 0);
+      
+      // Check if each contestantId has entries
+      if (teamMembers.length > 0) {
+        teamMembers.forEach(member => {
+          console.log(`Member ${member.contestantId} has surveys:`, !!statuses[member.contestantId], 
+            statuses[member.contestantId] ? `Count: ${statuses[member.contestantId].length}` : 'No surveys');
+        });
+      }
+      
+      setLoadingSurveys(false);
+    } catch (error) {
+      console.error('Error fetching survey statuses:', error);
+      setLoadingSurveys(false);
     }
   };
 
@@ -288,7 +375,72 @@ const TeamDetailsDialog: React.FC<TeamDetailsProps> = ({ team, onClose }) => {
               <TableBody>
                 {members.map(member => (
                   <TableRow key={member.id}>
-                    <TableCell className="font-medium">{member.contestant.name}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{member.contestant.name}</span>
+                        {/* Debug button */}
+                        <div 
+                          className="inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium bg-blue-200 hover:bg-blue-300 cursor-pointer ml-1"
+                          onClick={() => console.log(`DEBUG: Member ${member.contestantId}`, member, `Survey statuses:`, surveyStatuses)}
+                        >
+                          Debug
+                        </div>
+                        {/* Survey status buttons placed beside member name */}
+                        <div className="flex gap-1">
+                          {/* Debugging info */}
+                          <div 
+                            className="inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium bg-purple-200 hover:bg-purple-300 cursor-pointer mr-1"
+                            onClick={() => {
+                              const hasSurveys = surveyStatuses && surveyStatuses[member.contestantId]?.length > 0;
+                              console.log(`Rendering conditions for ${member.contestant.name} (ID: ${member.contestantId}):`); 
+                              console.log(`- Loading? ${loadingSurveys}`); 
+                              console.log(`- Has surveyStatuses? ${!!surveyStatuses}`); 
+                              console.log(`- Has entry for this contestant? ${surveyStatuses && !!surveyStatuses[member.contestantId]}`); 
+                              console.log(`- Length check: ${surveyStatuses && surveyStatuses[member.contestantId]?.length}`); 
+                              console.log(`- Rendering path: ${loadingSurveys ? 'LOADING' : hasSurveys ? 'SURVEYS' : 'NO SURVEYS'}`);
+                            }}
+                          >
+                            Render?
+                          </div>
+                          
+                          {loadingSurveys ? (
+                            <div className="flex items-center gap-1">
+                              <Skeleton className="h-5 w-5 rounded" />
+                              <Skeleton className="h-5 w-5 rounded" />
+                            </div>
+                          ) : surveyStatuses && surveyStatuses[member.contestantId]?.length > 0 ? (
+                            <TooltipProvider>
+                              {surveyStatuses[member.contestantId].map((survey) => {
+                                let buttonColor = "bg-gray-200 hover:bg-gray-300";
+                                let tooltipText = `${survey.name}: Not started (0/${survey.totalQuestions})`;
+                                let label = `S${survey.id}`;
+                                if (survey.status === "partial") {
+                                  buttonColor = "bg-yellow-200 hover:bg-yellow-300";
+                                  tooltipText = `${survey.name}: In progress (${survey.answeredQuestions}/${survey.totalQuestions})`;
+                                } else if (survey.status === "completed") {
+                                  buttonColor = "bg-green-200 hover:bg-green-300";
+                                  tooltipText = `${survey.name}: Completed (${survey.answeredQuestions}/${survey.totalQuestions})`;
+                                }
+                                return (
+                                  <Tooltip key={survey.id}>
+                                    <TooltipTrigger asChild>
+                                      <div className={`inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium cursor-pointer ${buttonColor}`} aria-label={`Survey status: ${tooltipText}`} >
+                                        {label}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{tooltipText}</TooltipContent>
+                                  </Tooltip>
+                                );
+                              })}
+                            </TooltipProvider>
+                          ) : (
+                            <div className="inline-flex items-center justify-center rounded-md border px-1.5 py-0.5 text-xs font-medium text-gray-500 bg-gray-100">
+                              No surveys
+                            </div>
+                          )}  
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>{member.contestant.ic}</TableCell>
                     <TableCell>{member.role || "Member"}</TableCell>
                     <TableCell>{formatDate(member.joinedAt)}</TableCell>

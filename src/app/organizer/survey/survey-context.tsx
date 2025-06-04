@@ -18,6 +18,7 @@ export interface Survey {
   id: number;
   name: string;
   description: string | null;
+  status: string;
   createdAt: string;
   updatedAt: string;
   questions: SurveyQuestion[];

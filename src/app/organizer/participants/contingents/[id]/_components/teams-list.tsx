@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Card, 
   CardContent, 
@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { 
   Input 
@@ -59,11 +60,27 @@ import {
   RefreshCw,
   PlusCircle,
   Users,
-  Eye
+  Eye,
+  ClipboardCheck,
+  AlertCircle,
+  Clipboard
 } from "lucide-react";
 import { useContingent } from './contingent-context';
 import TeamForm from './team-form';
 import TeamDetailsDialog from './team-details';
+
+interface SurveyStatus {
+  id: number;
+  name: string;
+  status: 'not_started' | 'partial' | 'completed';
+  totalQuestions: number;
+  answeredQuestions: number;
+}
+
+interface TeamSurveyStatus {
+  teamId: number;
+  surveys: Record<number, number>; // Map of surveyId to completion percentage (0-100)
+}
 
 export interface TeamsListProps {
   contingentId: number;
@@ -77,6 +94,10 @@ const TeamsList: React.FC<TeamsListProps> = ({ contingentId }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [isViewingDetails, setIsViewingDetails] = useState(false);
+  const [activeSurveys, setActiveSurveys] = useState<any[]>([]);
+  const [teamSurveyStatus, setTeamSurveyStatus] = useState<Record<number, Record<number, { completed: number, total: number }>>>({});
+  const [loadingSurveys, setLoadingSurveys] = useState(false);
+  const [teamMenuStates, setTeamMenuStates] = useState<Record<number, boolean>>({}); // Track open/closed state for each team's menu
   
   // Handle search
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,6 +137,160 @@ const TeamsList: React.FC<TeamsListProps> = ({ contingentId }) => {
     setSelectedTeam(null);
     setIsAddingNew(true);
   };
+
+  // Fetch active surveys
+  const fetchActiveSurveys = async () => {
+    try {
+      // Try the diagnostic endpoint first
+      const debugResponse = await fetch('/api/survey-debug');
+      if (debugResponse.ok) {
+        const debugData = await debugResponse.json();
+        console.log('Survey debug data:', debugData);
+      }
+
+      // Directly fetch all surveys and filter on client side
+      const response = await fetch('/api/survey');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch surveys: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('All surveys from API:', data);
+      
+      // Check if surveys have the status field
+      if (data.length > 0 && data[0].status === undefined) {
+        console.error('Surveys are missing status field. API might need updating.');
+      }
+      
+      const active = data.filter((survey: any) => survey.status === 'active');
+      console.log('Filtered active surveys:', active);
+      
+      // Set active surveys even if empty, to update UI state
+      setActiveSurveys(active);
+      return active;
+    } catch (error) {
+      console.error("Error fetching active surveys:", error);
+      return [];
+    }
+  };
+
+  // Fetch survey completion for a team
+  const fetchTeamSurveyStatus = async (teamId: number) => {
+    try {
+      const response = await fetch(`/api/organizer/teams/${teamId}/members`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch team members: ${response.status}`);
+      }
+      
+      const teamMembers = await response.json();
+      console.log(`Team ${teamId} members:`, teamMembers);
+      
+      if (teamMembers.length === 0) {
+        return {};
+      }
+      
+      // Initialize survey status for all active surveys
+      const surveyStatus: Record<number, { completed: number, total: number }> = {};
+      activeSurveys.forEach(survey => {
+        surveyStatus[survey.id] = { completed: 0, total: 0 };
+      });
+      
+      // For each member, get survey completion status
+      for (const member of teamMembers) {
+        const contestantId = member.contestantId;
+        console.log(`Fetching survey status for contestant ${contestantId}`);
+        
+        try {
+          const response = await fetch(`/api/survey-status/contestant?contestantId=${contestantId}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Contestant ${contestantId} survey data:`, data);
+            const surveys = data.surveys || [];
+            
+            // For each active survey, update the completion count
+            activeSurveys.forEach(activeSurvey => {
+              // Find this survey in the contestant's responses
+              const contestantSurvey = surveys.find((s: any) => s.id === activeSurvey.id);
+              
+              // Initialize if not exists
+              if (!surveyStatus[activeSurvey.id]) {
+                surveyStatus[activeSurvey.id] = { completed: 0, total: 0 };
+              }
+              
+              // Always increment total for this member
+              surveyStatus[activeSurvey.id].total += 1;
+              
+              // Increment completed count if the contestant completed this survey
+              if (contestantSurvey && contestantSurvey.status === 'completed') {
+                surveyStatus[activeSurvey.id].completed += 1;
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error getting survey status for contestant ${contestantId}:`, error);
+        }
+      }
+      
+      console.log(`Team ${teamId} survey status:`, surveyStatus);
+      return surveyStatus;
+    } catch (error) {
+      console.error(`Error fetching survey status for team ${teamId}:`, error);
+      return {};
+    }
+  };
+
+  // Fetch all teams' survey status
+  const fetchAllTeamsSurveyStatus = async () => {
+    if (!teams.length || !activeSurveys.length) return;
+    
+    try {
+      setLoadingSurveys(true);
+      const statusMap: Record<number, Record<number, { completed: number, total: number }>> = {};
+      
+      await Promise.all(teams.map(async (team) => {
+        const status = await fetchTeamSurveyStatus(team.id);
+        statusMap[team.id] = status;
+      }));
+      
+      setTeamSurveyStatus(statusMap);
+    } catch (error) {
+      console.error("Error fetching teams survey status:", error);
+    } finally {
+      setLoadingSurveys(false);
+    }
+  };
+
+  // Initial data load on component mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      console.log('Initial loading of data...');
+      await refreshTeams();
+      const surveys = await fetchActiveSurveys();
+      console.log('Initial load complete, teams:', teams.length, 'active surveys:', surveys.length);
+    };
+    
+    loadInitialData();
+  }, []);
+  
+  // Handle refreshes when editing is complete
+  useEffect(() => {
+    if (!isEditing && !isAddingNew) {
+      refreshTeams();
+      fetchActiveSurveys();
+    }
+  }, [isEditing, isAddingNew]);
+  
+  // Fetch survey status when teams or active surveys change
+  useEffect(() => {
+    console.log('Effect triggered - teams:', teams.length, 'active surveys:', activeSurveys.length);
+    if (teams.length > 0 && activeSurveys.length > 0) {
+      console.log('Fetching all team survey statuses for', teams.length, 'teams');
+      fetchAllTeamsSurveyStatus();
+    }
+  }, [teams, activeSurveys]);
 
   // Handle form completion
   const handleFormComplete = () => {
@@ -216,6 +391,7 @@ const TeamsList: React.FC<TeamsListProps> = ({ contingentId }) => {
                     <TableHead>Contest</TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead>Members</TableHead>
+                    <TableHead>Surveys</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -237,37 +413,140 @@ const TeamsList: React.FC<TeamsListProps> = ({ contingentId }) => {
                           <span>{team.maxMembers}</span>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {loadingSurveys ? (
+                            <div className="flex items-center gap-1">
+                              <div className="h-6 w-6 rounded-full bg-slate-200 animate-pulse"></div>
+                            </div>
+                          ) : activeSurveys.length > 0 ? (
+                            <TooltipProvider>
+                              {activeSurveys.map((survey) => {
+                                const status = teamSurveyStatus[team.id]?.[survey.id];
+                                
+                                if (!status) return null;
+                                
+                                // Calculate completion percentage
+                                const completionPercent = status.total > 0 
+                                  ? Math.round((status.completed / status.total) * 100) 
+                                  : 0;
+                                
+                                // Determine button color based on completion
+                                let buttonColor = "bg-gray-200 hover:bg-gray-300"; // no members completed
+                                let tooltipText = `${survey.name}: No members completed (0%)`;  
+                                let icon = <AlertCircle className="h-3 w-3 text-gray-600" />;
+                                
+                                if (completionPercent > 0 && completionPercent < 100) {
+                                  buttonColor = "bg-yellow-200 hover:bg-yellow-300"; // partial completion
+                                  tooltipText = `${survey.name}: ${status.completed}/${status.total} members completed (${completionPercent}%)`;
+                                  icon = <Clipboard className="h-3 w-3 text-yellow-600" />;
+                                } else if (completionPercent === 100) {
+                                  buttonColor = "bg-green-200 hover:bg-green-300"; // all completed
+                                  tooltipText = `${survey.name}: All members completed (${status.completed}/${status.total})`;
+                                  icon = <ClipboardCheck className="h-3 w-3 text-green-600" />;
+                                }
+                                
+                                return (
+                                  <Tooltip key={survey.id}>
+                                    <TooltipTrigger>
+                                      <div 
+                                        className={`inline-flex items-center justify-center rounded-md border p-1 h-6 w-6 text-sm cursor-pointer ${buttonColor}`}
+                                      >
+                                        {icon}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{tooltipText}</TooltipContent>
+                                  </Tooltip>
+                                );
+                              })}
+                            </TooltipProvider>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">No active surveys</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{renderStatusBadge(team.status)}</TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                        <div className="relative inline-block text-left">
+                          <div>
+                            <div 
+                              onClick={() => {
+                                const newTeamMenuStates = {...teamMenuStates};
+                                newTeamMenuStates[team.id] = !teamMenuStates[team.id];
+                                setTeamMenuStates(newTeamMenuStates);
+                              }}
+                              className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-secondary cursor-pointer"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Open menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleViewTeamDetails(team)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditTeam(team)}>
-                              <FileEdit className="h-4 w-4 mr-2" />
-                              Edit Team
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteTeam(team)}>
-                              <Trash className="h-4 w-4 mr-2" />
-                              Delete Team
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleViewTeamDetails(team)}>
-                              <UserCog className="h-4 w-4 mr-2" />
-                              Manage Members
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                            </div>
+                          </div>
+                          {teamMenuStates[team.id] && (
+                            <div className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+                                 role="menu"
+                                 aria-orientation="vertical"
+                                 aria-labelledby="menu-button">
+                              <div className="py-1" role="none">
+                                <div className="px-3 py-2 text-xs font-medium text-gray-500">Actions</div>
+                                <div className="h-px bg-gray-200 my-1"></div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    handleViewTeamDetails(team);
+                                    const newTeamMenuStates = {...teamMenuStates};
+                                    newTeamMenuStates[team.id] = false;
+                                    setTeamMenuStates(newTeamMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    handleEditTeam(team);
+                                    const newTeamMenuStates = {...teamMenuStates};
+                                    newTeamMenuStates[team.id] = false;
+                                    setTeamMenuStates(newTeamMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <FileEdit className="h-4 w-4 mr-2" />
+                                  Edit Team
+                                </div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    handleDeleteTeam(team);
+                                    const newTeamMenuStates = {...teamMenuStates};
+                                    newTeamMenuStates[team.id] = false;
+                                    setTeamMenuStates(newTeamMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <Trash className="h-4 w-4 mr-2" />
+                                  Delete Team
+                                </div>
+                                
+                                <div className="h-px bg-gray-200 my-1"></div>
+                                
+                                <div 
+                                  onClick={() => {
+                                    handleViewTeamDetails(team);
+                                    const newTeamMenuStates = {...teamMenuStates};
+                                    newTeamMenuStates[team.id] = false;
+                                    setTeamMenuStates(newTeamMenuStates);
+                                  }}
+                                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                                >
+                                  <UserCog className="h-4 w-4 mr-2" />
+                                  Manage Members
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

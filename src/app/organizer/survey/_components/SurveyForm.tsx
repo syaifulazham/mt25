@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, PlusCircle, ArrowUp, ArrowDown, Trash2, Settings } from "lucide-react";
+import { X, PlusCircle, ArrowUp, ArrowDown, Trash2, Settings, ArrowLeft } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -223,8 +223,20 @@ export function SurveyForm({ survey, onCancel, onSuccess }: SurveyFormProps) {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle>{survey ? 'Edit Survey' : 'Create New Survey'}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex flex-row items-center gap-2">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="icon" 
+            onClick={onCancel} 
+            className="mr-2"
+            title="Back to surveys"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <CardTitle>{survey ? 'Edit Survey' : 'Create New Survey'}</CardTitle>
+        </div>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
