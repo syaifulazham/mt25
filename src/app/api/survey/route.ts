@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getSessionUser } from "@/lib/session";
 
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+
 const prisma = new PrismaClient();
 
 interface SurveyBase {
@@ -142,7 +145,8 @@ export async function POST(request: NextRequest) {
           // Assuming questionData is an object: { question: string, questionType?: string, options?: any[], displayOrder?: number }
           const questionText = questionData.question;
           const questionType = questionData.questionType || 'text';
-          const options = questionData.options || null; // Prisma $executeRaw handles JS objects for JSON columns
+          // MySQL doesn't support arrays directly, so we need to serialize to JSON string
+          const options = questionData.options ? JSON.stringify(questionData.options) : null;
           const displayOrder = questionData.displayOrder || 0;
           
           if (questionText && questionText.trim()) {
@@ -172,11 +176,23 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(result, { status: 201 });
-  } catch (error) {
-    console.error("Error creating survey:", error);
+  } catch (error: any) {
+    console.error("Error creating survey:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
+    // Extract more helpful error information
+    let errorMessage = "Failed to create survey";
+    let statusCode = 500;
+    
+    // Handle Prisma errors (type assertion for error properties)
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2010') {
+      const meta = error.meta as { message?: string } || {};
+      errorMessage = `Database error: ${meta.message || 'Invalid data format'}. Make sure all array data is properly serialized.`;
+      statusCode = 400;
+    }
+    
     return NextResponse.json(
-      { error: "Failed to create survey" },
-      { status: 500 }
+      { error: errorMessage, details: error && typeof error === 'object' && 'meta' in error ? error.meta : {} },
+      { status: statusCode }
     );
   }
 }
