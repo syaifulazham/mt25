@@ -855,7 +855,7 @@
   "sidebar.contestants": "参加者",
   "sidebar.managers": "トレーナー",
   "sidebar.teams": "チーム",
-  "sidebar.lms": "学習管理システム",
+  "sidebar.lms": "Bengkel MT",
   "lms.title": "学習管理システム",
   "lms.account_status": "LMSアカウントの状態",
   "lms.description": "学習管理システム（LMS）アカウントの状態を確認する",

@@ -417,7 +417,7 @@ export default function NewContestantPage() {
                     name="age"
                     type="number"
                     min="5"
-                    max="25"
+                    max="30"
                     placeholder={t('contestant.new.age_placeholder')}
                     value={formData.age}
                     onChange={handleInputChange}
