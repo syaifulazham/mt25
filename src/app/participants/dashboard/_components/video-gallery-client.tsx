@@ -53,8 +53,8 @@ export default function VideoGalleryClient() {
         setIsLoading(true);
         setError(null);
         
-        // Add a cache-busting parameter to prevent stale data
-        const response = await fetch(`/api/videos?t=${new Date().getTime()}`, {
+        // Add a cache-busting parameter to prevent stale data and filter for only 'Registration' group videos
+        const response = await fetch(`/api/videos?group_name=Registration&activeOnly=true&t=${new Date().getTime()}`, {
           credentials: 'include' // Include cookies for authentication
         });
         

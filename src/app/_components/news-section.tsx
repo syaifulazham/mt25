@@ -288,6 +288,8 @@ export default function NewsSection() {
             </div>
           </div>
         </div>
+
+        
       </div>
     </section>
   );

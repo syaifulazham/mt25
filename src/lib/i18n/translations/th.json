@@ -336,6 +336,9 @@
   "independent.save": "บันทึก",
   
   "videos.title": "วิดีโอการฝึกอบรม",
+  "videos.section_title": "วิดีโอแนะนำ",
+  "videos.section_description": "รับชมวิดีโอและการอัปเดตล่าสุดของเรา",
+  "videos.featured": "วิดีโอแนะนำ",
   "videos.watch_video": "ดูวิดีโอ",
   "videos.video1_title": "คู่มือเริ่มต้น",
   "videos.video1_description": "เรียนรู้พื้นฐานของแพลตฟอร์ม Techlympics",
@@ -904,5 +907,6 @@
   "team.join_event": "ลงทะเบียน",
   "team.event_joined_success": "เข้าร่วมกิจกรรมสำเร็จ!",
   "team.event_joined_error": "ไม่สามารถเข้าร่วมกิจกรรมได้ โปรดลองอีกครั้ง",
-  "videos.no_videos_available": "ไม่มีวิดีโอที่พร้อมใช้งาน"
+  "videos.no_videos_available": "ไม่มีวิดีโอที่พร้อมใช้งาน",
+  "videos.view_all": "ดูวิดีโอทั้งหมด"
 }

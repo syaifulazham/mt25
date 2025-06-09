@@ -827,6 +827,9 @@
   "contestant.new.save_button": "I-save ang Kalahok",
   
   "videos.title": "Mga Training Video",
+  "videos.section_title": "Mga Featured Video",
+  "videos.section_description": "Panoorin ang aming mga pinakabagong video at updates",
+  "videos.featured": "Mga Featured Video",
   "videos.watch_video": "Panoorin ang Video",
   "videos.video1_title": "Getting Started Guide",
   "videos.video1_description": "Matuto ng mga basic sa Techlympics platform",
@@ -1021,5 +1024,6 @@
   "team.join_event": "Mag-rehistro",
   "team.event_joined_success": "Matagumpay na sumali sa event!",
   "team.event_joined_error": "Nabigo sa pagsali sa event. Pakisubukan ulit.",
-  "videos.no_videos_available": "Walang available na mga video"
+  "videos.no_videos_available": "Walang available na mga video",
+  "videos.view_all": "Tingnan Lahat ng Video"
 }

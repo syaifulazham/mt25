@@ -816,6 +816,9 @@
   "contestant.new.save_button": "Simpan Peserta",
   
   "videos.title": "Video Latihan",
+  "videos.section_title": "Video Pilihan",
+  "videos.section_description": "Tonton video dan kemas kini terbaru kami",
+  "videos.featured": "Video Pilihan",
   "videos.watch_video": "Tonton Video",
   "videos.video1_title": "Panduan Permulaan",
   "videos.video1_description": "Belajar asas platform Techlympics",
@@ -1009,5 +1012,6 @@
   "team.join_event": "Daftar",
   "team.event_joined_success": "Berjaya menyertai acara!",
   "team.event_joined_error": "Gagal menyertai acara. Sila cuba lagi.",
-  "videos.no_videos_available": "Tiada video tersedia"
+  "videos.no_videos_available": "Tiada video yang tersedia",
+  "videos.view_all": "Lihat Semua Video"
 }

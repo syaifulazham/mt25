@@ -10,6 +10,7 @@ import GallerySection from "./_components/gallery-section";
 import GalleryCarousel from "./_components/gallery-carousel";
 import NewsSection from "./_components/news-section";
 import PartnersSection from "./_components/partners-section";
+import VideoSection from "./_components/video-section";
 import { useLanguage } from "@/lib/i18n/language-context";
 import { LanguageSwitcher } from "@/lib/i18n/language-switcher";
 import AnimatedHoneycomb from "./_components/animated-honeycomb";
@@ -292,6 +293,21 @@ export default function Home() {
       {/* News Section */}
       <section id="news">
         <NewsSection />
+      </section>
+      
+      {/* Videos Section - Now a standalone section */}
+      <section id="videos" className="pt-12 pb-16 bg-gradient-to-b from-gray-900 to-black">
+        <div className="container mx-auto px-6">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-red-400 via-purple-500 to-blue-500">
+              {t('videos.featured') || 'Featured Videos'}
+            </span>
+          </h2>
+          <p className="text-center text-gray-300 mb-12 max-w-3xl mx-auto">
+            {t('videos.section_description') || 'Watch our latest videos and updates'}
+          </p>
+          <VideoSection />
+        </div>
       </section>
 
       {/* Partners Section */}

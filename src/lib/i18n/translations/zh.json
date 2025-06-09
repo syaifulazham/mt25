@@ -336,6 +336,9 @@
   "independent.save": "保存",
   
   "videos.title": "培训视频",
+  "videos.section_title": "精选视频",
+  "videos.section_description": "观看我们最新的视频和更新",
+  "videos.featured": "精选视频",
   "videos.watch_video": "观看视频",
   "videos.video1_title": "快速入门指南",
   "videos.video1_description": "了解Techlympics平台的基础知识",
@@ -948,5 +951,6 @@
   "team.join_event": "报名",
   "team.event_joined_success": "成功加入赛事！",
   "team.event_joined_error": "加入赛事失败。请重试。",
-  "videos.no_videos_available": "没有可用的视频"
+  "videos.no_videos_available": "没有可用的视频",
+  "videos.view_all": "查看所有视频"
 }

@@ -814,6 +814,9 @@
   "contestant.new.save_button": "競技者を保存",
   
   "videos.title": "トレーニングビデオ",
+  "videos.section_title": "特集ビデオ",
+  "videos.section_description": "最新のビデオとアップデートをご覧ください",
+  "videos.featured": "特集ビデオ",
   "videos.watch_video": "ビデオを見る",
   "videos.video1_title": "はじめに",
   "videos.video1_description": "テックリンピックスプラットフォームの基本を学ぶ",
@@ -1009,5 +1012,6 @@
   "requests.error_fetching": "要求の取得エラー",
   "requests.error_found": "管理者が見つかりません",
   "manager.none_found": "管理者が見つかりません",
-  "videos.no_videos_available": "利用可能なビデオがありません"
+  "videos.no_videos_available": "利用可能なビデオがありません",
+  "videos.view_all": "すべてのビデオを見る"
 }

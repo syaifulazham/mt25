@@ -828,6 +828,9 @@
   "contestant.new.save_button": "Save Contestant",
   
   "videos.title": "Training Videos",
+  "videos.section_title": "Featured Videos",
+  "videos.section_description": "Watch our latest videos and updates",
+  "videos.featured": "Featured Videos",
   "videos.watch_video": "Watch Video",
   "videos.video1_title": "Getting Started Guide",
   "videos.video1_description": "Learn the basics of the Techlympics platform",
@@ -1020,5 +1023,6 @@
   "team.join_event": "Register",
   "team.event_joined_success": "Successfully joined the event!",
   "team.event_joined_error": "Failed to join the event. Please try again.",
-  "videos.no_videos_available": "No videos available"
+  "videos.no_videos_available": "No videos available",
+  "videos.view_all": "View All Videos"
 }
