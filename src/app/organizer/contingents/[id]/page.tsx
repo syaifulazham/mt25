@@ -29,7 +29,9 @@ import { Separator } from "@/components/ui/separator";
 import { StateFormatter } from "../_components/state-formatter";
 import { ContingentDetailTabs } from "../_components/contingent-detail-tabs";
 import { PrimaryManagerWrapper } from "../_components/primary-manager-wrapper";
+import { AdminPrimaryManagerChanger } from "../_components/admin-primary-manager-changer";
 import { prismaExecute } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
 type PageProps = {
   params: {
@@ -171,6 +173,10 @@ export default async function ContingentDetailPage({ params }: PageProps) {
   }
   
   try {
+    // Get current user to check if they're admin
+    const currentUser = await getCurrentUser();
+    const isAdmin = currentUser?.role === 'ADMIN';
+    
     // Fetch contingent details with all related information using prismaExecute for connection management
     // The query structure matches the actual Prisma schema
     const contingent = await prismaExecute(prisma => prisma.contingent.findUnique({
@@ -489,12 +495,22 @@ export default async function ContingentDetailPage({ params }: PageProps) {
             <Card>
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Contingent Management</CardTitle>
-                {contingentWithDetails.managers.length > 1 && (
-                  <PrimaryManagerWrapper 
-                    contingentId={contingentWithDetails.id}
-                    managers={contingentWithDetails.managers}
-                  />
-                )}
+                <div className="flex gap-2">
+                  {/* Show admin component only for admin users */}
+                  {isAdmin && contingentWithDetails.managers.length > 1 && (
+                    <AdminPrimaryManagerChanger 
+                      contingentId={contingentWithDetails.id}
+                      managers={contingentWithDetails.managers}
+                    />
+                  )}
+                  {/* Regular component for all users */}
+                  {contingentWithDetails.managers.length > 1 && (
+                    <PrimaryManagerWrapper 
+                      contingentId={contingentWithDetails.id}
+                      managers={contingentWithDetails.managers}
+                    />
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Primary Manager */}
