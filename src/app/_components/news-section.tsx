@@ -32,7 +32,13 @@ const fallbackImage = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/s
 
 // Helper function to normalize image paths
 const normalizeImagePath = (path: string | null | undefined): string => {
-  if (!path) return fallbackImage;
+  if (!path) {
+    console.debug('News section: No image path provided, using fallback');
+    return fallbackImage;
+  }
+  
+  // Log the original path for debugging
+  console.debug(`News section: Processing image path: ${path}`);
   
   // If it's already a data URL or absolute URL, return as is
   if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) {
@@ -56,11 +62,19 @@ const normalizeImagePath = (path: string | null | undefined): string => {
     // Check if we're using a base path in production
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
     if (basePath && !path.startsWith(basePath)) {
-      return `${basePath}${path}`;
+      path = `${basePath}${path}`;
+      console.debug(`News section: Added base path, now: ${path}`);
     }
   }
   
-  return path;
+  // Add a cache-busting parameter to force refresh of images
+  // This can help resolve issues where images might be cached incorrectly
+  const cacheBuster = Date.now();
+  const separator = path.includes('?') ? '&' : '?';
+  const finalPath = `${path}${separator}t=${cacheBuster}`;
+  
+  console.debug(`News section: Final normalized path: ${finalPath}`);
+  return finalPath;
 };
 
 export default function NewsSection() {
@@ -233,8 +247,9 @@ export default function NewsSection() {
                     fill
                     className="object-cover"
                     onError={() => handleImageError(featuredNews.id)}
-                    unoptimized={featuredNews.coverImage?.startsWith('data:') || false}
+                    unoptimized={true} // Disable image optimization to prevent processing issues
                     priority
+                    loading="eager" // Force immediate loading
                   />
                 </div>
                 <div className="p-6">
@@ -272,7 +287,8 @@ export default function NewsSection() {
                     fill
                     className="object-cover"
                     onError={() => handleImageError(news.id)}
-                    unoptimized={news.coverImage?.startsWith('data:') || false}
+                    unoptimized={true} // Disable image optimization to prevent processing issues
+                    loading="eager" // Force immediate loading
                   />
                 </div>
                 <div className="flex-1">
