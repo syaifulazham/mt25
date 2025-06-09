@@ -28,7 +28,6 @@ const nextConfig = {
   },
   // Ensure images from uploads can be optimized
   images: {
-    domains: ['localhost'],
     remotePatterns: [
       {
         protocol: 'https',
@@ -39,6 +38,11 @@ const nextConfig = {
         protocol: 'http',
         hostname: '**',
         pathname: '/uploads/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        pathname: '/**',
       },
     ],
   },

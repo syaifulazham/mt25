@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { StateFormatter } from "../_components/state-formatter";
 import { ContingentDetailTabs } from "../_components/contingent-detail-tabs";
+import { PrimaryManagerWrapper } from "../_components/primary-manager-wrapper";
 import { prismaExecute } from "@/lib/prisma";
 
 type PageProps = {
@@ -486,8 +487,14 @@ export default async function ContingentDetailPage({ params }: PageProps) {
             
             {/* Contingent Managers */}
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Contingent Management</CardTitle>
+                {contingentWithDetails.managers.length > 1 && (
+                  <PrimaryManagerWrapper 
+                    contingentId={contingentWithDetails.id}
+                    managers={contingentWithDetails.managers}
+                  />
+                )}
               </CardHeader>
               <CardContent className="space-y-3">
                 {/* Primary Manager */}
