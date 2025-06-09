@@ -30,6 +30,7 @@ import { StateFormatter } from "../_components/state-formatter";
 import { ContingentDetailTabs } from "../_components/contingent-detail-tabs";
 import { PrimaryManagerWrapper } from "../_components/primary-manager-wrapper";
 import { AdminPrimaryManagerChanger } from "../_components/admin-primary-manager-changer";
+import { DirectAdminChanger } from "../_components/direct-admin-changer";
 import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -176,6 +177,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
     // Get current user to check if they're admin
     const currentUser = await getCurrentUser();
     const isAdmin = currentUser?.role === 'ADMIN';
+    const adminEmail = isAdmin ? currentUser.email : null;
     
     // Fetch contingent details with all related information using prismaExecute for connection management
     // The query structure matches the actual Prisma schema
@@ -496,7 +498,15 @@ export default async function ContingentDetailPage({ params }: PageProps) {
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Contingent Management</CardTitle>
                 <div className="flex gap-2">
-                  {/* Show admin component only for admin users */}
+                  {/* Direct admin override component with direct database auth */}
+                  {isAdmin && adminEmail && contingentWithDetails.managers.length > 1 && (
+                    <DirectAdminChanger 
+                      contingentId={contingentWithDetails.id}
+                      managers={contingentWithDetails.managers}
+                      adminEmail={adminEmail}
+                    />
+                  )}
+                  {/* Standard admin component */}
                   {isAdmin && contingentWithDetails.managers.length > 1 && (
                     <AdminPrimaryManagerChanger 
                       contingentId={contingentWithDetails.id}
