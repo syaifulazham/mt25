@@ -32,6 +32,7 @@ import { PrimaryManagerWrapper } from "../_components/primary-manager-wrapper";
 import { AdminPrimaryManagerChanger } from "../_components/admin-primary-manager-changer";
 import { DirectAdminChanger } from "../_components/direct-admin-changer";
 import { ForcePrimaryManagerChanger } from "../_components/force-primary-manager-changer";
+import { EmergencyPrimaryManagerForm } from "../_components/emergency-primary-manager-form";
 import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
