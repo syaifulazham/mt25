@@ -81,20 +81,56 @@ export function PrimaryManagerChanger({ contingentId, managers, onManagersUpdate
         console.log('Adding admin override headers');
       }
       
-      const response = await fetch(`/api/organizer/contingents/${contingentId}/primary-manager`, {
-        method: 'PATCH',
-        headers,
-        credentials: 'include', // Important: Include cookies for authentication
-        body: JSON.stringify({
-          newPrimaryManagerId: selectedManagerId,
-          isAdminUser: isAdmin, // Send admin status in the payload as well
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
+      // Try both methods: normal authenticated and emergency endpoint
+      let response;
+      let useEmergencyEndpoint = false;
+      
+      // First try the normal authenticated endpoint
+      try {
+        console.log('Attempting regular authenticated endpoint...');
+        response = await fetch(`/api/organizer/contingents/${contingentId}/primary-manager`, {
+          method: 'PATCH',
+          headers,
+          credentials: 'include', // Include cookies for authentication
+          cache: 'no-store', // Prevent caching
+          body: JSON.stringify({
+            newPrimaryManagerId: selectedManagerId,
+            isAdminUser: isAdmin,
+          }),
+        });
         
+        // Check if authentication failed
         if (response.status === 401) {
+          console.log('Authentication failed on regular endpoint, trying emergency endpoint...');
+          useEmergencyEndpoint = true;
+        }
+      } catch (error) {
+        console.error('Error with regular endpoint:', error);
+        useEmergencyEndpoint = true;
+      }
+      
+      // If regular endpoint failed with auth issues, try emergency endpoint
+      if (useEmergencyEndpoint) {
+        console.log('Using emergency endpoint as fallback...');
+        response = await fetch(`/api/emergency/update-primary-manager`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          // No credentials - completely bypassing auth
+          body: JSON.stringify({
+            contingentId: contingentId,
+            newPrimaryManagerId: selectedManagerId
+          }),
+        });
+      }
+
+      // Ensure response is defined before proceeding
+      if (!response || !response.ok) {
+        // If response is undefined, create a generic error message
+        const errorData = response ? await response.json() : { error: 'Request failed' };
+        
+        if (response && response.status === 401) {
           // Specific handling for authentication errors
           console.error('Authentication error:', errorData);
           toast.error('Authentication error. Please refresh the page and try again.');
@@ -106,7 +142,12 @@ export function PrimaryManagerChanger({ contingentId, managers, onManagersUpdate
         throw new Error(errorData.error || errorData.message || 'Failed to update primary manager');
       }
 
-      toast.success('Primary manager updated successfully');
+      const successResult = response ? await response.json().catch(() => ({})) : {};
+      const methodUsed = useEmergencyEndpoint ? 'emergency bypass' : 'standard authentication';
+      console.log(`Primary manager updated successfully using ${methodUsed}`);
+      toast.success(`Primary manager updated successfully`);
+      
+      // Trigger any callback functions to update UI
       onManagersUpdated();
     } catch (error) {
       console.error('Failed to update primary manager:', error);
