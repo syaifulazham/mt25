@@ -1,5 +1,8 @@
 import React from "react";
 import { Metadata } from "next";
+import { FaEnvelope } from "react-icons/fa";
+import { MdOutlineContactSupport } from "react-icons/md";
+import { ImDatabase } from "react-icons/im";
 import Link from "next/link";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
@@ -23,7 +26,7 @@ import {
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { StateFormatter } from "../_components/state-formatter";
@@ -502,10 +505,17 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                 <div className="flex gap-2">
                   {/* Force change primary manager - NO AUTH CHECKS */}
                   {isAdmin && contingentWithDetails.managers.length > 1 && (
-                    <ForcePrimaryManagerChanger 
-                      contingentId={contingentWithDetails.id}
-                      managers={contingentWithDetails.managers}
-                    />
+                    <div className="flex gap-2">
+                      <ForcePrimaryManagerChanger 
+                        contingentId={contingentWithDetails.id}
+                        managers={contingentWithDetails.managers}
+                      />
+                      <Link href={`/emergency-tools`}>
+                        <Button variant="outline" size="sm" className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-500">
+                          Emergency Tools
+                        </Button>
+                      </Link>
+                    </div>
                   )}
                   {/* Direct admin override component with direct database auth */}
                   {isAdmin && adminEmail && contingentWithDetails.managers.length > 1 && (

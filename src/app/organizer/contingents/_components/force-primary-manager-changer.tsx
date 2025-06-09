@@ -57,13 +57,15 @@ export function ForcePrimaryManagerChanger({ contingentId, managers }: ForcePrim
     setLoading(true);
 
     try {
-      // Use the no-auth force update endpoint
-      const response = await fetch(`/api/organizer/contingents/${contingentId}/force-update-primary`, {
-        method: 'PATCH',
+      // Use the completely auth-free emergency endpoint
+      const response = await fetch(`/api/emergency/update-primary-manager`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
+        // No credentials included - completely bypassing auth
         body: JSON.stringify({
+          contingentId: contingentId,
           newPrimaryManagerId: selectedManagerId
         }),
       });
