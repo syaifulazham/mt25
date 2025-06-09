@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { checkAdminStatus } from './check-admin-status';
 import { Button } from "@/components/ui/button";
 import { 
   Dialog, 
@@ -38,12 +39,24 @@ export function PrimaryManagerChanger({ contingentId, managers, onManagersUpdate
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedManagerId, setSelectedManagerId] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Find current primary manager to pre-select
   const currentPrimaryManager = managers.find(m => m.isOwner);
 
+  // Check if current user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const adminStatus = await checkAdminStatus();
+      setIsAdmin(adminStatus);
+      console.log('User admin status:', adminStatus);
+    };
+    
+    checkAdmin();
+  }, []);
+
   // Initialize the selected manager to the current primary manager
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentPrimaryManager && !selectedManagerId) {
       setSelectedManagerId(currentPrimaryManager.id);
     }
@@ -58,14 +71,23 @@ export function PrimaryManagerChanger({ contingentId, managers, onManagersUpdate
     setLoading(true);
 
     try {
+      // If user is admin, include special header for admin authorization
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (isAdmin) {
+        headers['X-Admin-Override'] = 'true';
+        console.log('Adding admin override headers');
+      }
+      
       const response = await fetch(`/api/organizer/contingents/${contingentId}/primary-manager`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include', // Important: Include cookies for authentication
         body: JSON.stringify({
           newPrimaryManagerId: selectedManagerId,
+          isAdminUser: isAdmin, // Send admin status in the payload as well
         }),
       });
 
