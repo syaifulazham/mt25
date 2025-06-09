@@ -11,10 +11,18 @@ export async function PATCH(
 ) {
   try {
     // Check authorization - only organizers can manage contingents
+    console.log('Authenticating organizer API request for primary-manager update...');
     const authResult = await authenticateOrganizerApi(['ADMIN', 'OPERATOR']);
+    
     if (!authResult.success) {
-      return NextResponse.json({ error: authResult.message }, { status: authResult.status || 401 });
+      console.error('Authentication failed:', authResult.message);
+      return NextResponse.json({ 
+        error: `Authentication failed: ${authResult.message}`,
+        details: authResult
+      }, { status: authResult.status || 401 });
     }
+    
+    console.log('Authentication successful, proceeding with primary manager update');
 
     const contingentId = parseInt(params.id);
     if (isNaN(contingentId)) {

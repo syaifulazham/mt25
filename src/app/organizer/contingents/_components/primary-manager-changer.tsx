@@ -63,6 +63,7 @@ export function PrimaryManagerChanger({ contingentId, managers, onManagersUpdate
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Important: Include cookies for authentication
         body: JSON.stringify({
           newPrimaryManagerId: selectedManagerId,
         }),
@@ -70,7 +71,17 @@ export function PrimaryManagerChanger({ contingentId, managers, onManagersUpdate
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update primary manager');
+        
+        if (response.status === 401) {
+          // Specific handling for authentication errors
+          console.error('Authentication error:', errorData);
+          toast.error('Authentication error. Please refresh the page and try again.');
+          // Optionally force a page reload to refresh the auth session
+          setTimeout(() => window.location.reload(), 2500);
+          return;
+        }
+        
+        throw new Error(errorData.error || errorData.message || 'Failed to update primary manager');
       }
 
       toast.success('Primary manager updated successfully');
