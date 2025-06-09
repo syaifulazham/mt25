@@ -38,6 +38,12 @@ const normalizeImagePath = (path: string | null | undefined): string => {
   if (path.startsWith('data:') || path.startsWith('http://') || path.startsWith('https://')) {
     return path;
   }
+
+  // For specific problematic images in production, return fallback immediately
+  if (path.includes('content_5538f370f0c6e62d.jpg')) {
+    console.warn(`Known problematic image path: ${path}`);
+    return fallbackImage;
+  }
   
   // Ensure path starts with /
   if (!path.startsWith('/')) {
