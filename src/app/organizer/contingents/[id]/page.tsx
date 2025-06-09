@@ -31,6 +31,7 @@ import { ContingentDetailTabs } from "../_components/contingent-detail-tabs";
 import { PrimaryManagerWrapper } from "../_components/primary-manager-wrapper";
 import { AdminPrimaryManagerChanger } from "../_components/admin-primary-manager-changer";
 import { DirectAdminChanger } from "../_components/direct-admin-changer";
+import { ForcePrimaryManagerChanger } from "../_components/force-primary-manager-changer";
 import { prismaExecute } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -498,6 +499,13 @@ export default async function ContingentDetailPage({ params }: PageProps) {
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">Contingent Management</CardTitle>
                 <div className="flex gap-2">
+                  {/* Force change primary manager - NO AUTH CHECKS */}
+                  {isAdmin && contingentWithDetails.managers.length > 1 && (
+                    <ForcePrimaryManagerChanger 
+                      contingentId={contingentWithDetails.id}
+                      managers={contingentWithDetails.managers}
+                    />
+                  )}
                   {/* Direct admin override component with direct database auth */}
                   {isAdmin && adminEmail && contingentWithDetails.managers.length > 1 && (
                     <DirectAdminChanger 
