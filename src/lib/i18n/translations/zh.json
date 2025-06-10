@@ -289,6 +289,8 @@
   "contingent.no_description": "没有提供描述",
   "contingent.primary_manager": "主要管理员",
   "contingent.co_manager": "共同管理员",
+  "contingent.manage_co_managers": "管理共同管理员",
+  "contingent.manage_co_managers_desc": "查看和管理此代表团的共同管理员",
   "contingent.pending_approval": "等待批准",
   "contingent.pending_request": "待处理请求",
   "contingent.pending_request_desc": "您加入此团队的请求正在等待团队管理员的批准。",

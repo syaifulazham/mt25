@@ -227,6 +227,19 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
+    // Parse request body to get verification code
+    const requestData = await request.json();
+    const { verificationCode, expectedCode } = requestData;
+    
+    if (!verificationCode || !expectedCode) {
+      return NextResponse.json({ error: "Verification code is required" }, { status: 400 });
+    }
+    
+    // Verify that the code matches
+    if (verificationCode !== expectedCode) {
+      return NextResponse.json({ error: "Verification code does not match" }, { status: 400 });
+    }
+    
     const contingentId = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
     const managerId = searchParams.get("managerId");

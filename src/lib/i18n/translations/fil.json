@@ -197,6 +197,8 @@
   
   "contingent.title": "Contingent",
   "contingent.manager": "Manager",
+  "contingent.management": "Pamamahala ng Contingent",
+  "contingent.management_desc": "Pamahalaan ang mga miyembro, setting, at co-manager ng iyong contingent",
   "contingent.member": "Miyembro",
   "contingent.none": "Wala",
   "contingent.error_loading": "Error sa paglo-load ng contingent data",
@@ -289,6 +291,8 @@
   "contingent.no_description": "Walang naibigay na paglalarawan",
   "contingent.primary_manager": "Pangunahing Manager",
   "contingent.co_manager": "Co-Manager",
+  "contingent.manage_co_managers": "Pamahalaan ang mga Co-Manager",
+  "contingent.manage_co_managers_desc": "Tingnan at pamahalaan ang mga co-manager para sa contingent na ito",
   "contingent.pending_approval": "Naghihintay ng Pag-apruba",
   "contingent.pending_request": "Naghihintay na Kahilingan",
   "contingent.pending_request_desc": "Ang inyong kahilingan na sumali sa contingent na ito ay naghihintay ng pag-apruba mula sa manager ng contingent.",

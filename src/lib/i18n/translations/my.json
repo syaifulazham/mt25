@@ -289,6 +289,8 @@
   "contingent.no_description": "Tiada penerangan disediakan",
   "contingent.primary_manager": "Pengurus Utama",
   "contingent.co_manager": "Pengurus Bersama",
+  "contingent.manage_co_managers": "Urus Pengurus Bersama",
+  "contingent.manage_co_managers_desc": "Lihat dan urus pengurus bersama untuk kontinjen ini",
   "contingent.pending_approval": "Menunggu Kelulusan",
   "contingent.pending_request": "Permintaan Tertunda",
   "contingent.pending_request_desc": "Permintaan anda untuk menyertai kontinjen ini sedang menunggu kelulusan daripada pengurus kontinjen.",

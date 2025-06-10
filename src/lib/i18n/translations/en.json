@@ -197,6 +197,8 @@
   
   "contingent.title": "Contingent",
   "contingent.manager": "Manager",
+  "contingent.management": "Contingent Management",
+  "contingent.management_desc": "Manage your contingent members, settings, and co-managers",
   "contingent.member": "Member",
   "contingent.none": "None",
   "contingent.error_loading": "Error loading contingent data",
@@ -289,6 +291,8 @@
   "contingent.no_description": "No description provided",
   "contingent.primary_manager": "Primary Manager",
   "contingent.co_manager": "Co-Manager",
+  "contingent.manage_co_managers": "Manage Co-Managers",
+  "contingent.manage_co_managers_desc": "View and manage co-managers for this contingent",
   "contingent.pending_approval": "Pending Approval",
   "contingent.pending_request": "Pending Request",
   "contingent.pending_request_desc": "Your request to join this contingent is pending approval from the contingent manager.",

@@ -10,7 +10,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { FileUploadDropzone } from "@/components/ui/file-upload-dropzone";
 import { toast } from "sonner";
-import { School as SchoolIcon, Building, Users, CheckCircle, XCircle, Clock, Search, Loader2 } from "lucide-react";
+import { School as SchoolIcon, Building, Users, CheckCircle, XCircle, Clock, Search, Loader2, UserCog } from "lucide-react";
+import { CoManagerList } from "./co-manager-list";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -399,6 +400,28 @@ export default function ContingentManagerClient({ userId }: ContingentManagerCli
                         ))}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* Co-managers List - only visible for primary managers */}
+              {selectedContingent?.isOwner && selectedContingent.status === 'ACTIVE' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <UserCog className="h-5 w-5" />
+                      {t('contingent.manage_co_managers') || 'Manage Co-Managers'}
+                    </CardTitle>
+                    <CardDescription>
+                      {t('contingent.manage_co_managers_desc') || 'View and manage co-managers for this contingent'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <CoManagerList 
+                      contingentId={selectedContingent.id}
+                      isPrimaryManager={selectedContingent.isOwner}
+                      onManagersUpdated={() => loadContingentRequests(selectedContingent.id)}
+                    />
                   </CardContent>
                 </Card>
               )}

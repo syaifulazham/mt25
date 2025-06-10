@@ -262,6 +262,51 @@ const contingentApi = {
       throw error;
     }
   },
+
+  // Get managers for a contingent
+  async getContingentManagers(contingentId: number) {
+    try {
+      const response = await fetch(`/api/participants/contingents/${contingentId}/managers`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch contingent managers');
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching contingent managers:', error);
+      throw error;
+    }
+  },
+  
+  // Remove a manager from a contingent with verification
+  async removeManager(contingentId: number, managerId: number, verificationCode: string, expectedCode: string) {
+    try {
+      const response = await fetch(
+        `/api/participants/contingents/${contingentId}/managers?managerId=${managerId}`, 
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            verificationCode,
+            expectedCode
+          }),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove manager');
+      }
+      
+      return response.json();
+    } catch (error) {
+      console.error('Error removing manager:', error);
+      throw error;
+    }
+  },
 };
 
 export default contingentApi;

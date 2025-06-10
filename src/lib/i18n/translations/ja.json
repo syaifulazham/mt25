@@ -290,6 +290,8 @@
   "contingent.no_description": "説明が提供されていません",
   "contingent.primary_manager": "主要管理者",
   "contingent.co_manager": "共同管理者",
+  "contingent.manage_co_managers": "共同管理者を管理",
+  "contingent.manage_co_managers_desc": "この代表団の共同管理者を表示・管理する",
   "contingent.pending_approval": "承認待ち",
   "contingent.pending_request": "保留中のリクエスト",
   "contingent.pending_request_desc": "このコンティンジェントに参加するためのリクエストは、コンティンジェントマネージャーからの承認を待っています。",

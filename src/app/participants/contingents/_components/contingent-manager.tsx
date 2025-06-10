@@ -14,6 +14,7 @@ import { Search, School, Building, Users, CheckCircle, XCircle, Clock } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CoManagerList } from "./co-manager-list";
 
 // API client for contingent management
 const contingentApi = {
@@ -631,6 +632,8 @@ export default function ContingentManager({ userId }: ContingentManagerProps) {
                         key={contingent.id}
                         className={`p-3 border rounded-md cursor-pointer hover:border-primary ${selectedContingent?.id === contingent.id ? 'border-primary bg-accent' : ''}`}
                         onClick={() => {
+                          console.log('Selected contingent:', contingent);
+                          console.log('Is primary manager (isOwner):', contingent.isOwner);
                           setSelectedContingent(contingent);
                           if (contingent.isManager) {
                             loadContingentRequests(contingent.id);
@@ -695,6 +698,19 @@ export default function ContingentManager({ userId }: ContingentManagerProps) {
                         </p>
                       </div>
                     )}
+                    
+                    {/* Managers List - temporary debug version to check rendering */}
+                    <div className="mt-4">
+                      <Separator className="my-4" />
+                      <div className="bg-yellow-100 p-2 text-sm mb-3">
+                        Debug info: isOwner={String(selectedContingent.isOwner)}, status={selectedContingent.status}
+                      </div>
+                      <CoManagerList 
+                        contingentId={selectedContingent.id}
+                        isPrimaryManager={selectedContingent.isOwner}
+                        onManagersUpdated={() => loadContingentRequests(selectedContingent.id)}
+                      />
+                    </div>
                     
                     <Separator />
                     

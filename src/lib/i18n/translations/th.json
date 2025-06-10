@@ -289,6 +289,8 @@
   "contingent.no_description": "ไม่มีคำอธิบาย",
   "contingent.primary_manager": "ผู้จัดการหลัก",
   "contingent.co_manager": "ผู้จัดการร่วม",
+  "contingent.manage_co_managers": "จัดการผู้จัดการร่วม",
+  "contingent.manage_co_managers_desc": "ดูและจัดการผู้จัดการร่วมสำหรับคณะนี้",
   "contingent.pending_approval": "รอการอนุมัติ",
   "contingent.pending_request": "คำขอที่รอดำเนินการ",
   "contingent.pending_request_desc": "คำขอของคุณเพื่อเข้าร่วมคณะนี้กำลังรอการอนุมัติจากผู้จัดการคณะ",
