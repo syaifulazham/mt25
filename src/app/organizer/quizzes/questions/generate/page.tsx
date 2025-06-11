@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
+import { MathRenderer } from "@/components/math/math-renderer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -143,6 +144,7 @@ export default function GenerateQuestionsPage() {
     difficulty: "medium",
     language: "english", // Default to English
     with_images: false,
+    with_math_equations: false,
     specific_topics: "",
   });
   
@@ -176,6 +178,7 @@ export default function GenerateQuestionsPage() {
           difficulty: formState.difficulty,
           language: formState.language,
           with_images: formState.with_images,
+          with_math_equations: formState.with_math_equations,
           specific_topics: formState.specific_topics,
         }),
       });
@@ -416,6 +419,25 @@ export default function GenerateQuestionsPage() {
                 </p>
               </div>
             </div>
+            
+            <div className="flex items-start space-x-2 pt-2">
+              <Checkbox
+                id="with_math_equations"
+                checked={formState.with_math_equations}
+                onCheckedChange={(checked) => handleInputChange("with_math_equations", checked)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label
+                  htmlFor="with_math_equations"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Include mathematical equations
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  AI will use LaTeX notation for mathematical content when appropriate
+                </p>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="specific_topics">Specific Topics (Optional)</Label>
@@ -427,7 +449,7 @@ export default function GenerateQuestionsPage() {
                 className="resize-none h-20"
               />
               <p className="text-xs text-gray-500">
-                Separate multiple topics with commas
+                Separate multiple topics with commas. Check "Include mathematical equations" option above for STEM topics requiring math formulas.
               </p>
             </div>
 
@@ -497,7 +519,9 @@ export default function GenerateQuestionsPage() {
                               <Badge variant="outline">{question.target_group}</Badge>
                               <Badge variant="outline">{question.answer_type.replace('_', ' ')}</Badge>
                             </div>
-                            <p className="font-medium">{question.question}</p>
+                            <p className="font-medium">
+                              <MathRenderer content={question.question} />
+                            </p>
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -514,7 +538,7 @@ export default function GenerateQuestionsPage() {
                                   {option.option}
                                 </div>
                                 <div className="flex-1 line-clamp-1">
-                                  {option.answer}
+                                  <MathRenderer content={option.answer} />
                                 </div>
                                 {question.answer_correct.includes(option.option) && (
                                   <Badge className="bg-green-100 text-green-800 flex-shrink-0">Correct</Badge>

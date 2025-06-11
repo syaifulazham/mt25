@@ -28,15 +28,10 @@ export async function GET(
       return NextResponse.json({ error: "Invalid question ID" }, { status: 400 });
     }
 
+    // Find the question with related data
     const question = await prisma.question_bank.findUnique({
       where: { id: questionId },
       include: {
-        creator: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
         quiz_questions: {
           include: {
             quiz: {
@@ -58,7 +53,7 @@ export async function GET(
     // Transform the response to include formatted data
     const transformedQuestion = {
       ...question,
-      creatorName: question.creator.name,
+      creatorName: question.createdBy || 'Unknown', // Use createdBy field instead of creator relation
       usedInQuizzes: question.quiz_questions.map((qq) => ({
         quizId: qq.quiz.id,
         quizName: qq.quiz.quiz_name,

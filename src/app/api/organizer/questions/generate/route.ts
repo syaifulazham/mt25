@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Extract optional boolean parameters with defaults
+    const withImages = data.with_images === true;
+    const withMathEquations = data.with_math_equations === true;
+    
     // Set default language to English if not specified
     const language = data.language || 'english';
 
@@ -65,7 +69,11 @@ export async function POST(request: NextRequest) {
 
     // Build prompt for OpenAI
     let specificTopics = data.specific_topics ? `Focus on these specific topics: ${data.specific_topics}.` : '';
-    let includeImages = data.with_images ? "Include a brief description for an appropriate image where relevant." : '';
+    let includeImages = withImages ? "Include a brief description for an appropriate image where relevant." : '';
+    
+    // Add instructions for mathematical equations if requested
+    let includeMathEquations = withMathEquations ? 
+      "Where appropriate, include mathematical equations using LaTeX notation. For inline equations use single dollar signs like $E=mc^2$ and for block equations use double dollar signs like $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$. Make sure the LaTeX syntax is correct and properly escaped in the JSON response." : '';
     
     // Add language instruction
     let languageInstruction = '';
@@ -80,6 +88,7 @@ export async function POST(request: NextRequest) {
     Your task is to generate ${data.count} ${data.difficulty} level questions about ${data.knowledge_field} for ${data.target_group} students.
     ${specificTopics}
     ${includeImages}
+    ${includeMathEquations}
     ${languageInstruction}
     
     Your response MUST be a valid JSON object with the following structure:
