@@ -61,33 +61,107 @@ export async function GET(request: NextRequest) {
     
     // Allow both participants and organizers with PARTICIPANTS_MANAGER or ADMIN role
     if (!('role' in user) || user.role === 'PARTICIPANTS_MANAGER' || user.role === 'ADMIN') {
-      // Use standard Prisma query with explicit select statements
-      const managers = await (prisma as any).manager.findMany({
+      // First, find all contingents where current user is a manager (primary or co-manager)
+      const userContingents = await prisma.contingentManager.findMany({
         where: {
-          createdBy: user.id,
+          participantId: user.id,
         },
         select: {
-          id: true,
-          name: true,
-          ic: true,
-          email: true,
-          phoneNumber: true,
-          hashcode: true,
-          teamId: true,
-          createdAt: true,
-          createdBy: true,
-          team: {
-            select: {
-              id: true,
-              name: true,
-              hashcode: true,
-            },
+          contingentId: true,
+        },
+      });
+      
+      const contingentIds = userContingents.map(c => c.contingentId);
+      console.log('User contingent IDs:', contingentIds);
+      
+      // Find all user IDs who are managers in the same contingents as the current user
+      let managers;
+      
+      if (contingentIds.length === 0) {
+        // If user is not a manager of any contingent, only return their own managers
+        managers = await (prisma as any).manager.findMany({
+          where: {
+            createdBy: user.id,
           },
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }) as any[];
+          select: {
+            id: true,
+            name: true,
+            ic: true,
+            email: true,
+            phoneNumber: true,
+            hashcode: true,
+            teamId: true,
+            createdAt: true,
+            createdBy: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                hashcode: true,
+              },
+            },
+            creator: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }) as any[];
+      } else {
+        // User is a manager of at least one contingent
+        // Find all users who are managers of the same contingents
+        const contingentManagers = await prisma.contingentManager.findMany({
+          where: {
+            contingentId: { in: contingentIds }
+          },
+          select: {
+            participantId: true
+          }
+        });
+        
+        const managerUserIds = contingentManagers.map(cm => cm.participantId);
+        console.log('Manager participant IDs in same contingents:', managerUserIds);
+        
+        // Get all managers created by any of these users
+        managers = await (prisma as any).manager.findMany({
+          where: {
+            createdBy: { in: managerUserIds }
+          },
+          select: {
+            id: true,
+            name: true,
+            ic: true,
+            email: true,
+            phoneNumber: true,
+            hashcode: true,
+            teamId: true,
+            createdAt: true,
+            createdBy: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+                hashcode: true,
+              },
+            },
+            creator: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }) as any[];
+      }
       
       console.log('Prisma query results:', JSON.stringify(managers));
       
@@ -102,6 +176,11 @@ export async function GET(request: NextRequest) {
         teamId: manager.teamId || null,
         teamName: manager.team?.name || null,
         createdAt: manager.createdAt.toISOString(),
+        createdBy: manager.creator ? {
+          id: manager.creator.id,
+          name: manager.creator.name,
+          email: manager.creator.email,
+        } : undefined
       }));
       
       return NextResponse.json(formattedManagers);

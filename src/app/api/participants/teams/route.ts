@@ -43,14 +43,38 @@ export async function GET(request: NextRequest) {
     
     const participantId = parseInt(participantIdParam);
     
-    // Get teams where the participant is a manager
+    // First, find all contingents where the user is a manager (primary or co-manager)
+    const userContingents = await prisma.contingentManager.findMany({
+      where: {
+        participantId: participantId,
+      },
+      select: {
+        contingentId: true,
+      },
+    });
+    
+    const contingentIds = userContingents.map(c => c.contingentId);
+    console.log('User contingent IDs:', contingentIds);
+    
+    // Get teams from all contingents the user manages, OR teams where the user is directly a manager
     const teamsAsManager = await prisma.team.findMany({
       where: {
-        managers: {
-          some: {
-            participantId: participantId
+        OR: [
+          {
+            // Teams from contingents the user manages
+            contingentId: {
+              in: contingentIds
+            }
+          },
+          {
+            // Teams the user directly manages (possibly from other contingents)
+            managers: {
+              some: {
+                participantId: participantId
+              }
+            }
           }
-        }
+        ]
       },
       include: {
         contest: {
