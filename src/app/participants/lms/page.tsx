@@ -5,11 +5,12 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, XCircle, ExternalLink, Copy, Check } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, ExternalLink, Copy, Check, Key } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/lib/i18n/language-context";
 import { Label } from "@/components/ui/label";
 import { SimplePasswordForm } from "./simple-form";
+import { ResetPasswordForm } from "./reset-password-form";
 import {
   Dialog,
   DialogContent,
@@ -39,10 +40,12 @@ export default function LMSPage() {
   
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [userStatus, setUserStatus] = useState<MoodleUserStatus | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [copied, setCopied] = useState(false);
   
   useEffect(() => {
@@ -133,6 +136,37 @@ export default function LMSPage() {
     }
   };
   
+  const resetPassword = async (password: string) => {
+    try {
+      setResettingPassword(true);
+      
+      const response = await fetch('/api/participants/lms/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: session?.user?.email,
+          password
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to reset password");
+      }
+      
+      const data = await response.json();
+      setShowResetPasswordModal(false);
+      toast.success(t('lms.password_reset_success') || "Password has been reset successfully");
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error(t('lms.error_resetting_password') || "Error resetting password");
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+  
   const openLmsLogin = () => {
     setShowLoginModal(true);
   };
@@ -200,10 +234,20 @@ export default function LMSPage() {
                 <p className="text-gray-600 mb-6 max-w-md">
                   {t('lms.account_exists_message') || "You already have an account in our Learning Management System. You can access your courses and training materials by clicking the button below."}
                 </p>
-                <Button onClick={openLmsLogin} className="gap-2">
-                  <ExternalLink className="h-4 w-4" />
-                  {t('lms.login_to_lms') || "Login to LMS"}
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button onClick={openLmsLogin} className="gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    {t('lms.login_to_lms') || "Login to LMS"}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowResetPasswordModal(true)}
+                    className="gap-2"
+                  >
+                    <Key className="h-4 w-4" />
+                    {t('lms.reset_password_button') || "Reset Password"}
+                  </Button>
+                </div>
               </div>
             ) : showPreview && userDetails ? (
               <div className="flex flex-col items-center text-center max-w-md">
@@ -312,6 +356,27 @@ export default function LMSPage() {
                 {t('lms.go_to_login') || "Go to LMS Login"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Password Reset Modal */}
+      <Dialog open={showResetPasswordModal} onOpenChange={setShowResetPasswordModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('lms.reset_password_title') || "Reset LMS Password"}</DialogTitle>
+            <DialogDescription>
+              {t('lms.reset_password_description') || "Create a new password for your LMS account. Your old password will no longer be valid."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <ResetPasswordForm
+              onSubmit={resetPassword}
+              onCancel={() => setShowResetPasswordModal(false)}
+              isSubmitting={resettingPassword}
+              username={userStatus?.username}
+            />
           </div>
         </DialogContent>
       </Dialog>

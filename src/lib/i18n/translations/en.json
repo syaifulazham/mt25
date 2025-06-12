@@ -915,6 +915,7 @@
   "lms.auth_manual": "Email/Password Authentication",
   "lms.password": "Password",
   "lms.password_requirements": "Password must be at least 8 characters and include a mix of uppercase, lowercase, numbers, and special characters for better security.",
+  "lms.reset_password": "Reset Password",
   "lms.confirm_password": "Confirm Password",
   "lms.back": "Back",
   "lms.confirm_registration": "Confirm Registration",
