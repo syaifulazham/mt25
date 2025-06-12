@@ -11,6 +11,11 @@
   "nav.gallery": "ギャラリー",
   "nav.news": "ニュース",
   
+  "common.search": "検索",
+  "common.reset": "リセット",
+  "common.apply": "適用",
+  "contestant.all": "すべて",
+  
   "hero.title": "テックリンピックス 2025",
   "hero.subtitle": "非凡、グローバル、包括的",
   "hero.description": "単なる技術イベントや競争ではなく、人間の創意工夫、創造性、そして協力の祝典です。学生、教育者、技術愛好家が集まり、学び、アイデアを共有し、互いに刺激を与える独自のプラットフォームを提供します",

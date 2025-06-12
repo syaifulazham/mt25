@@ -97,6 +97,8 @@ export async function GET(request: NextRequest) {
       const class_grade = searchParams.get("class_grade");
       const class_name = searchParams.get("class_name");
       const age = searchParams.get("age") ? parseInt(searchParams.get("age")!) : undefined;
+      const searchQuery = searchParams.get("search");
+      const eduLevelFilter = searchParams.get("edu_level");
       
       // Calculate pagination values
       const skip = (page - 1) * limit;
@@ -121,6 +123,30 @@ export async function GET(request: NextRequest) {
       
       if (age) {
         where.age = age;
+      }
+      
+      // Add search query filter if provided
+      if (searchQuery) {
+        // Use a simpler approach with lowercase for case-insensitive search
+        const lowerQuery = searchQuery.toLowerCase();
+        where.OR = [
+          {
+            name: {
+              contains: searchQuery
+              // Removed 'mode: insensitive' as it might not be supported by some DB configs
+            }
+          },
+          {
+            ic: {
+              contains: searchQuery
+            }
+          }
+        ];
+      }
+      
+      // Add education level filter if provided
+      if (eduLevelFilter && eduLevelFilter !== "all") {
+        where.edu_level = eduLevelFilter;
       }
       
       // Get total count for pagination

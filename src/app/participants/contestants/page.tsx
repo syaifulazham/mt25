@@ -30,7 +30,9 @@ import {
   Pencil,
   FileText,
   FileDown,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  LayoutGrid
 } from "lucide-react";
 import Link from "next/link";
 import EditContestantModal from "./_components/edit-contestant-modal";
@@ -90,6 +92,16 @@ export default function ContestantsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalContestants, setTotalContestants] = useState(0);
   const [limit] = useState(20); // 20 records per page
+  
+  // Stats state
+  const [stats, setStats] = useState({
+    total: 0,
+    byEduLevel: {
+      "sekolah rendah": 0,
+      "sekolah menengah": 0,
+      "belia": 0
+    }
+  });
   
   // Filter state
   const [classGradeFilter, setClassGradeFilter] = useState("");
@@ -154,6 +166,16 @@ export default function ContestantsPage() {
       params.append('page', page.toString());
       params.append('limit', limit.toString());
       
+      // Add search query if present
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      
+      // Add education level filter if not "all"
+      if (eduLevelFilter && eduLevelFilter !== 'all') {
+        params.append('edu_level', eduLevelFilter);
+      }
+      
       if (classGradeFilter && classGradeFilter !== 'all') {
         params.append('class_grade', classGradeFilter);
       }
@@ -184,6 +206,9 @@ export default function ContestantsPage() {
       if (result.data.length === 0 && result.pagination.total === 0) {
         console.log("No contestants found for managed contingents");
       }
+      
+      // Fetch stats after contestants to get accurate tab counts
+      fetchStats();
     } catch (error) {
       console.error("Error fetching contestants:", error);
       setError(t('contestant.error_load'));
@@ -192,6 +217,44 @@ export default function ContestantsPage() {
     }
   };
   
+  // Fetch contestant stats
+  const fetchStats = async () => {
+    if (!session?.user?.email) return;
+    
+    try {
+      // Build query parameters for stats (apply same filters as contestants)
+      const params = new URLSearchParams();
+      
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
+      
+      if (classGradeFilter && classGradeFilter !== 'all') {
+        params.append('class_grade', classGradeFilter);
+      }
+      
+      if (classNameFilter) {
+        params.append('class_name', classNameFilter);
+      }
+      
+      if (ageFilter) {
+        params.append('age', ageFilter);
+      }
+      
+      const statsResponse = await fetch(`/api/participants/contestants/stats?${params.toString()}`);
+      
+      if (!statsResponse.ok) {
+        console.error("Failed to fetch contestant stats");
+        return;
+      }
+      
+      const statsData = await statsResponse.json();
+      setStats(statsData);
+    } catch (error) {
+      console.error("Error fetching contestant stats:", error);
+    }
+  };
+
   // Initial check for contingents before fetching contestants
   useEffect(() => {
     if (session?.user?.email) {
@@ -199,23 +262,46 @@ export default function ContestantsPage() {
     }
   }, [session]);
   
-  // Filter contestants based on search query and education level (client-side filtering for the search box only)
-  const filteredContestants = contestants.filter(contestant => {
-    const matchesSearch = 
-      searchQuery === "" || 
-      contestant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contestant.ic.includes(searchQuery);
-    
-    const matchesEduLevel = 
-      eduLevelFilter === "all" || 
-      contestant.edu_level === eduLevelFilter;
-    
-    return matchesSearch && matchesEduLevel;
-  });
-  
   // Handle filter apply
   const handleFilterApply = () => {
     fetchContestants(1); // Reset to first page when applying filters
+  };
+  
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    
+    // Set education level filter based on active tab
+    let newEduLevelFilter = "all";
+    if (value === "primary") {
+      newEduLevelFilter = "sekolah rendah";
+    } else if (value === "secondary") {
+      newEduLevelFilter = "sekolah menengah";
+    } else if (value === "youth") {
+      newEduLevelFilter = "belia";
+    }
+    
+    // Only update if the filter actually changed
+    if (eduLevelFilter !== newEduLevelFilter) {
+      setEduLevelFilter(newEduLevelFilter);
+      // Reset to page 1 when changing tabs/filters
+      setCurrentPage(1);
+      setTimeout(() => {
+        fetchContestants(1);
+      }, 0);
+    }
+  };
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Handle search form submit
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCurrentPage(1); // Reset to page 1 when searching
+    fetchContestants(1);
   };
   
   // Handle filter reset
@@ -223,6 +309,9 @@ export default function ContestantsPage() {
     setClassGradeFilter("");
     setClassNameFilter("");
     setAgeFilter("");
+    setEduLevelFilter("all");
+    setSearchQuery("");
+    setActiveTab("all"); // Reset active tab to "all"
     // Fetch with reset filters
     setTimeout(() => {
       fetchContestants(1);
@@ -338,8 +427,8 @@ export default function ContestantsPage() {
       );
     }
     
-    // Show pagination only when we're not doing client-side filtering
-    const shouldShowPagination = totalPages > 1 && searchQuery === "" && eduLevelFilter === "all";
+    // Show pagination only when we have multiple pages
+    const shouldShowPagination = totalPages > 1;
     
     return (
       <div className="space-y-4">
@@ -568,108 +657,181 @@ export default function ContestantsPage() {
         </div>
       </div>
       
-      <div className="space-y-4">
-        {/* Search and filter controls */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={t('contestant.search_placeholder')}
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex flex-row gap-2">
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={eduLevelFilter}
-              onChange={(e) => setEduLevelFilter(e.target.value)}
-            >
-              <option value="all">{t('contestant.all_edu_levels')}</option>
-              <option value="sekolah rendah">{t('contestant.primary_school')}</option>
-              <option value="sekolah menengah">{t('contestant.secondary_school')}</option>
-              <option value="belia">{t('contestant.youth')}</option>
-            </select>
-          </div>
-        </div>
+      {/* Search and filter row - placed above tabs */}
+      <div className="mb-4 flex flex-wrap items-center gap-2 justify-between bg-card rounded-md p-3 shadow-sm border">
+        <form onSubmit={handleSearchSubmit} className="relative flex items-center flex-1">
+          <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder={t('contestant.search_placeholder') || "Search by name or IC..."}
+            className="pl-8 w-full"
+            value={searchQuery}
+            onChange={handleSearchChange}
+          />
+          <Button type="submit" variant="secondary" className="ml-2">
+            {t('common.search')}
+          </Button>
+        </form>
         
-        {/* Advanced Filters */}
-        <ContestantsFilters
-          classGrade={classGradeFilter}
-          setClassGrade={setClassGradeFilter}
-          className={classNameFilter}
-          setClassName={setClassNameFilter}
-          age={ageFilter}
-          setAge={setAgeFilter}
-          onFilterApply={handleFilterApply}
-          onFilterReset={handleFilterReset}
-        />
+        <div className="flex items-center space-x-2 flex-shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Filter className="mr-2 h-4 w-4" />
+                {t('contestant.filters')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[320px]">
+              <DropdownMenuLabel>{t('contestant.filters')}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <div className="p-4 grid gap-4">
+                {/* Class Grade Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="dropdown_class_grade" className="text-xs font-medium">
+                    {t('contestant.filter.grade')}
+                  </Label>
+                  <Select
+                    value={classGradeFilter}
+                    onValueChange={setClassGradeFilter}
+                  >
+                    <SelectTrigger id="dropdown_class_grade" className="h-8">
+                      <SelectValue placeholder={t('contestant.filter.all_grades')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{t('contestant.filter.all_grades')}</SelectItem>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="4">4</SelectItem>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="6">6</SelectItem>
+                      <SelectItem value="PPKI">PPKI</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Class Name Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="dropdown_class_name" className="text-xs font-medium">
+                    {t('contestant.filter.class_name')}
+                  </Label>
+                  <Input
+                    id="dropdown_class_name"
+                    placeholder={t('contestant.filter.enter_class_name')}
+                    value={classNameFilter}
+                    onChange={(e) => setClassNameFilter(e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                
+                {/* Age Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="dropdown_age" className="text-xs font-medium">
+                    {t('contestant.filter.age')}
+                  </Label>
+                  <Input
+                    id="dropdown_age"
+                    type="number"
+                    placeholder={t('contestant.filter.enter_age')}
+                    value={ageFilter}
+                    onChange={(e) => setAgeFilter(e.target.value)}
+                    min={5}
+                    max={25}
+                    className="h-8"
+                  />
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex justify-between pt-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleFilterReset}
+                  >
+                    <X className="mr-2 h-3 w-3" />
+                    {t('common.reset')}
+                  </Button>
+                  <Button 
+                    size="sm"
+                    onClick={handleFilterApply}
+                  >
+                    <Search className="mr-2 h-3 w-3" />
+                    {t('common.apply')}
+                  </Button>
+                </div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-4 w-full">
-          <TabsTrigger value="all" className="relative">
-            All
-            <Badge variant="secondary" className="ml-2 bg-gray-500/10">
-              {contestants.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="primary" className="relative">
-            Primary
-            <Badge variant="secondary" className="ml-2 bg-blue-500/10">
-              {contestantsByEduLevel["sekolah rendah"].length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="secondary" className="relative">
-            Secondary
-            <Badge variant="secondary" className="ml-2 bg-purple-500/10">
-              {contestantsByEduLevel["sekolah menengah"].length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="youth" className="relative">
-            Youth
-            <Badge variant="secondary" className="ml-2 bg-amber-500/10">
-              {contestantsByEduLevel["belia"].length}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs section */}
+      <Tabs 
+        defaultValue="all" 
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <TabsList className="grid grid-cols-4 w-auto">
+            <TabsTrigger value="all" className="relative">
+              <LayoutGrid className="h-4 w-4 md:hidden" />
+              <span className="hidden md:inline">{t('contestant.all') || "All"}</span>
+              <Badge variant="secondary" className="ml-2">
+                {stats.total}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="primary" className="relative">
+              <School className="h-4 w-4 md:hidden" />
+              <span className="hidden md:inline">{t('contestant.primary_school') || "Primary"}</span>
+              <Badge variant="secondary" className="ml-2 bg-blue-500/10">
+                {stats.byEduLevel["sekolah rendah"]}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="secondary" className="relative">
+              <GraduationCap className="h-4 w-4 md:hidden" />
+              <span className="hidden md:inline">{t('contestant.secondary_school') || "Secondary"}</span>
+              <Badge variant="secondary" className="ml-2 bg-purple-500/10">
+                {stats.byEduLevel["sekolah menengah"]}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="youth" className="relative">
+              <Users className="h-4 w-4 md:hidden" />
+              <span className="hidden md:inline">{t('contestant.youth') || "Youth"}</span>
+              <Badge variant="secondary" className="ml-2 bg-amber-500/10">
+                {stats.byEduLevel["belia"]}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+        </div>
         
         <TabsContent value="all" className="mt-4">
-          {renderContestantsTable(filteredContestants)}
+          {renderContestantsTable(contestants)}
         </TabsContent>
         
         <TabsContent value="primary" className="mt-4">
-          {renderContestantsTable(
-            filteredContestants.filter(c => c.edu_level === "sekolah rendah")
-          )}
+          {renderContestantsTable(contestants)}
         </TabsContent>
         
         <TabsContent value="secondary" className="mt-4">
-          {renderContestantsTable(
-            filteredContestants.filter(c => c.edu_level === "sekolah menengah")
-          )}
+          {renderContestantsTable(contestants)}
         </TabsContent>
         
         <TabsContent value="youth" className="mt-4">
-          {renderContestantsTable(
-            filteredContestants.filter(c => c.edu_level === "belia")
-          )}
+          {renderContestantsTable(contestants)}
         </TabsContent>
       </Tabs>
       
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Showing {filteredContestants.length} of {contestants.length} contestants
+          Showing {contestants.length} of {totalContestants} contestants
         </p>
         
         <div className="flex gap-2">
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => downloadContestantsAsDocx(filteredContestants, `senarai_peserta_${new Date().toISOString().split('T')[0]}`)}
+            onClick={() => downloadContestantsAsDocx(contestants, `senarai_peserta_${new Date().toISOString().split('T')[0]}`)}
           >
             <FileDown className="mr-2 h-4 w-4" /> {t('contestant.export')}
           </Button>
