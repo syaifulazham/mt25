@@ -2,8 +2,12 @@
  * Moodle API client for interacting with Moodle LMS
  */
 
-const MOODLE_URL = process.env.MOODLE_URL || 'https://bengkel.techlympics.my';
-const MOODLE_TOKEN = process.env.MOODLE_TOKEN || '8a8e29909ce28ef0db4471355163ab0e';
+const MOODLE_URL = process.env.MOODLE_URL;
+const MOODLE_TOKEN = process.env.MOODLE_TOKEN;
+
+// Log which Moodle URL is being used (but not the token for security reasons)
+console.log(`[Moodle API] Using Moodle URL: ${MOODLE_URL}`);
+console.log(`[Moodle API] Moodle token configured: ${!!MOODLE_TOKEN}`);
 
 interface MoodleUser {
   id: number;

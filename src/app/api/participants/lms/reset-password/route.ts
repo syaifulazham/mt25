@@ -80,7 +80,16 @@ export async function POST(request: NextRequest) {
       // Convert URLSearchParams to string properly
       const formDataString = formData.toString();
       console.log("Making Moodle API call to:", url);
-      console.log("With payload:", formDataString);
+      console.log("With payload:", formDataString.replace(MOODLE_TOKEN, '[REDACTED]')); // Redact token for security
+      console.log("Moodle API environment check:", { 
+        moodleUrlConfigured: !!process.env.MOODLE_URL, 
+        moodleTokenConfigured: !!process.env.MOODLE_TOKEN,
+        nodeEnv: process.env.NODE_ENV
+      });
+      
+      // Add timeout to prevent long-hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       response = await fetch(url, {
         method: 'POST',
@@ -88,38 +97,50 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: formDataString,
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
+      
       console.log("Moodle API response status:", response.status);
-    } catch (fetchError) {
+      console.log("Moodle API response headers:", Object.fromEntries(response.headers.entries()));
+    } catch (error) {
+      const fetchError = error as Error;
       console.error("Moodle API fetch error:", fetchError);
       return NextResponse.json(
-        { error: "Failed to connect to Moodle API" },
+        { error: "Failed to connect to Moodle API", details: fetchError.message || "Unknown fetch error" },
         { status: 500 }
       );
     }
     
+    // Always capture the raw response first for debugging in production
+    let responseText;
+    try {
+      responseText = await response.clone().text();
+      console.log("Full Moodle API response:", responseText.substring(0, 1000) + (responseText.length > 1000 ? '...' : ''));
+    } catch (textError) {
+      console.error("Could not get response text:", textError);
+    }
+    
     if (!response.ok) {
       let errorData;
-      let responseText;
       try {
-        // First try to get the raw text
-        responseText = await response.text();
-        console.error("Raw error response:", responseText);
-        
         // Then try to parse it as JSON if possible
         try {
-          errorData = JSON.parse(responseText);
+          errorData = responseText ? JSON.parse(responseText) : { error: response.statusText };
         } catch (jsonError) {
           errorData = { error: response.statusText, rawResponse: responseText };
+          console.error("Response parsing error:", jsonError);
         }
       } catch (e) {
         errorData = { error: response.statusText };
+        console.error("Error handling response:", e);
       }
       
       console.error("Failed to reset password:", {
         status: response.status,
         statusText: response.statusText,
+        contentType: response.headers.get('Content-Type'),
         errorData
       });
       
@@ -129,22 +150,42 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // If the response was successful, analyze the response format
     let result;
     try {
-      result = await response.json();
+      // For core_user_update_users, an empty array response is success
+      if (responseText === 'null' || responseText === '[]' || responseText === '') {
+        console.log("Moodle API returned empty response, which indicates success");
+        result = { success: true };
+      } else {
+        result = await response.json();
+      }
     } catch (parseError) {
       console.error("Failed to parse Moodle API response:", parseError);
-      return NextResponse.json(
-        { error: "Invalid response from Moodle API" },
-        { status: 500 }
-      );
+      // If the response is empty but status is OK, treat as success
+      if (response.ok && (!responseText || responseText === 'null' || responseText === '[]')) {
+        console.log("Treating empty response as success");
+        result = { success: true };
+      } else {
+        return NextResponse.json(
+          { 
+            error: "Invalid response from Moodle API", 
+            details: (parseError as Error).message,
+            responseText: responseText?.substring(0, 200) + (responseText && responseText.length > 200 ? '...' : '')
+          },
+          { status: 500 }
+        );
+      }
     }
     
     // Check if there was an exception from Moodle
-    if (result && result.exception) {
-      console.error("Moodle API error:", result.exception);
+    if (result && (result.exception || (typeof result === 'object' && 'error' in result))) {
+      console.error("Moodle API error:", result);
       return NextResponse.json(
-        { error: "Failed to reset password: " + result.exception.message },
+        { 
+          error: "Failed to reset password", 
+          details: result.exception ? result.exception.message : result.error || 'Unknown Moodle error'
+        },
         { status: 500 }
       );
     }

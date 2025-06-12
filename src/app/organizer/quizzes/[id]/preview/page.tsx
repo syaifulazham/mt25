@@ -24,7 +24,48 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import 'katex/dist/katex.min.css';
+import { InlineMath, BlockMath } from 'react-katex';
 import { toast } from "sonner";
+
+// Component to render text with math expressions
+const MathText = ({ text }: { text: string }) => {
+  // Regex to identify math expressions
+  const mathRegex = /\$\$(.*?)\$\$|\$(.*?)\$/g;
+  
+  // Splitting the text by math expressions
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = mathRegex.exec(text)) !== null) {
+    // Add text before the math expression
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    
+    // Add the math expression
+    const isBlock = match[0].startsWith('$$');
+    const formula = isBlock ? match[1] : match[2];
+    
+    if (isBlock) {
+      parts.push(<BlockMath key={`math-${parts.length}`} math={formula} />);
+    } else {
+      parts.push(<InlineMath key={`math-${parts.length}`} math={formula} />);
+    }
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text after the last match
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return <>{parts.map((part, i) => (
+    typeof part === 'string' ? <span key={`text-${i}`}>{part}</span> : part
+  ))}</>;
+};
 
 type Question = {
   id: number;
@@ -349,7 +390,9 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                       </Badge>
                     </div>
                     
-                    <h3 className="text-xl font-medium">{currentQuestion?.question}</h3>
+                    <h3 className="text-xl font-medium">
+                      <MathText text={currentQuestion?.question || ''} />
+                    </h3>
                     
                     {currentQuestion?.question_image && (
                       <div className="my-4 bg-gray-100 p-4 rounded-md flex items-center justify-center">
@@ -386,7 +429,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                         `}>
                           {option.option}
                         </div>
-                        <div className="flex-1">{option.answer}</div>
+                        <div className="flex-1"><MathText text={option.answer} /></div>
                       </div>
                     ))}
                   </div>
@@ -509,7 +552,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                           </Badge>
                         </div>
                         
-                        <p className="mt-2">{question.question}</p>
+                        <p className="mt-2"><MathText text={question.question} /></p>
                         
                         <div className="mt-4 space-y-2">
                           {question.answer_options.map((option) => {
@@ -535,7 +578,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                                 `}>
                                   {option.option}
                                 </div>
-                                <div className="flex-1">{option.answer}</div>
+                                <div className="flex-1"><MathText text={option.answer} /></div>
                               </div>
                             );
                           })}
