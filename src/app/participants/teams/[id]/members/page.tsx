@@ -598,14 +598,59 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     }
   }, [team?.members]);
   
+  // Load all contestants when the dialog first opens
+  useEffect(() => {
+    if (addMemberDialogOpen && contestants.length === 0 && !isLoadingContestants) {
+      console.log("Dialog opened for the first time, loading all contestants");
+      const loadInitialContestants = async () => {
+        // Use the existing loadAllContestantsForSearch but adapt it to not apply search filtering
+        setIsLoadingContestants(true);
+        
+        try {
+          // Load a large batch initially (500 contestants)
+          const { contestants: initialBatch, pagination } = await fetchContestants({
+            page: 1,
+            limit: 500,
+            educationLevel: educationFilter,
+            targetGroup: targetGroupFilter
+          });
+          
+          setContestants(initialBatch);
+          setFilteredContestants(initialBatch);
+          setContestantsPagination(pagination);
+          
+          // If we have less than the limit, no need to load more
+          if (initialBatch.length < 500 || !pagination.hasMore) {
+            console.log(`Loaded ${initialBatch.length} contestants (all available)`);  
+          } else {
+            console.log(`Loaded first batch of ${initialBatch.length} contestants. More available.`);
+          }
+        } catch (error) {
+          console.error("Error loading initial contestants:", error);
+          toast.error(t('team.members.error_fetch_contestants'));
+        } finally {
+          setIsLoadingContestants(false);
+        }
+      };
+      
+      loadInitialContestants();
+    }
+  }, [addMemberDialogOpen]);
+  
   // Filter contestants based on search term, education level, and age criteria
   useEffect(() => {
-    if (!contestants.length || !team) return;
+    // Don't run filtering if we have no contestants or team info
+    if (!contestants.length || !team) {
+      console.log('No contestants or team data to filter');
+      return;
+    }
+    
+    console.log(`Filtering ${contestants.length} contestants with search term: "${searchTerm || '(empty)'}"`);
     
     let filtered = [...contestants];
     
     // Apply search filter
-    if (searchTerm) {
+    if (searchTerm && searchTerm.trim() !== '') {
       filtered = filtered.filter(contestant => 
         contestant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (contestant.icNumber && contestant.icNumber.includes(searchTerm)) ||
@@ -613,14 +658,18 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       );
     }
     
-    // Apply education level filter if selected in UI
-    if (educationFilter !== "all") {
+    // Apply education level filter if selected in UI, but only if not first load
+    // For initial load or if "all" is selected, skip this filtering to show all contestants first
+    const isFirstLoad = addMemberDialogOpen && searchTerm === "" && filtered.length === contestants.length;
+    
+    if (educationFilter !== "all" && !isFirstLoad) {
       console.log(`Filtering by education level: "${educationFilter}"`); // Debug logging
       
       // Log what we know before filtering
       console.log('Before filtering:', {
         totalContestants: filtered.length,
         filterValue: educationFilter,
+        isFirstLoad,
         sampleContestants: filtered.slice(0, 3).map(c => ({
           name: c.name, 
           educationLevel: c.educationLevel || 'NONE'
@@ -641,7 +690,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       filtered = filtered.filter(contestant => {
         // Handle case where contestant has no education level
         if (!contestant.educationLevel) {
-          return false;
+          return true; // Show contestants without education level on initial load
         }
         
         // Get normalized education level
@@ -680,7 +729,10 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
     
     // Apply target group filtering based on contest criteria ONLY if user hasn't selected a specific filter
     // This ensures we don't double-filter and override the user's selection
-    if (educationFilter === "all" && team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0) {
+    // NOTE: For initial dialog load, we'll skip this filtering to show all contestants first
+    const initialDialogLoad = addMemberDialogOpen && contestants.length > 0 && filtered.length === contestants.length;
+    
+    if (!initialDialogLoad && educationFilter === "all" && team.targetGroup?.educationLevels && team.targetGroup.educationLevels.length > 0) {
       console.log('Applying contest target group filter (since user selected "all")');
       console.log('Available target group levels:', team.targetGroup.educationLevels);
       
@@ -697,7 +749,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       
       filtered = filtered.filter(contestant => {
         // Skip filtering if contestant doesn't have education level
-        if (!contestant.educationLevel) return false;
+        if (!contestant.educationLevel) return true; // Changed to true - show contestants without education level
         
         const contestantLevel = contestant.educationLevel.toLowerCase().trim();
         
@@ -1468,10 +1520,43 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                 </div>
               </div>
               
+              {/* Interactive Loading Indicator */}
               {(isSearching || isLoadingContestants) && (
-                <div className="flex justify-center items-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-                  <span>{isSearching ? t('common.searching') : t('common.loading')}</span>
+                <div className="space-y-1 pb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                      <span className="font-medium">{isSearching ? t('common.searching') : t('common.loading')}</span>
+                    </div>
+                    {isLoadingContestants && contestantsPagination.page > 1 && (
+                      <div className="text-xs text-muted-foreground">
+                        {`${t('team.members.loading_page')} ${contestantsPagination.page}/${contestantsPagination.totalPages || '?'}`}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Skeleton UI for contestants */}
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="bg-muted/30 py-3 px-4 border-b flex justify-between">
+                      <div className="w-[60%]">
+                        <Skeleton className="h-5 w-24" />
+                      </div>
+                      <div className="w-[40%] flex justify-end">
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                    </div>
+                    {Array.from({ length: 5 }).map((_, index) => (
+                      <div key={`skeleton-${index}`} className="border-b last:border-b-0 p-4 flex justify-between items-center">
+                        <div className="space-y-2 w-[60%]">
+                          <Skeleton className="h-5 w-[85%]" />
+                          <Skeleton className="h-3 w-[70%]" />
+                        </div>
+                        <div className="w-[40%] flex justify-end">
+                          <Skeleton className="h-9 w-20 rounded-md" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               

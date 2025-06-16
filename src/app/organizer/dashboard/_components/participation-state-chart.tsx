@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MapPin, Mars, Venus } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 // Chart colors for gender representation
 const GENDER_COLORS = {
@@ -59,6 +61,9 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
   // State for toggle between percentage modes
   const [percentageMode, setPercentageMode] = useState<PercentageMode>('per-state');
   
+  // State for bar length mode (100% vs total count)
+  const [barLengthMode, setBarLengthMode] = useState<'percentage' | 'total'>('percentage');
+  
   // Calculate totals for each state and add them to the data
   const data = rawData.map(item => ({
     ...item,
@@ -86,6 +91,18 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
             <TabsTrigger value="per-state">Per State Distribution</TabsTrigger>
             <TabsTrigger value="overall">Overall Distribution</TabsTrigger>
           </TabsList>
+          {percentageMode === 'per-state' && (
+            <div className="flex items-center space-x-2 mt-4 mb-2">
+              <Switch 
+                id="bar-length-mode" 
+                checked={barLengthMode === 'total'}
+                onCheckedChange={(checked) => setBarLengthMode(checked ? 'total' : 'percentage')}
+              />
+              <Label htmlFor="bar-length-mode" className="text-xs">
+                {barLengthMode === 'percentage' ? 'Show all bars at 100%' : 'Scale bars by state total'}
+              </Label>
+            </div>
+          )}
         </Tabs>
         <div className="w-full">
           <div className="space-y-3">
@@ -142,7 +159,8 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                     <div className="w-1/2 flex justify-end items-center space-x-2">
                       <span className="text-xs text-muted-foreground">
                         {percentageMode === 'overall' ? 
-                          `${malePercentage + femalePercentage}% of total` : ''}
+                          `${malePercentage + femalePercentage}% of total` : 
+                          `${formatNumber(item.TOTAL)} total`}
                       </span>
                     </div>
                   </div>
@@ -153,7 +171,13 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                       {/* Stacked bar container with fixed width based on total percentage */}
                       <div 
                         className={`h-full flex ${GENDER_COLORS.TOTAL}`} 
-                        style={{ width: percentageMode === 'overall' ? `${malePercentage + femalePercentage}%` : '100%' }}
+                        style={{ 
+                          width: percentageMode === 'overall' 
+                            ? `${malePercentage + femalePercentage}%`
+                            : (barLengthMode === 'percentage' || percentageMode !== 'per-state') 
+                              ? '100%' 
+                              : `${Math.max(Math.round((item.TOTAL / maxCount) * 100), 15)}%`
+                        }}
                       >
                         {/* Male portion */}
                         <Tooltip>
