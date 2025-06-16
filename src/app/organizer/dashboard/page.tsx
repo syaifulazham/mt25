@@ -932,55 +932,7 @@ export default async function DashboardPage() {
         <div className="border rounded-lg p-4 shadow-sm">
           <h3 className="text-lg font-medium mb-4">Contest Participations by State and Gender</h3>
           <ParticipationStateChart data={participationStateData} />
-          <div className="mt-4 border-t pt-4">
-            <h4 className="font-medium mb-2">Data Values:</h4>
-            <div className="grid grid-cols-4 gap-x-4 gap-y-1 text-sm">
-              <div className="font-medium flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                <span>State</span>
-              </div>
-              <div className="font-medium text-blue-600 flex items-center gap-1">
-                <Mars className="h-4 w-4" />
-                <span>Male</span>
-              </div>
-              <div className="font-medium text-pink-600 flex items-center gap-1">
-                <Venus className="h-4 w-4" />
-                <span>Female</span>
-              </div>
-              <div className="font-medium text-green-600 flex items-center gap-1">
-                <Hash className="h-4 w-4" />
-                <span>Total</span>
-              </div>
-              {participationStateData.map((item, i) => {
-                const total = item.MALE + item.FEMALE;
-                return (
-                  <Fragment key={i}>
-                    <div>{item.state}</div>
-                    <div>{item.MALE.toLocaleString()}</div>
-                    <div>{item.FEMALE.toLocaleString()}</div>
-                    <div>{total.toLocaleString()}</div>
-                  </Fragment>
-                );
-              })}
-              {participationStateData.length > 0 && (
-                <>
-                  <div className="font-bold text-base border-t pt-2 mt-1">GRAND TOTAL</div>
-                  <div className="font-bold text-base text-blue-600 border-t pt-2 mt-1">
-                    {participationStateData.reduce((sum, item) => sum + item.MALE, 0).toLocaleString()}
-                  </div>
-                  <div className="font-bold text-base text-pink-600 border-t pt-2 mt-1">
-                    {participationStateData.reduce((sum, item) => sum + item.FEMALE, 0).toLocaleString()}
-                  </div>
-                  <div className="font-bold text-base text-green-600 border-t pt-2 mt-1">
-                    {participationStateData.reduce((sum, item) => sum + item.MALE + item.FEMALE, 0).toLocaleString()}
-                  </div>
-                </>
-              )}
-              {participationStateData.length === 0 && 
-                <div className="col-span-4">No data available</div>
-              }
-            </div>
-          </div>
+          
         </div>
       </div>
 

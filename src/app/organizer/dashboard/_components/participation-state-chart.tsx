@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPin, Mars, Venus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Chart colors for gender representation
 const GENDER_COLORS = {
@@ -49,7 +52,13 @@ type ParticipationStateData = {
   TOTAL?: number;
 };
 
+// Mode for percentage calculation
+type PercentageMode = 'per-state' | 'overall';
+
 export default function ParticipationStateChart({ data: rawData }: { data: ParticipationStateData[] }) {
+  // State for toggle between percentage modes
+  const [percentageMode, setPercentageMode] = useState<PercentageMode>('per-state');
+  
   // Calculate totals for each state and add them to the data
   const data = rawData.map(item => ({
     ...item,
@@ -58,6 +67,9 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
   
   // Sort data by total count in descending order
   const sortedData = [...data].sort((a, b) => b.TOTAL - a.TOTAL);
+  
+  // Calculate grand total across all states
+  const grandTotal = sortedData.reduce((sum, item) => sum + item.TOTAL, 0);
   
   // Find the maximum count to calculate percentages
   const maxCount = Math.max(...sortedData.map(item => item.TOTAL), 1); // Ensure at least 1
@@ -69,6 +81,12 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
         <CardDescription>Distribution of contest participations by gender across states</CardDescription>
       </CardHeader>
       <CardContent>
+        <Tabs defaultValue="per-state" className="mb-4" onValueChange={(value) => setPercentageMode(value as PercentageMode)}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="per-state">Per State Distribution</TabsTrigger>
+            <TabsTrigger value="overall">Overall Distribution</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="w-full">
           <div className="space-y-3">
             <div className="flex items-center mb-2 text-xs">
@@ -86,10 +104,29 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
             </div>
             
             {sortedData.map((item, index) => {
-              // Calculate percentage widths for the male and female bars
-              const totalPercentage = Math.round((item.TOTAL / maxCount) * 100);
-              const malePercentage = Math.round((item.MALE / item.TOTAL) * 100);
-              const femalePercentage = 100 - malePercentage; // Ensure they add up to 100%
+              // Calculate percentages based on selected mode
+              const totalWidthPercentage = Math.round((item.TOTAL / maxCount) * 100);
+              
+              // Per-state percentages (male/female within each state)
+              const malePerStatePercentage = Math.round((item.MALE / item.TOTAL) * 100);
+              const femalePerStatePercentage = 100 - malePerStatePercentage;
+              
+              // Overall percentages (relative to grand total)
+              const maleOverallPercentage = Math.round((item.MALE / grandTotal) * 100);
+              const femaleOverallPercentage = Math.round((item.FEMALE / grandTotal) * 100);
+              
+              // Choose which percentages to display based on mode
+              const malePercentage = percentageMode === 'per-state' ? malePerStatePercentage : maleOverallPercentage;
+              const femalePercentage = percentageMode === 'per-state' ? femalePerStatePercentage : femaleOverallPercentage;
+              
+              // For stacked bar widths (visual representation)
+              const maleWidthPercentage = percentageMode === 'per-state' 
+                ? malePerStatePercentage 
+                : Math.round((item.MALE / item.TOTAL) * 100);
+                
+              const femaleWidthPercentage = percentageMode === 'per-state'
+                ? femalePerStatePercentage
+                : Math.round((item.FEMALE / item.TOTAL) * 100);
               
               const shortState = formatStateName(item.state);
               
@@ -102,41 +139,64 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                       </div>
                       <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
                     </div>
-                    <div className="w-1/2 flex justify-end">
-                      <span className="text-xs font-semibold">{formatNumber(item.TOTAL)}</span>
+                    <div className="w-1/2 flex justify-end items-center space-x-2">
+                      <span className="text-xs text-muted-foreground">
+                        {percentageMode === 'overall' ? 
+                          `${malePercentage + femalePercentage}% of total` : ''}
+                      </span>
                     </div>
                   </div>
                   
                   {/* Total bar background */}
-                  <div className="h-4 w-full bg-muted rounded-full overflow-hidden">
-                    {/* Stacked bar container with fixed width based on total percentage */}
-                    <div className={`h-full flex ${GENDER_COLORS.TOTAL}`} style={{ width: `${totalPercentage}%` }}>
-                      {/* Male portion */}
+                  <TooltipProvider>
+                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden">
+                      {/* Stacked bar container with fixed width based on total percentage */}
                       <div 
-                        className={`h-full ${GENDER_COLORS.MALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
-                        style={{ width: `${malePercentage}%` }}
+                        className={`h-full flex ${GENDER_COLORS.TOTAL}`} 
+                        style={{ width: percentageMode === 'overall' ? `${malePercentage + femalePercentage}%` : '100%' }}
                       >
-                        {item.MALE > 0 && malePercentage > 15 ? formatNumber(item.MALE) : ''}
-                      </div>
-                      {/* Female portion */}
-                      <div 
-                        className={`h-full ${GENDER_COLORS.FEMALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
-                        style={{ width: `${femalePercentage}%` }}
-                      >
-                        {item.FEMALE > 0 && femalePercentage > 15 ? formatNumber(item.FEMALE) : ''}
+                        {/* Male portion */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div 
+                              className={`h-full ${GENDER_COLORS.MALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
+                              style={{ width: `${maleWidthPercentage}%` }}
+                            >
+                              {malePercentage > 15 ? `${malePercentage}%` : ''}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>Male: {formatNumber(item.MALE)} ({malePercentage}%)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        
+                        {/* Female portion */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div 
+                              className={`h-full ${GENDER_COLORS.FEMALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
+                              style={{ width: `${femaleWidthPercentage}%` }}
+                            >
+                              {femalePercentage > 15 ? `${femalePercentage}%` : ''}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>Female: {formatNumber(item.FEMALE)} ({femalePercentage}%)</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
-                  </div>
+                  </TooltipProvider>
                   
-                  {/* Show values outside bar if they couldn't fit inside */}
+                  {/* Show percentages outside bar if they couldn't fit inside */}
                   <div className="flex text-[9px] mt-0.5">
                     <div className="flex-1">
-                      {item.MALE > 0 && malePercentage <= 15 ? 
-                        <span className="text-blue-600 font-medium">{formatNumber(item.MALE)}</span> : null}
+                      {malePercentage > 0 && malePercentage <= 15 ? 
+                        <span className="text-blue-600 font-medium">{malePercentage}%</span> : null}
                     </div>
                     <div className="flex-1 text-right">
-                      {item.FEMALE > 0 && femalePercentage <= 15 ? 
-                        <span className="text-pink-600 font-medium">{formatNumber(item.FEMALE)}</span> : null}
+                      {femalePercentage > 0 && femalePercentage <= 15 ? 
+                        <span className="text-pink-600 font-medium">{femalePercentage}%</span> : null}
                     </div>
                   </div>
                 </div>
