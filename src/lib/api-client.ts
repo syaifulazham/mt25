@@ -1057,4 +1057,13 @@ export const eventApi = {
     apiRequest<{message: string}>(`/api/events/${eventId}/contests/${contestId}`, {
       method: 'DELETE',
     }),
+    
+  /**
+   * Bulk update the max team per contingent value for all contests in an event
+   */
+  bulkUpdateMaxTeam: (eventId: number | string, maxteampercontingent: number) =>
+    apiRequest<{message: string; updatedCount: number; eventContests: any[]}>(`/api/events/${eventId}/contests/bulk-update`, {
+      method: 'PATCH',
+      body: { maxteampercontingent },
+    }),
 };

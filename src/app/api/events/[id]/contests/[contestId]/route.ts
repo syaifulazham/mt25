@@ -147,18 +147,32 @@ export async function PATCH(
     // There could be confusion in how IDs are being used
     // The contestId parameter might be eventcontest.id instead of contest.id
     try {
-      // First, log all event contests for debugging
+      console.log('===== DEBUG: PATCH EVENT CONTEST =====');
+      console.log(`Looking for event-contest with eventId=${eventId} and contestId=${contestIdParam}`);
+      
+      // First, try with a more direct query to check if the record exists
+      const directQuery = `
+        SELECT ec.id, ec.eventId, ec.contestId, e.name as eventName, c.name as contestName 
+        FROM eventcontest ec
+        JOIN event e ON ec.eventId = e.id
+        JOIN contest c ON ec.contestId = c.id
+        WHERE ec.eventId = ? AND ec.contestId = ?
+      `;
+      
+      const directMatches = await prisma.$queryRawUnsafe(directQuery, eventId, contestIdParam);
+      console.log('Direct matches (eventId AND contestId):', JSON.stringify(directMatches, null, 2));
+      
+      // Now try the broader query to see what other records might be matching partially
       const listQuery = `
         SELECT ec.id, ec.eventId, ec.contestId, e.name as eventName, c.name as contestName 
         FROM eventcontest ec
         JOIN event e ON ec.eventId = e.id
         JOIN contest c ON ec.contestId = c.id
         WHERE ec.eventId = ? OR ec.id = ? OR ec.contestId = ?
-        LIMIT 10
       `;
       
       const eventContests = await prisma.$queryRawUnsafe(listQuery, eventId, contestIdParam, contestIdParam);
-      console.log('Available event contests:', JSON.stringify(eventContests, null, 2));
+      console.log('Available event contests (broader search):', JSON.stringify(eventContests, null, 2));
       
       // Try to find the event contest by different combinations of IDs
       let targetEventContest: any = null;

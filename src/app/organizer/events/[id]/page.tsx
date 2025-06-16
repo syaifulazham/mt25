@@ -85,6 +85,10 @@ export default function EventDetailsPage() {
     person_incharge_phone: '' 
   });
   
+  // State for bulk updating max team per contingent
+  const [globalMaxTeam, setGlobalMaxTeam] = useState<number>(1);
+  const [isBulkUpdateDialogOpen, setIsBulkUpdateDialogOpen] = useState(false);
+  
   // Fetch event details
   useEffect(() => {
     const fetchEventDetails = async () => {
@@ -262,6 +266,35 @@ export default function EventDetailsPage() {
     } catch (error) {
       console.error('Error updating contest details:', error);
       toast.error('Failed to update contest details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle bulk updating max team per contingent for all contests
+  const handleBulkUpdateMaxTeam = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Call the API to bulk update all contests for this event
+      const response = await eventApi.bulkUpdateMaxTeam(eventId, globalMaxTeam);
+      
+      toast.success(`Updated max team per contingent for ${response.updatedCount} contests`);
+      
+      // Close the dialog
+      setIsBulkUpdateDialogOpen(false);
+      
+      // Update the event contests list with the returned data
+      if (response.eventContests && Array.isArray(response.eventContests)) {
+        setEventContests(response.eventContests);
+      } else {
+        // If the response doesn't include the updated contests, fetch them
+        const updatedEventContests = await eventApi.getEventContests(eventId);
+        setEventContests(Array.isArray(updatedEventContests) ? updatedEventContests : []);
+      }
+    } catch (error) {
+      console.error('Error bulk updating max team per contingent:', error);
+      toast.error('Failed to update max team per contingent');
     } finally {
       setIsLoading(false);
     }
@@ -553,6 +586,70 @@ export default function EventDetailsPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Global Settings for Contests */}
+              {eventContests.length > 0 && (
+                <div className="mb-6 p-4 border rounded-md bg-slate-50">
+                  <h3 className="text-sm font-semibold mb-2">Global Settings</h3>
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                      <div className="text-sm mb-1">Max Team Per Contingent</div>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          className="w-24"
+                          value={globalMaxTeam}
+                          onChange={(e) => setGlobalMaxTeam(parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsBulkUpdateDialogOpen(true)}
+                    >
+                      Apply to All Contests
+                    </Button>
+                    
+                    <div className="text-xs text-gray-500">
+                      This will set the maximum number of teams allowed per contingent for all contests in this event.
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Alert Dialog for Bulk Update Confirmation */}
+              <AlertDialog open={isBulkUpdateDialogOpen} onOpenChange={setIsBulkUpdateDialogOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Update All Contests</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to set Max Team Per Contingent to <strong>{globalMaxTeam}</strong> for all {eventContests.length} contests in this event?
+                      This action cannot be undone and will override individual settings.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleBulkUpdateMaxTeam();
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        'Yes, Update All'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              
               {eventContests.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-500 mb-4">No contests added to this event yet.</p>
