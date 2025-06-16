@@ -239,8 +239,17 @@ export default function EventDetailsPage() {
     try {
       setIsLoading(true);
       
-      // Call API to update the contest details
-      await eventApi.updateEventContest(eventId, eventcontestId, editForm);
+      // Find the event contest object from the list to get its contestId
+      const eventContest = eventContests.find(ec => ec.id === eventcontestId);
+      if (!eventContest) {
+        toast.error('Contest not found');
+        setIsLoading(false);
+        return;
+      }
+      
+      // The backend API prioritizes matching eventId + contestId
+      // so we must pass eventContest.contestId as the second parameter
+      await eventApi.updateEventContest(eventId, eventContest.contestId, editForm);
       
       toast.success('Contest details updated');
       
