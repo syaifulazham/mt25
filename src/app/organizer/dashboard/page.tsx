@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Import the client components for charts
 import ContingentStateChart from "./_components/contingent-state-chart";
 import ParticipationStateChart from "./_components/participation-state-chart";
+import OverallGenderPieChart from "./_components/overall-gender-pie-chart";
 import EducationLevelChart from "./_components/education-level-chart";
 import SchoolCategoryChart from "./_components/school-category-chart";
 
@@ -930,7 +931,20 @@ export default async function DashboardPage() {
         
         {/* Use client component for Contest Participations by State and Gender Chart */}
         <div className="border rounded-lg p-4 shadow-sm">
-          <h3 className="text-lg font-medium mb-4">Contest Participations by State and Gender</h3>
+          <h3 className="text-lg font-medium mb-4">Contest Participations by Gender</h3>
+          
+          {/* Overall Gender Distribution Pie Chart */}
+          <div className="mb-6">
+            <OverallGenderPieChart 
+              data={{
+                MALE: participationStateData.reduce((sum, item) => sum + item.MALE, 0),
+                FEMALE: participationStateData.reduce((sum, item) => sum + item.FEMALE, 0),
+              }} 
+            />
+          </div>
+          
+          {/* Contest Participations by State and Gender Bar Chart */}
+          <h3 className="text-lg font-medium mb-4">Breakdown by State and Gender</h3>
           <ParticipationStateChart data={participationStateData} />
           
         </div>
