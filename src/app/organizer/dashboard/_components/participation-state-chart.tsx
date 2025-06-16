@@ -160,7 +160,7 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                       <span className="text-xs text-muted-foreground">
                         {percentageMode === 'overall' ? 
                           `${malePercentage + femalePercentage}% of total` : 
-                          `${formatNumber(item.TOTAL)} total`}
+                          `${formatNumber(item.TOTAL)}`}
                       </span>
                     </div>
                   </div>
