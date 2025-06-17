@@ -223,7 +223,7 @@ export async function createUser(userData: {
   firstname: string;
   lastname: string;
   password?: string | null;
-}): Promise<{ success: boolean; user?: MoodleUser; error?: string }> {
+}): Promise<{ success: boolean; user?: MoodleUser; error?: string; password?: string }> {
   // Generate username from email (before @) with timestamp to ensure uniqueness
   // Adding a timestamp helps avoid conflicts if multiple users have similar email usernames
   const emailUsername = userData.email.split('@')[0].toLowerCase();
@@ -238,7 +238,20 @@ export async function createUser(userData: {
     console.log('Warning: No password provided for LMS registration. Using randomly generated password.');
   }
   
-  const password = userData.password || Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10).toUpperCase();
+  // Generate a password that meets Moodle requirements:
+  // - Must include lowercase letters
+  // - Must include uppercase letters
+  // - Must include at least 1 special character (*, -, #, etc.)
+  // - Should be reasonably strong
+  const specialChars = "*-#$%&!?+=";
+  const randomSpecialChar = specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+  const password = userData.password || 
+    Math.random().toString(36).slice(2, 8) + // lowercase and numbers
+    Math.random().toString(36).slice(2, 8).toUpperCase() + // UPPERCASE and numbers
+    randomSpecialChar; // At least one special character
+  
+  // Log the generated password for debugging purposes
+  console.log(`[Moodle API] Generated password for ${userData.email}: ${password}`);
   
   const userToCreate = {
     username,
@@ -262,15 +275,41 @@ export async function createUser(userData: {
     alternatename: '',
   };
   
-  const response = await callMoodleApi<MoodleUser[]>('core_user_create_users', {
-    users: [userToCreate],
-  });
-  
-  if (response.exception || !response.data) {
-    return { 
-      success: false, 
-      error: response.exception?.message || 'Failed to create user' 
+  let response;
+  try {
+    console.log('[Moodle API] Creating user with data:', {
+      username: userToCreate.username,
+      firstname: userToCreate.firstname,
+      lastname: userToCreate.lastname,
+      email: userToCreate.email,
+      // Don't log the password for security
+    });
+    
+    response = await callMoodleApi<MoodleUser[]>('core_user_create_users', {
+      users: [userToCreate],
+    });
+    
+    // Log the raw response for debugging
+    console.log('[Moodle API] Raw create_users response:', JSON.stringify(response));
+    
+    if (response.exception || !response.data) {
+      console.error('[Moodle API] Error creating user:', response.exception || 'No data returned');
+      return { 
+        success: false, 
+        error: response.exception?.message || 'Failed to create user' 
+      };
+    }
+  } catch (error) {
+    console.error('[Moodle API] Exception in createUser:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
     };
+  }
+  
+  // If we reached here, we have a valid response with data
+  if (!response || !response.data) {
+    return { success: false, error: 'No response data available' };
   }
   
   const createdUsers = Array.isArray(response.data) ? response.data : [];
@@ -282,6 +321,7 @@ export async function createUser(userData: {
   return {
     success: true,
     user: createdUsers[0],
+    password: password // Include the password in the return value for debugging
   };
 }
 
@@ -329,4 +369,244 @@ export async function deleteUser(userId: number): Promise<boolean> {
   });
   
   return !response.exception;
+}
+
+/**
+ * Get list of available Moodle courses
+ */
+export async function getCourses(): Promise<{ id: number; shortname: string; fullname: string; idnumber: string }[]> {
+  const response = await callMoodleApi<any[]>('core_course_get_courses');
+  
+  if (response.exception || !response.data) {
+    console.error('Error fetching Moodle courses:', response.exception?.message);
+    return [];
+  }
+  
+  // Map the response to a simpler structure
+  return response.data.map(course => ({
+    id: course.id,
+    shortname: course.shortname,
+    fullname: course.fullname,
+    idnumber: course.idnumber || ''
+  }));
+}
+
+/**
+ * Enrolls a user in a course
+ */
+export async function enrollUserInCourse(
+  userId: number,
+  courseId: number,
+  roleId: number = 5 // Default role ID for students
+): Promise<{ success: boolean; error?: string }> {
+  const response = await callMoodleApi('enrol_manual_enrol_users', {
+    enrolments: [
+      {
+        roleid: roleId,
+        userid: userId,
+        courseid: courseId
+      }
+    ]
+  });
+  
+  if (response.exception) {
+    return { 
+      success: false, 
+      error: response.exception.message || 'Failed to enroll user in course'
+    };
+  }
+  
+  return {
+    success: true
+  };
+}
+
+/**
+ * Creates a Moodle user and enrolls them in a course in one operation
+ */
+export async function createUserAndEnrollInCourse(
+  userData: {
+    email: string;
+    firstname: string;
+    lastname: string;
+    password?: string | null;
+  },
+  courseId: number,
+  roleId: number = 5 // Default role ID for students
+): Promise<{ success: boolean; user?: MoodleUser; enrolled: boolean; error?: string; password?: string }> {
+  // Check if user already exists
+  const userCheck = await checkUserExists(userData.email);
+  
+  let userId: number;
+  let createSuccess = false;
+  let generatedPassword: string | undefined;
+  
+  if (userCheck.exists && userCheck.user) {
+    // User already exists, use their ID
+    userId = userCheck.user.id;
+    createSuccess = true;
+    console.log(`User already exists with ID ${userId}, will attempt to enroll in course`);
+  } else {
+    // Create new user
+    const createResult = await createUser(userData);
+    if (!createResult.success || !createResult.user) {
+      return {
+        success: false,
+        enrolled: false,
+        error: createResult.error || 'Failed to create user'
+      };
+    }
+    userId = createResult.user.id;
+    createSuccess = true;
+    // Save password for later return
+    generatedPassword = createResult.password;
+  }
+  
+  // Enroll user in course
+  if (createSuccess) {
+    const enrollResult = await enrollUserInCourse(userId, courseId, roleId);
+    
+    if (!enrollResult.success) {
+      return {
+        success: true, // User creation succeeded
+        enrolled: false,
+        error: enrollResult.error || 'Failed to enroll user in course'
+      };
+    }
+    
+    // Return success with user data if we have it
+    const result: { 
+      success: boolean; 
+      enrolled: boolean; 
+      user?: MoodleUser; 
+      password?: string 
+    } = {
+      success: true,
+      enrolled: true
+    };
+    
+    // Add user info if we have a user ID
+    if (userId) {
+      result.user = { 
+        id: userId,
+        username: '', // These fields aren't used but required by the type
+        firstname: '',
+        lastname: '',
+        email: userData.email,
+        auth: 'manual',
+        confirmed: true
+      };
+    }
+    
+    // Add password if we have one
+    if (generatedPassword) {
+      result.password = generatedPassword;
+    }
+    
+    return result;
+  }
+  
+  return {
+    success: false,
+    enrolled: false,
+    error: 'Failed to create or find user'
+  };
+}
+
+/**
+ * Updates a Moodle user's password
+ */
+export async function updateUserPassword(
+  userId: number,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  const response = await callMoodleApi('core_user_update_users', {
+    users: [
+      {
+        id: userId,
+        password: newPassword
+      }
+    ]
+  });
+  
+  if (response.exception) {
+    return { 
+      success: false, 
+      error: response.exception.message || 'Failed to update user password' 
+    };
+  }
+  
+  return {
+    success: true
+  };
+}
+
+/**
+ * Joins a user to a course (ensures enrollment in the course)
+ */
+export async function joinCourse(
+  email: string,
+  courseId: number,
+  roleId: number = 5 // Default role ID for students
+): Promise<{ success: boolean; enrolled: boolean; error?: string }> {
+  // First check if the user exists
+  const userCheck = await checkUserExists(email);
+  
+  if (!userCheck.exists || !userCheck.user) {
+    return {
+      success: false,
+      enrolled: false,
+      error: `No Moodle account found with email ${email}`
+    };
+  }
+  
+  // User exists, enroll them in the course
+  const enrollResult = await enrollUserInCourse(userCheck.user.id, courseId, roleId);
+  
+  if (!enrollResult.success) {
+    return {
+      success: false,
+      enrolled: false,
+      error: enrollResult.error || 'Failed to join course'
+    };
+  }
+  
+  return {
+    success: true,
+    enrolled: true
+  };
+}
+
+/**
+ * Get all courses a user is enrolled in
+ * @param userId Moodle user ID
+ * @returns Array of courses the user is enrolled in
+ */
+export async function getUserCourses(userId: number): Promise<{ id: number; shortname: string; fullname: string }[]> {
+  try {
+    const response = await callMoodleApi("core_enrol_get_users_courses", { userid: userId });
+    
+    if (isApiSuccess(response) && Array.isArray(response.data)) {
+      return response.data.map(course => ({
+        id: course.id,
+        shortname: course.shortname,
+        fullname: course.fullname,
+      }));
+    }
+    
+    console.error("[Moodle API] Error getting user courses:", response);
+    return [];
+  } catch (error) {
+    console.error("[Moodle API] Exception getting user courses:", error);
+    return [];
+  }
+}
+
+/**
+ * True if the api request succeeded
+ * @param response 
+ * @returns 
+ */
+export function isApiSuccess(response: any): boolean {
+  return !response.exception && !response.error && !response.errorcode;
 }

@@ -128,30 +128,33 @@ export default async function ParticipantsPage() {
       createdAt: Date;
       schoolName: string | null;
       higherName: string | null;
+      stateName: string | null; // Add state name for display as badge
       contestantCount: number;
       managerName: string | null;
       managerEmail: string | null;
       managerPhone: string | null;
-    }>>`
+    }>>` 
       SELECT 
         c.id, 
         c.name, 
         c.createdAt,
         s.name as schoolName,
         h.name as higherName,
+        st.name as stateName,
         COUNT(DISTINCT cont.id) as contestantCount,
         up.name as managerName,
         up.email as managerEmail,
         up.phoneNumber as managerPhone
       FROM contingent c
       LEFT JOIN school s ON c.schoolId = s.id
+      LEFT JOIN state st ON s.stateId = st.id
       LEFT JOIN higherinstitution h ON c.higherInstId = h.id
       LEFT JOIN contingentManager cm ON cm.contingentId = c.id AND cm.isOwner = true
       LEFT JOIN user_participant up ON up.id = cm.participantId
       JOIN contestant cont ON cont.contingentId = c.id
       LEFT JOIN contestParticipation cp ON cp.contestantId = cont.id
       WHERE cp.id IS NULL
-      GROUP BY c.id, c.name, c.createdAt, s.name, h.name, up.name, up.email, up.phoneNumber
+      GROUP BY c.id, c.name, c.createdAt, s.name, h.name, st.name, up.name, up.email, up.phoneNumber
       HAVING COUNT(DISTINCT cont.id) > 0
       ORDER BY contestantCount DESC
     `;
@@ -285,8 +288,13 @@ const statsCards: StatsCard[] = [
                                 <span className="font-semibold mr-1">Phone:</span> {contingent.managerPhone}
                               </div>
                             )}
-                            <div className="flex items-center">
+                            <div className="flex items-center flex-wrap">
                               <span className="font-semibold mr-1">School:</span> {contingent.schoolName || contingent.higherName || "Unknown"}
+                              {contingent.stateName && (
+                                <Badge className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200">
+                                  {contingent.stateName}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </div>

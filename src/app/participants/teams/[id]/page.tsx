@@ -25,7 +25,12 @@ import {
   Upload,
   FileText,
   Eye,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  LogIn,
+  GraduationCap,
+  Key,
+  EyeOff
 } from "lucide-react";
 import EventRegistrations from "./event-registrations";
 import Link from "next/link";
@@ -66,6 +71,10 @@ interface Team {
   status: string;
   contestId: number;
   contestName: string;
+  contest?: {
+    code: string;
+    name: string;
+  };
   contingentId: number;
   contingentName: string;
   institutionName?: string;
@@ -97,6 +106,42 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
   const [documentRemovalDialogOpen, setDocumentRemovalDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Moodle integration states
+  const [createMoodleDialogOpen, setCreateMoodleDialogOpen] = useState(false);
+  const [joinCourseDialogOpen, setJoinCourseDialogOpen] = useState(false);
+  const [updatePasswordDialogOpen, setUpdatePasswordDialogOpen] = useState(false);
+  const [moodlePassword, setMoodlePassword] = useState("");
+  const [confirmMoodlePassword, setConfirmMoodlePassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isAddingMembers, setIsAddingMembers] = useState(false);
+  const [availableCourse, setAvailableCourse] = useState<{ id: number; name: string; idnumber: string } | null>(null);
+  const [matchingCourse, setMatchingCourse] = useState<{ id: number; name: string; idnumber: string } | null>(null);
+  const [isMoodleActionLoading, setIsMoodleActionLoading] = useState(false);
+  
+  // Moodle account status state
+  const [moodleAccountStatus, setMoodleAccountStatus] = useState<{
+    isChecking: boolean;
+    exists: boolean;
+    user: { id: number; username: string; email: string } | null;
+    matchingCourse: { id: number; name: string; idnumber: string } | null;
+    enrolled: boolean;
+    error: string | null;
+  }>({
+    isChecking: false,
+    exists: false,
+    user: null,
+    matchingCourse: null,
+    enrolled: false,
+    error: null
+  });
+  const [moodleAccountDetails, setMoodleAccountDetails] = useState<{
+    userId: number;
+    username: string;
+    password: string;
+    courseId: number;
+    courseName: string;
+  } | null>(null);
+  
   // Fetch the team details
   useEffect(() => {
     const fetchTeam = async () => {
@@ -119,6 +164,26 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
         }
         
         const data = await response.json();
+        
+        // Fetch the contest details to get the code
+        if (data.contestId) {
+          try {
+            const contestResponse = await fetch(`/api/contests/${data.contestId}`);
+            if (contestResponse.ok) {
+              const contestData = await contestResponse.json();
+              // Update the team data with contest information
+              data.contest = {
+                code: contestData.code,
+                name: contestData.name
+              };
+            } else {
+              console.error("Failed to fetch contest details");
+            }
+          } catch (contestError) {
+            console.error("Error fetching contest details:", contestError);
+          }
+        }
+        
         setTeam(data);
       } catch (error) {
         console.error("Error fetching team details:", error);
@@ -263,12 +328,309 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
-  // Set initial email state when team data is loaded
+  // Set initial email state and check for available course when team data is loaded
   useEffect(() => {
     if (team?.team_email) {
       setTeamEmail(team.team_email);
     }
-  }, [team?.team_email]);
+    
+    // Check for available Moodle course matching the contest code
+    if (team?.contest?.code && team?.team_email) {
+      // Check Moodle account status
+      checkMoodleAccountStatus();
+      const checkAvailableCourse = async () => {
+        try {
+          const response = await fetch(`/api/courses/moodle`);
+          
+          if (response.ok) {
+            const courses = await response.json();
+            
+            // More flexible matching logic to handle prefixed course IDs
+            const match = courses.find((course: any) => 
+              // Match if the course idnumber ends with or contains the contest code
+              course.idnumber.endsWith(team.contest?.code) || 
+              course.idnumber.includes(team.contest?.code)
+            );
+            
+            if (match) {
+              setAvailableCourse(match);
+              console.log("Found matching course:", match);
+            } else {
+              console.log("No matching course found for code:", team.contest?.code);
+              setAvailableCourse(null);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking for available course:", error);
+          setAvailableCourse(null);
+        }
+      };
+      
+      checkAvailableCourse();
+    } else {
+      setAvailableCourse(null);
+    }
+  }, [team?.team_email, team?.contest?.code]);
+
+  // Check if Moodle account exists for the team
+  const checkMoodleAccountStatus = async () => {
+    if (!team?.id || !team?.team_email) return;
+    
+    try {
+      setMoodleAccountStatus(prev => ({ ...prev, isChecking: true, error: null }));
+      
+      const response = await fetch(`/api/participants/teams/${team.id}/moodle/check`, {
+        headers: {
+          'Cache-Control': 'no-store, must-revalidate',
+        },
+        cache: 'no-store'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        setMoodleAccountStatus(prev => ({
+          ...prev,
+          isChecking: false,
+          error: errorData.error || 'Failed to check Moodle account status'
+        }));
+        return;
+      }
+      
+      const data = await response.json();
+      
+      setMoodleAccountStatus({
+        isChecking: false,
+        exists: data.exists,
+        user: data.user,
+        matchingCourse: data.matchingCourse,
+        enrolled: data.enrolled,
+        error: null
+      });
+      
+      // If account exists and we haven't stored account details yet, update the UI
+      if (data.exists && data.user && !moodleAccountDetails) {
+        setMoodleAccountDetails({
+          userId: data.user.id,
+          username: data.user.username,
+          password: '', // Password not returned for security
+          courseId: data.matchingCourse?.id || 0,
+          courseName: data.matchingCourse?.name || ''
+        });
+      }
+      
+      console.log("Moodle account status:", data);
+    } catch (error) {
+      console.error('Error checking Moodle account status:', error);
+      setMoodleAccountStatus(prev => ({
+        ...prev,
+        isChecking: false,
+        error: error instanceof Error ? error.message : 'An error occurred'
+      }));
+    }
+  };
+
+  // Check for matching Moodle course when opening join dialog
+  const checkMatchingCourse = async (): Promise<boolean> => {
+    if (!team?.contest?.code) {
+      setMatchingCourse(null);
+      toast.error("Contest code is missing. Cannot find matching Moodle course.");
+      return false;
+    }
+
+    try {
+      setIsMoodleActionLoading(true);
+      const response = await fetch(`/api/courses/moodle`);
+      
+      if (response.ok) {
+        const courses = await response.json();
+        
+        // More flexible matching logic to handle prefixed course IDs
+        const match = courses.find((course: any) => 
+          // Match if the course idnumber ends with or contains the contest code
+          course.idnumber.endsWith(team.contest?.code) || 
+          course.idnumber.includes(team.contest?.code)
+        );
+        
+        if (match) {
+          setMatchingCourse(match);
+          console.log("Dialog: Found matching course:", match);
+          return true;
+        } else {
+          console.log("Dialog: No matching course found for code:", team.contest?.code);
+          setMatchingCourse(null);
+          // Show error toast if no matching course is found
+          toast.error(`No Moodle course found with ID matching contest code ${team.contest?.code}`);
+          return false;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error("Error checking for matching course:", error);
+      setMatchingCourse(null);
+      toast.error("Failed to check for matching Moodle course");
+      return false;
+    } finally {
+      setIsMoodleActionLoading(false);
+    }
+  };
+
+  // Handle Moodle account creation
+  const handleCreateMoodleAccount = async () => {
+    if (!team || !team.team_email) {
+      toast.error("Team email is required");
+      return;
+    }
+    
+    try {
+      setIsMoodleActionLoading(true);
+      
+      const response = await fetch(`/api/participants/teams/${team.id}/moodle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Failed to create Moodle account");
+      }
+      
+      console.log("Moodle account creation response:", data);
+      
+      // Store Moodle account details from response
+      if (data.success) {
+        // Create account details object based on actual API response format
+        setMoodleAccountDetails({
+          userId: data.userId || 0,  // May not be in the response
+          username: team.team_email || '',
+          password: data.password || "[Generated password]", // May not be in the response
+          courseId: data.course?.id || 0,
+          courseName: data.course?.fullname || data.course?.name || matchingCourse?.name || availableCourse?.name || 'Course'
+        });
+        
+        const enrollmentStatus = data.enrolled === false ? 
+          "\nNote: Account created but course enrollment failed. Please try Join Course action." : "";
+        
+        toast.success("Moodle account created successfully" + enrollmentStatus);
+      } else {
+        throw new Error(data.error || "Failed to create Moodle account");
+      }
+      
+      setCreateMoodleDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error creating Moodle account:", error);
+      toast.error(error.message || "Failed to create Moodle account");
+    } finally {
+      setIsMoodleActionLoading(false);
+    }
+  };
+  
+  // Handle join course
+  const handleJoinCourse = async () => {
+    if (!team || !team.team_email) {
+      toast.error("Team email is required");
+      return;
+    }
+    
+    try {
+      setIsMoodleActionLoading(true);
+      
+      const response = await fetch(`/api/participants/teams/${team.id}/moodle/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Failed to join Moodle course");
+      }
+      
+      toast.success(data.message || "Successfully joined Moodle course");
+      setJoinCourseDialogOpen(false);
+    } catch (error: any) {
+      console.error("Error joining Moodle course:", error);
+      toast.error(error.message || "Failed to join Moodle course");
+    } finally {
+      setIsMoodleActionLoading(false);
+    }
+  };
+  
+  // Handle password update
+  const handleUpdatePassword = async () => {
+    if (!team || !team.team_email) {
+      toast.error("Team email is required");
+      return;
+    }
+    
+    if (moodlePassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    
+    if (moodlePassword !== confirmMoodlePassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    
+    try {
+      setIsMoodleActionLoading(true);
+      
+      const response = await fetch(`/api/participants/teams/${team.id}/moodle/update-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password: moodlePassword })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || data.details || "Failed to update password");
+      }
+      
+      toast.success("Moodle password updated successfully");
+      setUpdatePasswordDialogOpen(false);
+      setMoodlePassword("");
+      setConfirmMoodlePassword("");
+    } catch (error: any) {
+      console.error("Error updating Moodle password:", error);
+      toast.error(error.message || "Failed to update Moodle password");
+    } finally {
+      setIsMoodleActionLoading(false);
+    }
+  };
+  
+  // Open the join dialog after checking for matching course
+  const openJoinDialog = async () => {
+    if (!team?.team_email) {
+      toast.error("Team email is required");
+      return;
+    }
+    
+    const hasMatchingCourse = await checkMatchingCourse();
+    if (hasMatchingCourse) {
+      setJoinCourseDialogOpen(true);
+    }
+  };
+  
+  // Open the create dialog after checking for matching course
+  const openCreateDialog = async () => {
+    if (!team?.team_email) {
+      toast.error("Team email is required");
+      return;
+    }
+    
+    const hasMatchingCourse = await checkMatchingCourse();
+    if (hasMatchingCourse) {
+      setCreateMoodleDialogOpen(true);
+    }
+  };
 
   // Handle team deletion
   const handleDeleteTeam = async () => {
@@ -428,6 +790,7 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <CardTitle className="text-base">{t('teams.contest_participation')}</CardTitle>
+                  <h1 className="text-lg font-semibold">{team.name}</h1>
                   <CardDescription>{team.hashcode}</CardDescription>
                 </div>
                 <div className="flex flex-col md:flex-row gap-2">
@@ -700,6 +1063,140 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Moodle Integration Card */}
+          <Card className="mt-6 bg-red-50">
+            <CardHeader className="pb-3">
+              <CardTitle>Moodle Integration</CardTitle>
+              <CardDescription className="flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2 text-red-600" />
+                <div className="flex flex-col">
+                  <span>Manage this team's Moodle learning management system account</span>
+                  <strong className="text-red-600 mt-1">NOTE: This section is still under construction</strong>
+                </div>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex flex-col space-y-2">
+                  <h3 className="text-sm font-medium">Team Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm text-muted-foreground block">Team Email</span>
+                      <div className="flex items-center">
+                        <Mail className="h-4 w-4 mr-1 text-muted-foreground" />
+                        <span className="font-medium">{team?.team_email || "Not set"}</span>
+                      </div>
+                      {!team?.team_email && (
+                        <p className="text-xs text-red-500 mt-1">
+                          <AlertTriangle className="h-3 w-3 inline mr-1" />
+                          Team email is required for Moodle integration
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground block">Contest Code</span>
+                      <div className="flex items-center">
+                        <Key className="h-4 w-4 mr-1 text-muted-foreground" />
+                        <span className="font-medium">{team?.contest?.code || "Not available"}</span>
+                      </div>
+                      {!team?.contest?.code && (
+                        <p className="text-xs text-red-500 mt-1">
+                          <AlertTriangle className="h-3 w-3 inline mr-1" />
+                          Contest code is required for Moodle course matching
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium mb-4">Moodle Actions</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="border rounded-md p-4 flex flex-col items-center text-center space-y-2">
+                      <div className="bg-blue-50 p-2 rounded-full">
+                        <GraduationCap className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <h4 className="font-medium">{moodleAccountDetails ? "Moodle Account Info" : "Create Moodle Account"}</h4>
+                      {moodleAccountDetails ? (
+                        <div className="w-full text-left space-y-2">
+                          <div className="border-b pb-1">
+                            <p className="text-xs font-semibold">Username:</p>
+                            <p className="text-sm font-mono overflow-hidden text-ellipsis">{moodleAccountDetails.username}</p>
+                          </div>
+                          <div className="border-b pb-1">
+                            <p className="text-xs font-semibold">Password:</p>
+                            <p className="text-sm font-mono overflow-hidden text-ellipsis">{moodleAccountDetails.password}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold">Course:</p>
+                            <p className="text-sm overflow-hidden text-ellipsis">{moodleAccountDetails.courseName}</p>
+                          </div>
+                          <div className="mt-1 pt-1">
+                            <p className="text-xs text-green-600">✓ Account created successfully</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-muted-foreground">Create a new account and automatically enroll in the matching course</p>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="mt-2" 
+                            onClick={openCreateDialog}
+                            disabled={!team?.team_email || !team?.contest?.code}
+                          >
+                            Create Account
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="border rounded-md p-4 flex flex-col items-center text-center space-y-2">
+                      <div className="bg-green-50 p-2 rounded-full">
+                        <LogIn className="h-5 w-5 text-green-600" />
+                      </div>
+                      <h4 className="font-medium">Join Moodle Course</h4>
+                      <p className="text-xs text-muted-foreground">Link an existing Moodle account to the matching course</p>
+                      {availableCourse && (
+                        <div className="mt-1">
+                          <p className="text-xs text-blue-600 font-medium">
+                            Available: {availableCourse.name}
+                          </p>
+                        </div>
+                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="mt-1" 
+                        onClick={openJoinDialog}
+                        disabled={!team?.team_email || !team?.contest?.code}
+                      >
+                        Join Course
+                      </Button>
+                    </div>
+
+                    <div className="border rounded-md p-4 flex flex-col items-center text-center space-y-2">
+                      <div className="bg-amber-50 p-2 rounded-full">
+                        <Lock className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <h4 className="font-medium">Update Password</h4>
+                      <p className="text-xs text-muted-foreground">Change the password for the team's Moodle account</p>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="mt-2" 
+                        onClick={() => team?.team_email ? setUpdatePasswordDialogOpen(true) : toast.error("Team email is required")}
+                        disabled={!team?.team_email}
+                      >
+                        Update Password
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           
           <Card className="mt-6">
             <CardHeader className="pb-3">
@@ -781,6 +1278,220 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
           
           {/* Event Registration Section */}
           {team && <EventRegistrations teamId={team.id} />}
+          
+          {/* Moodle Account Creation Dialog */}
+          <Dialog open={createMoodleDialogOpen} onOpenChange={setCreateMoodleDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Moodle Account</DialogTitle>
+                <DialogDescription>
+                  Create a new Moodle account for this team and automatically enroll in the matching course.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Team Information</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Team Email:</span>
+                      <p className="font-medium">{team?.team_email}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Course Match:</span>
+                      <p className="font-medium">{team?.contest?.code} ↔️ {matchingCourse?.name}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-2">
+                  <p className="text-sm text-amber-600 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    A randomly generated password will be created for this account.
+                  </p>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCreateMoodleDialogOpen(false)}
+                  disabled={isMoodleActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateMoodleAccount}
+                  disabled={isMoodleActionLoading}
+                >
+                  {isMoodleActionLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : "Create Account"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Moodle Join Course Dialog */}
+          <Dialog open={joinCourseDialogOpen} onOpenChange={setJoinCourseDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Join Moodle Course</DialogTitle>
+                <DialogDescription>
+                  Enroll an existing Moodle user in the matching course based on your contest code.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-sm">Account Information</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Account Email:</span>
+                      <p className="font-medium">{team?.team_email}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Course Match:</span>
+                      <p className="font-medium">{team?.contest?.code} ↔️ {matchingCourse?.name}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="border-t pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    This will link the existing Moodle account with email <span className="font-medium">{team?.team_email}</span> to 
+                    the course <span className="font-medium">{matchingCourse?.name}</span>.
+                  </p>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setJoinCourseDialogOpen(false)}
+                  disabled={isMoodleActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleJoinCourse}
+                  disabled={isMoodleActionLoading}
+                >
+                  {isMoodleActionLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Joining...
+                    </>
+                  ) : "Join Course"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Moodle Update Password Dialog */}
+          <Dialog open={updatePasswordDialogOpen} onOpenChange={setUpdatePasswordDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Moodle Password</DialogTitle>
+                <DialogDescription>
+                  Change the password for the Moodle account associated with this team.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 py-4">
+                <div className="space-y-1">
+                  <span className="text-sm font-medium">Account Email:</span>
+                  <p className="text-sm">{team?.team_email}</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex flex-col space-y-1.5">
+                    <label htmlFor="new-password" className="text-sm font-medium">New Password</label>
+                    <div className="relative">
+                      <input
+                        id="new-password"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pr-10"
+                        type={showPassword ? "text" : "password"}
+                        value={moodlePassword}
+                        onChange={(e) => setMoodlePassword(e.target.value)}
+                        placeholder="Enter password (min. 8 characters)"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col space-y-1.5">
+                    <label htmlFor="confirm-password" className="text-sm font-medium">Confirm Password</label>
+                    <input
+                      id="confirm-password"
+                      className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${confirmMoodlePassword && moodlePassword !== confirmMoodlePassword ? 'border-red-500' : 'border-input'}`}
+                      type="password"
+                      value={confirmMoodlePassword}
+                      onChange={(e) => setConfirmMoodlePassword(e.target.value)}
+                      placeholder="Confirm password"
+                    />
+                  </div>
+                  
+                  {confirmMoodlePassword && moodlePassword !== confirmMoodlePassword && (
+                    <p className="text-xs text-red-500">Passwords do not match</p>
+                  )}
+                  
+                  {moodlePassword && moodlePassword.length < 8 && (
+                    <p className="text-xs text-amber-500">Password must be at least 8 characters</p>
+                  )}
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setUpdatePasswordDialogOpen(false);
+                    setMoodlePassword("");
+                    setConfirmMoodlePassword("");
+                    setShowPassword(false);
+                  }}
+                  disabled={isMoodleActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleUpdatePassword}
+                  disabled={isMoodleActionLoading || moodlePassword.length < 8 || moodlePassword !== confirmMoodlePassword}
+                >
+                  {isMoodleActionLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating...
+                    </>
+                  ) : "Update Password"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {/* Delete confirmation dialog */}
           <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
             <DialogContent>
