@@ -78,8 +78,8 @@ export function DocxDownloadButton({
   return (
     <Button 
       onClick={handleDownload} 
-      className="gap-1 ml-2" 
-      variant="outline"
+      className="gap-1 ml-2 bg-blue-600 hover:bg-blue-700 text-white" 
+      variant="default"
       disabled={isLoading}
     >
       {isLoading ? (
