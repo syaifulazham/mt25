@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/auth-options";
 import * as moodleApi from "@/lib/moodle-api";
 
+// Mark this route as dynamic to prevent static generation errors
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/courses/moodle
  * Returns a list of all courses from Moodle LMS
