@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserRound } from "lucide-react";
 import { DownloadButton } from "./DownloadButton";
+import { DocxDownloadButton } from "./DocxDownloadButton";
+import { XlsxDownloadButton } from "./XlsxDownloadButton";
 
 interface TabSelectorProps {
   children: React.ReactNode;
@@ -40,15 +42,35 @@ export function TabSelector({
             Manage all contingents participating in Techlympics 2025
           </p>
         </div>
-        <DownloadButton 
-          allContingents={allContingents} 
-          schoolContingents={schoolContingents}
-          independentContingents={independentContingents}
-          contingentsWithoutContestants={contingentsWithoutContestants}
-          activeTab={activeTab}
-          searchTerm={searchTerm} 
-          stateFilter={stateFilter} 
-        />
+        <div className="flex items-center">
+          <DownloadButton 
+            allContingents={allContingents} 
+            schoolContingents={schoolContingents}
+            independentContingents={independentContingents}
+            contingentsWithoutContestants={contingentsWithoutContestants}
+            activeTab={activeTab}
+            searchTerm={searchTerm} 
+            stateFilter={stateFilter} 
+          />
+          <DocxDownloadButton 
+            allContingents={allContingents} 
+            schoolContingents={schoolContingents}
+            independentContingents={independentContingents}
+            contingentsWithoutContestants={contingentsWithoutContestants}
+            activeTab={activeTab}
+            searchTerm={searchTerm} 
+            stateFilter={stateFilter} 
+          />
+          <XlsxDownloadButton 
+            allContingents={allContingents} 
+            schoolContingents={schoolContingents}
+            independentContingents={independentContingents}
+            contingentsWithoutContestants={contingentsWithoutContestants}
+            activeTab={activeTab}
+            searchTerm={searchTerm} 
+            stateFilter={stateFilter} 
+          />
+        </div>
       </div>
 
       <Tabs defaultValue="all" onValueChange={handleTabChange}>
