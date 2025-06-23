@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLanguage } from "@/lib/i18n/language-context";
 import { XIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogHeader, DialogFooter } from "@/components/ui/dialog";
@@ -119,6 +119,7 @@ export default function ThemesSection() {
     }
   };
   const [isLoadingContests, setIsLoadingContests] = useState(false);
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string | number, boolean>>({});
   
   // Fetch themes on component mount
   useEffect(() => {
@@ -156,6 +157,15 @@ export default function ThemesSection() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedTheme(null);
+    setExpandedDescriptions({});
+  };
+
+  // Toggle description expansion
+  const toggleDescription = (contestId: string | number) => {
+    setExpandedDescriptions(prev => ({
+      ...prev,
+      [contestId]: !prev[contestId]
+    }));
   };
 
   return (
@@ -294,7 +304,20 @@ export default function ThemesSection() {
                           {contest.code ? `${contest.code} - ${contest.name}` : contest.name}
                         </h3>
                       </div>
-                      <p className="text-gray-300 text-sm mb-3 line-clamp-2">{contest.description}</p>
+                      <div className="text-gray-300 text-sm mb-3">
+                        <p className={expandedDescriptions[contest.id] ? '' : 'line-clamp-2'}>
+                          {contest.description}
+                        </p>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleDescription(contest.id);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-xs mt-1 font-medium focus:outline-none transition-colors"
+                        >
+                          {expandedDescriptions[contest.id] ? 'Read Less' : 'Read More'}
+                        </button>
+                      </div>
                       <div className="flex flex-col space-y-2">
                         <div className="flex items-center">
                           <span className="text-xs text-gray-400">
