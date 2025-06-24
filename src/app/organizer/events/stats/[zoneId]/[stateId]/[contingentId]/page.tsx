@@ -389,11 +389,8 @@ export default async function ContingentStatsPage({
                                     // Use age field directly from data
                                     const age = member.age !== null ? member.age : '-';
                                       
-                                    // Combine class_grade and class_name
-                                    const classInfo = [
-                                      member.class_grade,
-                                      member.class_name
-                                    ].filter(Boolean).join(' ');
+                                    // Use only class_grade for Darjah/Tingkatan
+                                    const classInfo = member.class_grade || '-';
                                     
                                     return (
                                       <TableRow key={member.id}>
