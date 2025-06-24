@@ -30,6 +30,11 @@ type ContestantData = {
   id: number;
   name: string;
   ic: string | null;
+  gender: string;
+  birthdate: Date | null;
+  age: number | null;
+  class_grade: string | null;
+  class_name: string | null;
 };
 
 type TeamData = {
@@ -142,7 +147,12 @@ async function getContingentStatistics(
             select: {
               id: true,
               name: true,
-              ic: true
+              ic: true,
+              gender: true,
+              birthdate: true,
+              age: true,
+              class_grade: true,
+              class_name: true
             }
           }
         }
@@ -368,19 +378,36 @@ export default async function ContingentStatsPage({
                                 <TableHeader>
                                   <TableRow>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>ID</TableHead>
+                                    <TableHead className="w-[120px]">IC</TableHead>
+                                    <TableHead className="w-[80px]">Gender</TableHead>
+                                    <TableHead className="w-[60px]">Age</TableHead>
+                                    <TableHead className="w-[150px]">Darjah/Tingkatan</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {team.members.map((member: ContestantData) => (
-                                    <TableRow key={member.id}>
-                                      <TableCell>{member.name}</TableCell>
-                                      <TableCell>{member.ic || 'Not available'}</TableCell>
-                                    </TableRow>
-                                  ))}
+                                  {team.members.map((member: ContestantData) => {
+                                    // Use age field directly from data
+                                    const age = member.age !== null ? member.age : '-';
+                                      
+                                    // Combine class_grade and class_name
+                                    const classInfo = [
+                                      member.class_grade,
+                                      member.class_name
+                                    ].filter(Boolean).join(' ');
+                                    
+                                    return (
+                                      <TableRow key={member.id}>
+                                        <TableCell>{member.name}</TableCell>
+                                        <TableCell>{member.ic || 'Not available'}</TableCell>
+                                        <TableCell>{member.gender || '-'}</TableCell>
+                                        <TableCell>{age}</TableCell>
+                                        <TableCell>{classInfo || '-'}</TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
                                   {team.members.length === 0 && (
                                     <TableRow>
-                                      <TableCell colSpan={2} className="text-center text-gray-500">
+                                      <TableCell colSpan={5} className="text-center text-gray-500">
                                         No team members found
                                       </TableCell>
                                     </TableRow>

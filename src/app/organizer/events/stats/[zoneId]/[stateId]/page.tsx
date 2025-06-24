@@ -177,7 +177,8 @@ async function getStateStatistics(zoneId: number, stateId: number): Promise<Stat
   // Maps to store processed data
   const schoolLevelMap = new Map<string, SchoolLevelGroup>();
   const contestGroupMap = new Map<number, ContestGroup>();
-  const contingentMap = new Map<number, ProcessedContingent>();
+  // Map of contest-specific contingent maps to track contingents per contest
+  const contestContingentMaps = new Map<number, Map<number, ProcessedContingent>>();
 
   // Process each team
   for (const team of teams) {
@@ -215,15 +216,19 @@ async function getStateStatistics(zoneId: number, stateId: number): Promise<Stat
         };
         contestGroupMap.set(contestId, contestGroup);
         
+        // Create a new contingent map for this contest
+        contestContingentMaps.set(contestId, new Map<number, ProcessedContingent>());
+        
         // Add to appropriate school level group
         schoolLevelMap.get(schoolLevel)!.contests.push(contestGroup);
       }
       
       const contestGroup = contestGroupMap.get(contestId)!;
+      const contestContingentMap = contestContingentMaps.get(contestId)!;
 
-      // Get or create contingent entry
+      // Get or create contingent entry for this specific contest
       const contingentKey = contingent.id;
-      if (!contingentMap.has(contingentKey)) {
+      if (!contestContingentMap.has(contingentKey)) {
         // Determine display name based on contingent type
         const displayName = contingent.contingentType === 'SCHOOL' && contingent.school
           ? contingent.school.name
@@ -237,12 +242,12 @@ async function getStateStatistics(zoneId: number, stateId: number): Promise<Stat
           contestantsCount: 0
         };
 
-        contingentMap.set(contingentKey, contingentEntry);
+        contestContingentMap.set(contingentKey, contingentEntry);
         contestGroup.contingents.push(contingentEntry);
       }
 
       // Update team and contestant counts
-      const contingentEntry = contingentMap.get(contingentKey)!;
+      const contingentEntry = contestContingentMap.get(contingentKey)!;
       contingentEntry.teamsCount += 1;
       contingentEntry.contestantsCount += team.members.length;
     }
@@ -281,22 +286,45 @@ async function getStateStatistics(zoneId: number, stateId: number): Promise<Stat
   }
 
   // Calculate summary data
-  const uniqueContingentIds = new Set<number>();
-  const uniqueSchoolContingentIds = new Set<number>();
-  let totalTeams = 0;
-  let totalContestants = 0;
-
+  // Create a map to track unique contingent participation across all contests
+  const uniqueContingentMap = new Map<number, { teamsCount: number, contestantsCount: number, isSchool: boolean }>();
+  
+  // First pass: collect all contingent data from all contests
   for (const schoolLevelGroup of schoolLevelGroups) {
     for (const contestGroup of schoolLevelGroup.contests) {
       for (const contingent of contestGroup.contingents) {
-        uniqueContingentIds.add(contingent.id);
-        if (contingent.contingentType === 'SCHOOL') {
-          uniqueSchoolContingentIds.add(contingent.id);
+        const isSchool = contingent.contingentType === 'SCHOOL';
+        
+        if (!uniqueContingentMap.has(contingent.id)) {
+          uniqueContingentMap.set(contingent.id, {
+            teamsCount: contingent.teamsCount,
+            contestantsCount: contingent.contestantsCount,
+            isSchool
+          });
+        } else {
+          // Add teams and contestants counts for this contingent in this contest
+          const existing = uniqueContingentMap.get(contingent.id)!;
+          existing.teamsCount += contingent.teamsCount;
+          existing.contestantsCount += contingent.contestantsCount;
         }
-        totalTeams += contingent.teamsCount;
-        totalContestants += contingent.contestantsCount;
       }
     }
+  }
+  
+  // Calculate summary from the uniqueContingentMap
+  const uniqueContingentIds = new Set(uniqueContingentMap.keys());
+  const uniqueSchoolContingentIds = new Set(
+    Array.from(uniqueContingentMap.entries())
+      .filter(([_, data]) => data.isSchool)
+      .map(([id, _]) => id)
+  );
+  
+  let totalTeams = 0;
+  let totalContestants = 0;
+  
+  for (const data of uniqueContingentMap.values()) {
+    totalTeams += data.teamsCount;
+    totalContestants += data.contestantsCount;
   }
 
   const summary = {
@@ -317,13 +345,13 @@ async function getStateStatistics(zoneId: number, stateId: number): Promise<Stat
 function getSchoolLevelInfo(schoolLevel: string) {
   switch (schoolLevel) {
     case 'Primary':
-      return { displayName: 'Kids', icon: <Baby size={20} /> };
+      return { displayName: 'Kids', Icon: Baby };
     case 'Secondary':
-      return { displayName: 'Teens', icon: <Gamepad2 size={20} /> };
+      return { displayName: 'Teens', Icon: Gamepad2 };
     case 'Higher Education':
-      return { displayName: 'Youth', icon: <Rocket size={20} /> };
+      return { displayName: 'Youth', Icon: Rocket };
     default:
-      return { displayName: schoolLevel, icon: null };
+      return { displayName: schoolLevel, Icon: null };
   }
 }
 
@@ -382,60 +410,57 @@ export default async function StateStatsPage({ params }: { params: { zoneId: str
       ) : (
         <div className="space-y-8">
           {groupedData.map((schoolLevelGroup: SchoolLevelGroup) => {
-            const { displayName, icon } = getSchoolLevelInfo(schoolLevelGroup.schoolLevel);
+            const { displayName, Icon } = getSchoolLevelInfo(schoolLevelGroup.schoolLevel);
             return (
-              <Card key={schoolLevelGroup.schoolLevel} className="mb-6">
-                <CardHeader className="bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    {icon}
-                    <CardTitle>{displayName}</CardTitle>
+              <div key={schoolLevelGroup.schoolLevel} className="space-y-4 mb-10">
+                <div className="bg-primary p-4 rounded-md">
+                  <h2 className="text-2xl font-bold flex items-center gap-2 text-primary-foreground">
+                    {Icon && <Icon size={24} className="text-primary-foreground" />}
+                    {displayName}
+                  </h2>
+                </div>
+                {schoolLevelGroup.contests.map((contestGroup: ContestGroup) => (
+                  <div key={contestGroup.contestId} className="space-y-4 mb-8 ml-4">
+                    <div className="bg-secondary p-4 rounded-md">
+                      <h3 className="text-xl font-bold">
+                        {contestGroup.contestName}{" "}
+                        <span className="text-sm font-normal bg-primary/10 px-2 py-1 rounded">
+                          {contestGroup.contestCode}
+                        </span>
+                      </h3>
+                    </div>
+                    {contestGroup.contingents.length === 0 ? (
+                      <p>No data available for this contest.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Contingent</TableHead>
+                            <TableHead className="text-right">Teams</TableHead>
+                            <TableHead className="text-right">Contestants</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {contestGroup.contingents.map((contingent: ProcessedContingent) => (
+                            <TableRow key={contingent.id}>
+                              <TableCell className="font-medium">
+                                <Link 
+                                  href={`/organizer/events/stats/${zone.id}/${state.id}/${contingent.id}`}
+                                  className="text-blue-500 hover:text-blue-700 hover:underline"
+                                >
+                                  {contingent.displayName}
+                                </Link>
+                              </TableCell>
+                              <TableCell className="text-right">{contingent.teamsCount}</TableCell>
+                              <TableCell className="text-right">{contingent.contestantsCount}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="space-y-6">
-                    {schoolLevelGroup.contests.map((contestGroup: ContestGroup) => (
-                      <div key={contestGroup.contestId} className="border rounded-lg shadow-sm">
-                        <div className="p-4 border-b bg-gray-50">
-                          <h3 className="text-lg font-semibold">
-                            {contestGroup.contestCode} {contestGroup.contestName}
-                          </h3>
-                        </div>
-                        <div className="p-4">
-                          {contestGroup.contingents.length === 0 ? (
-                            <p>No data available for this contest.</p>
-                          ) : (
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Contingent</TableHead>
-                                  <TableHead className="text-right">Teams</TableHead>
-                                  <TableHead className="text-right">Contestants</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {contestGroup.contingents.map((contingent: ProcessedContingent) => (
-                                  <TableRow key={contingent.id}>
-                                    <TableCell className="font-medium">
-                                      <Link 
-                                        href={`/organizer/events/stats/${zone.id}/${state.id}/${contingent.id}`}
-                                        className="text-blue-500 hover:text-blue-700 hover:underline"
-                                      >
-                                        {contingent.displayName}
-                                      </Link>
-                                    </TableCell>
-                                    <TableCell className="text-right">{contingent.teamsCount}</TableCell>
-                                    <TableCell className="text-right">{contingent.contestantsCount}</TableCell>
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                ))}
+              </div>
             );
           })}
         </div>
