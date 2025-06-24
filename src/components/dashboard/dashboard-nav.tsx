@@ -4,9 +4,33 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthUser } from "@/lib/auth";
+import { ChevronDown, ChevronUp } from "lucide-react";
+
+// Types for navigation items
+type SubMenuItem = {
+  title: string;
+  href: string;
+};
+
+type NavItemBase = {
+  title: string;
+  icon: React.ReactNode;
+};
+
+type NavItemLink = NavItemBase & {
+  href: string;
+  subItems?: never;
+};
+
+type NavItemDropdown = NavItemBase & {
+  href?: never;
+  subItems: SubMenuItem[];
+};
+
+type NavItem = NavItemLink | NavItemDropdown;
 
 // Navigation items for the dashboard
-export const navItems = [
+export const navItems: NavItem[] = [
   {
     title: "Dashboard",
     href: "/organizer/dashboard",
@@ -54,12 +78,21 @@ export const navItems = [
   },
   {
     title: "Events",
-    href: "/organizer/events",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
     ),
+    subItems: [
+      {
+        title: "Management",
+        href: "/organizer/events",
+      },
+      {
+        title: "Stats",
+        href: "/organizer/events/stats",
+      },
+    ],
   },
   {
     title: "Participation",
@@ -136,6 +169,13 @@ export function DashboardNav({ user }: DashboardNavProps) {
   // We'll keep the manual collapse option for user preference
   // but also add responsive behavior
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // State to track which dropdown is open
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  // Toggle dropdown state
+  const toggleDropdown = (title: string) => {
+    setOpenDropdown(openDropdown === title ? null : title);
+  };
 
   const handleLogout = async () => {
     try {
@@ -225,6 +265,60 @@ export function DashboardNav({ user }: DashboardNavProps) {
             return true;
           })
           .map((item) => {
+            // Handle dropdown menu items
+            if ('subItems' in item && item.subItems) {
+              const isDropdownActive = item.subItems.some(subItem => pathname === subItem.href);
+              const isOpen = openDropdown === item.title;
+              
+              return (
+                <div key={item.title} className="space-y-1">
+                  {/* Dropdown toggle button */}
+                  <button
+                    onClick={() => toggleDropdown(item.title)}
+                    className={`flex items-center w-full ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-between"} px-4 py-2 text-sm font-medium rounded-md ${
+                      isDropdownActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <span className="flex-shrink-0">{item.icon}</span>
+                      {!isCollapsed && <span className="hidden lg:inline ml-3">{item.title}</span>}
+                    </div>
+                    {!isCollapsed && (
+                      <span className="hidden lg:inline">
+                        {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </span>
+                    )}
+                  </button>
+                  
+                  {/* Dropdown items */}
+                  {isOpen && !isCollapsed && (
+                    <div className="ml-4 lg:ml-8 space-y-1 mt-1">
+                      {item.subItems.map(subItem => {
+                        const isSubItemActive = pathname === subItem.href;
+                        return (
+                          <Link
+                            key={subItem.href}
+                            href={subItem.href}
+                            className={`flex items-center ${isCollapsed ? "justify-center" : "md:justify-center lg:justify-start"} px-4 py-2 text-sm font-medium rounded-md ${
+                              isSubItemActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                            }`}
+                          >
+                            <div className="w-1 h-1 rounded-full bg-current mr-2"></div>
+                            <span className="hidden lg:inline">{subItem.title}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            
+            // Regular menu items (non-dropdowns)
             const isActive = pathname === item.href;
             return (
               <Link

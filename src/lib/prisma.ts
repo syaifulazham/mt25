@@ -15,19 +15,16 @@ export const prisma =
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// Helper function to execute a Prisma query and properly close the connection
+// Helper function to execute a Prisma query using the singleton Prisma client
 export async function prismaExecute<T>(
   callback: (prisma: PrismaClient) => Promise<T>
 ): Promise<T> {
   try {
-    // Execute the query
+    // Execute the query using the singleton Prisma client instance
     return await callback(prisma);
-  } finally {
-    // Explicitly disconnect in production/serverless environments
-    // In development, we keep the connection open
-    if (process.env.NODE_ENV === 'production') {
-      await prisma.$disconnect();
-    }
+  } catch (error) {
+    console.error('Prisma query error:', error);
+    throw error;
   }
 }
 
