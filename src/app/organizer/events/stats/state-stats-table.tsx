@@ -151,7 +151,10 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
               const zoneGroup = zoneGroups.find(group => group.firstIndex === index);
               
               return (
-                <TableRow key={state.id}>
+                <TableRow 
+                  key={state.id} 
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+                >
                   {zoneGroup ? (
                     <TableCell 
                       className={`font-medium pl-3 ${getZoneColorClass(state.zone.name)} hover:opacity-80 cursor-pointer`}
@@ -162,7 +165,14 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
                       </Link>
                     </TableCell>
                   ) : null}
-                  <TableCell className="font-medium">{state.name.replace('WILAYAH PERSEKUTUAN', 'WP')}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link 
+                      href={`/organizer/events/stats/${state.zone.id}/${state.id}`}
+                      className="text-blue-500 hover:text-blue-700 hover:underline"
+                    >
+                      {state.name.replace('WILAYAH PERSEKUTUAN', 'WP')}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-center">{stats.contingentsCount > 0 ? stats.contingentsCount : ''}</TableCell>
                   <TableCell className="text-center">{stats.teamCount > 0 ? stats.teamCount : ''}</TableCell>
                 </TableRow>
@@ -196,7 +206,10 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
               const zoneGroup = zoneGroups.find(group => group.firstIndex === index);
               
               return (
-                <TableRow key={state.id}>
+                <TableRow 
+                  key={state.id} 
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+                >
                   {zoneGroup ? (
                     <TableCell 
                       className={`font-medium pl-3 ${getZoneColorClass(state.zone.name)} hover:opacity-80 cursor-pointer`}
@@ -207,7 +220,14 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
                       </Link>
                     </TableCell>
                   ) : null}
-                  <TableCell className="font-medium">{state.name.replace('WILAYAH PERSEKUTUAN', 'WP')}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link 
+                      href={`/organizer/events/stats/${state.zone.id}/${state.id}`}
+                      className="text-blue-500 hover:text-blue-700 hover:underline"
+                    >
+                      {state.name.replace('WILAYAH PERSEKUTUAN', 'WP')}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-center">{stats.schoolsCount > 0 ? stats.schoolsCount : ''}</TableCell>
                   <TableCell className="text-center">{stats.primarySchools > 0 ? stats.primarySchools : ''}</TableCell>
                   <TableCell className="text-center">{stats.secondarySchools > 0 ? stats.secondarySchools : ''}</TableCell>
@@ -246,7 +266,10 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
               const zoneGroup = zoneGroups.find(group => group.firstIndex === index);
               
               return (
-                <TableRow key={state.id}>
+                <TableRow 
+                  key={state.id} 
+                  className="hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150"
+                >
                   {zoneGroup ? (
                     <TableCell 
                       className={`font-medium pl-3 ${getZoneColorClass(state.zone.name)} hover:opacity-80 cursor-pointer`}
@@ -257,7 +280,14 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
                       </Link>
                     </TableCell>
                   ) : null}
-                  <TableCell className="font-medium">{state.name.replace('WILAYAH PERSEKUTUAN', 'WP')}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link 
+                      href={`/organizer/events/stats/${state.zone.id}/${state.id}`}
+                      className="text-blue-500 hover:text-blue-700 hover:underline"
+                    >
+                      {state.name.replace('WILAYAH PERSEKUTUAN', 'WP')}
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-center">{stats.schoolTeams > 0 ? stats.schoolTeams : ''}</TableCell>
                   <TableCell className="text-center">{stats.primarySchoolTeams > 0 ? stats.primarySchoolTeams : ''}</TableCell>
                   <TableCell className="text-center">{stats.secondarySchoolTeams > 0 ? stats.secondarySchoolTeams : ''}</TableCell>

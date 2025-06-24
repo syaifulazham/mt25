@@ -5,6 +5,7 @@ import Link from "next/link";
 import { prismaExecute } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Baby, Rocket, Gamepad2 } from 'lucide-react';
 
 
 // Dynamic metadata
@@ -42,7 +43,7 @@ type StatsSummary = {
 
 type ZoneStatsResult = {
   zone: ZoneData | null;
-  groupedData: ContestGroup[];
+  groupedData: SchoolLevelGroup[];
   summary: StatsSummary;
 };
 
@@ -94,6 +95,9 @@ type TeamData = {
         id: number;
         name: string;
         code: string;
+        targetgroup: {
+          schoolLevel: string;
+        }[];
       };
       event: { name: string };
     };
@@ -112,6 +116,11 @@ type StateGroup = {
   stateId: number;
   stateName: string;
   contingents: ProcessedContingent[];
+};
+
+type SchoolLevelGroup = {
+  schoolLevel: string;
+  contests: ContestGroup[];
 };
 
 type ContestGroup = {
@@ -262,7 +271,12 @@ async function getZoneStatistics(zoneId: number) {
                 select: {
                   id: true,
                   name: true,
-                  code: true
+                  code: true,
+                  targetgroup: {
+                    select: {
+                      schoolLevel: true
+                    }
+                  }
                 }
               },
               event: {
@@ -277,19 +291,34 @@ async function getZoneStatistics(zoneId: number) {
     }
   })) as TeamData[];
 
-  // Process data to extract contest information
-  const contestGroups = new Map<number, ContestGroup>();
+  // Process data to extract school level and contest information
+  const schoolLevelGroups = new Map<string, SchoolLevelGroup>();
 
-  // Process each team to collect contest and contingent data
+  // Process each team to collect school level, contest, and contingent data
   for (const team of teams) {
     for (const ect of team.eventcontestteam) {
-      // Group by contest ID
-      const contestId = ect.eventcontest.contest.id;
-      const contestName = ect.eventcontest.contest.name;
-      const contestCode = ect.eventcontest.contest.code;
+      // Determine school level
+      const contest = ect.eventcontest.contest;
+      const contestTargetgroups = contest.targetgroup || [];
+      const schoolLevel = contestTargetgroups.length > 0 ? contestTargetgroups[0].schoolLevel : 'Uncategorized';
       
-      // Find or create contest group
-      let contestGroup = contestGroups.get(contestId);
+      // Group by contest ID
+      const contestId = contest.id;
+      const contestName = contest.name;
+      const contestCode = contest.code;
+      
+      // Find or create school level group
+      let schoolLevelGroup = schoolLevelGroups.get(schoolLevel);
+      if (!schoolLevelGroup) {
+        schoolLevelGroup = {
+          schoolLevel,
+          contests: []
+        };
+        schoolLevelGroups.set(schoolLevel, schoolLevelGroup);
+      }
+      
+      // Find or create contest group within school level group
+      let contestGroup = schoolLevelGroup.contests.find(cg => cg.contestId === contestId);
       if (!contestGroup) {
         contestGroup = {
           contestId,
@@ -297,7 +326,7 @@ async function getZoneStatistics(zoneId: number) {
           contestCode,
           stateGroups: []
         };
-        contestGroups.set(contestId, contestGroup);
+        schoolLevelGroup.contests.push(contestGroup);
       }
 
       // Get state ID for this contingent
@@ -358,20 +387,36 @@ async function getZoneStatistics(zoneId: number) {
   }
 
   // Convert to array and sort
-  const groupedData = Array.from(contestGroups.values());
+  const groupedData = Array.from(schoolLevelGroups.values());
+  
+  // Sort school level groups (Primary first, then Secondary, then Higher Education)
+  const schoolLevelOrder: Record<string, number> = {
+    'Primary': 1,
+    'Secondary': 2,
+    'Higher Education': 3
+  };
+  groupedData.sort((a: SchoolLevelGroup, b: SchoolLevelGroup) => {
+    const orderA = schoolLevelOrder[a.schoolLevel] || 999;
+    const orderB = schoolLevelOrder[b.schoolLevel] || 999;
+    return orderA - orderB;
+  });
+  
+  // Sort contests by name within each school level group
+  for (const schoolLevelGroup of groupedData) {
+    schoolLevelGroup.contests.sort((a: ContestGroup, b: ContestGroup) => a.contestName.localeCompare(b.contestName));
+  }
 
-  // Sort contest groups by name
-  groupedData.sort((a: ContestGroup, b: ContestGroup) => a.contestName.localeCompare(b.contestName));
-
-  // Sort state groups by name within each contest
-  for (const contestGroup of groupedData) {
-    contestGroup.stateGroups.sort((a: StateGroup, b: StateGroup) => a.stateName.localeCompare(b.stateName));
-    
-    // Sort contingents by name within each state group
-    for (const stateGroup of contestGroup.stateGroups) {
-      stateGroup.contingents.sort((a: ProcessedContingent, b: ProcessedContingent) => {
-        return a.displayName.localeCompare(b.displayName);
-      });
+    // Sort state groups by name within each contest
+  for (const schoolLevelGroup of groupedData) {
+    for (const contestGroup of schoolLevelGroup.contests) {
+      contestGroup.stateGroups.sort((a: StateGroup, b: StateGroup) => a.stateName.localeCompare(b.stateName));
+      
+      // Sort contingents by name within each state group
+      for (const stateGroup of contestGroup.stateGroups) {
+        stateGroup.contingents.sort((a: ProcessedContingent, b: ProcessedContingent) => {
+          return a.displayName.localeCompare(b.displayName);
+        });
+      }
     }
   }
 
@@ -381,19 +426,21 @@ async function getZoneStatistics(zoneId: number) {
   let totalTeams = 0;
   let totalContestants = 0;
 
-  for (const contestGroup of groupedData) {
-    for (const stateGroup of contestGroup.stateGroups) {
-      for (const contingent of stateGroup.contingents) {
-        uniqueContingentIds.add(contingent.id);
-        if (contingent.contingentType === 'SCHOOL') {
-          uniqueSchoolContingentIds.add(contingent.id);
+  for (const schoolLevelGroup of groupedData) {
+    for (const contestGroup of schoolLevelGroup.contests) {
+      for (const stateGroup of contestGroup.stateGroups) {
+        for (const contingent of stateGroup.contingents) {
+          uniqueContingentIds.add(contingent.id);
+          if (contingent.contingentType === 'SCHOOL') {
+            uniqueSchoolContingentIds.add(contingent.id);
+          }
+          totalTeams += contingent.teamsCount;
+          totalContestants += contingent.contestantsCount;
         }
-        totalTeams += contingent.teamsCount;
-        totalContestants += contingent.contestantsCount;
       }
     }
   }
-
+  
   const summary = {
     schoolCount: uniqueSchoolContingentIds.size,
     teamCount: totalTeams,
@@ -405,6 +452,24 @@ async function getZoneStatistics(zoneId: number) {
     groupedData: groupedData,
     summary: summary
   };
+}
+
+// Define the mapping type with display name and icon component
+type SchoolLevelMapping = {
+  displayName: string;
+  icon: React.ElementType;
+};
+
+// Function to map school level to display info
+function getSchoolLevelInfo(schoolLevel: string): SchoolLevelMapping {
+  const schoolLevelMap: Record<string, SchoolLevelMapping> = {
+    'Primary': { displayName: 'Kids', icon: Baby },
+    'Secondary': { displayName: 'Teens', icon: Gamepad2 },
+    'Higher Education': { displayName: 'Youth', icon: Rocket },
+    // Add more mappings if needed
+  };
+  
+  return schoolLevelMap[schoolLevel] || { displayName: schoolLevel, icon: Gamepad2 };
 }
 
 export default async function ZoneStatsPage({ params }: { params: { zoneId: string } }) {
@@ -459,52 +524,78 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
         </Card>
       ) : (
         <div className="space-y-8">
-          {groupedData.map((contestGroup: ContestGroup) => (
-            <Card key={contestGroup.contestId}>
-              <CardHeader>
-                <CardTitle>{contestGroup.contestCode} {contestGroup.contestName}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {contestGroup.stateGroups.length === 0 ? (
-                  <p>No data available for this contest.</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[200px]">State</TableHead>
-                        <TableHead>Contingent</TableHead>
-                        <TableHead className="text-right">Teams</TableHead>
-                        <TableHead className="text-right">Contestants</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contestGroup.stateGroups.map((stateGroup: StateGroup) => (
-                        <React.Fragment key={stateGroup.stateId}>
-                          {stateGroup.contingents.map((contingent: ProcessedContingent, i: number) => (
-                            <TableRow key={contingent.id}>
-                              {i === 0 ? (
-                                <TableCell rowSpan={stateGroup.contingents.length} className="font-medium align-top">
-                                  {stateGroup.stateName}
-                                </TableCell>
-                              ) : null}
-                              <TableCell>
-                                <div>{contingent.displayName}</div>
-                                <div className="text-xs text-gray-500">
-                                  {contingent.contingentType === 'SCHOOL' ? 'School' : 'Independent'}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">{contingent.teamsCount}</TableCell>
-                              <TableCell className="text-right">{contingent.contestantsCount}</TableCell>
-                            </TableRow>
+          {groupedData.map((schoolLevelGroup: SchoolLevelGroup) => {
+            const { displayName, icon: Icon } = getSchoolLevelInfo(schoolLevelGroup.schoolLevel);
+            return (
+              <div key={schoolLevelGroup.schoolLevel} className="space-y-4 mb-10">
+                <div className="bg-primary p-4 rounded-md">
+                  <h2 className="text-2xl font-bold flex items-center gap-2 text-primary-foreground">
+                    {Icon && <Icon size={24} className="text-primary-foreground" />}
+                    {displayName}
+                  </h2>
+                </div>
+                {schoolLevelGroup.contests.map((contestGroup: ContestGroup) => (
+                  <div key={contestGroup.contestId} className="space-y-4 mb-8 ml-4">
+                    <div className="bg-secondary p-4 rounded-md">
+                      <h3 className="text-xl font-bold">
+                        {contestGroup.contestName}{" "}
+                        <span className="text-sm font-normal bg-primary/10 px-2 py-1 rounded">
+                          {contestGroup.contestCode}
+                        </span>
+                      </h3>
+                    </div>
+                    {contestGroup.stateGroups.length === 0 ? (
+                      <p>No data available for this contest.</p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[200px]">State</TableHead>
+                            <TableHead>Contingent</TableHead>
+                            <TableHead className="text-right">Teams</TableHead>
+                            <TableHead className="text-right">Contestants</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {contestGroup.stateGroups.map((stateGroup: StateGroup) => (
+                            <React.Fragment key={stateGroup.stateId}>
+                              {stateGroup.contingents.map((contingent: ProcessedContingent, i: number) => (
+                                <TableRow key={contingent.id}>
+                                  {i === 0 ? (
+                                    <TableCell rowSpan={stateGroup.contingents.length} className="font-medium align-top">
+                                      <Link 
+                                        href={`/organizer/events/stats/${zone.id}/${stateGroup.stateId}`}
+                                        className="text-blue-500 hover:text-blue-700 hover:underline"
+                                      >
+                                        {stateGroup.stateName}
+                                      </Link>
+                                    </TableCell>
+                                  ) : null}
+                                  <TableCell>
+                                    <Link 
+                                      href={`/organizer/events/stats/${zone.id}/${stateGroup.stateId}/${contingent.id}`}
+                                      className="text-blue-500 hover:text-blue-700 hover:underline"
+                                    >
+                                      {contingent.displayName}
+                                    </Link>
+                                    <div className="text-xs text-gray-500">
+                                      {contingent.contingentType === 'SCHOOL' ? 'School' : 'Independent'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">{contingent.teamsCount}</TableCell>
+                                  <TableCell className="text-right">{contingent.contestantsCount}</TableCell>
+                                </TableRow>
+                              ))}
+                            </React.Fragment>
                           ))}
-                        </React.Fragment>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
