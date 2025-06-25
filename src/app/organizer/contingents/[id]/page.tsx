@@ -255,6 +255,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
             description: true,
             status: true,
             createdAt: true,
+            evidence_doc: true,
             contest: {
               select: {
                 id: true,
