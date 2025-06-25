@@ -6,7 +6,53 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Plus, Search, ShieldAlert, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight, FileQuestion, FileText, Image, Plus, Search, ShieldAlert, Users } from "lucide-react";
+
+// Evidence Document Viewer component
+const EvidenceDocumentViewer = ({ documentPath }: { documentPath: string }) => {
+  const fileExtension = documentPath.split('.').pop()?.toLowerCase();
+  const isPdf = fileExtension === 'pdf';
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  
+  return (
+    <Dialog>
+      <DialogTrigger className="flex items-center justify-center">
+        {isPdf ? (
+          <FileText className="h-5 w-5 text-blue-600 cursor-pointer hover:text-blue-800" />
+        ) : isImage ? (
+          <Image className="h-5 w-5 text-green-600 cursor-pointer hover:text-green-800" />
+        ) : (
+          <FileQuestion className="h-5 w-5 text-amber-600 cursor-pointer hover:text-amber-800" />
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Evidence Document</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-auto max-h-[calc(80vh-80px)]">
+          {isPdf ? (
+            <iframe 
+              src={documentPath} 
+              className="w-full h-[70vh]" 
+              title="PDF Document"
+            />
+          ) : isImage ? (
+            <img 
+              src={documentPath} 
+              alt="Evidence Document" 
+              className="max-w-full max-h-[70vh] mx-auto"
+            />
+          ) : (
+            <div className="p-4 text-center">
+              <p>Unsupported document format. <a href={documentPath} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Click here to download</a></p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 interface Team {
   id: number;
@@ -15,6 +61,7 @@ interface Team {
   description: string | null;
   status: string;
   createdAt: Date;
+  evidence_doc: string | null;
   contest: {
     id: number;
     name: string;
@@ -93,14 +140,19 @@ export function PaginatedTeamsList({ teams, pageSize = 5 }: PaginatedTeamsListPr
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-base">{team.name}</CardTitle>
-                        <Badge 
-                          variant="secondary"
-                          className={`text-xs ${team.status === "ACTIVE" ? "bg-green-100 text-green-800" : team.status === "PENDING" ? "bg-yellow-100 text-yellow-800" : ""}`}
-                        >
-                          {team.status}
-                        </Badge>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-base">{team.name}</CardTitle>
+                          <Badge 
+                            variant="secondary"
+                            className={`text-xs ${team.status === "ACTIVE" ? "bg-green-100 text-green-800" : team.status === "PENDING" ? "bg-yellow-100 text-yellow-800" : ""}`}
+                          >
+                            {team.status}
+                          </Badge>
+                        </div>
+                        {team.evidence_doc && (
+                          <EvidenceDocumentViewer documentPath={team.evidence_doc} />
+                        )}
                       </div>
                       <CardDescription className="flex flex-col gap-1">
                         <div>Code: {team.hashcode}</div>
