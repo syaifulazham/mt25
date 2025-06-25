@@ -2,9 +2,11 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Baby, Gamepad2, Rocket, FileText, Image, FileQuestion } from "lucide-react";
+import { useState } from "react";
 import { prismaExecute } from '@/lib/prisma';
-import { Baby, Rocket, Gamepad2 } from 'lucide-react';
 
 // Define types
 type ZoneData = {
@@ -40,6 +42,7 @@ type ContestantData = {
 type TeamData = {
   id: number;
   name: string;
+  evidence_doc: string | null;
   members: {
     contestant: ContestantData;
   }[];
@@ -59,9 +62,10 @@ type TeamData = {
   }[];
 };
 
-type TeamWithContestants = {
+interface TeamWithContestants {
   id: number;
   name: string;
+  evidence_doc?: string | null;
   members: ContestantData[];
 };
 
@@ -141,6 +145,7 @@ async function getContingentStatistics(
     select: {
       id: true,
       name: true,
+      evidence_doc: true,
       members: {
         select: {
           contestant: {
@@ -224,6 +229,7 @@ async function getContingentStatistics(
       contestGroup.teams.push({
         id: team.id,
         name: team.name,
+        evidence_doc: team.evidence_doc,
         members
       });
     }
@@ -287,6 +293,51 @@ function getSchoolLevelInfo(schoolLevel: string): SchoolLevelMapping {
   
   return schoolLevelMap[schoolLevel] || { displayName: schoolLevel, icon: Gamepad2 };
 }
+
+// Evidence Document Viewer component
+const EvidenceDocumentViewer = ({ documentPath }: { documentPath: string }) => {
+  const fileExtension = documentPath.split('.').pop()?.toLowerCase();
+  const isPdf = fileExtension === 'pdf';
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+  
+  return (
+    <Dialog>
+      <DialogTrigger className="flex items-center justify-center">
+        {isPdf ? (
+          <FileText className="h-5 w-5 text-blue-600 cursor-pointer hover:text-blue-800" />
+        ) : isImage ? (
+          <Image className="h-5 w-5 text-green-600 cursor-pointer hover:text-green-800" />
+        ) : (
+          <FileQuestion className="h-5 w-5 text-amber-600 cursor-pointer hover:text-amber-800" />
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Evidence Document</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-auto max-h-[calc(80vh-80px)]">
+          {isPdf ? (
+            <iframe 
+              src={documentPath} 
+              className="w-full h-[70vh]" 
+              title="PDF Document"
+            />
+          ) : isImage ? (
+            <img 
+              src={documentPath} 
+              alt="Evidence Document" 
+              className="max-w-full max-h-[70vh] mx-auto"
+            />
+          ) : (
+            <div className="p-4 text-center">
+              <p>Unsupported document format. <a href={documentPath} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Click here to download</a></p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export default async function ContingentStatsPage({ 
   params 
@@ -371,8 +422,11 @@ export default async function ContingentStatsPage({
                         <div className="space-y-6">
                           {contestGroup.teams.map((team: TeamWithContestants) => (
                             <div key={team.id} className="border rounded-md p-4">
-                              <div className="font-medium text-lg mb-2">
-                                {team.name || `Team ${team.id}`}
+                              <div className="font-medium text-lg mb-2 flex items-center justify-between">
+                                <span>{team.name || `Team ${team.id}`}</span>
+                                {team.evidence_doc && (
+                                  <EvidenceDocumentViewer documentPath={team.evidence_doc} />
+                                )}
                               </div>
                               <Table>
                                 <TableHeader>
