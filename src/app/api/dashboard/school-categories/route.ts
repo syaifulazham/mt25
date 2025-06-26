@@ -3,6 +3,9 @@ import { prismaExecute } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 
+// Force dynamic rendering to prevent static generation errors during build
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     // Authenticate the request
