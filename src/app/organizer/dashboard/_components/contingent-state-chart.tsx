@@ -51,50 +51,42 @@ export default function ContingentStateChart({ data: rawData }: { data: Continge
   const maxCount = Math.max(...sortedData.map(item => item.count), 1); // Ensure at least 1
   
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Contingents by State</CardTitle>
-        <CardDescription>Distribution of contingents across Malaysian states</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="w-full">
-          <div className="space-y-3">
-            {sortedData.map((item, index) => {
-              // Calculate percentage width for the bar (max 96% to leave room for the count)
-              const percentage = Math.round((item.count / maxCount) * 96);
-              const shortState = formatStateName(item.state);
-              
-              return (
-                <div key={index} className="relative">
-                  <div className="flex items-center mb-1">
-                    <div className="w-1/2 flex items-center">
-                      <div className="mr-2 p-1 rounded-full bg-muted">
-                        <MapPin className="h-3 w-3" />
-                      </div>
-                      <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
-                    </div>
-                    <div className="w-1/2 flex justify-end">
-                      <span className="text-xs font-semibold">{formatNumber(item.count)}</span>
-                    </div>
+    <div className="w-full h-full">
+      <div className="space-y-3">
+        {sortedData.map((item, index) => {
+          // Calculate percentage width for the bar (max 96% to leave room for the count)
+          const percentage = Math.round((item.count / maxCount) * 96);
+          const shortState = formatStateName(item.state);
+          
+          return (
+            <div key={index} className="relative">
+              <div className="flex items-center mb-1">
+                <div className="w-1/2 flex items-center">
+                  <div className="mr-2 p-1 rounded-full bg-muted">
+                    <MapPin className="h-3 w-3" />
                   </div>
-                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full ${BAR_COLOR} rounded-full flex items-center justify-center`} 
-                      style={{ width: `${percentage}%` }}
-                    ></div>
-                  </div>
+                  <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
                 </div>
-              );
-            })}
-            
-            {sortedData.length === 0 && (
-              <div className="text-sm text-muted-foreground py-2 text-center">
-                No data available
+                <div className="w-1/2 flex justify-end">
+                  <span className="text-xs font-semibold">{formatNumber(item.count)}</span>
+                </div>
               </div>
-            )}
+              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${BAR_COLOR} rounded-full flex items-center justify-center`} 
+                  style={{ width: `${percentage}%` }}
+                ></div>
+              </div>
+            </div>
+          );
+        })}
+        
+        {sortedData.length === 0 && (
+          <div className="text-sm text-muted-foreground py-2 text-center">
+            No data available
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+    </div>
   );
 }

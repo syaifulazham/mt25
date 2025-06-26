@@ -58,11 +58,21 @@ type ParticipationStateData = {
 type PercentageMode = 'per-state' | 'overall';
 
 export default function ParticipationStateChart({ data: rawData }: { data: ParticipationStateData[] }) {
+  // Add detailed logging of incoming data
+  console.log('ParticipationStateChart received raw data:', rawData);
+  console.log('Number of states in raw data:', rawData.length);
+  if (rawData.length > 0) {
+    console.log('States received:', rawData.map(item => item.state).join(', '));
+  }
+  
   // State for toggle between percentage modes
   const [percentageMode, setPercentageMode] = useState<PercentageMode>('per-state');
   
   // State for bar length mode (100% vs total count)
-  const [barLengthMode, setBarLengthMode] = useState<'percentage' | 'total'>('percentage');
+  const [barLengthMode, setBarLengthMode] = useState<'percentage' | 'total'>('total');
+  
+  // State for showing gender breakdown or just total
+  const [showGenderBreakdown, setShowGenderBreakdown] = useState<boolean>(false);
   
   // Calculate totals for each state and add them to the data
   const data = rawData.map(item => ({
@@ -91,8 +101,19 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
             <TabsTrigger value="per-state">Per State Distribution</TabsTrigger>
             <TabsTrigger value="overall">Overall Distribution</TabsTrigger>
           </TabsList>
+          <div className="flex items-center space-x-2 mt-4 mb-1">
+            <Switch 
+              id="gender-breakdown-toggle" 
+              checked={showGenderBreakdown}
+              onCheckedChange={setShowGenderBreakdown}
+            />
+            <Label htmlFor="gender-breakdown-toggle" className="text-xs">
+              Show Gender Breakdown
+            </Label>
+          </div>
+          
           {percentageMode === 'per-state' && (
-            <div className="flex items-center space-x-2 mt-4 mb-2">
+            <div className="flex items-center space-x-2 mt-2 mb-2">
               <Switch 
                 id="bar-length-mode" 
                 checked={barLengthMode === 'total'}
@@ -109,14 +130,23 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
             <div className="flex items-center mb-2 text-xs">
               <div className="w-1/2">State</div>
               <div className="w-1/2 flex">
-                <div className="flex items-center mr-3">
-                  <div className="w-3 h-3 mr-1 rounded-sm bg-blue-500"></div>
-                  <span className="flex items-center"><Mars className="h-3 w-3 mr-1" /> Male</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 mr-1 rounded-sm bg-pink-500"></div>
-                  <span className="flex items-center"><Venus className="h-3 w-3 mr-1" /> Female</span>
-                </div>
+                {showGenderBreakdown ? (
+                  <>
+                    <div className="flex items-center mr-3">
+                      <div className="w-3 h-3 mr-1 rounded-sm bg-blue-500"></div>
+                      <span className="flex items-center"><Mars className="h-3 w-3 mr-1" /> Male</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 mr-1 rounded-sm bg-pink-500"></div>
+                      <span className="flex items-center"><Venus className="h-3 w-3 mr-1" /> Female</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 mr-1 rounded-sm bg-primary"></div>
+                    <span>Total</span>
+                  </div>
+                )}
               </div>
             </div>
             
@@ -168,7 +198,7 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                   {/* Total bar background */}
                   <TooltipProvider>
                     <div className="h-4 w-full bg-muted rounded-full overflow-hidden">
-                      {/* Stacked bar container with fixed width based on total percentage */}
+                      {/* Bar container with fixed width based on percentage */}
                       <div 
                         className={`h-full flex ${GENDER_COLORS.TOTAL}`} 
                         style={{ 
@@ -179,35 +209,53 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                               : `${Math.max(Math.round((item.TOTAL / maxCount) * 100), 15)}%`
                         }}
                       >
-                        {/* Male portion */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div 
-                              className={`h-full ${GENDER_COLORS.MALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
-                              style={{ width: `${maleWidthPercentage}%` }}
-                            >
-                              {malePercentage > 15 ? `${malePercentage}%` : ''}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p>Male: {formatNumber(item.MALE)} ({malePercentage}%)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                        
-                        {/* Female portion */}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div 
-                              className={`h-full ${GENDER_COLORS.FEMALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
-                              style={{ width: `${femaleWidthPercentage}%` }}
-                            >
-                              {femalePercentage > 15 ? `${femalePercentage}%` : ''}
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p>Female: {formatNumber(item.FEMALE)} ({femalePercentage}%)</p>
-                          </TooltipContent>
-                        </Tooltip>
+                        {showGenderBreakdown ? (
+                          <>
+                            {/* Male portion */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div 
+                                  className={`h-full ${GENDER_COLORS.MALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
+                                  style={{ width: `${maleWidthPercentage}%` }}
+                                >
+                                  {malePercentage > 15 ? `${malePercentage}%` : ''}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p>Male: {formatNumber(item.MALE)} ({malePercentage}%)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            
+                            {/* Female portion */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div 
+                                  className={`h-full ${GENDER_COLORS.FEMALE} flex items-center justify-center text-[10px] text-white overflow-hidden`}
+                                  style={{ width: `${femaleWidthPercentage}%` }}
+                                >
+                                  {femalePercentage > 15 ? `${femalePercentage}%` : ''}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="top">
+                                <p>Female: {formatNumber(item.FEMALE)} ({femalePercentage}%)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </>
+                        ) : (
+                          /* Total bar for when gender breakdown is not shown */
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div 
+                                className="h-full bg-primary flex items-center justify-center text-[10px] text-white overflow-hidden w-full"
+                              >
+                                {item.TOTAL > 10 ? formatNumber(item.TOTAL) : ''}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p>Total: {formatNumber(item.TOTAL)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </div>
                   </TooltipProvider>
