@@ -78,6 +78,8 @@ export function ContingentDetailTabs({ contingentData }: ContingentTabsProps) {
             <PaginatedContestantsList 
               key={`contestants-${refreshKey}`}
               contestants={contingentData.contestants} 
+              contingentId={contingentData.id}
+              refreshData={refreshContestants}
               pageSize={5} 
             />
           ) : (

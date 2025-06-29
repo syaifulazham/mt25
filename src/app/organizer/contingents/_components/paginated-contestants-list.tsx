@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Award, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import AssignContestsModal from "./assign-contests-modal";
 
 interface Contestant {
   id: number;
@@ -34,10 +35,12 @@ interface Contestant {
 
 interface PaginatedContestantsListProps {
   contestants: Contestant[];
+  contingentId: number;
+  refreshData?: () => void;
   pageSize?: number;
 }
 
-export function PaginatedContestantsList({ contestants, pageSize = 5 }: PaginatedContestantsListProps) {
+export function PaginatedContestantsList({ contestants, contingentId, refreshData, pageSize = 5 }: PaginatedContestantsListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredContestants, setFilteredContestants] = useState(contestants);
@@ -133,6 +136,14 @@ export function PaginatedContestantsList({ contestants, pageSize = 5 }: Paginate
                     </div>
                   </div>
                 </CardHeader>
+                <CardFooter className="bg-slate-50 py-2 px-6 flex justify-end">
+                  <AssignContestsModal
+                    contestantId={contestant.id}
+                    contestantName={contestant.name}
+                    contingentId={contingentId}
+                    onSuccess={refreshData}
+                  />
+                </CardFooter>
               </Card>
             ))}
           </div>
