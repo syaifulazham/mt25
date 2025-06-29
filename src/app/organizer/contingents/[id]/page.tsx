@@ -218,6 +218,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
             edu_level: true,
             class_grade: true,
             class_name: true,
+            is_ppki: true,
             contests: {
               select: {
                 id: true,

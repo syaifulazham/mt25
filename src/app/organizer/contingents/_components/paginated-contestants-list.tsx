@@ -20,6 +20,7 @@ interface Contestant {
   edu_level: string;
   class_grade: string | null;
   class_name: string | null;
+  is_ppki?: boolean; // true/false for PPKI status
   contests: Array<{
     id: number;
     contest: {
@@ -91,14 +92,27 @@ export function PaginatedContestantsList({ contestants, pageSize = 5 }: Paginate
         <>
           <div className="space-y-4">
             {currentContestants.map((contestant) => (
-              <Card key={contestant.id} className="overflow-hidden border-l-4 border-l-primary">
+              <Card 
+                key={contestant.id} 
+                className={`overflow-hidden border-l-4 ${contestant.is_ppki 
+                  ? 'border-l-amber-500 bg-amber-50/50' 
+                  : 'border-l-primary'}`}
+              >
                 <CardHeader className="py-3">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-9 w-9">
                       <AvatarFallback>{contestant.name.substring(0, 2)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <CardTitle className="text-base">{contestant.name}</CardTitle>
+                      <div className="flex justify-between">
+                        <CardTitle className="text-base">{contestant.name}</CardTitle>
+                        {contestant.is_ppki && (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 flex items-center gap-1">
+                            <Award className="h-3 w-3" />
+                            PPKI
+                          </Badge>
+                        )}
+                      </div>
                       <CardDescription className="flex flex-col gap-1">
                         <div>
                           ID: {contestant.ic || 'N/A'} 
