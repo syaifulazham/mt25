@@ -50,6 +50,7 @@
     "d3": "^7.9.0",
     "date-fns": "^3.6.0",
     "docx": "^9.5.1",
+    "docx-templates": "^4.14.1",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",

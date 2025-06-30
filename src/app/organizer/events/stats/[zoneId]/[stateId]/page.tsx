@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { prismaExecute } from '@/lib/prisma';
 import { Baby, Rocket, Gamepad2 } from 'lucide-react';
+import { DownloadStateStatsDocxButton } from "@/app/organizer/events/stats/_components/download-state-stats-docx-button";
 
 // Define types
 type ZoneData = {
@@ -374,6 +375,14 @@ export default async function StateStatsPage({ params }: { params: { zoneId: str
             </Link>
           </div>
           <h1 className="text-3xl font-bold">{state.name} State Statistics</h1>
+        </div>
+        <div>
+          <DownloadStateStatsDocxButton 
+            zoneId={zone.id} 
+            zoneName={zone.name} 
+            stateId={state.id} 
+            stateName={state.name} 
+          />
         </div>
       </div>
       
