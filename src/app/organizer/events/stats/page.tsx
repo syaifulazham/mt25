@@ -4,13 +4,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StateStatsTable } from "./state-stats-table";
-import { PrismaClient } from "@prisma/client";
+import { ContestStatsTable } from "./_components/contest-stats-table";
+import { ContestStatsClient } from "./_components/contest-stats-client";
+import { getContestStatistics } from "./_utils/contest-statistics";
+
+// Common type definitions
+type Zone = {
+  id: number;
+  name: string;
+};
+
+type State = {
+  id: number;
+  name: string;
+  zoneId: number;
+  zone?: {
+    id: number;
+    name: string;
+  };
+};
 
 type School = {
   id: number;
   name: string;
   level: string;
-  contingent: any[];
 };
 
 type Contestant = {
@@ -24,16 +41,17 @@ type TeamMember = {
   contestant: Contestant;
 };
 
+type Contingent = {
+  id: number;
+  school?: { level: string; } | undefined;
+  independent?: any;
+  contingentType: string;
+};
+
 type Team = {
   id: number;
-  contingent: {
-    school?: {
-      level: string;
-    };
-    independent?: any;
-    contingentType: string;
-  };
-  members: TeamMember[];
+  contingent?: Contingent;
+  members?: TeamMember[];
 };
 
 type Independent = {
@@ -51,15 +69,6 @@ type Independent = {
   }[];
 };
 
-type State = {
-  id: number;
-  name: string;
-  zone: {
-    id: number;
-    name: string;
-  };
-};
-
 type StateStats = {
   contingentsCount: number;
   teamCount: number;
@@ -74,46 +83,47 @@ type StateStats = {
   independentTeamsWithU18: number;
 };
 
+type StateWithStats = {
+  state: State;
+  stats: StateStats;
+};
+
 export const metadata: Metadata = {
   title: "Event Statistics | Organizer Portal",
   description: "View event statistics and analytics by state",
 };
 
-async function getStatsForState(stateId: number) {
-  // Get only teams registered for events via EventContestTeam
+async function getStatsForState(stateId: number): Promise<StateStats> {
+  // Get all teams with their contingents and schools that match the state
   const teams = await prismaExecute((prisma) => prisma.team.findMany({
     where: {
-      contingent: {
-        OR: [
-          { school: { stateId } },
-          { higherInstitution: { stateId } },
-          { independent: { stateId } }
-        ]
-      },
-      // Only include teams that are registered for an event
-      eventcontestteam: {
-        some: {}
-      }
+      OR: [
+        { contingent: { school: { stateId } } },
+        { contingent: { higherInstitution: { stateId } } },
+        { contingent: { independent: { stateId } } }
+      ]
     },
-    include: {
+    select: {
+      id: true,
       contingent: {
-        include: {
-          school: true,
+        select: {
+          id: true,
+          contingentType: true,
+          school: {
+            select: {
+              level: true
+            }
+          },
           independent: true
-        }
-      },
-      members: {
-        include: {
-          contestant: true
         }
       }
     }
-  })) as any[];
+  }));
 
   // Extract unique contingent IDs from teams and count them
   const uniqueContingentIds = new Set<number>();
   teams.forEach((team: any) => {
-    if (team.contingent?.id) {
+    if (team.contingent && team.contingent.id) {
       uniqueContingentIds.add(team.contingent.id);
     }
   });
@@ -212,31 +222,79 @@ async function getStatsForState(stateId: number) {
   };
 }
 
-export default async function EventStatsPage() {
-  // Get all states with their zones, ordered by zone name then state name
-  const states = await prismaExecute<State[]>((prisma) => prisma.state.findMany({
-    include: {
-      zone: true
+// Server Component for Contest Statistics with zone and state filters
+async function ContestStatsServer({ states, zones, searchParams }: { 
+  states: State[], 
+  zones: Zone[],
+  searchParams?: { zoneId?: string, stateId?: string }
+}) {
+  // Convert query params to numbers if they exist
+  const zoneId = searchParams?.zoneId ? parseInt(searchParams.zoneId, 10) : undefined;
+  const stateId = searchParams?.stateId ? parseInt(searchParams.stateId, 10) : undefined;
+  
+  // Get contest stats with optional filters
+  const contestStats = await getContestStatistics(zoneId, stateId);
+  
+  // Process states to ensure zoneId is available for filtering
+  const statesWithZoneId = states.map(state => ({
+    id: state.id,
+    name: state.name,
+    zoneId: state.zone?.id || 0 // Use zone ID from relation or default
+  }));
+  
+  return (
+    <ContestStatsClient 
+      groupedContests={contestStats.groupedContests} 
+      summary={contestStats.summary}
+      zoneFilters={zones}
+      stateFilters={statesWithZoneId}
+    />
+  );
+}
+
+export default async function EventStatsPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+  // Get zones
+  const zones: Zone[] = await prismaExecute((prisma) => prisma.zone.findMany({
+    orderBy: {
+      name: 'asc'
     },
-    orderBy: [
-      {
-        zone: {
-          name: 'asc'
-        }
-      },
-      {
-        name: 'asc'
-      }
-    ]
+    select: {
+      id: true,
+      name: true
+    }
   }));
 
-  // Get stats for each state
-  const statsPromises = states.map(async (state: State) => {
-    const stats = await getStatsForState(state.id);
-    return { state, stats };
-  });
+  // Get states with zone info
+  const states: State[] = await prismaExecute((prisma) => prisma.state.findMany({
+    orderBy: {
+      name: 'asc'
+    },
+    select: {
+      id: true,
+      name: true,
+      zoneId: true,
+      zone: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
+    }
+  }));
 
-  const stateStats = await Promise.all(statsPromises);
+  // State stats with total and with zones
+  const stateStats = await Promise.all(
+    states.map(async (state) => {
+      const stats = await getStatsForState(state.id);
+      return { 
+        state: {
+          ...state,
+          zone: state.zone || { id: 0, name: 'Unknown' } // Ensure zone is always defined
+        },
+        stats 
+      };
+    })
+  );
 
   // Calculate total stats across all states
   const totalStats = stateStats.reduce(
@@ -277,6 +335,7 @@ export default async function EventStatsPage() {
       <Tabs defaultValue="by-state" className="mt-8">
         <TabsList className="mb-4">
           <TabsTrigger value="by-state">By State</TabsTrigger>
+          <TabsTrigger value="by-contest">By Contest</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
         </TabsList>
         
@@ -370,6 +429,17 @@ export default async function EventStatsPage() {
           <div className="space-y-6">
             <StateStatsTable stateStats={stateStats} totalStats={totalStats} />
           </div>
+        </TabsContent>
+        
+        <TabsContent value="by-contest" className="pt-4">
+          <ContestStatsServer 
+            states={states} 
+            zones={zones} 
+            searchParams={{
+              zoneId: typeof searchParams.zoneId === 'string' ? searchParams.zoneId : undefined,
+              stateId: typeof searchParams.stateId === 'string' ? searchParams.stateId : undefined
+            }} 
+          />
         </TabsContent>
       </Tabs>
     </div>
