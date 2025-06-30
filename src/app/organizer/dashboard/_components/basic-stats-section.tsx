@@ -60,8 +60,8 @@ export default async function BasicStatsSection({ isAdmin = false }: { isAdmin?:
   // Fetch contingent count separately to avoid blocking if it's slow
   const contingentCount = await prismaExecute(prisma => prisma.contingent.count());
   
-  // Fetch contestant count separately
-  const contestantCount = await prismaExecute(prisma => prisma.contestant.count());
+  // Fetch teams count
+  const teamsCount = await prismaExecute(prisma => prisma.team.count());
 
   // Format numbers with ###,##0 format
   const formatNumber = (num: number): string => {
@@ -85,10 +85,10 @@ export default async function BasicStatsSection({ isAdmin = false }: { isAdmin?:
         linkText="View all"
       />
       <StatsCard 
-        title="Contestants" 
-        value={formatNumber(contestantCount)} 
+        title="Teams" 
+        value={formatNumber(teamsCount)} 
         icon={UsersRound} 
-        link="/organizer/contestants"
+        link="/organizer/teams"
         linkText="View all"
       />
       <StatsCard 
