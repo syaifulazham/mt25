@@ -62,7 +62,7 @@ export function DownloadStatsDocxButton({ zoneId, zoneName }: DownloadStatsDocxB
       toast({
         title: 'Document Ready',
         description: 'Your DOCX document has been downloaded.',
-        variant: 'success',
+        variant: 'default',
       });
     } catch (error) {
       console.error('Download error:', error);

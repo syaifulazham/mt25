@@ -7,6 +7,7 @@ import { StateStatsTable } from "./state-stats-table";
 import { ContestStatsTable } from "./_components/contest-stats-table";
 import { ContestStatsClient } from "./_components/contest-stats-client";
 import { getContestStatistics } from "./_utils/contest-statistics";
+import { StatsDebugView } from "./_components/stats-debug-view";
 
 // Common type definitions
 type Zone = {
@@ -79,6 +80,7 @@ type StateStats = {
   primarySchoolTeams: number;
   secondarySchoolTeams: number;
   youthTeams: number;
+  independentContingents: number;
   independentContingentsWithU18: number;
   independentTeamsWithU18: number;
 };
@@ -95,13 +97,18 @@ export const metadata: Metadata = {
 
 async function getStatsForState(stateId: number): Promise<StateStats> {
   // Get all teams with their contingents and schools that match the state
+  // Only include teams that have eventcontestteam records
   const teams = await prismaExecute((prisma) => prisma.team.findMany({
     where: {
       OR: [
         { contingent: { school: { stateId } } },
         { contingent: { higherInstitution: { stateId } } },
         { contingent: { independent: { stateId } } }
-      ]
+      ],
+      // Filter to only include teams with eventcontestteam records
+      eventcontestteam: {
+        some: {}
+      }
     },
     select: {
       id: true,
@@ -116,6 +123,12 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
           },
           independent: true
         }
+      },
+      // Include eventcontestteam in the selection for debugging
+      eventcontestteam: {
+        select: {
+          id: true
+        }
       }
     }
   }));
@@ -129,59 +142,68 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
   });
   const contingentsCount = uniqueContingentIds.size;
 
-  // Extract unique schools from the teams that have registered for events
-  const uniqueSchoolIds = new Set<number>();
+  // Extract unique school contingents from the teams that have registered for events
+  const schoolContingentIds = new Set<number>();
+  const independentContingentIds = new Set<number>();
+  
   teams.forEach((team: any) => {
-    if (team.contingent?.school?.id) {
-      uniqueSchoolIds.add(team.contingent.school.id);
+    if (team.contingent?.id) {
+      if (team.contingent.contingentType === 'SCHOOL') {
+        schoolContingentIds.add(team.contingent.id);
+      } else if (team.contingent.contingentType === 'INDEPENDENT') {
+        independentContingentIds.add(team.contingent.id);
+      }
     }
   });
   
-  // Create an array of unique schools
-  const schools = Array.from(uniqueSchoolIds).map(id => {
-    return teams.find((team: any) => team.contingent?.school?.id === id)?.contingent.school;
-  }).filter(Boolean) as any[];
-
-  // Primary and secondary schools counts (from the unique schools list)
-  const primarySchools = schools.filter((school: { level: string }) => 
-    school.level?.toLowerCase() === "rendah" || 
-    school.level?.toLowerCase() === "primary" ||
-    school.level?.toLowerCase() === "sekolah rendah"
-  ).length;
+  // Get unique school contingents with their level information
+  const schoolContingents = Array.from(schoolContingentIds).map(id => {
+    const team = teams.find((team: any) => team.contingent?.id === id);
+    return team?.contingent;
+  }).filter(Boolean);
   
-  const secondarySchools = schools.filter((school: { level: string }) => 
-    school.level?.toLowerCase() === "menengah" || 
-    school.level?.toLowerCase() === "secondary" ||
-    school.level?.toLowerCase() === "sekolah menengah"
-  ).length;
+  // Primary and secondary schools counts based on contingent type SCHOOL
+  const primarySchools = schoolContingents.filter((contingent: any) => {
+    const level = contingent.school?.level?.toLowerCase();
+    return level === "rendah" || level === "primary" || level === "sekolah rendah";
+  }).length;
+  
+  const secondarySchools = schoolContingents.filter((contingent: any) => {
+    const level = contingent.school?.level?.toLowerCase();
+    return level === "menengah" || level === "secondary" || level === "sekolah menengah";
+  }).length;
 
-  // Teams counts (all teams registered for events from this state)
+  // Teams counts (all teams registered for events from this state - only with eventcontestteam)
   const teamCount = teams.length;
   
-  // School teams counts
+  // School teams counts - only teams with eventcontestteam records
   const primarySchoolTeams = teams.filter((team: any) => {
     const level = team.contingent?.school?.level?.toLowerCase();
-    return level === "rendah" || level === "primary" || level === "sekolah rendah";
+    return (level === "rendah" || level === "primary" || level === "sekolah rendah") && 
+           team.eventcontestteam && team.eventcontestteam.length > 0;
   }).length;
   
   const secondarySchoolTeams = teams.filter((team: any) => {
     const level = team.contingent?.school?.level?.toLowerCase();
-    return level === "menengah" || level === "secondary" || level === "sekolah menengah";
+    return (level === "menengah" || level === "secondary" || level === "sekolah menengah") && 
+           team.eventcontestteam && team.eventcontestteam.length > 0;
   }).length;
 
-  // Total school teams (contingentType !== INDEPENDENT)
+  // Total school teams (contingentType !== INDEPENDENT) with eventcontestteam records
   const schoolTeams = teams.filter((team: any) => 
-    team.contingent?.contingentType !== 'INDEPENDENT'
+    team.contingent?.contingentType !== 'INDEPENDENT' && team.eventcontestteam && team.eventcontestteam.length > 0
   ).length;
   
+  // Count unique independent contingents based on contingentType 'INDEPENDENT'
+  const independentContingentsCount = independentContingentIds.size;
+  
   // Count unique independent contingents with U18 members
-  // Use an array to track contingent IDs instead of a Set to avoid TypeScript errors
   const independentContingentIdsWithU18: number[] = [];
 
   teams.forEach((team: any) => {
     if (team.contingent?.contingentType === 'INDEPENDENT' && team.members) {
       const hasU18 = team.members.some((member: any) => {
-        return member.contestant.age < 18;
+        return member.contestant?.age < 18;
       });
       
       if (hasU18 && team.contingent.id && !independentContingentIdsWithU18.includes(team.contingent.id)) {
@@ -195,14 +217,16 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
   // Youth teams (from independent contingents - all members are under 18)
   const youthTeams = teams.filter((team: any) => 
     team.contingent?.contingentType === 'INDEPENDENT' && 
-    team.members?.every((member: any) => member.contestant.age < 18)
+    team.eventcontestteam && team.eventcontestteam.length > 0 &&
+    team.members?.every((member: any) => member.contestant?.age < 18)
   ).length;
   
   // Independent teams with U18 (at least one member under 18)
   const independentTeamsWithU18 = teams.filter((team: any) => 
     team.contingent?.contingentType === "INDEPENDENT" && 
+    team.eventcontestteam && team.eventcontestteam.length > 0 &&
     team.members?.some((member: any) => {
-      const age = member.contestant.age;
+      const age = member.contestant?.age;
       return age !== null && age !== undefined && age < 18;
     })
   ).length;
@@ -210,14 +234,15 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
   return {
     contingentsCount,
     teamCount,
-    schoolsCount: schools.length,
+    schoolsCount: schoolContingents.length,
     primarySchools,
     secondarySchools,
     schoolTeams,
     primarySchoolTeams,
     secondarySchoolTeams,
     youthTeams,
-    independentContingentsWithU18: independentContingentsWithU18,
+    independentContingents: independentContingentsCount,
+    independentContingentsWithU18,
     independentTeamsWithU18
   };
 }
@@ -295,38 +320,48 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
       };
     })
   );
+  
+  // Sort states by zone name first, then by state name
+  stateStats.sort((a, b) => {
+    // First compare zone names
+    const zoneComparison = a.state.zone.name.localeCompare(b.state.zone.name);
+    if (zoneComparison !== 0) {
+      return zoneComparison;
+    }
+    // If same zone, compare state names
+    return a.state.name.localeCompare(b.state.name);
+  });
 
   // Calculate total stats across all states
-  const totalStats = stateStats.reduce(
-    (acc: StateStats, { stats }: { state: State; stats: StateStats }) => {
-      return {
-        contingentsCount: acc.contingentsCount + stats.contingentsCount,
-        teamCount: acc.teamCount + stats.teamCount,
-        schoolsCount: acc.schoolsCount + stats.schoolsCount,
-        primarySchools: acc.primarySchools + stats.primarySchools,
-        secondarySchools: acc.secondarySchools + stats.secondarySchools,
-        schoolTeams: acc.schoolTeams + stats.schoolTeams,
-        primarySchoolTeams: acc.primarySchoolTeams + stats.primarySchoolTeams,
-        secondarySchoolTeams: acc.secondarySchoolTeams + stats.secondarySchoolTeams,
-        youthTeams: acc.youthTeams + stats.youthTeams,
-        independentContingentsWithU18: acc.independentContingentsWithU18 + stats.independentContingentsWithU18,
-        independentTeamsWithU18: acc.independentTeamsWithU18 + stats.independentTeamsWithU18
-      };
-    },
-    {
-      contingentsCount: 0,
-      teamCount: 0,
-      schoolsCount: 0,
-      primarySchools: 0,
-      secondarySchools: 0,
-      schoolTeams: 0,
-      primarySchoolTeams: 0,
-      secondarySchoolTeams: 0,
-      youthTeams: 0,
-      independentContingentsWithU18: 0,
-      independentTeamsWithU18: 0
-    }
-  );
+  const totalStats = stateStats.reduce((acc: StateStats, { stats }: { state: State; stats: StateStats }) => {
+    return {
+      contingentsCount: acc.contingentsCount + stats.contingentsCount,
+      teamCount: acc.teamCount + stats.teamCount,
+      schoolsCount: acc.schoolsCount + stats.schoolsCount,
+      primarySchools: acc.primarySchools + stats.primarySchools,
+      secondarySchools: acc.secondarySchools + stats.secondarySchools,
+      schoolTeams: acc.schoolTeams + stats.schoolTeams,
+      primarySchoolTeams: acc.primarySchoolTeams + stats.primarySchoolTeams,
+      secondarySchoolTeams: acc.secondarySchoolTeams + stats.secondarySchoolTeams,
+      youthTeams: acc.youthTeams + stats.youthTeams,
+      independentContingents: acc.independentContingents + stats.independentContingents,
+      independentContingentsWithU18: acc.independentContingentsWithU18 + stats.independentContingentsWithU18,
+      independentTeamsWithU18: acc.independentTeamsWithU18 + stats.independentTeamsWithU18
+    };
+  }, {
+    contingentsCount: 0,
+    teamCount: 0,
+    schoolsCount: 0,
+    primarySchools: 0,
+    secondarySchools: 0,
+    schoolTeams: 0,
+    primarySchoolTeams: 0,
+    secondarySchoolTeams: 0,
+    youthTeams: 0,
+    independentContingents: 0,
+    independentContingentsWithU18: 0,
+    independentTeamsWithU18: 0
+  } as StateStats);
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -438,10 +473,17 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
             searchParams={{
               zoneId: typeof searchParams.zoneId === 'string' ? searchParams.zoneId : undefined,
               stateId: typeof searchParams.stateId === 'string' ? searchParams.stateId : undefined
-            }} 
-          />
+            }} />
         </TabsContent>
       </Tabs>
+      
+      {/* Debug view for national summary data */}
+      <StatsDebugView 
+        stateStats={stateStats} 
+        totalStats={totalStats} 
+        zones={zones} 
+        states={states} 
+      />
     </div>
   );
 }

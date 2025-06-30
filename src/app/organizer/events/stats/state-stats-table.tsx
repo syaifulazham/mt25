@@ -11,6 +11,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { ContingentDataDebugger } from "./_components/contingent-data-debugger";
 
 type State = {
   id: number;
@@ -108,6 +109,9 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
   };
   
   const zoneGroups = getGroupedZones();
+
+  // Find the first zoneId from stats (if available)
+  const firstZoneId = stateStats.length > 0 ? stateStats[0]?.state.zone.id : 0;
 
   return (
     <>
@@ -308,6 +312,9 @@ export function StateStatsTable({ stateStats, totalStats }: StateStatsTableProps
           </TableBody>
         </Table>
       )}
+      
+      {/* Add the debugging component */}
+      {firstZoneId > 0 && <ContingentDataDebugger zoneId={firstZoneId} />}
     </>
   );
 }
