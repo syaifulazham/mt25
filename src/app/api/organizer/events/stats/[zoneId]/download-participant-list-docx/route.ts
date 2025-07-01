@@ -278,7 +278,7 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
     
     // If not authenticated via headers, try cookie-based authentication
     if (!isAuthenticated) {
-      console.log('Attempting cookie-based authentication...');
+      console.log('[download-participant-list-docx] Attempting cookie-based authentication...');
       const auth = await authenticateOrganizerApi(['ADMIN', 'OPERATOR']);
       
       if (!auth.success) {
