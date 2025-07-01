@@ -4,10 +4,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prismaExecute } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DownloadContingentSummaryButton } from "../_components/download-contingent-summary-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Baby, Rocket, Gamepad2 } from 'lucide-react';
-import { DownloadStatsDocxButton } from "../_components/download-stats-docx-button";
+import { DownloadModal } from "../_components/download-modal";
 import { getZoneStatistics } from "../_utils/zone-statistics";
 
 
@@ -170,15 +169,21 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
           <h1 className="text-3xl font-bold">{zone.name} Zone Statistics</h1>
         </div>
         <div>
-          <DownloadStatsDocxButton zoneId={zone.id} zoneName={zone.name} />
+          <DownloadModal 
+            zoneId={zone.id} 
+            zoneName={zone.name} 
+            hasContingentData={contingentSummary.length > 0} 
+          />
         </div>
       </div>
       
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-2xl">{summary?.schoolCount || 0}</CardTitle>
-            <CardDescription>Schools</CardDescription>
+            <CardTitle className="text-2xl">
+              {contingentSummary.reduce((total, state) => total + state.contingents.length, 0)}
+            </CardTitle>
+            <CardDescription>Contingents</CardDescription>
           </CardHeader>
         </Card>
         <Card>
@@ -204,11 +209,7 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
               Total participation statistics grouped by state and contingent
             </CardDescription>
           </div>
-          <div>
-            {contingentSummary.length > 0 && (
-              <DownloadContingentSummaryButton zoneId={zone.id} zoneName={zone.name} />
-            )}
-          </div>
+          {/* Download button moved to centralized modal */}
         </CardHeader>
         <CardContent>
           {contingentSummary.length === 0 ? (

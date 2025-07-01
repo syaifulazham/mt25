@@ -69,7 +69,7 @@ export function MobileMenu({ user }: MobileMenuProps) {
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={item.href || "#"}
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center px-4 py-2 text-sm font-medium ${
                       isActive

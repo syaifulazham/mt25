@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { File, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
-interface DownloadContingentSummaryButtonProps {
+interface DownloadParticipantListButtonProps {
   zoneId: number;
   zoneName: string;
 }
 
-export function DownloadContingentSummaryButton({ zoneId, zoneName }: DownloadContingentSummaryButtonProps) {
+export function DownloadParticipantListButton({ zoneId, zoneName }: DownloadParticipantListButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDownload = async () => {
@@ -18,11 +18,11 @@ export function DownloadContingentSummaryButton({ zoneId, zoneName }: DownloadCo
       setIsLoading(true);
       toast({
         title: 'Preparing document',
-        description: 'Your contingent summary document is being generated...',
+        description: 'Your participant list document is being generated...',
       });
 
       const response = await fetch(
-        `/api/organizer/events/stats/${zoneId}/download-contingent-summary-docx`,
+        `/api/organizer/events/stats/${zoneId}/download-participant-list-docx`,
         {
           method: 'GET',
           headers: {
@@ -33,12 +33,12 @@ export function DownloadContingentSummaryButton({ zoneId, zoneName }: DownloadCo
       );
 
       if (!response.ok) {
-        throw new Error('Failed to generate document');
+        throw new Error('Failed to generate participant list document');
       }
 
       // Get the filename from the Content-Disposition header if available
       const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `${zoneName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_contingent_summary.docx`;
+      let filename = `${zoneName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_participant_list.docx`;
       
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename=["']?([^"';]*)/i);
@@ -61,14 +61,14 @@ export function DownloadContingentSummaryButton({ zoneId, zoneName }: DownloadCo
 
       toast({
         title: 'Document Ready',
-        description: 'Your contingent summary document has been downloaded.',
+        description: 'Your participant list document has been downloaded.',
         variant: 'default',
       });
     } catch (error) {
       console.error('Download error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to download the document. Please try again.',
+        description: 'Failed to download the participant list document. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -82,7 +82,7 @@ export function DownloadContingentSummaryButton({ zoneId, zoneName }: DownloadCo
       size="sm"
       onClick={handleDownload}
       disabled={isLoading}
-      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+      className="flex items-center gap-2"
     >
       {isLoading ? (
         <>
@@ -92,7 +92,7 @@ export function DownloadContingentSummaryButton({ zoneId, zoneName }: DownloadCo
       ) : (
         <>
           <File className="h-4 w-4" />
-          Zone Summary
+          Participant List
         </>
       )}
     </Button>

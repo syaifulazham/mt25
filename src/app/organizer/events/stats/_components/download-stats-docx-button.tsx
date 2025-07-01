@@ -92,7 +92,7 @@ export function DownloadStatsDocxButton({ zoneId, zoneName }: DownloadStatsDocxB
       ) : (
         <>
           <File className="h-4 w-4" />
-          Download DOCX
+          Zone Details
         </>
       )}
     </Button>
