@@ -81,6 +81,8 @@ type StateStats = {
   secondarySchoolTeams: number;
   youthTeams: number;
   independentContingents: number;
+  youthGroupContingents: number;
+  parentContingents: number;
   independentContingentsWithU18: number;
   independentTeamsWithU18: number;
 };
@@ -121,7 +123,11 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
               level: true
             }
           },
-          independent: true
+          independent: {
+            select: {
+              type: true
+            }
+          }
         }
       },
       // Include eventcontestteam in the selection for debugging
@@ -145,6 +151,8 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
   // Extract unique school contingents from the teams that have registered for events
   const schoolContingentIds = new Set<number>();
   const independentContingentIds = new Set<number>();
+  const youthGroupContingentIds = new Set<number>();
+  const parentContingentIds = new Set<number>();
   
   teams.forEach((team: any) => {
     if (team.contingent?.id) {
@@ -152,6 +160,13 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
         schoolContingentIds.add(team.contingent.id);
       } else if (team.contingent.contingentType === 'INDEPENDENT') {
         independentContingentIds.add(team.contingent.id);
+        
+        // Track independent contingent types
+        if (team.contingent.independent?.type === 'YOUTH_GROUP') {
+          youthGroupContingentIds.add(team.contingent.id);
+        } else if (team.contingent.independent?.type === 'PARENT') {
+          parentContingentIds.add(team.contingent.id);
+        }
       }
     }
   });
@@ -231,6 +246,10 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
     })
   ).length;
 
+  // Count youth group and parent contingents
+  const youthGroupContingentsCount = youthGroupContingentIds.size;
+  const parentContingentsCount = parentContingentIds.size;
+  
   return {
     contingentsCount,
     teamCount,
@@ -242,6 +261,8 @@ async function getStatsForState(stateId: number): Promise<StateStats> {
     secondarySchoolTeams,
     youthTeams,
     independentContingents: independentContingentsCount,
+    youthGroupContingents: youthGroupContingentsCount,
+    parentContingents: parentContingentsCount,
     independentContingentsWithU18,
     independentTeamsWithU18
   };
@@ -345,6 +366,8 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
       secondarySchoolTeams: acc.secondarySchoolTeams + stats.secondarySchoolTeams,
       youthTeams: acc.youthTeams + stats.youthTeams,
       independentContingents: acc.independentContingents + stats.independentContingents,
+      youthGroupContingents: acc.youthGroupContingents + stats.youthGroupContingents,
+      parentContingents: acc.parentContingents + stats.parentContingents,
       independentContingentsWithU18: acc.independentContingentsWithU18 + stats.independentContingentsWithU18,
       independentTeamsWithU18: acc.independentTeamsWithU18 + stats.independentTeamsWithU18
     };
@@ -359,6 +382,8 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
     secondarySchoolTeams: 0,
     youthTeams: 0,
     independentContingents: 0,
+    youthGroupContingents: 0,
+    parentContingents: 0,
     independentContingentsWithU18: 0,
     independentTeamsWithU18: 0
   } as StateStats);
@@ -392,6 +417,22 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
                         <dt>Total Contingents:</dt>
                         <dd className="font-semibold">{totalStats.contingentsCount}</dd>
                       </div>
+                      <div className="flex justify-between pl-4">
+                        <dt>School Contingents:</dt>
+                        <dd className="font-semibold">{totalStats.schoolsCount}</dd>
+                      </div>
+                      <div className="flex justify-between pl-4">
+                        <dt>Independent Contingents:</dt>
+                        <dd className="font-semibold">{totalStats.independentContingents}</dd>
+                      </div>
+                      <div className="flex justify-between pl-8">
+                        <dt>Youth Group:</dt>
+                        <dd className="font-semibold">{totalStats.youthGroupContingents}</dd>
+                      </div>
+                      <div className="flex justify-between pl-8">
+                        <dt>Parent:</dt>
+                        <dd className="font-semibold">{totalStats.parentContingents}</dd>
+                      </div>
                       <div className="flex justify-between">
                         <dt>Total Teams:</dt>
                         <dd className="font-semibold">{totalStats.teamCount}</dd>
@@ -417,10 +458,6 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
                       <div className="flex justify-between">
                         <dt>Secondary Schools:</dt>
                         <dd className="font-semibold">{totalStats.secondarySchools}</dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt>Independent with U18:</dt>
-                        <dd className="font-semibold">{totalStats.independentContingentsWithU18}</dd>
                       </div>
                     </dl>
                   </CardContent>
@@ -448,9 +485,41 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
                         <dt>Youth Teams:</dt>
                         <dd className="font-semibold">{totalStats.youthTeams}</dd>
                       </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-gray-50 dark:bg-gray-900">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Independent</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="space-y-2">
                       <div className="flex justify-between">
-                        <dt>Independent Teams with U18:</dt>
-                        <dd className="font-semibold">{totalStats.independentTeamsWithU18}</dd>
+                        <dt>Total Independent:</dt>
+                        <dd className="font-semibold">{totalStats.independentContingents}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>Youth Groups:</dt>
+                        <dd className="font-semibold">{totalStats.youthGroupContingents}</dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt>Parents:</dt>
+                        <dd className="font-semibold">{totalStats.parentContingents}</dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-gray-50 dark:bg-gray-900">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Independent Teams</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="space-y-2">
+                      <div className="flex justify-between">
+                        <dt>Youth Group Teams:</dt>
+                        <dd className="font-semibold">{totalStats.youthTeams}</dd>
                       </div>
                     </dl>
                   </CardContent>

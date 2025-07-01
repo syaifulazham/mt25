@@ -16,6 +16,7 @@ export type ZoneStatsResult = {
   zone: ZoneData | null;
   groupedData: SchoolLevelGroup[];
   summary: StatsSummary;
+  contingentSummary: StateContingentSummary[];
 };
 
 type SchoolData = {
@@ -103,6 +104,86 @@ export type ContestGroup = {
   stateGroups: StateGroup[];
 };
 
+export type ContingentSummaryItem = {
+  id: number;
+  displayName: string;
+  contingentType: string;
+  totalTeams: number;
+  totalContestants: number;
+};
+
+export type StateContingentSummary = {
+  stateId: number;
+  stateName: string;
+  contingents: ContingentSummaryItem[];
+};
+
+// Create summary data grouped by state and contingent
+function createStateSummary(groupedData: SchoolLevelGroup[]): StateContingentSummary[] {
+  const stateMap = new Map<number, { 
+    stateId: number; 
+    stateName: string; 
+    contingentSummaries: Map<number, ContingentSummaryItem>;
+  }>();
+  
+  // Process all data to extract contingent summaries by state
+  for (const schoolLevelGroup of groupedData) {
+    for (const contestGroup of schoolLevelGroup.contests) {
+      for (const stateGroup of contestGroup.stateGroups) {
+        // Get or create state entry
+        let stateSummary = stateMap.get(stateGroup.stateId);
+        if (!stateSummary) {
+          stateSummary = {
+            stateId: stateGroup.stateId,
+            stateName: stateGroup.stateName,
+            contingentSummaries: new Map()
+          };
+          stateMap.set(stateGroup.stateId, stateSummary);
+        }
+        
+        // Add contingent data
+        for (const contingent of stateGroup.contingents) {
+          let contingentSummary = stateSummary.contingentSummaries.get(contingent.id);
+          if (!contingentSummary) {
+            contingentSummary = {
+              id: contingent.id,
+              displayName: contingent.displayName,
+              contingentType: contingent.contingentType,
+              totalTeams: 0,
+              totalContestants: 0
+            };
+            stateSummary.contingentSummaries.set(contingent.id, contingentSummary);
+          }
+          
+          // Add teams and contestants
+          contingentSummary.totalTeams += contingent.teamsCount;
+          contingentSummary.totalContestants += contingent.contestantsCount;
+        }
+      }
+    }
+  }
+  
+  // Convert to array and sort states
+  const stateSummaries: StateContingentSummary[] = [];
+  
+  // Convert maps to arrays and sort
+  for (const [_, stateSummary] of stateMap.entries()) {
+    const contingents = Array.from(stateSummary.contingentSummaries.values());
+    contingents.sort((a, b) => a.displayName.localeCompare(b.displayName));
+    
+    stateSummaries.push({
+      stateId: stateSummary.stateId,
+      stateName: stateSummary.stateName,
+      contingents: contingents
+    });
+  }
+  
+  // Sort states by name
+  stateSummaries.sort((a, b) => a.stateName.localeCompare(b.stateName));
+  
+  return stateSummaries;
+}
+
 export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult> {
   // First, get the zone to ensure it exists
   const zone = await prismaExecute<ZoneData | null>((prisma) => prisma.zone.findUnique({
@@ -116,7 +197,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
   }));
   
   if (!zone) {
-    return { zone: null, groupedData: [], summary: { schoolCount: 0, teamCount: 0, contestantCount: 0 } };
+    return { zone: null, groupedData: [], summary: { schoolCount: 0, teamCount: 0, contestantCount: 0 }, contingentSummary: [] };
   }
   
   // Get all states in this zone
@@ -206,7 +287,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
   ];
   
   if (contingentIds.length === 0) {
-    return { zone, groupedData: [], summary: { schoolCount: 0, teamCount: 0, contestantCount: 0 } };
+    return { zone, groupedData: [], summary: { schoolCount: 0, teamCount: 0, contestantCount: 0 }, contingentSummary: [] };
   }
 
   // Create a state ID map for independent contingents without additional queries
@@ -420,9 +501,13 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
     contestantCount: totalContestants
   };
 
+  // Create state-contingent summary
+  const contingentSummary = createStateSummary(groupedData);
+
   return {
     zone,
     groupedData,
-    summary
+    summary,
+    contingentSummary
   };
 }

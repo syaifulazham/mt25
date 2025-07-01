@@ -60,12 +60,18 @@ function getDisplayNameForSchoolLevel(schoolLevel: string | null): string {
  * @param stateId Optional state ID to filter by (more specific than zoneId)
  */
 export async function getContestStatistics(zoneId?: number, stateId?: number): Promise<ContestStatsResult> {
-  // Get all contests with their target groups
+  // Get all contests with their target groups - only including zone-level events
   const contests = await prismaExecute((prisma) => prisma.contest.findMany({
     include: {
       targetgroup: true,
       eventcontests: {
+        where: {
+          event: {
+            scopeArea: 'ZONE'
+          }
+        },
         include: {
+          event: true,
           eventcontestteam: {
             include: {
               team: {

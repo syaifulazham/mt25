@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prismaExecute } from "@/lib/prisma";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DownloadContingentSummaryButton } from "../_components/download-contingent-summary-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Baby, Rocket, Gamepad2 } from 'lucide-react';
 import { DownloadStatsDocxButton } from "../_components/download-stats-docx-button";
@@ -151,7 +152,7 @@ function getSchoolLevelInfo(schoolLevel: string): SchoolLevelMapping {
 }
 
 export default async function ZoneStatsPage({ params }: { params: { zoneId: string } }) {
-  const { zone, groupedData, summary } = await getZoneStatistics(parseInt(params.zoneId));
+  const { zone, groupedData, summary, contingentSummary } = await getZoneStatistics(parseInt(params.zoneId));
   
   if (!zone) {
     notFound();
@@ -193,6 +194,72 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
           </CardHeader>
         </Card>
       </div>
+
+      {/* Summary by Contingent Table Section */}
+      <Card className="mt-6 bg-green-50 border-green-200">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Summary by Contingent</CardTitle>
+            <CardDescription>
+              Total participation statistics grouped by state and contingent
+            </CardDescription>
+          </div>
+          <div>
+            {contingentSummary.length > 0 && (
+              <DownloadContingentSummaryButton zoneId={zone.id} zoneName={zone.name} />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {contingentSummary.length === 0 ? (
+            <p>No data available.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[200px]">State</TableHead>
+                  <TableHead>Contingent</TableHead>
+                  <TableHead className="text-right">Teams</TableHead>
+                  <TableHead className="text-right">Contestants</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contingentSummary.map((stateSummary) => (
+                  <React.Fragment key={stateSummary.stateId}>
+                    {stateSummary.contingents.map((contingent, i) => (
+                      <TableRow key={contingent.id}>
+                        {i === 0 ? (
+                          <TableCell rowSpan={stateSummary.contingents.length} className="font-medium align-top">
+                            <Link 
+                              href={`/organizer/events/stats/${zone.id}/${stateSummary.stateId}`}
+                              className="text-blue-500 hover:text-blue-700 hover:underline"
+                            >
+                              {stateSummary.stateName}
+                            </Link>
+                          </TableCell>
+                        ) : null}
+                        <TableCell>
+                          <Link 
+                            href={`/organizer/events/stats/${zone.id}/${stateSummary.stateId}/${contingent.id}`}
+                            className="text-blue-500 hover:text-blue-700 hover:underline"
+                          >
+                            {contingent.displayName}
+                          </Link>
+                          <div className="text-xs text-gray-500">
+                            {contingent.contingentType === 'SCHOOL' ? 'School' : 'Independent'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{contingent.totalTeams}</TableCell>
+                        <TableCell className="text-right">{contingent.totalContestants}</TableCell>
+                      </TableRow>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
       
       {groupedData.length === 0 ? (
         <Card>

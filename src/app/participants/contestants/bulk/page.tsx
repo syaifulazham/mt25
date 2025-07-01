@@ -50,6 +50,8 @@ export default function BulkUploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
   const [activeStep, setActiveStep] = useState<'upload' | 'verify' | 'confirm'>('upload');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
@@ -205,6 +207,9 @@ export default function BulkUploadPage() {
       batches.push(validRecords.slice(i, i + BATCH_SIZE));
     }
     
+    // Set total chunks for progress tracking
+    setTotalChunks(batches.length);
+    
     // Track overall results
     const overallResults = {
       success: 0,
@@ -224,6 +229,7 @@ export default function BulkUploadPage() {
         
         // Update progress based on batches completed
         setUploadProgress(Math.floor((batchesCompleted / totalBatches) * 100));
+        setCurrentChunk(batchesCompleted);
         
         // Show toast for each batch
         toast.info(`${t('contestant.bulk.uploading_batch')} ${i+1}/${totalBatches} (${batch.length} ${t('contestant.bulk.records')})`);
@@ -255,6 +261,7 @@ export default function BulkUploadPage() {
         
         batchesCompleted++;
         setUploadProgress(Math.floor((batchesCompleted / totalBatches) * 100));
+        setCurrentChunk(batchesCompleted);
         
         // Small delay between batches to avoid overwhelming the server
         if (i < batches.length - 1) {
@@ -271,6 +278,9 @@ export default function BulkUploadPage() {
       toast.error(t('contestant.bulk.error_uploading'));
     } finally {
       setIsUploading(false);
+      // Reset chunk tracking when upload is complete
+      setCurrentChunk(0);
+      setTotalChunks(0);
     }
   };
 
@@ -604,6 +614,7 @@ export default function BulkUploadPage() {
                 <div className="space-y-2 mt-4">
                   <Label>{t('contestant.bulk.validating')}</Label>
                   <Progress value={uploadProgress} className="h-2" />
+                  <p className="text-sm text-center text-muted-foreground">{uploadProgress}% {t('contestant.bulk.complete')}</p>
                 </div>
               )}
             </CardContent>
@@ -840,6 +851,10 @@ export default function BulkUploadPage() {
                 <div className="space-y-2 mt-4">
                   <Label>{t('contestant.bulk.uploading')}</Label>
                   <Progress value={uploadProgress} className="h-2" />
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-muted-foreground">{t('contestant.bulk.processing_chunks')}: {currentChunk}/{totalChunks}</span>
+                    <span className="text-muted-foreground">{uploadProgress}% {t('contestant.bulk.complete')}</span>
+                  </div>
                 </div>
               )}
             </CardContent>
