@@ -347,6 +347,12 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
 
   // Process data to extract school level and contest information
   const schoolLevelGroups = new Map<string, SchoolLevelGroup>();
+  
+  // Track unique contestants globally to avoid double counting
+  const globalUniqueContestants = new Set<number>();
+  
+  // Track unique contestants per contingent to calculate accurate counts
+  const contingentContestants = new Map<number, Set<number>>();
 
   // Process each team to collect school level, contest, and contingent data
   for (const team of teams) {
@@ -434,9 +440,22 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
         stateGroup.contingents.push(contingentEntry);
       }
 
-      // Update team and contestant counts
+      // Track unique contestants for this contingent
+      if (!contingentContestants.has(contingent.id)) {
+        contingentContestants.set(contingent.id, new Set<number>());
+      }
+      const contingentContestantSet = contingentContestants.get(contingent.id)!;
+      
+      // Add contestants to both global and contingent-specific sets
+      for (const member of team.members) {
+        globalUniqueContestants.add(member.contestantId);
+        contingentContestantSet.add(member.contestantId);
+      }
+
+      // Update team count (increment by 1 for each team)
       contingentEntry.teamsCount += 1;
-      contingentEntry.contestantsCount += team.members.length;
+      // Update contestant count to reflect unique contestants in this contingent
+      contingentEntry.contestantsCount = contingentContestantSet.size;
     }
   }
 
@@ -478,7 +497,6 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
   const uniqueContingentIds = new Set<number>();
   const uniqueSchoolContingentIds = new Set<number>();
   let totalTeams = 0;
-  let totalContestants = 0;
 
   for (const schoolLevelGroup of groupedData) {
     for (const contestGroup of schoolLevelGroup.contests) {
@@ -489,7 +507,6 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
             uniqueSchoolContingentIds.add(contingent.id);
           }
           totalTeams += contingent.teamsCount;
-          totalContestants += contingent.contestantsCount;
         }
       }
     }
@@ -498,7 +515,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
   const summary = {
     schoolCount: uniqueSchoolContingentIds.size,
     teamCount: totalTeams,
-    contestantCount: totalContestants
+    contestantCount: globalUniqueContestants.size // Use global unique contestants count
   };
 
   // Create state-contingent summary
