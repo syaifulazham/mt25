@@ -345,6 +345,54 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
     }
   })) as TeamData[];
 
+  // First, create a map to track unique teams and contestants per contingent
+  const contingentStats = new Map<number, {
+    uniqueTeams: Set<number>;
+    uniqueContestants: Set<number>;
+    contingentData: ContingentData;
+    stateId: number;
+  }>();
+
+  // Build contingent stats with unique teams and contestants
+  for (const team of teams) {
+    // Get state ID for this contingent
+    let stateId: number | undefined;
+    
+    // Check if this is a school contingent
+    const schoolContingent = schoolContingents.find(c => c.id === team.contingentId);
+    if (schoolContingent && schoolContingent.school && schoolContingent.school.stateId) {
+      stateId = schoolContingent.school.stateId;
+    } else {
+      // Assume this is an independent contingent
+      stateId = independentStateMap.get(team.contingentId);
+    }
+
+    // Skip if we couldn't determine the state
+    if (!stateId) continue;
+
+    // Find contingent data
+    const contingent = schoolContingent || independentContingents.find(c => c.id === team.contingentId);
+    if (!contingent) continue;
+
+    // Get or create contingent stats entry
+    let contingentStatEntry = contingentStats.get(team.contingentId);
+    if (!contingentStatEntry) {
+      contingentStatEntry = {
+        uniqueTeams: new Set<number>(),
+        uniqueContestants: new Set<number>(),
+        contingentData: contingent,
+        stateId
+      };
+      contingentStats.set(team.contingentId, contingentStatEntry);
+    }
+
+    // Add unique team and contestants
+    contingentStatEntry.uniqueTeams.add(team.id);
+    team.members.forEach(member => {
+      contingentStatEntry!.uniqueContestants.add(member.contestantId);
+    });
+  }
+
   // Process data to extract school level and contest information
   const schoolLevelGroups = new Map<string, SchoolLevelGroup>();
 
@@ -424,19 +472,22 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
           displayName = contingent.school.name;
         }
 
+        // Get the actual unique counts from our contingent stats
+        const contingentStatEntry = contingentStats.get(contingent.id);
+        const uniqueTeamsCount = contingentStatEntry ? contingentStatEntry.uniqueTeams.size : 0;
+        const uniqueContestantsCount = contingentStatEntry ? contingentStatEntry.uniqueContestants.size : 0;
+
         contingentEntry = {
           id: contingent.id,
           displayName,
           contingentType: contingent.contingentType,
-          teamsCount: 0,
-          contestantsCount: 0
+          teamsCount: uniqueTeamsCount,
+          contestantsCount: uniqueContestantsCount
         };
         stateGroup.contingents.push(contingentEntry);
       }
 
-      // Update team and contestant counts
-      contingentEntry.teamsCount += 1;
-      contingentEntry.contestantsCount += team.members.length;
+      // No need to update counts here anymore, as they're already set correctly above
     }
   }
 
