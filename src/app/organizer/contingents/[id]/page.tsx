@@ -580,18 +580,18 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                 <CardTitle className="text-base">Contingent Management</CardTitle>
                 
                 {/* Management Action Buttons */}
-                <div className="flex gap-2 mt-3">
+                <div className="flex flex-wrap gap-2 mt-3 w-full">
                   {/* Force change primary manager - NO AUTH CHECKS */}
                   {isAdmin && contingentWithDetails.managers.length > 1 && (
-                    <div className="flex gap-2">
-                      <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                    <div className="flex flex-wrap gap-2 w-full">
+                      <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
                         <ForcePrimaryManagerChanger 
                           contingentId={contingentWithDetails.id}
                           managers={contingentWithDetails.managers}
                         />
                       </div>
-                      <Link href={`/emergency-tools`}>
-                        <Button variant="outline" size="sm" className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-500">
+                      <Link href={`/emergency-tools`} className="flex-shrink-0">
+                        <Button variant="outline" size="sm" className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-500 px-3 py-1">
                           Emergency Tools
                         </Button>
                       </Link>
@@ -599,7 +599,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                   )}
                   {/* Direct admin override component with direct database auth */}
                   {isAdmin && adminEmail && contingentWithDetails.managers.length > 1 && (
-                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
                       <DirectAdminChanger 
                         contingentId={contingentWithDetails.id}
                         managers={contingentWithDetails.managers}
@@ -609,7 +609,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                   )}
                   {/* Standard admin component */}
                   {isAdmin && contingentWithDetails.managers.length > 1 && (
-                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
                       <AdminPrimaryManagerChanger 
                         contingentId={contingentWithDetails.id}
                         managers={contingentWithDetails.managers}
@@ -618,7 +618,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                   )}
                   {/* Regular component for all users */}
                   {contingentWithDetails.managers.length > 1 && (
-                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
                       <PrimaryManagerWrapper 
                         contingentId={contingentWithDetails.id}
                         managers={contingentWithDetails.managers}
