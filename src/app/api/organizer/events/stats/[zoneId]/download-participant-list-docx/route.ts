@@ -486,7 +486,7 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
             
             // Generated timestamp
             new Paragraph({
-              text: `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
+              text: `Generated on ${new Date().toLocaleDateString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })} at ${new Date().toLocaleTimeString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}`,
               alignment: AlignmentType.CENTER,
               spacing: { after: 400 }, // Add some space after the timestamp
             }),
