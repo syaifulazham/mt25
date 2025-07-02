@@ -7,6 +7,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   Award,
   Building2,
@@ -15,6 +16,7 @@ import {
   Edit,
   Mail,
   MapPin,
+  MoreHorizontal,
   Phone,
   School,
   ShieldAlert,
@@ -42,6 +44,14 @@ import { prismaExecute } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 import { redirect } from "next/navigation";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
 
 type PageProps = {
   params: {
@@ -581,42 +591,7 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                 
                 {/* Management Action Buttons */}
                 <div className="flex flex-wrap gap-2 mt-3 w-full">
-                  {/* Force change primary manager - NO AUTH CHECKS */}
-                  {isAdmin && contingentWithDetails.managers.length > 1 && (
-                    <div className="flex flex-wrap gap-2 w-full">
-                      <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
-                        <ForcePrimaryManagerChanger 
-                          contingentId={contingentWithDetails.id}
-                          managers={contingentWithDetails.managers}
-                        />
-                      </div>
-                      <Link href={`/emergency-tools`} className="flex-shrink-0">
-                        <Button variant="outline" size="sm" className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-500 px-3 py-1">
-                          Emergency Tools
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                  {/* Direct admin override component with direct database auth */}
-                  {isAdmin && adminEmail && contingentWithDetails.managers.length > 1 && (
-                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
-                      <DirectAdminChanger 
-                        contingentId={contingentWithDetails.id}
-                        managers={contingentWithDetails.managers}
-                        adminEmail={adminEmail}
-                      />
-                    </div>
-                  )}
-                  {/* Standard admin component */}
-                  {isAdmin && contingentWithDetails.managers.length > 1 && (
-                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
-                      <AdminPrimaryManagerChanger 
-                        contingentId={contingentWithDetails.id}
-                        managers={contingentWithDetails.managers}
-                      />
-                    </div>
-                  )}
-                  {/* Regular component for all users */}
+                  {/* Show Change Primary Manager button for all users */}
                   {contingentWithDetails.managers.length > 1 && (
                     <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black [&>button]:text-xs [&>button]:px-3 [&>button]:py-1 flex-shrink-0">
                       <PrimaryManagerWrapper 
@@ -624,6 +599,73 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                         managers={contingentWithDetails.managers}
                       />
                     </div>
+                  )}
+                  
+                  {/* Admin Actions Modal - Only for admins */}
+                  {isAdmin && contingentWithDetails.managers.length > 1 && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="text-xs px-2 py-1 flex-shrink-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Advanced Management Actions</DialogTitle>
+                          <DialogDescription>
+                            Additional management options for this contingent.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          {/* Force change primary manager - NO AUTH CHECKS */}
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Force Change Primary Manager</h4>
+                            <div className="[&>button]:bg-red-600 [&>button]:hover:bg-red-700 [&>button]:text-white [&>button]:border-red-500">
+                              <ForcePrimaryManagerChanger 
+                                contingentId={contingentWithDetails.id}
+                                managers={contingentWithDetails.managers}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Direct admin override component */}
+                          {adminEmail && (
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium">Direct Admin Override</h4>
+                              <div className="[&>button]:bg-orange-600 [&>button]:hover:bg-orange-700 [&>button]:text-white [&>button]:border-orange-500">
+                                <DirectAdminChanger 
+                                  contingentId={contingentWithDetails.id}
+                                  managers={contingentWithDetails.managers}
+                                  adminEmail={adminEmail}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Standard admin component */}
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Admin Manager Changer</h4>
+                            <div className="[&>button]:bg-blue-600 [&>button]:hover:bg-blue-700 [&>button]:text-white [&>button]:border-blue-500">
+                              <AdminPrimaryManagerChanger 
+                                contingentId={contingentWithDetails.id}
+                                managers={contingentWithDetails.managers}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Emergency Tools */}
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Emergency Tools</h4>
+                            <Link href={`/emergency-tools`}>
+                              <Button variant="outline" size="sm" className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-500 w-full">
+                                <AlertTriangle className="h-4 w-4 mr-2" />
+                                Emergency Tools
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </div>
               </CardHeader>
