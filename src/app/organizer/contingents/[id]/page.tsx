@@ -576,16 +576,20 @@ export default async function ContingentDetailPage({ params }: PageProps) {
             
             {/* Contingent Managers */}
             <Card>
-              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">Contingent Management</CardTitle>
-                <div className="flex gap-2">
+                
+                {/* Management Action Buttons */}
+                <div className="flex gap-2 mt-3">
                   {/* Force change primary manager - NO AUTH CHECKS */}
                   {isAdmin && contingentWithDetails.managers.length > 1 && (
                     <div className="flex gap-2">
-                      <ForcePrimaryManagerChanger 
-                        contingentId={contingentWithDetails.id}
-                        managers={contingentWithDetails.managers}
-                      />
+                      <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                        <ForcePrimaryManagerChanger 
+                          contingentId={contingentWithDetails.id}
+                          managers={contingentWithDetails.managers}
+                        />
+                      </div>
                       <Link href={`/emergency-tools`}>
                         <Button variant="outline" size="sm" className="text-xs bg-red-600 hover:bg-red-700 text-white border-red-500">
                           Emergency Tools
@@ -595,25 +599,31 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                   )}
                   {/* Direct admin override component with direct database auth */}
                   {isAdmin && adminEmail && contingentWithDetails.managers.length > 1 && (
-                    <DirectAdminChanger 
-                      contingentId={contingentWithDetails.id}
-                      managers={contingentWithDetails.managers}
-                      adminEmail={adminEmail}
-                    />
+                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                      <DirectAdminChanger 
+                        contingentId={contingentWithDetails.id}
+                        managers={contingentWithDetails.managers}
+                        adminEmail={adminEmail}
+                      />
+                    </div>
                   )}
                   {/* Standard admin component */}
                   {isAdmin && contingentWithDetails.managers.length > 1 && (
-                    <AdminPrimaryManagerChanger 
-                      contingentId={contingentWithDetails.id}
-                      managers={contingentWithDetails.managers}
-                    />
+                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                      <AdminPrimaryManagerChanger 
+                        contingentId={contingentWithDetails.id}
+                        managers={contingentWithDetails.managers}
+                      />
+                    </div>
                   )}
                   {/* Regular component for all users */}
                   {contingentWithDetails.managers.length > 1 && (
-                    <PrimaryManagerWrapper 
-                      contingentId={contingentWithDetails.id}
-                      managers={contingentWithDetails.managers}
-                    />
+                    <div className="[&>button]:bg-black [&>button]:hover:bg-gray-800 [&>button]:text-white [&>button]:border-black">
+                      <PrimaryManagerWrapper 
+                        contingentId={contingentWithDetails.id}
+                        managers={contingentWithDetails.managers}
+                      />
+                    </div>
                   )}
                 </div>
               </CardHeader>
