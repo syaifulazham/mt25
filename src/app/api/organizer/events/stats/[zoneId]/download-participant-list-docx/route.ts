@@ -341,42 +341,54 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
 
     // Fetch all participants data from database with necessary joins
     const participants = await prismaExecute(async (prisma) => {
-      // First, find all teams in the zone through contingents
-      const teamsInZone = await prisma.team.findMany({
+      // First, find teams that are registered for event contests AND in the specified zone
+      const teamsWithEventContests = await prisma.team.findMany({
         where: {
-          OR: [
+          AND: [
             {
-              // Teams from school contingents
-              contingent: {
-                school: {
-                  state: {
-                    zone: {
-                      id: zoneId
-                    }
-                  }
-                }
+              // Teams must have event contest registrations
+              eventcontestteam: {
+                some: {}
               }
             },
             {
-              // Teams from independent contingents
-              contingent: {
-                independent: {
-                  state: {
-                    zone: {
-                      id: zoneId
+              OR: [
+                {
+                  // Teams from school contingents in the zone
+                  contingent: {
+                    school: {
+                      state: {
+                        zone: {
+                          id: zoneId
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  // Teams from independent contingents in the zone
+                  contingent: {
+                    independent: {
+                      state: {
+                        zone: {
+                          id: zoneId
+                        }
+                      }
                     }
                   }
                 }
-              }
+              ]
             }
           ]
         },
         select: { id: true }
       });
 
-      const teamIds = teamsInZone.map(team => team.id);
+      const teamIds = teamsWithEventContests.map(team => team.id);
       
-      // Then find all contestants in those teams
+      console.log(`[download-participant-list-docx] Found ${teamIds.length} teams with event contest registrations in zone ${zoneId}`);
+      
+      // Then find all contestants in those teams that have event contest registrations
       return prisma.contestant.findMany({
         where: {
           teamMembers: {
