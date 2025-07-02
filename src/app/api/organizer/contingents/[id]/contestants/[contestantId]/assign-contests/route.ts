@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prismaExecute } from "@/lib/prisma";
-import { getCurrentUser, hasRequiredRole, authenticateOrganizerApi } from "@/lib/auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/auth-options";
+import prisma from "@/lib/prisma";
 
 // Force dynamic rendering - required for routes that use cookies
 export const dynamic = 'force-dynamic';
@@ -8,42 +10,20 @@ export const dynamic = 'force-dynamic';
 // GET handler to fetch eligible contests for a contestant
 export async function GET(request: NextRequest, { params }: { params: { id: string, contestantId: string } }) {
   try {
-    // For this critical route, implement the same robust auth pattern as other organizer routes
-    // Check for special X-Admin-Access header with a secure key
-    const adminKey = process.env.ADMIN_ACCESS_KEY || 'techlympics2025-secure-admin-key';
-    const adminAccessHeader = request.headers.get('X-Admin-Access');
+    // Use NextAuth session authentication (same pattern as other working organizer APIs)
+    const session = await getServerSession(authOptions);
     
-    // Track authentication status
-    let isAuthenticated = false;
-    let user = null;
-    
-    // Check for admin bypass header - this allows direct access for admins
-    if (adminAccessHeader === adminKey) {
-      console.log('Using admin bypass authentication');
-      isAuthenticated = true;
-      user = { id: 999, role: 'ADMIN', name: 'Admin Override' };
-    }
-    // Also check traditional Authorization header as a fallback
-    else {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        console.log('Using Authorization header authentication');
-        isAuthenticated = true;
-        user = { id: 999, role: 'ADMIN', name: 'Admin Override' };
-      }
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // If not authenticated via headers, try cookie-based authentication
-    if (!isAuthenticated) {
-      console.log('Attempting cookie-based authentication...');
-      const auth = await authenticateOrganizerApi(['ADMIN', 'OPERATOR', 'PARTICIPANTS_MANAGER']);
-      
-      if (!auth.success) {
-        console.error(`API Auth Error: ${auth.message}`);
-        return NextResponse.json({ error: auth.message }, { status: auth.status });
-      }
-      
-      user = auth.user;
+    // Verify that the user is an organizer with appropriate role
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! }
+    });
+    
+    if (!user || !['ADMIN', 'OPERATOR', 'PARTICIPANTS_MANAGER'].includes(user.role)) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
     const contingentId = parseInt(params.id);
@@ -187,42 +167,20 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 // POST handler to update contest assignments
 export async function POST(request: NextRequest, { params }: { params: { id: string, contestantId: string } }) {
   try {
-    // For this critical route, implement the same robust auth pattern as other organizer routes
-    // Check for special X-Admin-Access header with a secure key
-    const adminKey = process.env.ADMIN_ACCESS_KEY || 'techlympics2025-secure-admin-key';
-    const adminAccessHeader = request.headers.get('X-Admin-Access');
+    // Use NextAuth session authentication (same pattern as other working organizer APIs)
+    const session = await getServerSession(authOptions);
     
-    // Track authentication status
-    let isAuthenticated = false;
-    let user = null;
-    
-    // Check for admin bypass header - this allows direct access for admins
-    if (adminAccessHeader === adminKey) {
-      console.log('Using admin bypass authentication');
-      isAuthenticated = true;
-      user = { id: 999, role: 'ADMIN', name: 'Admin Override' };
-    }
-    // Also check traditional Authorization header as a fallback
-    else {
-      const authHeader = request.headers.get('Authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        console.log('Using Authorization header authentication');
-        isAuthenticated = true;
-        user = { id: 999, role: 'ADMIN', name: 'Admin Override' };
-      }
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
-    // If not authenticated via headers, try cookie-based authentication
-    if (!isAuthenticated) {
-      console.log('Attempting cookie-based authentication...');
-      const auth = await authenticateOrganizerApi(['ADMIN', 'OPERATOR', 'PARTICIPANTS_MANAGER']);
-      
-      if (!auth.success) {
-        console.error(`API Auth Error: ${auth.message}`);
-        return NextResponse.json({ error: auth.message }, { status: auth.status });
-      }
-      
-      user = auth.user;
+    // Verify that the user is an organizer with appropriate role
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email! }
+    });
+    
+    if (!user || !['ADMIN', 'OPERATOR', 'PARTICIPANTS_MANAGER'].includes(user.role)) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
     const contingentId = parseInt(params.id);

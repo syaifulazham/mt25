@@ -21,7 +21,8 @@ import {
   Trash2,
   UserCog,
   UserRound,
-  Users
+  Users,
+  UserX
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,11 @@ import { AdminPrimaryManagerChanger } from "../_components/admin-primary-manager
 import { DirectAdminChanger } from "../_components/direct-admin-changer";
 import { ForcePrimaryManagerChanger } from "../_components/force-primary-manager-changer";
 import { EmergencyPrimaryManagerForm } from "../_components/emergency-primary-manager-form";
+import BulkAssignContestsButton from "../../participants/_components/bulk-assign-contests-button";
 import { prismaExecute } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/auth-options";
+import { redirect } from "next/navigation";
 
 type PageProps = {
   params: {
@@ -179,8 +183,16 @@ export default async function ContingentDetailPage({ params }: PageProps) {
   }
   
   try {
-    // Get current user to check if they're admin
-    const currentUser = await getCurrentUser();
+    // Get the session using Next Auth (same pattern as other organizer pages)
+    const session = await getServerSession(authOptions);
+    
+    // If not authenticated, redirect to login
+    if (!session || !session.user) {
+      redirect("/auth/organizer/login?redirect=/organizer/contingents/" + id);
+    }
+
+    // Get user from session
+    const currentUser = session.user;
     const isAdmin = currentUser?.role === 'ADMIN';
     const adminEmail = isAdmin ? currentUser.email : null;
     
@@ -285,6 +297,17 @@ export default async function ContingentDetailPage({ params }: PageProps) {
     if (!contingent) {
       notFound();
     }
+
+    // Count contestants without any contest assignments for this specific contingent
+    const contestantsWithoutContests = await prismaExecute(async (prisma) => {
+      const result = await prisma.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*) as count 
+        FROM contestant cont
+        LEFT JOIN contestParticipation cp ON cp.contestantId = cont.id
+        WHERE cont.contingentId = ${id} AND cp.id IS NULL
+      `;
+      return Number(result[0]?.count || 0);
+    });
 
     // Get pagination from searchParams or use defaults
     const pageSize = 5; // Number of items per page
@@ -480,6 +503,57 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
             </div>
+            
+            {/* Contestants without contests card */}
+            {contestantsWithoutContests > 0 && (
+              <Card className="border-orange-200 bg-orange-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <UserX className="h-5 w-5 text-orange-600" />
+                    Contestants Without Contests
+                  </CardTitle>
+                  <CardDescription>
+                    {contestantsWithoutContests} contestant{contestantsWithoutContests !== 1 ? 's' : ''} haven't been assigned to any contest yet
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-center">
+                      <div className="text-3xl font-bold text-orange-600 mb-1">
+                        {contestantsWithoutContests}
+                      </div>
+                      <span className="text-sm text-gray-600">
+                        Need Assignment
+                      </span>
+                    </div>
+                    {isAdmin ? (
+                      <BulkAssignContestsButton 
+                        contingentId={contingentWithDetails.id}
+                        contingentName={contingentWithDetails.name}
+                        contestantCount={contestantsWithoutContests}
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-500">Admin access required</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Show when no contestants without contests */}
+            {contestantsWithoutContests === 0 && (
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Award className="h-5 w-5 text-green-600" />
+                    All Contestants Assigned
+                  </CardTitle>
+                  <CardDescription>
+                    All contestants in this contingent have been assigned to contests.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            )}
             
             {/* Contest statistics */}
             <Card>
