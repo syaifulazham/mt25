@@ -442,7 +442,7 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
     <div className="container mx-auto px-4 py-6">
       <h1 className="text-2xl font-bold tracking-tight mb-4">Event Statistics</h1>
       
-      <Tabs defaultValue="by-state" className="mt-8">
+      <Tabs defaultValue={searchParams.tab?.toString() || "by-state"} className="mt-8">
         <TabsList className="mb-4">
           <TabsTrigger value="by-state">By State</TabsTrigger>
           <TabsTrigger value="by-contest">By Contest</TabsTrigger>
