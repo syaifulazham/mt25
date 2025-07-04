@@ -7,6 +7,7 @@ import { StateStatsTable } from "./state-stats-table";
 import { ContestStatsTable } from "./_components/contest-stats-table";
 import { ContestStatsClient } from "./_components/contest-stats-client";
 import { getContestStatistics } from "./_utils/contest-statistics";
+import { getStateStatistics } from "./_utils/state-statistics";
 import { StatsDebugView } from "./_components/stats-debug-view";
 
 // Common type definitions
@@ -328,10 +329,46 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
     }
   }));
 
+  // Get active event
+  const activeEvent = await prismaExecute((prisma) => prisma.event.findFirst({
+    where: { isActive: true },
+    select: { id: true }
+  }));
+
+  if (!activeEvent) {
+    throw new Error("No active event found");
+  }
+
   // State stats with total and with zones
   const stateStats = await Promise.all(
     states.map(async (state) => {
-      const stats = await getStatsForState(state.id);
+      // Use the refactored getStateStatistics utility that uses teams-raw-data API
+      // Pass the activeEvent object, not just the ID
+      const stateStatsResult = await getStateStatistics(activeEvent, state.id);
+      
+      // Map to the format expected by the StateStatsTable component
+      const stats = {
+        // Use the new contingent count fields from the backend
+        contingentsCount: stateStatsResult.summary.contingentCount || 0, // Total contingents
+        teamCount: stateStatsResult.summary.teamCount || 0,
+        schoolsCount: stateStatsResult.summary.schoolCount || 0,
+        // Map schoolLevel based on Rendah (Primary) and Menengah (Secondary)
+        primarySchools: stateStatsResult.summary.primarySchoolCount || 0,
+        secondarySchools: stateStatsResult.summary.secondarySchoolCount || 0,
+        // Map school teams from the backend API
+        schoolTeams: stateStatsResult.summary.schoolTeamsCount || 0,
+        primarySchoolTeams: stateStatsResult.summary.primarySchoolTeamsCount || 0,
+        secondarySchoolTeams: stateStatsResult.summary.secondarySchoolTeamsCount || 0,
+        youthTeams: 0,
+        // Use independentCount from the backend
+        independentContingents: stateStatsResult.summary.independentCount || 0,
+        // Use the new Youth Group and Parent counts from the backend
+        youthGroupContingents: stateStatsResult.summary.youthGroupCount || 0,
+        parentContingents: stateStatsResult.summary.parentCount || 0,
+        independentContingentsWithU18: 0,
+        independentTeamsWithU18: 0
+      };
+      
       return { 
         state: {
           ...state,
@@ -451,11 +488,11 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
                         <dt>Total Schools:</dt>
                         <dd className="font-semibold">{totalStats.schoolsCount}</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between pl-4">
                         <dt>Primary Schools:</dt>
                         <dd className="font-semibold">{totalStats.primarySchools}</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between pl-4">
                         <dt>Secondary Schools:</dt>
                         <dd className="font-semibold">{totalStats.secondarySchools}</dd>
                       </div>
@@ -473,15 +510,15 @@ export default async function EventStatsPage({ searchParams }: { searchParams: {
                         <dt>Total School Teams:</dt>
                         <dd className="font-semibold">{totalStats.schoolTeams}</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between pl-4">
                         <dt>Primary School Teams:</dt>
                         <dd className="font-semibold">{totalStats.primarySchoolTeams}</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between pl-4">
                         <dt>Secondary School Teams:</dt>
                         <dd className="font-semibold">{totalStats.secondarySchoolTeams}</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between pl-4">
                         <dt>Youth Teams:</dt>
                         <dd className="font-semibold">{totalStats.youthTeams}</dd>
                       </div>

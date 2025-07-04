@@ -97,7 +97,7 @@ function createHeaderRow() {
       new TableCell({
         children: [new Paragraph({ text: 'Name', alignment: AlignmentType.LEFT, heading: HeadingLevel.HEADING_4 })],
 
-        width: { size: 30, type: 'pct' },
+        width: { size: 50, type: 'pct' }, // Increased from 30% to 50% to provide more space for names
         borders: {
           bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
           top: { style: BorderStyle.NONE },
@@ -107,7 +107,7 @@ function createHeaderRow() {
       }),
       new TableCell({
         children: [new Paragraph({ text: 'IC', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
-        width: { size: 15, type: 'pct' },
+        width: { size: 20, type: 'pct' }, // Increased to fit 14 characters at font size 10
         borders: {
           bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
           top: { style: BorderStyle.NONE },
@@ -116,8 +116,8 @@ function createHeaderRow() {
         }
       }),
       new TableCell({
-        children: [new Paragraph({ text: 'Darjah/Tingkatan', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
-        width: { size: 25, type: 'pct' },
+        children: [new Paragraph({ text: 'Darjah/ Tingkatan', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })], // Added space after slash
+        width: { size: 20, type: 'pct' }, // Adjusted to fit 'Tingkatan' at font size 10
         borders: {
           bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
           top: { style: BorderStyle.NONE },
@@ -127,7 +127,7 @@ function createHeaderRow() {
       }),
       new TableCell({
         children: [new Paragraph({ text: 'Gender', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
-        width: { size: 25, type: 'pct' },
+        width: { size: 15, type: 'pct' }, // Adjusted to fit 'FEMALE' at font size 10
         borders: {
           bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
           top: { style: BorderStyle.NONE },
@@ -220,6 +220,59 @@ function createContingentTable(contingent: ContingentGroup) {
       insideVertical: { style: BorderStyle.NONE },
     },
     rows,
+  });
+}
+
+// Helper function to create summary counts table
+function createSummaryTable(contingentCount: number, teamCount: number, contestantCount: number) {
+  const borderColor = "D9D9D9"; // Light gray
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    alignment: AlignmentType.CENTER,
+    margins: { top: 100, bottom: 100, left: 100, right: 100 },
+    borders: {
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+      insideVertical: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+      top: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+      bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+      left: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+      right: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+    },
+    rows: [
+      // Header row
+      new TableRow({
+        tableHeader: true,
+        children: [
+          new TableCell({
+            children: [new Paragraph({ text: 'Contingents', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
+            width: { size: 33.33, type: 'pct' },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'Teams', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
+            width: { size: 33.33, type: 'pct' },
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: 'Contestants', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
+            width: { size: 33.33, type: 'pct' },
+          }),
+        ],
+      }),
+      // Data row
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ text: contingentCount.toString(), alignment: AlignmentType.CENTER })],
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: teamCount.toString(), alignment: AlignmentType.CENTER })],
+          }),
+          new TableCell({
+            children: [new Paragraph({ text: contestantCount.toString(), alignment: AlignmentType.CENTER })],
+          }),
+        ],
+      }),
+    ],
   });
 }
 
@@ -461,6 +514,28 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
     const groupedData = groupParticipantsByStateAndContingent(participantData);
     
     console.log(`[download-participant-list-docx] Grouped into ${groupedData.length} states`);
+    
+    // Calculate counts for summary table
+    let totalContingents = 0;
+    let totalTeams = new Set<number>(); // Use Set to track unique team IDs
+    
+    // Extract unique team IDs
+    // The participants data structure comes from the database query and contains team members
+    participants.forEach(participant => {
+      // Each contestant can be in multiple teams via team_member records
+      participant.teamMembers?.forEach(teamMember => {
+        if (teamMember.team?.id) {
+          totalTeams.add(teamMember.team.id);
+        }
+      });
+    });
+    
+    // Count unique contingents from grouped data
+    groupedData.forEach(stateGroup => {
+      totalContingents += stateGroup.contingents.length;
+    });
+    
+    console.log(`[download-participant-list-docx] Summary counts - Contingents: ${totalContingents}, Teams: ${totalTeams.size}, Contestants: ${participantData.length}`);
 
     // Generate the document
     const doc = new Document({
@@ -491,12 +566,18 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
               spacing: { after: 400 }, // Add some space after the timestamp
             }),
             
-            // Summary count
+            // Summary heading
             new Paragraph({
-              text: `Total Participants: ${participantData.length}`,
+              text: `Summary`,
               heading: HeadingLevel.HEADING_2,
               spacing: { before: 400, after: 200 },
             }),
+            
+            // Summary counts table
+            createSummaryTable(totalContingents, totalTeams.size, participantData.length),
+            
+            // Add spacing after summary table
+            new Paragraph({ spacing: { after: 400 } }),
             
             // State by state participant tables with separate tables for each contingent
             ...groupedData.flatMap(stateGroup => createStateGroupElements(stateGroup))

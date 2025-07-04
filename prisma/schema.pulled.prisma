@@ -1,0 +1,1015 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model analytics {
+  id        Int      @id @default(autoincrement())
+  metric    String
+  value     Float
+  createdAt DateTime @default(now())
+}
+
+model announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String   @db.Text
+  date        DateTime @default(now())
+  icon        String?
+  link        String?
+  linkText    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  userId      Int
+  user        user     @relation(fields: [userId], references: [id], map: "Announcement_userId_fkey")
+
+  @@index([userId], map: "Announcement_userId_fkey")
+}
+
+model contest {
+  id                   Int                        @id @default(autoincrement())
+  name                 String
+  code                 String                     @unique(map: "Contest_code_key")
+  description          String?                    @db.Text
+  contestType          contest_contestType
+  method               contest_method
+  judgingMethod        contest_judgingMethod
+  participation_mode   contest_participation_mode @default(INDIVIDUAL)
+  startDate            DateTime
+  endDate              DateTime
+  accessibility        Boolean                    @default(false)
+  minAge               Int?
+  maxAge               Int?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime
+  themeId              Int?
+  judgingTemplateId    Int?
+  eventId              Int?
+  maxMembersPerTeam    Int?                       @default(1)
+  event                event?                     @relation(fields: [eventId], references: [id], map: "Contest_eventId_fkey")
+  judgingtemplate      judgingtemplate?           @relation(fields: [judgingTemplateId], references: [id], map: "Contest_judgingTemplateId_fkey")
+  theme                theme?                     @relation(fields: [themeId], references: [id], map: "Contest_themeId_fkey")
+  contestParticipation contestParticipation[]
+  eventcontest         eventcontest[]
+  judging              judging[]
+  quiz                 quiz[]
+  result               result[]
+  submission           submission[]
+  team                 team[]
+  targetgroup          targetgroup[]              @relation("contesttotargetgroup")
+
+  @@index([eventId], map: "Contest_eventId_fkey")
+  @@index([judgingTemplateId], map: "Contest_judgingTemplateId_fkey")
+  @@index([themeId], map: "Contest_themeId_fkey")
+}
+
+model contestParticipation {
+  id           Int        @id @default(autoincrement())
+  contestId    Int
+  contestantId Int
+  registeredAt DateTime   @default(now())
+  status       String     @default("REGISTERED")
+  notes        String?
+  contest      contest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, contestantId])
+  @@index([contestId])
+  @@index([contestantId])
+}
+
+model contestant {
+  id                             Int                              @id @default(autoincrement())
+  name                           String
+  ic                             String?
+  email                          String?
+  phoneNumber                    String?
+  gender                         String
+  birthdate                      DateTime?
+  age                            Int?
+  edu_level                      String
+  class_grade                    String?
+  class_name                     String?
+  hashcode                       String?                          @unique
+  status                         String                           @default("ACTIVE")
+  contingentId                   Int
+  createdAt                      DateTime                         @default(now())
+  updatedAt                      DateTime
+  createdById                    Int?
+  updatedById                    Int?
+  is_ppki                        Boolean                          @default(false)
+  contestParticipation           contestParticipation[]
+  contingent                     contingent                       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  quiz_attempt                   quiz_attempt[]
+  submission                     submission[]
+  survey_answer                  survey_answer[]
+  survey_contestants_composition survey_contestants_composition[]
+  survey_submission_status       survey_submission_status[]
+  teamMember                     teamMember[]
+
+  @@index([contingentId], map: "contestant_contingentId_fkey")
+}
+
+model contingent {
+  id                   Int                 @id @default(autoincrement())
+  name                 String
+  schoolId             Int?
+  higherInstId         Int?
+  createdAt            DateTime            @default(now())
+  description          String?
+  updatedAt            DateTime
+  participantId        Int?
+  managedByParticipant Boolean             @default(true)
+  logoUrl              String?
+  short_name           String?
+  contingentType       String              @default("SCHOOL")
+  independentId        Int?
+  contestant           contestant[]
+  school               school?             @relation(fields: [schoolId], references: [id], map: "Contingent_schoolId_fkey")
+  higherinstitution    higherinstitution?  @relation(fields: [higherInstId], references: [id])
+  independent          independent?        @relation(fields: [independentId], references: [id])
+  user_participant     user_participant?   @relation(fields: [participantId], references: [id])
+  contingentManager    contingentManager[]
+  contingentRequest    contingentRequest[]
+  team                 team[]
+
+  @@index([schoolId], map: "Contingent_schoolId_fkey")
+  @@index([higherInstId])
+  @@index([independentId])
+  @@index([participantId])
+}
+
+model contingentManager {
+  id               Int              @id @default(autoincrement())
+  participantId    Int
+  contingentId     Int
+  isOwner          Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  contingent       contingent       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  user_participant user_participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, contingentId])
+  @@index([contingentId])
+  @@index([participantId])
+}
+
+model contingentRequest {
+  id               Int              @id @default(autoincrement())
+  contingentId     Int
+  participantId    Int
+  status           String           @default("PENDING")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  contingent       contingent       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  user_participant user_participant @relation(fields: [participantId], references: [id])
+
+  @@index([contingentId])
+  @@index([participantId])
+}
+
+model email_campaign {
+  id                 Int               @id @default(autoincrement())
+  campaign_name      String
+  description        String?           @db.Text
+  status             String            @default("DRAFT")
+  template_id        Int?
+  created_at         DateTime          @default(now())
+  updated_at         DateTime
+  scheduled_datetime DateTime?
+  completed_datetime DateTime?
+  created_by         Int?
+  total_recipients   Int               @default(0)
+  successful_sends   Int               @default(0)
+  failed_sends       Int               @default(0)
+  open_count         Int               @default(0)
+  click_count        Int               @default(0)
+  email_template     email_template?   @relation(fields: [template_id], references: [id])
+  email_outgoing     email_outgoing[]
+  email_recipient    email_recipient[]
+
+  @@index([template_id])
+}
+
+model email_outgoing {
+  id               Int              @id @default(autoincrement())
+  template_id      Int?
+  recipient_email  String
+  subject          String
+  content          String           @db.Text
+  delivery_status  String           @default("PENDING")
+  is_delivered     Boolean          @default(false)
+  is_read          Boolean          @default(false)
+  sent_at          DateTime?
+  read_at          DateTime?
+  error_message    String?          @db.Text
+  tracking_id      String?          @unique
+  created_at       DateTime         @default(now())
+  campaign_id      Int?
+  click_count      Int              @default(0)
+  first_clicked_at DateTime?
+  first_opened_at  DateTime?
+  last_clicked_at  DateTime?
+  last_opened_at   DateTime?
+  open_count       Int              @default(0)
+  recipient_id     Int?             @unique
+  email_campaign   email_campaign?  @relation(fields: [campaign_id], references: [id])
+  email_recipient  email_recipient? @relation(fields: [recipient_id], references: [id])
+  email_template   email_template?  @relation(fields: [template_id], references: [id])
+
+  @@index([campaign_id])
+  @@index([template_id], map: "email_outgoing_template_id_fkey")
+  @@index([tracking_id])
+}
+
+model email_recipient {
+  id             Int             @id @default(autoincrement())
+  campaign_id    Int
+  email          String
+  name           String?
+  source         String          @default("MANUAL")
+  source_id      Int?
+  status         String          @default("PENDING")
+  placeholders   Json?
+  sent_at        DateTime?
+  opened_at      DateTime?
+  clicked_at     DateTime?
+  email_outgoing email_outgoing?
+  email_campaign email_campaign  @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+
+  @@index([campaign_id])
+  @@index([email])
+}
+
+model email_template {
+  id                     Int              @id @default(autoincrement())
+  template_name          String
+  title                  String
+  content                String           @db.Text
+  subject                String
+  notes                  String?          @db.Text
+  delivery_type          String           @default("MANUAL")
+  scheduled_datetime     DateTime?
+  created_at             DateTime         @default(now())
+  updated_at             DateTime
+  created_by             Int?
+  is_active              Boolean          @default(true)
+  category               String?
+  available_placeholders String?          @db.Text
+  email_campaign         email_campaign[]
+  email_outgoing         email_outgoing[]
+}
+
+model event {
+  id           Int             @id @default(autoincrement())
+  name         String
+  scopeArea    event_scopeArea @default(OPEN)
+  code         String          @unique(map: "Event_code_key")
+  description  String?
+  startDate    DateTime
+  endDate      DateTime
+  venue        String?
+  address      String?
+  city         String?
+  addressState String?
+  zoneId       Int?
+  stateId      Int?
+  latitude     Float?
+  longitude    Float?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime
+  contest      contest[]
+  state        state?          @relation(fields: [stateId], references: [id])
+  zone         zone?           @relation(fields: [zoneId], references: [id])
+  eventcontest eventcontest[]
+
+  @@index([stateId], map: "event_stateId_fkey")
+  @@index([zoneId], map: "event_zoneId_fkey")
+}
+
+model eventcontest {
+  id                    Int                 @id @default(autoincrement())
+  eventId               Int
+  contestId             Int
+  maxteampercontingent  Int                 @default(1)
+  person_incharge       String?
+  person_incharge_phone String?
+  isActive              Boolean             @default(true)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime
+  contest               contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  event                 event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventcontestjudge     eventcontestjudge[]
+  eventcontestteam      eventcontestteam[]
+  team                  team[]
+
+  @@unique([eventId, contestId])
+  @@index([contestId])
+  @@index([eventId])
+}
+
+model eventcontestjudge {
+  id             Int          @id @default(autoincrement())
+  eventcontestId Int
+  userId         Int
+  isChiefJudge   Boolean      @default(false)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime
+  eventcontest   eventcontest @relation(fields: [eventcontestId], references: [id], onDelete: Cascade)
+  user           user         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventcontestId, userId])
+  @@index([eventcontestId])
+  @@index([userId])
+}
+
+model eventcontestteam {
+  id             Int          @id @default(autoincrement())
+  eventcontestId Int
+  teamId         Int
+  teamPriority   Int          @default(0)
+  status         String       @default("PENDING")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now())
+  eventcontest   eventcontest @relation(fields: [eventcontestId], references: [id], onDelete: Cascade)
+  team           team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([eventcontestId])
+  @@index([eventcontestId, teamId], map: "eventcontestteam_eventcontest_team_idx")
+  @@index([teamId])
+}
+
+model higherinstitution {
+  id               Int                @id @default(autoincrement())
+  name             String
+  code             String             @unique(map: "HigherInstitution_code_key")
+  address          String?
+  city             String?
+  postcode         String?
+  stateId          Int
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime           @default(now())
+  contingent       contingent[]
+  state            state              @relation(fields: [stateId], references: [id], map: "HigherInstitution_stateId_fkey")
+  user_participant user_participant[]
+
+  @@index([stateId], map: "HigherInstitution_stateId_fkey")
+}
+
+model independent {
+  id          Int          @id @default(autoincrement())
+  name        String
+  address     String?
+  town        String?
+  postcode    String?
+  stateId     Int
+  institution String?
+  type        String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  contingent  contingent[]
+  state       state        @relation(fields: [stateId], references: [id])
+
+  @@index([stateId])
+}
+
+model judging {
+  id                   Int                    @id @default(autoincrement())
+  submissionId         Int
+  score                Float
+  feedback             String?
+  contestId            Int
+  judgingTime          DateTime               @default(now())
+  judgeId              Int
+  contest              contest                @relation(fields: [contestId], references: [id], map: "Judging_contestId_fkey")
+  user                 user                   @relation(fields: [judgeId], references: [id], map: "Judging_judgeId_fkey")
+  submission           submission             @relation(fields: [submissionId], references: [id], map: "Judging_submissionId_fkey")
+  judgingcriteriascore judgingcriteriascore[]
+  result               result[]
+
+  @@index([contestId], map: "Judging_contestId_fkey")
+  @@index([judgeId], map: "Judging_judgeId_fkey")
+  @@index([submissionId], map: "Judging_submissionId_fkey")
+}
+
+model judgingcriteriascore {
+  id                  Int                                 @id @default(autoincrement())
+  judgingId           Int
+  criteriaName        String
+  criteriaDescription String?
+  evaluationType      judgingcriteriascore_evaluationType
+  weight              Int
+  score               Float
+  feedback            String?
+  discreteValue       String?
+  createdAt           DateTime                            @default(now())
+  judging             judging                             @relation(fields: [judgingId], references: [id], map: "JudgingCriteriaScore_judgingId_fkey")
+
+  @@index([judgingId], map: "JudgingCriteriaScore_judgingId_fkey")
+}
+
+model judgingtemplate {
+  id                      Int                          @id @default(autoincrement())
+  name                    String
+  description             String?
+  isDefault               Boolean                      @default(false)
+  contestType             judgingtemplate_contestType?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime
+  contest                 contest[]
+  judgingtemplatecriteria judgingtemplatecriteria[]
+}
+
+model judgingtemplatecriteria {
+  id                Int                                    @id @default(autoincrement())
+  name              String
+  description       String?
+  needsJuryCourtesy Boolean                                @default(false)
+  evaluationType    judgingtemplatecriteria_evaluationType
+  weight            Int                                    @default(1)
+  maxScore          Int?
+  discreteValues    String?
+  templateId        Int
+  createdAt         DateTime                               @default(now())
+  updatedAt         DateTime
+  judgingtemplate   judgingtemplate                        @relation(fields: [templateId], references: [id], onDelete: Cascade, map: "JudgingTemplateCriteria_templateId_fkey")
+
+  @@index([templateId], map: "JudgingTemplateCriteria_templateId_fkey")
+}
+
+model manager {
+  id               Int              @id @default(autoincrement())
+  name             String
+  ic               String
+  hashcode         String           @unique
+  teamId           Int?
+  createdAt        DateTime         @default(dbgenerated("(now(3))"))
+  updatedAt        DateTime
+  createdBy        Int
+  email            String?
+  phoneNumber      String?
+  user_participant user_participant @relation(fields: [createdBy], references: [id])
+  team             team?            @relation(fields: [teamId], references: [id])
+  manager_team     manager_team[]
+
+  @@index([createdBy])
+  @@index([teamId])
+}
+
+model manager_team {
+  id        Int      @id @default(autoincrement())
+  managerId Int
+  teamId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  manager   manager  @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  team      team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([managerId, teamId])
+  @@index([managerId])
+  @@index([teamId], map: "manager_team_teamId_fkey")
+}
+
+model news {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique(map: "News_slug_key")
+  excerpt     String   @db.Text
+  content     String   @db.LongText
+  coverImage  String?
+  date        DateTime @default(now())
+  readTime    String?
+  author      String?
+  featured    Boolean  @default(false)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  userId      Int
+  user        user     @relation(fields: [userId], references: [id], map: "News_userId_fkey")
+
+  @@index([userId], map: "News_userId_fkey")
+}
+
+model notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  createdAt DateTime @default(now())
+  user      user     @relation(fields: [userId], references: [id], map: "Notification_userId_fkey")
+
+  @@index([userId], map: "Notification_userId_fkey")
+}
+
+model photo {
+  id           Int          @id @default(autoincrement())
+  path         String
+  title        String?
+  description  String?      @db.Text
+  sortOrder    Int          @default(0)
+  galleryId    Int
+  createdAt    DateTime     @default(dbgenerated("(now(3))"))
+  updatedAt    DateTime
+  photogallery photogallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@index([galleryId])
+}
+
+model photogallery {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?  @db.Text
+  coverPhoto  String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(dbgenerated("(now(3))"))
+  updatedAt   DateTime
+  userId      Int
+  photo       photo[]
+  user        user     @relation(fields: [userId], references: [id], map: "PhotoGallery_userId_fkey")
+
+  @@index([userId], map: "PhotoGallery_userId_fkey")
+}
+
+model question_bank {
+  id              Int             @id @default(autoincrement())
+  target_group    String
+  knowledge_field String
+  question        String          @db.Text
+  question_image  String?
+  answer_type     String
+  answer_options  Json
+  answer_correct  String
+  createdBy       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  quiz_question   quiz_question[]
+
+  @@index([knowledge_field])
+  @@index([target_group])
+}
+
+model quiz {
+  id            Int             @id @default(autoincrement())
+  target_group  String
+  quiz_name     String
+  description   String?         @db.Text
+  time_limit    Int?
+  publishedAt   DateTime?
+  status        String
+  createdBy     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  contestId     Int?
+  contest       contest?        @relation(fields: [contestId], references: [id])
+  quiz_attempt  quiz_attempt[]
+  quiz_question quiz_question[]
+
+  @@index([contestId], map: "quiz_contestId_fkey")
+  @@index([status])
+  @@index([target_group])
+}
+
+model quiz_answer {
+  id               Int          @id @default(autoincrement())
+  attemptId        Int
+  questionId       Int
+  selected_options Json
+  is_correct       Boolean
+  points_earned    Int
+  createdAt        DateTime     @default(now())
+  quiz_attempt     quiz_attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId], map: "quiz_answer_attemptId_fkey")
+}
+
+model quiz_attempt {
+  id           Int           @id @default(autoincrement())
+  quizId       Int
+  contestantId Int
+  status       String
+  score        Int?
+  start_time   DateTime
+  end_time     DateTime?
+  time_taken   Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime
+  submissionId Int?
+  quiz_answer  quiz_answer[]
+  contestant   contestant    @relation(fields: [contestantId], references: [id])
+  quiz         quiz          @relation(fields: [quizId], references: [id])
+  submission   submission?   @relation(fields: [submissionId], references: [id])
+
+  @@index([contestantId])
+  @@index([quizId])
+  @@index([submissionId])
+}
+
+model quiz_question {
+  id            Int           @id @default(autoincrement())
+  quizId        Int
+  questionId    Int
+  order         Int
+  points        Int           @default(1)
+  question_bank question_bank @relation(fields: [questionId], references: [id])
+  quiz          quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionId])
+  @@index([questionId])
+  @@index([quizId])
+}
+
+model referencedata {
+  id          Int      @id @default(autoincrement())
+  type        String
+  code        String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@unique([type, code], map: "ReferenceData_type_code_key")
+}
+
+model result {
+  id           Int        @id @default(autoincrement())
+  contestId    Int
+  score        Float
+  rank         Int?
+  createdAt    DateTime   @default(now())
+  judgingId    Int
+  submissionId Int
+  updatedAt    DateTime
+  contest      contest    @relation(fields: [contestId], references: [id], map: "Result_contestId_fkey")
+  judging      judging    @relation(fields: [judgingId], references: [id], map: "Result_judgingId_fkey")
+  submission   submission @relation(fields: [submissionId], references: [id], map: "Result_submissionId_fkey")
+
+  @@index([contestId], map: "Result_contestId_fkey")
+  @@index([judgingId], map: "Result_judgingId_fkey")
+  @@index([submissionId], map: "Result_submissionId_fkey")
+}
+
+model school {
+  id               Int                @id @default(autoincrement())
+  name             String
+  ppd              String?
+  code             String             @unique(map: "School_code_key")
+  address          String?            @db.Text
+  city             String?
+  postcode         String?
+  stateId          Int
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime           @default(now())
+  category         String
+  level            String
+  contingent       contingent[]
+  state            state              @relation(fields: [stateId], references: [id], map: "School_stateId_fkey")
+  user_participant user_participant[]
+
+  @@index([stateId], map: "School_stateId_fkey")
+}
+
+model state {
+  id                Int                 @id @default(autoincrement())
+  name              String              @unique(map: "State_name_key")
+  zoneId            Int
+  event             event[]
+  higherinstitution higherinstitution[]
+  independent       independent[]
+  school            school[]
+  zone              zone                @relation(fields: [zoneId], references: [id], map: "State_zoneId_fkey")
+
+  @@index([zoneId], map: "State_zoneId_fkey")
+}
+
+model submission {
+  id               Int               @id @default(autoincrement())
+  contestId        Int
+  userId           Int?
+  submittedAt      DateTime          @default(now())
+  status           submission_status @default(PENDING)
+  metadata         Json?
+  participantId    Int?
+  contestantId     Int?
+  judging          judging[]
+  quiz_attempt     quiz_attempt[]
+  result           result[]
+  contest          contest           @relation(fields: [contestId], references: [id], map: "Submission_contestId_fkey")
+  user             user?             @relation(fields: [userId], references: [id], map: "Submission_userId_fkey")
+  contestant       contestant?       @relation(fields: [contestantId], references: [id])
+  user_participant user_participant? @relation(fields: [participantId], references: [id])
+
+  @@index([contestId], map: "Submission_contestId_fkey")
+  @@index([userId], map: "Submission_userId_fkey")
+  @@index([contestantId])
+  @@index([participantId])
+}
+
+model survey {
+  id                             Int                              @id @default(autoincrement())
+  name                           String
+  description                    String?                          @db.Text
+  status                         String                           @default("draft")
+  startDate                      DateTime?
+  endDate                        DateTime?
+  createdAt                      DateTime                         @default(now())
+  updatedAt                      DateTime
+  survey_answer                  survey_answer[]
+  survey_contestants_composition survey_contestants_composition[]
+  survey_question                survey_question[]
+  survey_submission_status       survey_submission_status[]
+
+  @@index([status])
+}
+
+model survey_answer {
+  id              Int             @id @default(autoincrement())
+  surveyId        Int
+  questionId      Int
+  contestantId    Int
+  answer          Json?
+  submittedAt     DateTime        @default(now())
+  contestant      contestant      @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  survey_question survey_question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  survey          survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([contestantId])
+  @@index([questionId])
+  @@index([surveyId, contestantId])
+  @@index([surveyId])
+}
+
+model survey_contestants_composition {
+  id           Int        @id @default(autoincrement())
+  surveyId     Int
+  contestantId Int
+  contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  survey       survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, contestantId])
+  @@index([contestantId])
+  @@index([surveyId])
+}
+
+model survey_question {
+  id            Int             @id @default(autoincrement())
+  surveyId      Int
+  question      String          @db.Text
+  questionType  String          @default("text")
+  options       Json?
+  isRequired    Boolean         @default(true)
+  displayOrder  Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  survey_answer survey_answer[]
+  survey        survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([surveyId, displayOrder])
+  @@index([surveyId])
+}
+
+model survey_submission_status {
+  id            Int        @id @default(autoincrement())
+  surveyId      Int
+  contestantId  Int
+  status        String     @default("not_started")
+  startedAt     DateTime?
+  completedAt   DateTime?
+  lastUpdatedAt DateTime   @default(now())
+  contestant    contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  survey        survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, contestantId])
+  @@index([contestantId])
+  @@index([status])
+  @@index([surveyId])
+}
+
+model targetgroup {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique(map: "TargetGroup_code_key")
+  name        String
+  ageGroup    String
+  schoolLevel String
+  maxAge      Int       @default(0)
+  minAge      Int       @default(0)
+  contest     contest[] @relation("contesttotargetgroup")
+}
+
+model team {
+  id                     Int                @id @default(autoincrement())
+  name                   String
+  hashcode               String             @unique
+  description            String?            @db.Text
+  contestId              Int
+  contingentId           Int
+  status                 String             @default("ACTIVE")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime
+  maxMembers             Int                @default(4)
+  eventcontestId         Int?
+  team_email             String?            @db.VarChar(255)
+  evidence_doc           String?            @db.Text
+  evidence_submitteddate DateTime?          @db.DateTime(0)
+  eventcontestteam       eventcontestteam[]
+  manager                manager[]
+  manager_team           manager_team[]
+  contest                contest            @relation(fields: [contestId], references: [id])
+  contingent             contingent         @relation(fields: [contingentId], references: [id])
+  eventcontest           eventcontest?      @relation(fields: [eventcontestId], references: [id])
+  teamManager            teamManager[]
+  teamMember             teamMember[]
+
+  @@index([contestId])
+  @@index([contingentId])
+  @@index([eventcontestId])
+}
+
+model teamManager {
+  id               Int              @id @default(autoincrement())
+  teamId           Int
+  participantId    Int
+  isOwner          Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  user_participant user_participant @relation(fields: [participantId], references: [id])
+  team             team             @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, participantId])
+  @@index([participantId])
+  @@index([teamId])
+}
+
+model teamMember {
+  id           Int        @id @default(autoincrement())
+  teamId       Int
+  contestantId Int
+  role         String?
+  joinedAt     DateTime   @default(now())
+  contestant   contestant @relation(fields: [contestantId], references: [id])
+  team         team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, contestantId])
+  @@index([contestantId])
+  @@index([teamId])
+}
+
+model theme {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique(map: "Theme_name_key")
+  color       String?
+  logoPath    String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  contest     contest[]
+}
+
+model user {
+  id                Int                 @id @default(autoincrement())
+  name              String?
+  email             String              @unique(map: "User_email_key")
+  password          String?
+  role              user_role           @default(ADMIN)
+  username          String              @unique(map: "User_username_key")
+  isActive          Boolean             @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  announcement      announcement[]
+  eventcontestjudge eventcontestjudge[]
+  judging           judging[]
+  news              news[]
+  notification      notification[]
+  photogallery      photogallery[]
+  submission        submission[]
+}
+
+model user_participant {
+  id                Int                 @id @default(autoincrement())
+  name              String
+  email             String              @unique
+  password          String?
+  username          String              @unique
+  ic                String?
+  phoneNumber       String?
+  gender            String?
+  dateOfBirth       DateTime?
+  schoolId          Int?
+  higherInstId      Int?
+  isActive          Boolean             @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  contingent        contingent[]
+  contingentManager contingentManager[]
+  contingentRequest contingentRequest[]
+  manager           manager[]
+  submission        submission[]
+  teamManager       teamManager[]
+  higherinstitution higherinstitution?  @relation(fields: [higherInstId], references: [id])
+  school            school?             @relation(fields: [schoolId], references: [id])
+
+  @@index([higherInstId], map: "user_participant_higherInstId_fkey")
+  @@index([schoolId], map: "user_participant_schoolId_fkey")
+}
+
+model video {
+  id                Int      @id @default(autoincrement())
+  group_name        String
+  title             String
+  video_description String?  @db.Text
+  video_link        String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
+  isActive          Boolean  @default(true)
+}
+
+model zone {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique(map: "Zone_name_key")
+  event event[]
+  state state[]
+}
+
+enum event_scopeArea {
+  NATIONAL
+  ZONE
+  STATE
+  OPEN
+  DISTRICT
+}
+
+enum contest_contestType {
+  QUIZ
+  CODING
+  STRUCTURE_BUILDING
+  FASTEST_COMPLETION
+  POSTER_PRESENTATION
+  SCIENCE_PROJECT
+  ENGINEERING_DESIGN
+  ANALYSIS_CHALLENGE
+}
+
+enum judgingcriteriascore_evaluationType {
+  POINTS
+  TIME
+  DISCRETE
+}
+
+enum judgingtemplate_contestType {
+  QUIZ
+  CODING
+  STRUCTURE_BUILDING
+  FASTEST_COMPLETION
+  POSTER_PRESENTATION
+  SCIENCE_PROJECT
+  ENGINEERING_DESIGN
+  ANALYSIS_CHALLENGE
+}
+
+enum judgingtemplatecriteria_evaluationType {
+  POINTS
+  TIME
+  DISCRETE
+}
+
+enum submission_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum user_role {
+  ADMIN
+  OPERATOR
+  VIEWER
+  PARTICIPANTS_MANAGER
+  JUDGE
+}
+
+enum contest_method {
+  ONLINE
+  PHYSICAL
+}
+
+enum contest_judgingMethod {
+  AI
+  JURY
+  POINT_SCORE
+  TIME_COMPLETION
+}
+
+enum contest_participation_mode {
+  INDIVIDUAL
+  TEAM
+}

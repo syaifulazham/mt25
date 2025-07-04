@@ -150,8 +150,10 @@ function getSchoolLevelInfo(schoolLevel: string): SchoolLevelMapping {
   return schoolLevelMap[schoolLevel] || { displayName: schoolLevel, icon: Gamepad2 };
 }
 
-export default async function ZoneStatsPage({ params }: { params: { zoneId: string } }) {
-  const { zone, groupedData, summary, contingentSummary } = await getZoneStatistics(parseInt(params.zoneId));
+export default async function ZoneStatsPage({ params, searchParams }: { params: { zoneId: string }, searchParams: { [key: string]: string | string[] | undefined } }) {
+  const zoneId = Number(params.zoneId);
+  const showDebug = searchParams.debug === 'true';
+  const { zone, groupedData, summary, contingentSummary, rawTeamData } = await getZoneStatistics(zoneId);
   
   if (!zone) {
     notFound();
@@ -159,6 +161,109 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
   
   return (
     <div className="p-6 space-y-6">
+      {/* Debug data section */}
+      {showDebug && rawTeamData && (
+        <div className="border border-red-500 p-4 bg-red-50 rounded-md">
+          <h2 className="text-xl font-bold text-red-700 mb-2">🛠️ Debug: Raw Team Data</h2>
+          <div className="mb-4">
+            <p className="font-semibold">Total teams in raw data: {rawTeamData.length}</p>
+            <p className="font-semibold">Teams counted in stats (with members {`>`} 0): {rawTeamData.filter(t => t.numberOfMembers > 0).length}</p>
+            <p className="text-amber-600">Note: Statistics only count teams with at least one member. Empty teams are excluded from statistics but shown in this debug view.</p>
+            
+            <h3 className="font-semibold mt-2">Teams by member count:</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {Array.from(new Set(rawTeamData.map(t => t.numberOfMembers)))
+                .sort((a, b) => a - b)
+                .map(count => {
+                  const teamsWithThisCount = rawTeamData.filter(t => t.numberOfMembers === count);
+                  return (
+                    <div key={count} className="border p-2 rounded">
+                      <span className="font-medium">{count} members:</span> {teamsWithThisCount.length} teams
+                      {count === 0 && <span className="text-red-500 ml-1">(empty)</span>}
+                    </div>
+                  );
+                })}
+            </div>
+            
+            <h3 className="font-semibold mt-2">Teams by contest:</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {Array.from(new Set(rawTeamData.map(t => t.contestName)))
+                .sort()
+                .map(contestName => {
+                  const teamsInContest = rawTeamData.filter(t => t.contestName === contestName);
+                  return (
+                    <div key={contestName} className="border p-2 rounded">
+                      <span className="font-medium">{contestName}:</span> {teamsInContest.length} teams
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+          
+          <details className="mb-4">
+            <summary className="cursor-pointer font-semibold text-red-700">Show teams with 0 members</summary>
+            <div className="mt-2 overflow-auto max-h-60">
+              <table className="w-full border-collapse border">
+                <thead>
+                  <tr className="bg-red-100">
+                    <th className="border p-1">Team ID</th>
+                    <th className="border p-1">Team Name</th>
+                    <th className="border p-1">Contingent</th>
+                    <th className="border p-1">Contest</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawTeamData
+                    .filter(team => team.numberOfMembers === 0)
+                    .map(team => (
+                      <tr key={team.teamId}>
+                        <td className="border p-1">{team.teamId}</td>
+                        <td className="border p-1">{team.teamName}</td>
+                        <td className="border p-1">{team.contingentName}</td>
+                        <td className="border p-1">{team.contestName}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+          
+          <details>
+            <summary className="cursor-pointer font-semibold text-red-700">Show all raw team data</summary>
+            <div className="mt-2 overflow-auto max-h-96">
+              <table className="w-full border-collapse border">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border p-1">Team ID</th>
+                    <th className="border p-1">Team Name</th>
+                    <th className="border p-1">Members</th>
+                    <th className="border p-1">Contest</th>
+                    <th className="border p-1">Contest Level</th>
+                    <th className="border p-1">Contingent</th>
+                    <th className="border p-1">Type</th>
+                    <th className="border p-1">State</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawTeamData.map(team => (
+                    <tr key={team.teamId} className={team.numberOfMembers === 0 ? "bg-red-50" : ""}>
+                      <td className="border p-1">{team.teamId}</td>
+                      <td className="border p-1">{team.teamName}</td>
+                      <td className="border p-1">{team.numberOfMembers}</td>
+                      <td className="border p-1">{team.contestName}</td>
+                      <td className="border p-1">{team.contestLevel}</td>
+                      <td className="border p-1">{team.contingentName}</td>
+                      <td className="border p-1">{team.contingentType}</td>
+                      <td className="border p-1">{team.stateName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -276,7 +381,7 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
           {groupedData.map((schoolLevelGroup: SchoolLevelGroup) => {
             const { displayName, icon: Icon } = getSchoolLevelInfo(schoolLevelGroup.schoolLevel);
             return (
-              <div key={schoolLevelGroup.schoolLevel} className="space-y-4 mb-10">
+              <div key={schoolLevelGroup.schoolLevel} className="space-y-4 mb-10 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-md">
                 <div className="bg-primary p-4 rounded-md">
                   <h2 className="text-2xl font-bold flex items-center gap-2 text-primary-foreground">
                     {Icon && <Icon size={24} className="text-primary-foreground" />}
@@ -296,6 +401,7 @@ export default async function ZoneStatsPage({ params }: { params: { zoneId: stri
                     {contestGroup.stateGroups.length === 0 ? (
                       <p>No data available for this contest.</p>
                     ) : (
+                      
                       <Table>
                         <TableHeader>
                           <TableRow>

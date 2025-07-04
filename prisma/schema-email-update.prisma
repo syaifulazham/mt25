@@ -1,0 +1,110 @@
+// New models for email campaign/project system
+
+// Add new email campaign model
+model email_campaign {
+  id                   Int                   @id @default(autoincrement())
+  campaign_name        String
+  description          String?               @db.Text
+  status               String                @default("DRAFT") // DRAFT, SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  template_id          Int?
+  created_at           DateTime              @default(now())
+  updated_at           DateTime              @updatedAt
+  scheduled_datetime   DateTime?
+  completed_datetime   DateTime?
+  created_by           Int?
+  total_recipients     Int                   @default(0)
+  successful_sends     Int                   @default(0)
+  failed_sends         Int                   @default(0)
+  open_count           Int                   @default(0)
+  click_count          Int                   @default(0)
+  
+  // Relations
+  template             email_template?       @relation(fields: [template_id], references: [id])
+  recipients           email_recipient[]
+  outgoing_emails      email_outgoing[]
+  
+  @@index([template_id])
+  @@map("email_campaign")
+}
+
+// Add new email recipient model
+model email_recipient {
+  id                   Int                   @id @default(autoincrement())
+  campaign_id          Int
+  email                String
+  name                 String?
+  source               String                @default("MANUAL") // CSV, PARTICIPANT, MANAGER, MANUAL
+  source_id            Int?                  // ID from the source table if applicable
+  status               String                @default("PENDING") // PENDING, SENT, FAILED, BOUNCED
+  placeholders         Json?                 // JSON object with placeholders for this recipient
+  sent_at              DateTime?
+  opened_at            DateTime?
+  clicked_at           DateTime?
+  
+  // Relations
+  campaign             email_campaign        @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+  outgoing_email       email_outgoing?       @relation("recipient_to_outgoing")
+  
+  @@index([campaign_id])
+  @@index([email])
+  @@map("email_recipient")
+}
+
+// Update existing email_template model to include relation to campaigns
+model email_template {
+  id                      Int              @id @default(autoincrement())
+  template_name           String
+  title                   String
+  subject                 String
+  content                 String           @db.Text
+  notes                   String?          @db.Text
+  delivery_type           String           @default("MANUAL") // MANUAL or SCHEDULED
+  scheduled_datetime      DateTime?
+  created_at              DateTime         @default(now())
+  updated_at              DateTime         @updatedAt
+  created_by              Int?
+  is_active               Boolean          @default(true)
+  category                String?
+  available_placeholders  String?          @db.Text
+  
+  // Relations
+  outgoing_emails         email_outgoing[]
+  campaigns               email_campaign[]
+  
+  @@map("email_template")
+}
+
+// Update existing email_outgoing model to link to campaigns and recipients
+model email_outgoing {
+  id                   Int                   @id @default(autoincrement())
+  campaign_id          Int?
+  recipient_id         Int?                  @unique // One recipient can have only one outgoing email per campaign
+  template_id          Int?
+  recipient_email      String
+  subject              String
+  content              String                @db.Text
+  delivery_status      String                @default("PENDING") // PENDING, SENT, FAILED, SCHEDULED
+  is_delivered         Boolean               @default(false)
+  is_read              Boolean               @default(false)
+  sent_at              DateTime?
+  read_at              DateTime?
+  error_message        String?               @db.Text
+  tracking_id          String?               @unique
+  created_at           DateTime              @default(now())
+  open_count           Int                   @default(0)
+  click_count          Int                   @default(0)
+  first_opened_at      DateTime?
+  last_opened_at       DateTime?
+  first_clicked_at     DateTime?
+  last_clicked_at      DateTime?
+  
+  // Relations
+  campaign             email_campaign?       @relation(fields: [campaign_id], references: [id])
+  template             email_template?       @relation(fields: [template_id], references: [id])
+  recipient            email_recipient?      @relation("recipient_to_outgoing", fields: [recipient_id], references: [id])
+  
+  @@index([campaign_id])
+  @@index([template_id])
+  @@index([tracking_id])
+  @@map("email_outgoing")
+}

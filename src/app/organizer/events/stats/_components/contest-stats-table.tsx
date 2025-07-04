@@ -33,13 +33,39 @@ type ContestStatsTableProps = {
 };
 
 export function ContestStatsTable({ 
-  groupedContests, 
-  summary, 
+  groupedContests: rawGroupedContests, 
+  summary: rawSummary, 
   zoneFilters,
   stateFilters,
   onFilterChange,
   currentFilters 
 }: ContestStatsTableProps) {
+  // Debug the grouped contests to see what we're actually receiving
+  console.log('[ContestStatsTable] Raw grouped contests received:', 
+    rawGroupedContests.map(g => ({
+      schoolLevel: g.schoolLevel,
+      displayName: g.displayName,
+      contestsCount: g.contests.length
+    })));
+
+  // Filter contests to exclude teams with no members (zero team count)
+  const groupedContests = rawGroupedContests.map(group => {
+    return {
+      ...group,
+      contests: group.contests.filter(contest => contest.teamCount > 0)
+    };
+  }).filter(group => group.contests.length > 0);
+
+  // Recalculate summary based on filtered contests
+  const summary = {
+    totalContests: groupedContests.reduce((sum, group) => sum + group.contests.length, 0),
+    totalTeams: groupedContests.reduce(
+      (sum, group) => sum + group.contests.reduce((subSum, contest) => subSum + contest.teamCount, 0), 
+      0
+    ),
+    totalContingents: rawSummary.totalContingents // Keep the original contingent count
+  };
+  
   // All unique education levels present in the data
   const allEduLevels = new Set<string>();
   groupedContests.forEach(group => {
@@ -194,7 +220,7 @@ export function ContestStatsTable({
         </Card>
       ) : (
         groupedContests.map((group) => (
-          <Card key={group.schoolLevel} className="mb-6">
+          <Card key={group.schoolLevel} className="mb-6 bg-blue-50 dark:bg-blue-900/20">
             <CardHeader className="py-4">
               <CardTitle className="text-xl">
                 {group.displayName}
@@ -240,11 +266,15 @@ export function ContestStatsTable({
                       <TableCell>GROUP TOTAL</TableCell>
                       <TableCell className="text-right">-</TableCell>
                       <TableCell className="text-right">
-                        {group.contests.reduce((sum, stat) => sum + stat.teamCount, 0)}
+                        {group.contests.reduce((sum, stat) => sum + (stat.teamCount || 0), 0)}
                       </TableCell>
                       {eduLevelArray.map((eduLevel) => {
                         const total = group.contests.reduce(
-                          (sum, stat) => sum + (stat.teamsByEduLevel[eduLevel] || 0),
+                          (sum, stat) => {
+                            // Handle potentially undefined teams or education levels
+                            if (!stat.teamsByEduLevel) return sum;
+                            return sum + (stat.teamsByEduLevel[eduLevel] || 0);
+                          },
                           0
                         );
                         return (
