@@ -10,7 +10,7 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ContestStat, SchoolLevelGroup } from "../_utils/contest-statistics";
+import { ContestItem, ContestLevelGroup, ContestStatsResult } from "../_utils/contest-statistics";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
@@ -20,11 +20,12 @@ type ZoneFilter = FilterOption;
 type StateFilter = FilterOption & { zoneId?: number };
 
 type ContestStatsTableProps = {
-  groupedContests: SchoolLevelGroup[];
+  groupedContests: ContestLevelGroup[];
   summary: {
     totalContests: number;
     totalTeams: number;
     totalContingents: number;
+    totalContestants: number;
   };
   zoneFilters: ZoneFilter[];
   stateFilters: StateFilter[];
@@ -40,21 +41,48 @@ export function ContestStatsTable({
   onFilterChange,
   currentFilters 
 }: ContestStatsTableProps) {
-  // Debug the grouped contests to see what we're actually receiving
+  // Enhanced debugging for grouped contests
   console.log('[ContestStatsTable] Raw grouped contests received:', 
-    rawGroupedContests.map(g => ({
-      schoolLevel: g.schoolLevel,
-      displayName: g.displayName,
+    rawGroupedContests?.map(g => ({
+      contestLevel: g.contestLevel,
       contestsCount: g.contests.length
     })));
+  
+  console.log('[ContestStatsTable] Full raw data structure:', JSON.stringify({
+    groupedContests: rawGroupedContests,
+    summary: rawSummary,
+    currentFilters
+  }, null, 2));
+  
+  // Check if we actually have data with contests
+  const hasRealData = rawGroupedContests && rawGroupedContests.some(group => 
+    group.contests && group.contests.length > 0
+  );
+  
+  console.log(`[ContestStatsTable] Has real data with contests: ${hasRealData}`);
+  
+  if (!rawGroupedContests) {
+    console.warn('[ContestStatsTable] Warning: groupedContests is undefined');
+  }
 
-  // Filter contests to exclude teams with no members (zero team count)
-  const groupedContests = rawGroupedContests.map(group => {
+  // Keep all contests regardless of team count to show complete data
+  console.log('[ContestStatsTable] Raw data before processing:', rawGroupedContests);
+  
+  // Avoid operations on undefined/null data
+  const groupedContests = (rawGroupedContests || []).map(group => {
+    if (!group || !group.contests) {
+      console.log('[ContestStatsTable] Missing group or contests in:', group);
+      return { contestLevel: group?.contestLevel || 'Unknown', contests: [], totals: { contingentCount: 0, teamCount: 0, contestantCount: 0 } };
+    }
+    
+    console.log(`[ContestStatsTable] Processing group ${group.contestLevel} with ${group.contests.length} contests`);
     return {
       ...group,
-      contests: group.contests.filter(contest => contest.teamCount > 0)
+      contests: group.contests // No filter applied - show all contests
     };
-  }).filter(group => group.contests.length > 0);
+  }).filter(group => group.contests && group.contests.length > 0); // Still filter out empty groups
+  
+  console.log('[ContestStatsTable] Processed groupedContests:', groupedContests);
 
   // Recalculate summary based on filtered contests
   const summary = {
@@ -66,23 +94,12 @@ export function ContestStatsTable({
     totalContingents: rawSummary.totalContingents // Keep the original contingent count
   };
   
-  // All unique education levels present in the data
-  const allEduLevels = new Set<string>();
-  groupedContests.forEach(group => {
-    group.contests.forEach(stat => {
-      Object.keys(stat.teamsByEduLevel).forEach(eduLevel => {
-        allEduLevels.add(eduLevel);
-      });
-    });
-  });
+  // Check if group has data
+  const groupHasData = (group: ContestLevelGroup) => {
+    return group.contests.some(c => c.teamCount > 0);
+  };
   
-  // Filter out specific education levels that should not be displayed
-  const excludedLevels = ['Menengah', 'Other', 'Rendah'];
-  const filteredEduLevels = [...allEduLevels].filter(level => 
-    !excludedLevels.some(excluded => level.includes(excluded))
-  );
-  
-  const eduLevelArray = filteredEduLevels.sort();
+  // In the new structure, we don't use education levels anymore
 
   // Local state for filters
   const [selectedZone, setSelectedZone] = useState<string | undefined>(
@@ -211,7 +228,7 @@ export function ContestStatsTable({
         </CardContent>
       </Card>
       
-      {/* Contest tables - grouped by school level */}
+      {/* Contest tables - grouped by level */}
       {groupedContests.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
@@ -219,77 +236,62 @@ export function ContestStatsTable({
           </CardContent>
         </Card>
       ) : (
-        groupedContests.map((group) => (
-          <Card key={group.schoolLevel} className="mb-6 bg-blue-50 dark:bg-blue-900/20">
-            <CardHeader className="py-4">
-              <CardTitle className="text-xl">
-                {group.displayName}
-              </CardTitle>
-              <CardDescription>
-                {group.contests.length} contest{group.contests.length !== 1 ? 's' : ''}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Contest</TableHead>
-                    <TableHead className="text-right">Contingents</TableHead>
-                    <TableHead className="text-right">Total Teams</TableHead>
-                    {eduLevelArray.map((eduLevel) => (
-                      <TableHead key={eduLevel} className="text-right">
-                        {eduLevel} Teams
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {group.contests.map((stat) => (
-                    <TableRow key={stat.contest.id}>
-                      <TableCell className="font-medium">
-                        <span className="font-bold text-muted-foreground mr-2">{stat.contest.code}</span>
-                        {stat.contest.name}
-                      </TableCell>
-                      <TableCell className="text-right">{stat.contingentsCount}</TableCell>
-                      <TableCell className="text-right">{stat.teamCount}</TableCell>
-                      {eduLevelArray.map((eduLevel) => (
-                        <TableCell key={eduLevel} className="text-right">
-                          {stat.teamsByEduLevel[eduLevel] || 0}
+        groupedContests.map((group) => 
+          groupHasData(group) && (
+            <Card key={group.contestLevel} className={cn(
+              "mb-6",
+              // Apply conditional styling based on level
+              group.contestLevel.toLowerCase().includes('kids') ? "bg-green-50 dark:bg-green-900/20" :
+              group.contestLevel.toLowerCase().includes('teens') ? "bg-blue-50 dark:bg-blue-900/20" :
+              group.contestLevel.toLowerCase().includes('youth') ? "bg-purple-50 dark:bg-purple-900/20" :
+              "bg-slate-50 dark:bg-slate-900/20"
+            )}>
+              <CardHeader className="py-4">
+                <CardTitle className="text-xl">
+                  {group.contestLevel}
+                </CardTitle>
+                <CardDescription>
+                  {group.contests.length} contest{group.contests.length !== 1 ? 's' : ''}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Contest</TableHead>
+                      <TableHead className="text-right">Contingents</TableHead>
+                      <TableHead className="text-right">Teams</TableHead>
+                      <TableHead className="text-right">Contestants</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {group.contests.map((contestItem) => (
+                      <TableRow key={contestItem.contestCode}>
+                        <TableCell className="font-medium">
+                          <span className="font-bold text-muted-foreground mr-2">{contestItem.contestCode}</span>
+                          {contestItem.contestName}
                         </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                  
-                  {/* Group summary row */}
-                  {group.contests.length > 0 && (
-                    <TableRow className="bg-slate-100 dark:bg-slate-800 font-medium">
-                      <TableCell>GROUP TOTAL</TableCell>
-                      <TableCell className="text-right">-</TableCell>
-                      <TableCell className="text-right">
-                        {group.contests.reduce((sum, stat) => sum + (stat.teamCount || 0), 0)}
-                      </TableCell>
-                      {eduLevelArray.map((eduLevel) => {
-                        const total = group.contests.reduce(
-                          (sum, stat) => {
-                            // Handle potentially undefined teams or education levels
-                            if (!stat.teamsByEduLevel) return sum;
-                            return sum + (stat.teamsByEduLevel[eduLevel] || 0);
-                          },
-                          0
-                        );
-                        return (
-                          <TableCell key={eduLevel} className="text-right">
-                            {total}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ))
+                        <TableCell className="text-right">{contestItem.contingentCount}</TableCell>
+                        <TableCell className="text-right">{contestItem.teamCount}</TableCell>
+                        <TableCell className="text-right">{contestItem.contestantCount}</TableCell>
+                      </TableRow>
+                    ))}
+                    
+                    {/* Group summary row */}
+                    {group.contests.length > 0 && (
+                      <TableRow className="bg-slate-100 dark:bg-slate-800 font-medium">
+                        <TableCell>GROUP TOTAL</TableCell>
+                        <TableCell className="text-right">{group.totals.contingentCount}</TableCell>
+                        <TableCell className="text-right">{group.totals.teamCount}</TableCell>
+                        <TableCell className="text-right">{group.totals.contestantCount}</TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )
+        )
       )}
       
       {/* Overall Summary row */}

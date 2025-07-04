@@ -3,18 +3,23 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ContestStatsTable } from "./contest-stats-table";
-import { SchoolLevelGroup } from "../_utils/contest-statistics";
+import { ContestLevelGroup } from "../_utils/contest-statistics";
+import { DebugRawDataButton } from "./debug-raw-data-button";
+
+// Debug imports
+import { useEffect as useEffectOnce } from "react";
 
 type FilterOption = { id: number; name: string };
 type ZoneFilter = FilterOption;
 type StateFilter = FilterOption & { zoneId?: number };
 
 type ContestStatsClientProps = {
-  groupedContests: SchoolLevelGroup[];
+  groupedContests: ContestLevelGroup[];
   summary: {
     totalContests: number;
     totalTeams: number;
     totalContingents: number;
+    totalContestants: number;
   };
   zoneFilters: ZoneFilter[];
   stateFilters: StateFilter[];
@@ -26,6 +31,16 @@ export function ContestStatsClient({
   zoneFilters,
   stateFilters,
 }: ContestStatsClientProps) {
+  console.log('[ContestStatsClient] Received props:', {
+    groupedContestsLength: groupedContests?.length || 0,
+    summary,
+    zoneFiltersLength: zoneFilters?.length || 0,
+    stateFiltersLength: stateFilters?.length || 0
+  });
+  
+  useEffectOnce(() => {
+    console.log('[ContestStatsClient] Detailed groupedContests:', JSON.stringify(groupedContests, null, 2));
+  }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -62,14 +77,28 @@ export function ContestStatsClient({
     router.push(newPath);
   };
 
+  // Get active event ID (assuming it's 1 for now, but ideally this should be passed from the server)
+  const activeEventId = 1;
+
   return (
-    <ContestStatsTable
-      groupedContests={groupedContests}
-      summary={summary}
-      zoneFilters={zoneFilters}
-      stateFilters={stateFilters}
-      onFilterChange={handleFilterChange}
-      currentFilters={currentFilters}
-    />
+    <div className="space-y-4">
+      <ContestStatsTable
+        groupedContests={groupedContests}
+        summary={summary}
+        zoneFilters={zoneFilters}
+        stateFilters={stateFilters}
+        onFilterChange={handleFilterChange}
+        currentFilters={currentFilters}
+      />
+      
+      {/* Debug button to show raw data */}
+      <div className="flex justify-end">
+        <DebugRawDataButton 
+          eventId={activeEventId} 
+          zoneId={currentFilters.zoneId} 
+          stateId={currentFilters.stateId}
+        />
+      </div>
+    </div>
   );
 }

@@ -1,12 +1,41 @@
 import { prismaExecute } from "@/lib/prisma";
-import { cookies } from "next/headers";
 
-interface TeamsRawDataApiResponse {
-  teams: TeamRawDataItem[];
-  totalCount: number;
-}
+/**
+ * Types for contest statistics
+ */
+export type ContestStatsResult = {
+  groupedContests: ContestLevelGroup[];
+  summary: ContestSummary;
+  zoneId?: number;
+  stateId?: number;
+};
 
-// Type for API response items
+export type ContestSummary = {
+  totalContests: number;
+  totalContingents: number;
+  totalTeams: number;
+  totalContestants: number;
+};
+
+export type ContestLevelGroup = {
+  contestLevel: string;
+  contests: ContestItem[];
+  totals: {
+    contingentCount: number;
+    teamCount: number;
+    contestantCount: number;
+  };
+};
+
+export type ContestItem = {
+  contestId: number;
+  contestName: string;
+  contestCode: string;
+  contingentCount: number;
+  teamCount: number;
+  contestantCount: number;
+};
+
 type TeamRawDataItem = {
   eventId: number;
   eventName: string;
@@ -23,678 +52,598 @@ type TeamRawDataItem = {
   teamId: number;
   teamName: string;
   numberOfMembers: number;
-  schoolLevel?: string | null;
-  independentType?: string | null;
-  contestLevel?: string | null;
+  contestLevel: string;
 };
 
-// Types for contest statistics
-export type ContestData = {
+type FilterClause = {
+  eventcontestFilter: Record<string, any>;
+  teamFilter: Record<string, any>;
+};
+
+type RawEventContestTeam = {
   id: number;
-  name: string;
-  code: string;
-  schoolLevel: string; // raw level from target group
-  displayLevel: string; // formatted display label
-};
-
-export type TeamsByEduLevel = {
-  [eduLevel: string]: number;
-};
-
-export type ContestStat = {
-  contest: ContestData;
-  contingentsCount: number;
-  teamCount: number;
-  contestantCount: number; // Added contestant count
-  teamsByEduLevel: TeamsByEduLevel;
-  contingentIds?: Set<number>; // Used internally for tracking unique contingents
-};
-
-// Group of contests by school level
-export type SchoolLevelGroup = {
-  schoolLevel: string; // raw level
-  displayName: string; // formatted display name
-  contests: ContestStat[];
-};
-
-export type ContestStatsResult = {
-  groupedContests: SchoolLevelGroup[];
-  summary: {
-    totalContests: number;
-    totalTeams: number;
-    totalContingents: number;
-    totalContestants: number;
+  teamId: number;
+  eventcontestId: number;
+  team?: any;
+  eventcontest?: {
+    id: number;
+    eventId: number;
+    contestId: number;
+    contest?: {
+      id: number;
+      name: string;
+      code: string;
+      targetgroup?: Array<{ schoolLevel: string; }>
+    };
+    event?: {
+      id: number;
+      name: string;
+    };
   };
-  stateId?: number;
-  zoneId?: number;
 };
 
 /**
- * Map raw school level to display name
+ * Create an empty result with standard contest level groups
  */
-function getDisplayNameForSchoolLevel(schoolLevel: string | null): string {
-  switch (schoolLevel?.toUpperCase()) {
-    case 'PRIMARY': 
-      return 'Kids';
-    case 'SECONDARY': 
-      return 'Teens';
-    case 'HIGHER EDUCATION':
-      return 'Youth';
-    default:
-      return schoolLevel || 'Other';
-  }
-}
-
-/**
- * Process team raw data from API to generate contest statistics
- */
-function processTeamRawData(teamItems: TeamRawDataItem[], zoneId?: number, stateId?: number): {
-  contestStats: Map<number, ContestStat>;
-  totalTeams: number;
-  totalContestants: number; // Track total contestants
-  uniqueContingentIds: Set<number>;
-} {
-  // Initialize data structures
-  const contestStats = new Map<number, ContestStat>();
-  const uniqueContingentIds = new Set<number>();
-  const uniqueTeamIds = new Set<number>();
-  const uniqueContestantIds = new Set<string>(); // Track unique contestants
-  
-  // Defensive check for teamItems being undefined or null
-  if (!teamItems) {
-    console.error('processTeamRawData: teamItems is undefined or null');
-    return { contestStats, totalTeams: 0, totalContestants: 0, uniqueContingentIds };
-  }
-  
-  // Filter teams by zone and/or state if specified
-  let filteredTeams = teamItems;
-  if (stateId !== undefined) {
-    filteredTeams = filteredTeams.filter(team => team.stateId === stateId);
-  } else if (zoneId !== undefined) {
-    filteredTeams = filteredTeams.filter(team => team.zoneId === zoneId);
-  }
-  
-  // Ensure filteredTeams is never undefined or null
-  if (!filteredTeams || !Array.isArray(filteredTeams)) {
-    console.error('processTeamRawData: filteredTeams is not an array', { filteredTeams });
-    return { contestStats, totalTeams: 0, totalContestants: 0, uniqueContingentIds };
-  }
-  
-  // Track teams, contestants, and education levels per contest
-  const contestTeams = new Map<number, Set<number>>();
-  const contestContestants = new Map<number, Map<number, number>>(); // Map<contestId, Map<teamId, memberCount>>
-  const contestTeamsByEduLevel = new Map<number, Map<string, Set<number>>>();
-  
-  // Process each team from filtered data
-  for (const item of filteredTeams) {
-    // Skip teams with no members
-    if (!item.numberOfMembers || item.numberOfMembers === 0) continue;
-    
-    // Track unique team IDs across all contests
-    uniqueTeamIds.add(item.teamId);
-    
-    // Track contingent
-    uniqueContingentIds.add(item.contingentId);
-    
-    // Get or create contest stat
-    if (!contestStats.has(item.contestId)) {
-      // Print detailed information about this contest
-      console.log(`[processTeamRawData] New contest found: ${item.contestId}:`, {
-        contestId: item.contestId,
-        contestName: item.contestName,
-        contestCode: item.contestCode,
-        rawContestLevel: item.contestLevel,
-        teamId: item.teamId,
-        teamName: item.teamName,
-        members: item.numberOfMembers
-      });
-
-      // Apply a default contestLevel if none is provided
-      let displayLevel = 'Kids'; // Default all contests to Kids since that's what we know they should be
-      
-      if (item.contestLevel) {
-        // If we have a valid contestLevel from API, use it
-        displayLevel = item.contestLevel;
-        console.log(`[processTeamRawData] Using API-provided contestLevel: ${displayLevel} for contest ${item.contestId}`);
-      } else {
-        console.log(`[processTeamRawData] WARNING: Missing contestLevel for contest ${item.contestId}, using default: ${displayLevel}`);
-      }
-      
-      // Map to schoolLevel for internal use (primarily for compatibility with existing code)
-      let schoolLevel;
-      if (displayLevel === 'Kids') {
-        schoolLevel = 'PRIMARY';
-      } else if (displayLevel === 'Teens') {
-        schoolLevel = 'SECONDARY';
-      } else if (displayLevel === 'Youth') {
-        schoolLevel = 'HIGHER EDUCATION';
-      } else {
-        schoolLevel = 'OTHER';
-      }
-      
-      contestStats.set(item.contestId, {
-        contest: {
-          id: item.contestId,
-          name: item.contestName,
-          code: item.contestCode || '',
-          schoolLevel,
-          displayLevel
-        },
-        contingentsCount: 0,
-        teamCount: 0,
-        contestantCount: 0, // Initialize contestant count
-        teamsByEduLevel: {},
-        contingentIds: new Set<number>() // Track contingent IDs for this contest
-      });
-      
-      // Initialize tracking maps for this contest
-      contestTeams.set(item.contestId, new Set<number>());
-      contestContestants.set(item.contestId, new Map<number, number>());
-      contestTeamsByEduLevel.set(item.contestId, new Map<string, Set<number>>());
-    }
-    
-    const contestStat = contestStats.get(item.contestId)!;
-    
-    // Track team for this contest
-    const teamsSet = contestTeams.get(item.contestId)!;
-    teamsSet.add(item.teamId);
-    
-    // Track contestants for this contest
-    const contestantsMap = contestContestants.get(item.contestId)!;
-    contestantsMap.set(item.teamId, item.numberOfMembers);
-    
-    // Generate unique contestant IDs using team ID and count (since we don't have actual IDs)
-    for (let i = 0; i < item.numberOfMembers; i++) {
-      uniqueContestantIds.add(`${item.teamId}-member-${i}`);
-    }
-    
-    // Track contingent for this contest
-    const contingentIds = contestStat.contingentIds || new Set<number>();
-    contingentIds.add(item.contingentId);
-    contestStat.contingentIds = contingentIds;
-    contestStat.contingentsCount = contingentIds.size;
-    
-    // Determine edu level for this team
-    let teamEduLevel = 'Other';
-    if (item.contingentType === 'SCHOOL') {
-      // Using contingent name or type to infer education level
-      // This is a simplification - in a real implementation you might want to fetch more detailed data
-      if (item.contingentName.toLowerCase().includes('primary') || item.contingentName.toLowerCase().includes('rendah')) {
-        teamEduLevel = 'Primary';
-      } else if (item.contingentName.toLowerCase().includes('secondary') || item.contingentName.toLowerCase().includes('menengah')) {
-        teamEduLevel = 'Secondary';
-      }
-    }
-    
-    // Get or create the edu level tracking set
-    const eduLevelMap = contestTeamsByEduLevel.get(item.contestId)!;
-    if (!eduLevelMap.has(teamEduLevel)) {
-      eduLevelMap.set(teamEduLevel, new Set<number>());
-    }
-    
-    // Add team to the edu level tracking set
-    eduLevelMap.get(teamEduLevel)!.add(item.teamId);
-  }
-  
-  // Update counts based on unique teams and contestants
-  for (const [contestId, stat] of contestStats.entries()) {
-    const teamsSet = contestTeams.get(contestId);
-    const contestantsMap = contestContestants.get(contestId);
-    
-    if (teamsSet) {
-      stat.teamCount = teamsSet.size;
-      
-      // Calculate total contestants as sum of all member counts in this contest
-      if (contestantsMap) {
-        let totalContestantsForContest = 0;
-        for (const memberCount of contestantsMap.values()) {
-          totalContestantsForContest += memberCount;
-        }
-        stat.contestantCount = totalContestantsForContest;
-      }
-      
-      // Update education level counts using unique team IDs
-      const eduLevelMap = contestTeamsByEduLevel.get(contestId);
-      if (eduLevelMap) {
-        stat.teamsByEduLevel = {};
-        for (const [eduLevel, teamSet] of eduLevelMap.entries()) {
-          stat.teamsByEduLevel[eduLevel] = teamSet.size;
-        }
-      }
-    }
-  }
-  
-  // Total teams is the number of unique team IDs
-  const totalTeams = uniqueTeamIds.size;
-  
-  // Total contestants across all contests
-  let totalContestants = 0;
-  for (const [_, contestantsMap] of contestContestants.entries()) {
-    for (const memberCount of contestantsMap.values()) {
-      totalContestants += memberCount;
-    }
-  }
-  
+function getEmptyResult(zoneId?: number, stateId?: number): ContestStatsResult {
   return {
-    contestStats,
-    totalTeams,
-    totalContestants,
-    uniqueContingentIds
+    groupedContests: [
+      { contestLevel: 'Kids', contests: [], totals: { contingentCount: 0, teamCount: 0, contestantCount: 0 } },
+      { contestLevel: 'Teens', contests: [], totals: { contingentCount: 0, teamCount: 0, contestantCount: 0 } },
+      { contestLevel: 'Youth', contests: [], totals: { contingentCount: 0, teamCount: 0, contestantCount: 0 } },
+      { contestLevel: 'Other', contests: [], totals: { contingentCount: 0, teamCount: 0, contestantCount: 0 } },
+    ],
+    summary: {
+      totalContests: 0,
+      totalContingents: 0,
+      totalTeams: 0,
+      totalContestants: 0,
+    },
+    zoneId,
+    stateId,
   };
 }
 
 /**
- * Get statistics for all contests, optionally filtered by zone and/or state
- * @param zoneId Optional zone ID to filter by
- * @param stateId Optional state ID to filter by (more specific than zoneId)
+ * Get contest statistics for the current active event
+ * with optional zone and state filters
  */
-export async function getContestStatistics(zoneId?: number, stateId?: number): Promise<ContestStatsResult> {
-  // Get all contests from our database for reference
-  const contests = await prismaExecute((prisma) => prisma.contest.findMany({
-    include: {
-      targetgroup: true
+export async function getContestStatistics(eventId: number, zoneId?: number, stateId?: number): Promise<ContestStatsResult> {
+  console.log(`[getContestStatistics] Fetching all ZONE-level events`);
+  const zoneEvents = await prismaExecute((prisma) => prisma.event.findMany({ 
+    where: { 
+      scopeArea: "ZONE"
     }
   }));
   
-  // Get active event ID
-  const activeEvent = await prismaExecute((prisma) => prisma.event.findFirst({
-    where: {
-      isActive: true
-    },
-    select: {
-      id: true
-    }
-  }));
-  
-  if (!activeEvent) {
-    console.log('[getContestStatistics] No active event found');
-    return { 
-      groupedContests: [],
-      summary: { totalContests: 0, totalTeams: 0, totalContingents: 0, totalContestants: 0 },
-      stateId,
-      zoneId
-    };
+  if (!zoneEvents || zoneEvents.length === 0) {
+    console.log('[getContestStatistics] No ZONE-level events found');
+    return getEmptyResult(zoneId, stateId);
   }
+  
+  console.log(`[getContestStatistics] Found ${zoneEvents.length} ZONE-level events:`, 
+    zoneEvents.map(e => `${e.id}: ${e.name}`));
+  
+  // Process each zone event
+  let allTeamData: TeamRawDataItem[] = [];
+  for (const zoneEvent of zoneEvents) {
+    console.log(`[getContestStatistics] Processing zone event ${zoneEvent.id}: ${zoneEvent.name}`);
+    const filters = buildFilterClause(zoneEvent.id, zoneId, stateId);
+    const eventTeamData = await fetchRawTeamData(filters);
+    console.log(`[getContestStatistics] Found ${eventTeamData.length} teams for event ${zoneEvent.id}`);
+    
+    // Add to the combined data
+    allTeamData = [...allTeamData, ...eventTeamData];
+  }
+  
+  console.log(`[getContestStatistics] Combined ${allTeamData.length} total teams from all zone events`);
+  
+  // Use the combined team data from all zone events
+  const teamData = allTeamData;
+  
+  if (!teamData.length) {
+    // If no team data was found across any zone events, return empty result
+    console.log('[getContestStatistics] No team data found across any zone events');
+    return getEmptyResult(zoneId, stateId);
+  }
+  
+  // Process the team data to generate contest statistics
+  const result = processTeamData(teamData, zoneId, stateId);
+  
+  if (!result.groupedContests.length) {
+    return getEmptyResult(zoneId, stateId);
+  }
+  
+  return result;
+}
 
-  console.log('[getContestStatistics] Active event ID:', activeEvent.id);
-  
-  // Instead of making an API call, fetch team data directly from the database
-  // This avoids the authentication issues with server-side API calls
-  console.log('[getContestStatistics] Fetching teams data directly from database');
-  
-  try {
-    // Build where clause based on optional zone/state filters
-    let whereClause: any = {};
-    
-    // Add filter for active event
-    whereClause.eventcontest = {
-      eventId: activeEvent.id
+/**
+ * Build database query filter based on event, zone, and state filters
+ */
+export function buildFilterClause(eventId: number, zoneId?: number, stateId?: number) {
+  // First, build the basic filter for eventcontestteams
+  const eventcontestFilter: any = {
+    eventId
+  };
+
+  // Then build team filter separately
+  let teamFilter: any = {};
+
+  if (stateId) {
+    teamFilter = {
+      contingent: {
+        OR: [
+          { schoolId: { not: null }, school: { stateId } },
+          { independentId: { not: null }, independent: { stateId } }
+        ]
+      }
     };
-    
-    // Filter by state if provided
-    if (stateId) {
-      whereClause.team = {
+    console.log('[buildFilterClause] Filtering by stateId:', stateId);
+  } else if (zoneId) {
+    teamFilter = {
+      contingent: {
+        OR: [
+          { schoolId: { not: null }, school: { state: { zoneId } } },
+          { independentId: { not: null }, independent: { state: { zoneId } } }
+        ]
+      }
+    };
+    console.log('[buildFilterClause] Filtering by zoneId:', zoneId);
+  }
+  
+  // Log complete filter for debugging
+  console.log('[buildFilterClause] Built filters:', {
+    eventId,
+    zoneId,
+    stateId,
+    eventcontestFilter,
+    teamFilter: JSON.stringify(teamFilter)
+  });
+
+  return { eventcontestFilter, teamFilter };
+}
+
+/**
+ * Fetch raw team data from database based on filter criteria
+ */
+export async function fetchRawTeamData(filters: { eventcontestFilter: any, teamFilter: any }): Promise<TeamRawDataItem[]> {
+  console.log('[fetchRawTeamData] Starting data fetch with filters:', JSON.stringify(filters, null, 2));
+  
+  // First, check if we have any teams at all to verify database access
+  const teamCount = await prismaExecute(async (prisma) => {
+    return prisma.team.count();
+  });
+  
+  console.log(`[fetchRawTeamData] Total teams in database: ${teamCount}`);
+  
+  // Get all eventcontests for this event
+  const eventcontests = await prismaExecute(async (prisma) => {
+    return prisma.eventcontest.findMany({
+      where: filters.eventcontestFilter,
+      include: {
+        event: true,
+        contest: { include: { targetgroup: true } }
+      }
+    });
+  });
+  
+  console.log(`[fetchRawTeamData] Found ${eventcontests.length} eventcontests for this event`);
+  
+  if (eventcontests.length === 0) {
+    console.log('[fetchRawTeamData] No eventcontests found for this event');
+    return [];
+  }
+  
+  // Then find all eventcontestteams linking the eventcontests and teams
+  const eventcontestteams: any[] = await prismaExecute(async (prisma) => {
+    return prisma.eventcontestteam.findMany({
+      where: {
+        eventcontestId: { in: eventcontests.map((ec: any) => ec.id) },
+        ...(Object.keys(filters.teamFilter).length > 0 ? { team: filters.teamFilter } : {})
+      },
+      select: {
+        id: true,
+        teamId: true,
+        eventcontestId: true
+      }
+    });
+  });
+  
+  console.log(`[fetchRawTeamData] Found ${eventcontestteams.length} eventcontestteams matching filter`);
+  
+  if (eventcontestteams.length === 0) {
+    console.log('[fetchRawTeamData] No event contest teams found matching filter');
+    return [];
+  }
+  
+  // Get team IDs and eventcontest IDs to use in follow-up queries
+  const teamIds: number[] = eventcontestteams.map((ect: any) => ect.teamId);
+  const eventcontestIds: number[] = eventcontestteams.map((ect: any) => ect.eventcontestId);
+  
+  console.log(`[fetchRawTeamData] Found ${teamIds.length} unique team IDs`);
+  
+  // Get teams with their contingents and members
+  const teams = await prismaExecute(async (prisma) => {
+    return prisma.team.findMany({
+      where: { id: { in: teamIds } },
+      include: {
+        members: true,
         contingent: {
-          OR: [
-            { schoolId: { not: null }, school: { stateId: stateId } },
-            { independentId: { not: null }, independent: { stateId: stateId } }
-          ]
+          include: {
+            school: { include: { state: { include: { zone: true } } } },
+            independent: { include: { state: { include: { zone: true } } } }
+          }
         }
-      };
-      console.log('[getContestStatistics] Filtering by stateId:', stateId);
-    }
-    // Filter by zone if provided
-    else if (zoneId) {
-      whereClause.team = {
-        contingent: {
-          OR: [
-            { schoolId: { not: null }, school: { state: { zoneId: zoneId } } },
-            { independentId: { not: null }, independent: { state: { zoneId: zoneId } } }
-          ]
-        }
-      };
-      console.log('[getContestStatistics] Filtering by zoneId:', zoneId);
+      }
+    });
+  });
+    
+  // Get specific eventcontests by IDs with their contests
+  const matchedEventContests = await prismaExecute(async (prisma) => {
+    return prisma.eventcontest.findMany({
+      where: { id: { in: eventcontestIds } },
+      include: {
+        event: true,
+        contest: { include: { targetgroup: true } }
+      }
+    });
+  });
+    
+  console.log(`[fetchRawTeamData] Retrieved ${teams?.length || 0} teams and ${matchedEventContests?.length || 0} eventcontests`);
+  
+  // Map the data to our expected format
+  const teamDataItems: TeamRawDataItem[] = [];
+  
+  for (const ect of eventcontestteams) {
+    const team = teams.find(t => t.id === ect.teamId);
+    const eventcontest = matchedEventContests.find(ec => ec.id === ect.eventcontestId);
+    
+    if (!team || !eventcontest) {
+      console.log(`[fetchRawTeamData] Missing team or eventcontest for ect ${ect.id}`);
+      continue;
     }
     
-    // Fetch all eventcontestteams with related data
-    const eventcontestteams = await prismaExecute(async (prisma) => {
-      return prisma.eventcontestteam.findMany({
-        where: whereClause,
-        include: {
-          team: {
-            include: {
-              contingent: {
-                include: {
-                  school: {
-                    include: {
-                      state: true
-                    }
-                  },
-                  independent: {
-                    include: {
-                      state: true
-                    }
-                  }
-                }
-              },
-              members: true // Include team members for counting
+    // Handle both school and independent contingents
+    const contingent = team.contingent;
+    if (!contingent) {
+      console.log(`[fetchRawTeamData] Team ${team.id} has no contingent`);
+      continue;
+    }
+    
+    // Get state and zone info based on contingent type
+    let stateId = 0;
+    let stateName = 'Unknown';
+    let zoneId = 0;
+    let zoneName = 'Unknown';
+    
+    if (contingent.school) {
+      stateId = contingent.school.state?.id || 0;
+      stateName = contingent.school.state?.name || 'Unknown';
+      zoneId = contingent.school.state?.zone?.id || 0;
+      zoneName = contingent.school.state?.zone?.name || 'Unknown';
+    } else if (contingent.independent) {
+      stateId = contingent.independent.state?.id || 0;
+      stateName = contingent.independent.state?.name || 'Unknown';
+      zoneId = contingent.independent.state?.zone?.id || 0;
+      zoneName = contingent.independent.state?.zone?.name || 'Unknown';
+    }
+    
+    // Get contest level from targetgroup
+    const schoolLevel = eventcontest.contest.targetgroup[0]?.schoolLevel || null;
+    let contestLevel = 'Other';
+    
+    // Map schoolLevel to contestLevel as we do in our existing code
+    if (schoolLevel) {
+      if (schoolLevel.includes('Primary') || schoolLevel.includes('Rendah')) {
+        contestLevel = 'Kids';
+      } else if (schoolLevel.includes('Secondary') || schoolLevel.includes('Menengah')) {
+        contestLevel = 'Teens';
+      } else if (schoolLevel.includes('Youth')) {
+        contestLevel = 'Youth';
+      }
+    }
+    
+    // Create the team data item
+    teamDataItems.push({
+      eventId: eventcontest.event.id,
+      eventName: eventcontest.event.name,
+      zoneId,
+      zoneName,
+      stateId,
+      stateName,
+      contestId: eventcontest.contest.id,
+      contestName: eventcontest.contest.name,
+      contestCode: eventcontest.contest.code,
+      contingentId: contingent.id,
+      contingentName: contingent.name,
+      contingentType: contingent.contingentType,
+      teamId: team.id,
+      teamName: team.name,
+      numberOfMembers: team.members.length,
+      contestLevel
+    });
+    }
+    
+  console.log(`[fetchRawTeamData] Processed ${teamDataItems.length} team data items`);
+  return teamDataItems;
+}
+
+/**
+ * Constructs team data manually from a direct database query result
+ * This is a fallback for when the normal query process fails
+ */
+async function constructTeamDataFromSample(directCheckResult: any[], eventId: number): Promise<TeamRawDataItem[]> {
+  console.log(`[constructTeamDataFromSample] Attempting to construct team data from ${directCheckResult.length} sample results`);
+  
+  const teamData: TeamRawDataItem[] = [];
+  
+  for (const ect of directCheckResult) {
+    try {
+      if (!ect.team || !ect.eventcontest || !ect.eventcontest.contest) {
+        console.log('[constructTeamDataFromSample] Missing required relation in sample data');
+        continue;
+      }
+      
+      // Get state and zone info based on contingent type
+      let stateId = 0;
+      let stateName = 'Unknown';
+      let zoneId = 0;
+      let zoneName = 'Unknown';
+      
+      // Handle contingent
+      const team = ect.team;
+      const contingent = team.contingent;
+      
+      if (!contingent) {
+        console.log(`[constructTeamDataFromSample] Team ${team.id} has no contingent`);
+        continue;
+      }
+      
+      // Get state and zone data
+      await prismaExecute(async (prisma) => {
+        if (contingent.schoolId) {
+          const school = await prisma.school.findUnique({
+            where: { id: contingent.schoolId },
+            include: { state: { include: { zone: true } } }
+          });
+          
+          if (school?.state) {
+            stateId = school.state.id;
+            stateName = school.state.name;
+            
+            if (school.state.zone) {
+              zoneId = school.state.zone.id;
+              zoneName = school.state.zone.name;
             }
-          },
-          eventcontest: {
-            include: {
-              contest: {
-                include: {
-                  targetgroup: true
-                }
-              },
-              event: true
+          }
+        } else if (contingent.independentId) {
+          const independent = await prisma.independent.findUnique({
+            where: { id: contingent.independentId },
+            include: { state: { include: { zone: true } } }
+          });
+          
+          if (independent?.state) {
+            stateId = independent.state.id;
+            stateName = independent.state.name;
+            
+            if (independent.state.zone) {
+              zoneId = independent.state.zone.id;
+              zoneName = independent.state.zone.name;
             }
           }
         }
       });
-    });
-    
-    console.log(`[getContestStatistics] Found ${eventcontestteams.length} eventcontestteams`);
-    
-    // Transform the Prisma data to match the expected API response format
-    const teamData: TeamRawDataItem[] = [];
-    
-    for (const ect of eventcontestteams) {
-      // Need to use type assertion since Prisma's type doesn't match our expected structure
-      const ectAny = ect as any;
-      const team = ectAny.team;
-      const contingent = team.contingent;
-      const eventcontest = ectAny.eventcontest;
-      const contest = eventcontest.contest;
-      const event = eventcontest.event;
       
-      // Determine state information based on contingent type
-      const stateInfo = contingent.school?.state || contingent.independent?.state;
-      const zoneInfo = stateInfo ? { id: stateInfo.zoneId, name: '' } : null;
+      // Determine contest level based on target group
+      let contestLevel = 'Other';
+      const schoolLevel = ect.eventcontest.contest.targetgroup?.schoolLevel;
       
-      // Get school level from contest target group
-      let schoolLevel = null;
-      if (contest.targetgroup && contest.targetgroup.length > 0) {
-        // Find active target group
-        const activeGroup = contest.targetgroup.find((tg: any) => tg.active);
-        if (activeGroup) {
-          schoolLevel = activeGroup.schoolLevel;
+      if (schoolLevel) {
+        if (schoolLevel.includes('Primary') || schoolLevel.includes('Rendah')) {
+          contestLevel = 'Kids';
+        } else if (schoolLevel.includes('Secondary') || schoolLevel.includes('Menengah')) {
+          contestLevel = 'Teens';
+        } else if (schoolLevel.includes('Youth')) {
+          contestLevel = 'Youth';
         }
       }
       
-      // Determine contest level from school level
-      let contestLevel = null;
-      if (schoolLevel === 'Primary') contestLevel = 'Kids';
-      else if (schoolLevel === 'Secondary') contestLevel = 'Teens';
-      else if (schoolLevel === 'Higher Education') contestLevel = 'Youth';
-      
-      // Only include teams with members
-      if (team.members && team.members.length > 0) {
-        teamData.push({
-          eventId: event.id,
-          eventName: event.name,
-          zoneId: zoneInfo ? zoneInfo.id : 0,
-          zoneName: zoneInfo ? zoneInfo.name : '',
-          stateId: stateInfo ? stateInfo.id : 0,
-          stateName: stateInfo ? stateInfo.name : '',
-          contestId: contest.id,
-          contestName: contest.name,
-          contestCode: contest.code,
-          contingentId: contingent.id,
-          contingentName: contingent.name,
-          contingentType: contingent.contingentType,
-          teamId: team.id,
-          teamName: team.name || `Team ${team.id}`,
-          numberOfMembers: team.members.length,
-          schoolLevel: schoolLevel,
-          contestLevel: contestLevel,
-          independentType: contingent.contingentType === 'INDEPENDENT' ? 'independent' : null
-        });
-      }
-    }
-    
-    console.log(`[getContestStatistics] Transformed ${teamData.length} teams with members`);
-    
-    if (teamData.length > 0) {
-      console.log(`[getContestStatistics] Raw team data sample (first 2 items):`, 
-        JSON.stringify(teamData.slice(0, 2), null, 2));
-      // Log contestLevel values for debugging groups
-      const contestLevels = [...new Set(teamData.map(item => item.contestLevel || 'null'))];
-      console.log(`[getContestStatistics] Available contestLevel values:`, contestLevels);
-    }
-    // Continue with processing the team data if we have it
-    if (teamData.length > 0) {
-      // Process team data from DB query
-      const result = processTeamRawData(
-        teamData,
+      // Create the team data item
+      teamData.push({
+        eventId,
+        eventName: ect.eventcontest.event?.name || 'Unknown Event',
         zoneId,
-        stateId
-      );
-      
-      const { contestStats, totalTeams, uniqueContingentIds, totalContestants } = result;
+        zoneName,
+        stateId,
+        stateName,
+        contestId: ect.eventcontest.contest.id,
+        contestName: ect.eventcontest.contest.name,
+        contestCode: ect.eventcontest.contest.code || ect.eventcontest.contest.name.substring(0, 3).toUpperCase(),
+        contingentId: contingent.id,
+        contingentName: contingent.name,
+        contingentType: contingent.contingentType,
+        teamId: team.id,
+        teamName: team.name,
+        numberOfMembers: team.members?.length || 0,
+        contestLevel
+      });
+    } catch (error) {
+      console.error('[constructTeamDataFromSample] Error processing sample item:', error);
+    }
+  }
+  
+  console.log(`[constructTeamDataFromSample] Constructed ${teamData.length} team data items`);
+  return teamData;
+}
 
-      console.log(`[getContestStatistics] processTeamRawData returned stats for ${contestStats.size} contests, ${totalTeams} teams, ${uniqueContingentIds.size} contingents`);
-      
-      // Convert contestStats Map to array for further processing
-      const processedContestStats: ContestStat[] = [];
-
-      // Maps to group contests by school level
-      const schoolLevelGroups = new Map<string, SchoolLevelGroup>();
-
-      // Debug contestStats map before processing
-      console.log('[getContestStatistics] Contest stats before processing:');
-      for (const [contestId, stat] of contestStats.entries()) {
-        console.log(`Contest ID ${contestId}: schoolLevel=${stat.contest.schoolLevel}, displayLevel=${stat.contest.displayLevel}`);
-      }
-
-      // Process each contest from the processed data
-      for (const [contestId, stat] of contestStats.entries()) {
-        // Clean up - we don't need to expose the Set in our return value
-        const { contingentIds, ...cleanStat } = stat as any;
-        
-        processedContestStats.push(cleanStat);
-        
-        // DIRECT APPROACH: Use displayLevel as the grouping key, defaulting to 'Kids' if missing
-        // We have confirmed all contests should be 'Kids' for this event
-        const contestLevelKey = stat.contest.displayLevel || 'Kids';
-        
-        console.log(`[getContestStatistics] Contest ${contestId} (${stat.contest.name}): Using contestLevel=${contestLevelKey}, teams=${stat.teamCount}, contestants=${stat.contestantCount}`);
-        
-        let group = schoolLevelGroups.get(contestLevelKey);
-        if (!group) {
-          group = {
-            schoolLevel: contestLevelKey, // Use contestLevel from API directly
-            displayName: contestLevelKey, // Display contest level as is from API
-            contests: []
-          };
-          schoolLevelGroups.set(contestLevelKey, group);
-          console.log(`[getContestStatistics] Created new group for ${contestLevelKey}`);
-        }
-        
-        // Double-check team and contestant counts before adding to the group
-        if (stat.teamCount === 0) {
-          console.log(`[getContestStatistics] WARNING: Contest ${contestId} (${stat.contest.name}) has 0 teams, skipping`);
-          continue; // Skip contests with no teams
-        }
-        
-        group.contests.push(cleanStat);
-      }
-
-      // Log school level groups before sorting
-      console.log(`[getContestStatistics] Created ${schoolLevelGroups.size} school level groups:`, 
-        Array.from(schoolLevelGroups.keys()));
-      
-      // Sort contests by name within each group
-      schoolLevelGroups.forEach(group => {
-        if (group && group.contests) {
-          group.contests.sort((a, b) => a.contest.name.localeCompare(b.contest.name));
+/**
+ * Process team data to generate contest statistics grouped by contestLevel
+ */
+function processTeamData(teamData: TeamRawDataItem[], zoneId?: number, stateId?: number): ContestStatsResult {
+  // Track unique contests, contingents by contest, teams, and contestants
+  const contestsMap = new Map<number, ContestItem>();
+  const contestContingentMap = new Map<number, Set<number>>();
+  const uniqueContingentIds = new Set<number>();
+  const uniqueTeamIds = new Set<number>();
+  let totalContestants = 0;
+  
+  // Process each team item
+  for (const team of teamData) {
+    // Track unique IDs
+    uniqueContingentIds.add(team.contingentId);
+    uniqueTeamIds.add(team.teamId);
+    totalContestants += team.numberOfMembers;
+    
+    // If we haven't seen this contest before, add it to our map
+    if (!contestsMap.has(team.contestId)) {
+      contestsMap.set(team.contestId, {
+        contestId: team.contestId,
+        contestName: team.contestName,
+        contestCode: team.contestCode,
+        contingentCount: 0,
+        teamCount: 0,
+        contestantCount: 0
+      });
+      contestContingentMap.set(team.contestId, new Set());
+    }
+    
+    // Track contingents per contest
+    const contingentSet = contestContingentMap.get(team.contestId)!;
+    contingentSet.add(team.contingentId);
+  }
+  
+  // Calculate stats for each contest
+  for (const [contestId, contingentSet] of contestContingentMap.entries()) {
+    const contest = contestsMap.get(contestId)!;
+    const teamsInContest = teamData.filter(t => t.contestId === contestId);
+    
+    contest.contingentCount = contingentSet.size;
+    contest.teamCount = teamsInContest.length;
+    contest.contestantCount = teamsInContest.reduce((sum, t) => sum + t.numberOfMembers, 0);
+  }
+  
+  // Group contests by level
+  const levelGroups = new Map<string, ContestLevelGroup>();
+  
+  for (const contest of contestsMap.values()) {
+    // Get contest level from the first matching team
+    const team = teamData.find(t => t.contestId === contest.contestId);
+    const level = team?.contestLevel || 'Other';
+    
+    if (!levelGroups.has(level)) {
+      levelGroups.set(level, {
+        contestLevel: level,
+        contests: [],
+        totals: {
+          contingentCount: 0,
+          teamCount: 0,
+          contestantCount: 0
         }
       });
-
-      // Convert map to array and sort groups
-      const groupedContests = Array.from(schoolLevelGroups.values());
-
-      // Define the custom order for contest levels
-      const levelOrder: { [key: string]: number } = {
-        // Direct contestLevel values from API
-        'Kids': 1,
-        'Teens': 2,
-        'Youth': 3,
-        // Legacy school level values for backward compatibility
-        'PRIMARY': 1,
-        'SECONDARY': 2,
-        'HIGHER EDUCATION': 3
-      };
-
-      // Sort groups by the defined order, with 'other' groups at the end
-      groupedContests.sort((a, b) => {
-        const orderA = levelOrder[a.schoolLevel] || 999;
-        const orderB = levelOrder[b.schoolLevel] || 999;
-        return orderA - orderB;
-      });
-      
-      // Log the final sorted groupedContests for debugging
-      console.log('[getContestStatistics] Final sorted groups:', 
-        groupedContests.map(g => ({ 
-          schoolLevel: g.schoolLevel, 
-          displayName: g.displayName, 
-          contestsCount: g.contests.length 
-        })));
-      
-      return {
-        groupedContests,
-        summary: {
-          totalContests: contests.length,
-          totalTeams,
-          totalContingents: uniqueContingentIds.size,
-          totalContestants
-        },
-        stateId,
-        zoneId
-      };
-    } else {
-      console.log('[getContestStatistics] No team data found after database query');
-      return { 
-        groupedContests: [],
-        summary: { totalContests: contests.length, totalTeams: 0, totalContingents: 0, totalContestants: 0 },
-        stateId,
-        zoneId
-      };
-    }
-  } catch (error) {
-    console.error('[getContestStatistics] Error fetching data from database:', error);
-    return { 
-      groupedContests: [],
-      summary: { totalContests: 0, totalTeams: 0, totalContingents: 0, totalContestants: 0 },
-      stateId,
-      zoneId
-    };
-  }
-
-  // Process team data from API
-  const result = processTeamRawData(
-    teamData,
-    zoneId,
-    stateId
-  );
-  
-  const { contestStats, totalTeams, uniqueContingentIds, totalContestants } = result;
-
-  console.log(`[getContestStatistics] processTeamRawData returned stats for ${contestStats.size} contests, ${totalTeams} teams, ${uniqueContingentIds.size} contingents`);
-  
-  // Convert contestStats Map to array for further processing
-  const processedContestStats: ContestStat[] = [];
-
-  // Maps to group contests by school level
-  const schoolLevelGroups = new Map<string, SchoolLevelGroup>();
-
-  // Debug contestStats map before processing
-  console.log('[getContestStatistics] Contest stats before processing:');
-  for (const [contestId, stat] of contestStats.entries()) {
-    console.log(`Contest ID ${contestId}: schoolLevel=${stat.contest.schoolLevel}, displayLevel=${stat.contest.displayLevel}`);
-  }
-
-  // Process each contest from the processed data
-  for (const [contestId, stat] of contestStats.entries()) {
-    // Clean up - we don't need to expose the Set in our return value
-    const { contingentIds, ...cleanStat } = stat as any;
-    
-    processedContestStats.push(cleanStat);
-    
-    // DIRECT APPROACH: Use displayLevel as the grouping key, defaulting to 'Kids' if missing
-    // We have confirmed all contests should be 'Kids' for this event
-    const contestLevelKey = stat.contest.displayLevel || 'Kids';
-    
-    console.log(`[getContestStatistics] Contest ${contestId} (${stat.contest.name}): Using contestLevel=${contestLevelKey}, teams=${stat.teamCount}, contestants=${stat.contestantCount}`);
-    
-    let group = schoolLevelGroups.get(contestLevelKey);
-    if (!group) {
-      group = {
-        schoolLevel: contestLevelKey, // Use contestLevel from API directly
-        displayName: contestLevelKey, // Display contest level as is from API
-        contests: []
-      };
-      schoolLevelGroups.set(contestLevelKey, group);
-      console.log(`[getContestStatistics] Created new group for ${contestLevelKey}`);
     }
     
-    // Double-check team and contestant counts before adding to the group
-    if (stat.teamCount === 0) {
-      console.log(`[getContestStatistics] WARNING: Contest ${contestId} (${stat.contest.name}) has 0 teams, skipping`);
-      continue; // Skip contests with no teams
-    }
-    
-    group.contests.push(cleanStat);
+    const group = levelGroups.get(level)!;
+    group.contests.push(contest);
+    group.totals.teamCount += contest.teamCount;
+    group.totals.contestantCount += contest.contestantCount;
   }
-
-  // Log school level groups before sorting
-  console.log(`[getContestStatistics] Created ${schoolLevelGroups.size} school level groups:`, 
-    Array.from(schoolLevelGroups.keys()));
   
-  // Sort contests by name within each group
-  schoolLevelGroups.forEach(group => {
-    group.contests.sort((a, b) => a.contest.name.localeCompare(b.contest.name));
-  });
-
-  // Convert map to array and sort groups
-  const groupedContests = Array.from(schoolLevelGroups.values());
-
-  // Define the custom order for contest levels
-  const levelOrder: { [key: string]: number } = {
-    // Direct contestLevel values from API
-    'Kids': 1,
-    'Teens': 2,
-    'Youth': 3,
-    // Legacy school level values for backward compatibility
-    'PRIMARY': 1,
-    'SECONDARY': 2,
-    'HIGHER EDUCATION': 3
-  };
-
-  // Sort groups by the defined order, with 'other' groups at the end
-  groupedContests.sort((a, b) => {
-    const orderA = levelOrder[a.schoolLevel] || 999;
-    const orderB = levelOrder[b.schoolLevel] || 999;
+  // Calculate unique contingent count per level group
+  for (const group of levelGroups.values()) {
+    const levelContingentIds = new Set<number>();
+    
+    // Get all team data for this level's contests
+    const contestCodes = group.contests.map(c => c.contestCode);
+    const levelTeams = teamData.filter(t => contestCodes.includes(t.contestCode));
+    
+    // Count unique contingents in this level
+    levelTeams.forEach(t => levelContingentIds.add(t.contingentId));
+    group.totals.contingentCount = levelContingentIds.size;
+  }
+  
+  // Sort contests within each group by code+name
+  for (const group of levelGroups.values()) {
+    group.contests.sort((a, b) => {
+      const codeA = a.contestCode || '';
+      const codeB = b.contestCode || '';
+      return codeA === codeB 
+        ? a.contestName.localeCompare(b.contestName) 
+        : codeA.localeCompare(codeB);
+    });
+  }
+  
+  // Convert to array and sort groups
+  const contestGroups = Array.from(levelGroups.values());
+  const levelOrder: Record<string, number> = { 'Kids': 1, 'Teens': 2, 'Youth': 3, 'Other': 4 };
+  
+  contestGroups.sort((a, b) => {
+    const orderA = levelOrder[a.contestLevel] || 99;
+    const orderB = levelOrder[b.contestLevel] || 99;
     return orderA - orderB;
   });
   
-  // Log the final sorted groupedContests for debugging
-  console.log('[getContestStatistics] Final sorted groups:', 
-    groupedContests.map(g => ({ 
-      schoolLevel: g.schoolLevel, 
-      displayName: g.displayName, 
-      contestsCount: g.contests.length 
-    })));
+  // Ensure all groups have the proper property format
+  for (const group of contestGroups) {
+    if (!('contests' in group)) {
+      (group as ContestLevelGroup).contests = [];
+    }
+  }
 
-  return {
-    groupedContests,
+  // Add missing contestLevel groups if not present in results
+  const standardLevels = ['Kids', 'Teens', 'Youth', 'Other'];
+  const existingLevels = new Set(contestGroups.map(g => g.contestLevel));
+  
+  standardLevels.forEach(level => {
+    if (!existingLevels.has(level)) {
+      contestGroups.push({ 
+        contestLevel: level, 
+        contests: [],
+        totals: {
+          contingentCount: 0,
+          teamCount: 0,
+          contestantCount: 0
+        } 
+      });
+    }
+  });
+  
+  // Sort the groups by level (Kids -> Teens -> Youth -> Other)
+  contestGroups.sort((a, b) => {
+    const levelOrder: Record<string, number> = { 'Kids': 0, 'Teens': 1, 'Youth': 2, 'Other': 3 };
+    return (levelOrder[a.contestLevel] ?? 99) - (levelOrder[b.contestLevel] ?? 99);
+  });
+
+  // Log summary for debugging
+  console.log(`[getContestStatistics] Processed stats: ${contestsMap.size} contests, ${uniqueTeamIds.size} teams, ${uniqueContingentIds.size} contingents, ${levelGroups.size} groups`);
+
+  // Create a result object with contest groups and summary
+  const result: ContestStatsResult = {
+    groupedContests: contestGroups,
     summary: {
-      totalContests: contests.length,
-      totalTeams,
+      totalContests: contestsMap.size,
       totalContingents: uniqueContingentIds.size,
+      totalTeams: uniqueTeamIds.size,
       totalContestants
     },
-    stateId,
-    zoneId
+    zoneId,
+    stateId
   };
+
+  console.log(`[processTeamData] Result summary:`, {
+    groupCount: result.groupedContests.length,
+    contestCount: result.summary.totalContests,
+    teamCount: result.summary.totalTeams,
+    contingentCount: result.summary.totalContingents
+  });
+
+  if (result.groupedContests.length > 0) {
+    console.log(`[processTeamData] First group:`, {
+      contestLevel: result.groupedContests[0].contestLevel,
+      contestCount: result.groupedContests[0].contests.length
+    });
+  } else {
+    console.log('[processTeamData] No contest groups found!');
+  }
+
+  return result;
 }

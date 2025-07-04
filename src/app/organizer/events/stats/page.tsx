@@ -279,19 +279,32 @@ async function ContestStatsServer({ states, zones, searchParams }: {
   const zoneId = searchParams?.zoneId ? parseInt(searchParams.zoneId, 10) : undefined;
   const stateId = searchParams?.stateId ? parseInt(searchParams.stateId, 10) : undefined;
   
+  // Debug log to check if zoneId is converted to a proper number
+  if (zoneId) {
+    console.log(`[ContestStatsServer] zoneId type: ${typeof zoneId}, value: ${zoneId}`);
+  }
+  
   // Get contest stats with optional filters
-  const contestStats = await getContestStatistics(zoneId, stateId);
+  // 1 is a placeholder eventId, but we're now fetching from all zone events anyway
+  const contestStats = await getContestStatistics(1, zoneId, stateId);
+  
+  console.log('[ContestStatsServer] Stats fetched with filters:', { 
+    zoneId, 
+    stateId,
+    groupCount: contestStats.groupedContests.length,
+    hasData: contestStats.groupedContests.some(g => g.contests.length > 0)
+  });
   
   // Process states to ensure zoneId is available for filtering
   const statesWithZoneId = states.map(state => ({
     id: state.id,
     name: state.name,
-    zoneId: state.zone?.id || 0 // Use zone ID from relation or default
+    zoneId: state.zoneId
   }));
   
   return (
     <ContestStatsClient 
-      groupedContests={contestStats.groupedContests} 
+      groupedContests={contestStats.groupedContests}
       summary={contestStats.summary}
       zoneFilters={zones}
       stateFilters={statesWithZoneId}

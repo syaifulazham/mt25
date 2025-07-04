@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const stateId = searchParams.get('stateId') ? parseInt(searchParams.get('stateId')!) : undefined;
     const contestId = searchParams.get('contestId') ? parseInt(searchParams.get('contestId')!) : undefined;
     const contingentId = searchParams.get('contingentId') ? parseInt(searchParams.get('contingentId')!) : undefined;
-    const includeEmptyTeams = searchParams.get('includeEmptyTeams') === 'true';
+    const includeEmptyTeams = searchParams.get('includeEmptyTeams') === 'false';
     
     console.log('[teams-raw-data] Query parameters:', { 
       eventId, 
