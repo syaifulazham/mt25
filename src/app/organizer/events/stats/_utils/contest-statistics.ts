@@ -480,6 +480,19 @@ async function constructTeamDataFromSample(directCheckResult: any[], eventId: nu
  * Process team data to generate contest statistics grouped by contestLevel
  */
 function processTeamData(teamData: TeamRawDataItem[], zoneId?: number, stateId?: number): ContestStatsResult {
+  console.log(`[processTeamData] Filtering out teams with 0 members from ${teamData.length} teams`);
+  
+  // Filter out teams with numberOfMembers = 0
+  teamData = teamData.filter(team => {
+    if (team.numberOfMembers === 0) {
+      console.log(`[processTeamData] Skipping team ${team.teamId} (${team.teamName}) with 0 members`);
+      return false;
+    }
+    return true;
+  });
+  
+  console.log(`[processTeamData] After filtering: ${teamData.length} teams remain`);
+  
   // Track unique contests, contingents by contest, teams, and contestants
   const contestsMap = new Map<number, ContestItem>();
   const contestContingentMap = new Map<number, Set<number>>();

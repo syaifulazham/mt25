@@ -57,8 +57,12 @@ export function ContestStatsClient({
     stateId: initialStateId
   });
 
+  // Force refresh when filters change
+  const [forceRefresh, setForceRefresh] = useState(0);
+
   // Handle filter changes
   const handleFilterChange = (filters: { zoneId?: number; stateId?: number }) => {
+    console.log('[ContestStatsClient] Filter changed:', filters);
     setCurrentFilters(filters);
     
     // Update URL with new filters
@@ -74,7 +78,13 @@ export function ContestStatsClient({
     
     // Replace URL without full page refresh
     const newPath = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
-    router.push(newPath);
+    
+    // Force the page to fully refresh to get new data from the server
+    window.location.href = newPath;
+    
+    // Alternatively, use router.push with a refresh flag
+    // router.push(newPath);
+    // setForceRefresh(prev => prev + 1); // Force component to re-render
   };
 
   // Get active event ID (assuming it's 1 for now, but ideally this should be passed from the server)
