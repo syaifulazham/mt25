@@ -47,6 +47,9 @@ type ZoneStatsResult = {
   zone: ZoneData | null;
   groupedData: SchoolLevelGroup[];
   summary: StatsSummary;
+  contingentSummary: any[];
+  rawTeamData?: any[];
+  error?: string; // Add error property to match the updated interface in utils
 };
 
 type SchoolData = {
@@ -153,14 +156,28 @@ function getSchoolLevelInfo(schoolLevel: string): SchoolLevelMapping {
 export default async function ZoneStatsPage({ params, searchParams }: { params: { zoneId: string }, searchParams: { [key: string]: string | string[] | undefined } }) {
   const zoneId = Number(params.zoneId);
   const showDebug = searchParams.debug === 'true';
-  const { zone, groupedData, summary, contingentSummary, rawTeamData } = await getZoneStatistics(zoneId);
+  const { zone, groupedData, summary, contingentSummary, rawTeamData, error } = await getZoneStatistics(zoneId);
   
+  // Handle both cases: no zone or an error occurred
   if (!zone) {
     notFound();
   }
   
+  // Check for error from statistics function
+  const hasError = !!error;
+  
   return (
     <div className="p-6 space-y-6">
+      {/* Error message display */}
+      {hasError && (
+        <div className="border border-red-500 p-4 bg-red-50 rounded-md mb-6">
+          <h2 className="text-xl font-bold text-red-700 mb-2">⚠️ Error Loading Statistics</h2>
+          <p className="text-red-700">{error}</p>
+          <p className="mt-2">
+            Try refreshing the page. If the problem persists, please contact technical support.
+          </p>
+        </div>
+      )}
       {/* Debug data section */}
       {showDebug && rawTeamData && (
         <div className="border border-red-500 p-4 bg-red-50 rounded-md">

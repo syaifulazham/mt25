@@ -48,7 +48,8 @@ export interface ZoneStatsResult {
   groupedData: SchoolLevelGroup[];
   summary: StatsSummary;
   contingentSummary: StateContingentSummary[];
-  rawTeamData?: TeamRawDataItem[]; // For debug purposes
+  rawTeamData?: TeamRawDataItem[];
+  error?: string; // Optional error message when data loading fails
 };
 
 type SchoolData = {
@@ -437,18 +438,28 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       throw new Error(`Zone ${zoneId} not found.`);
     }
     
-    // Get the active event
-    const event = await prismaExecute<{ id: number } | null>((prisma) =>
-      prisma.event.findFirst({
-        where: { isActive: true },
+    // Get all events with scopeArea = ZONE (not just the active event)
+    const zoneEvents = await prismaExecute<{ id: number }[]>((prisma) =>
+      prisma.event.findMany({
+        where: { 
+          scopeArea: 'ZONE',
+          isActive: true  // Still only include active events
+        },
         select: { id: true },
       })
     );
 
-    if (!event) {
-      throw new Error("No active event found.");
+    if (zoneEvents.length === 0) {
+      throw new Error("No events with scopeArea = ZONE found.");
     }
-    const eventId = event.id;
+    
+    // Get all event IDs
+    const eventIds = zoneEvents.map(e => e.id);
+    console.log(`[getZoneStatistics] Found ${eventIds.length} ZONE events: ${eventIds.join(', ')}`);
+    
+    // Use the first event ID for backward compatibility with the rest of the code
+    const eventId = eventIds[0];
+    
     
     console.log(`[getZoneStatistics] Fetching data for zone ${zoneId} and event ${eventId}`);
 
@@ -529,7 +540,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
             cont.id as contingentId, cont.name as contingentName, cont.contingentType,
             t.id as teamId, t.name as teamName,
             (SELECT COUNT(*) FROM teammember WHERE teammember.teamId = t.id) as numberOfMembers,
-            tg.schoolLevel
+            'Kids' as schoolLevel -- Default value since contesttargetgroup table doesn't exist
           FROM team t
           JOIN contingent cont ON t.contingentId = cont.id
           LEFT JOIN school sch ON cont.schoolId = sch.id
@@ -540,10 +551,10 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
           JOIN eventcontest ec ON ect.eventcontestId = ec.id
           JOIN contest c ON ec.contestId = c.id
           JOIN event e ON ec.eventId = e.id
-          LEFT JOIN contesttargetgroup tg ON c.id = tg.contestId AND tg.active = true
+          -- Removed reference to non-existent contesttargetgroup table
           WHERE z.id = ${zoneId}
-          AND e.id = ${eventId}
-          AND e.active = true
+          AND e.scopeArea = 'ZONE'
+          AND e.isActive = true
         `;
         
         return results;
@@ -656,7 +667,10 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
             }
           },
           eventcontest: {
-            eventId
+            event: {
+              scopeArea: 'ZONE',
+              isActive: true
+            }
           }
         },
         include: {
@@ -939,9 +953,75 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
   } catch (error) {
     console.error(`[getZoneStatistics] Error processing zone statistics for zone ${zoneId}:`, error);
     
+    // Variables defined in try block won't be accessible here, so we need to handle them carefully
+    let zoneData: ZoneData | null = null;
+    
+    // Try to fetch basic zone info again for debugging purposes
+    try {
+      // First attempt to get the zone again
+      zoneData = await prismaExecute<ZoneData | null>((prisma) => prisma.zone.findUnique({
+        where: { id: zoneId },
+      }));
+      
+      // Display more detailed debugging information
+      console.error(`[getZoneStatistics] DEBUG - Error stack trace:`, error instanceof Error ? error.stack : 'No stack trace');
+      console.error(`[getZoneStatistics] DEBUG - Zone ID:`, zoneId);
+      
+      // Try to get event ID
+      const eventData = await prismaExecute<{ id: number } | null>((prisma) =>
+        prisma.event.findFirst({
+          where: { isActive: true },
+          select: { id: true },
+        })
+      );
+      console.error(`[getZoneStatistics] DEBUG - Active event ID:`, eventData ? eventData.id : 'unknown');
+      
+      // Check for states in zone
+      const statesInZoneCheck = await prismaExecute<{id: number, name: string}[]>(async (prisma) => {
+        return prisma.state.findMany({
+          where: { zoneId },
+          select: { id: true, name: true },
+        });
+      });
+      
+      // Log whether zone exists and states in zone
+      console.error(`[getZoneStatistics] DEBUG - Zone exists:`, !!zoneData);
+      console.error(`[getZoneStatistics] DEBUG - States in zone:`, statesInZoneCheck?.length || 'unknown');
+      
+      // Check if this zone has any valid data at all
+      const basicCheck = await prismaExecute<{count: number}[]>(async (prisma) => {
+        return prisma.$queryRaw`
+          SELECT COUNT(*) as count
+          FROM zone z
+          JOIN state s ON s.zoneId = z.id
+          JOIN contingent c ON (c.schoolId IN (SELECT id FROM school WHERE stateId = s.id) OR c.independentId IN (SELECT id FROM independent WHERE stateId = s.id))
+          WHERE z.id = ${zoneId}
+        `;
+      });
+      
+      console.error(`[getZoneStatistics] DEBUG - Basic contingent check:`, basicCheck);
+      
+      // Check if there are any teams at all for this zone
+      const teamCheck = await prismaExecute<{count: number}[]>(async (prisma) => {
+        return prisma.$queryRaw`
+          SELECT COUNT(*) as count
+          FROM team t
+          JOIN contingent c ON t.contingentId = c.id
+          LEFT JOIN school s ON c.schoolId = s.id
+          LEFT JOIN independent i ON c.independentId = i.id
+          JOIN state st ON (s.stateId = st.id OR i.stateId = st.id)
+          WHERE st.zoneId = ${zoneId}
+        `;
+      });
+      
+      console.error(`[getZoneStatistics] DEBUG - Basic team check:`, teamCheck);
+    } catch (checkError) {
+      console.error(`[getZoneStatistics] DEBUG - Error during debug check:`, checkError);
+    }
+    
     // Return empty results if there's an error
     return {
-      zone: null,
+      zone: zoneData, // Use the locally fetched zone data
       groupedData: [],
       summary: {
         schoolCount: 0,
@@ -950,7 +1030,8 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
         contingentCount: 0,
         independentCount: 0
       },
-      contingentSummary: []
+      contingentSummary: [],
+      error: error instanceof Error ? error.message : 'Unknown error occurred' // Add error message to result
     };
   }
 }
