@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 // GET handler for tracking email opens via tracking pixel
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -28,8 +28,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       await prisma.email_outgoing.update({
         where: { id: email.id },
         data: {
-          opened: true,
-          opened_at: email.opened_at || new Date(), // Only update if not already tracked
+          is_read: true,
+          read_at: email.read_at || new Date(), // Only update if not already tracked
+          first_opened_at: email.first_opened_at || new Date(), // Set first open time if not set
+          last_opened_at: new Date(), // Always update last open time
           open_count: {
             increment: 1
           }

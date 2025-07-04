@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 // GET handler for tracking email link clicks
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
