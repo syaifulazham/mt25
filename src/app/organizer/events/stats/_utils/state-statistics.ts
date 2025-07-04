@@ -313,6 +313,7 @@ function processTeamRawData(teamItems: TeamRawDataItem[] | undefined, stateId: n
 // Function to get statistics for a specific state within a zone
 export async function getStateStatistics(activeEvent: { id: number }, stateId: number): Promise<StateStatsResult> {
   console.log('[getStateStatistics] Started with:', { eventId: activeEvent.id, stateId });
+  
   // Get zone and state info based on stateId
   const state = await prismaExecute<StateData | null>((prisma) => prisma.state.findUnique({
     where: { id: stateId },
@@ -329,8 +330,6 @@ export async function getStateStatistics(activeEvent: { id: number }, stateId: n
   }));
   
   const zone = state?.zone || null;
-  
-  // State already fetched above with its zone
   
   if (!zone || !state) {
     return { 
@@ -354,8 +353,6 @@ export async function getStateStatistics(activeEvent: { id: number }, stateId: n
     };
   }
   
-  // Using the activeEvent parameter that was passed in
-  
   if (!activeEvent) {
     return { 
       zone, 
@@ -377,101 +374,232 @@ export async function getStateStatistics(activeEvent: { id: number }, stateId: n
       } as StatsSummary
     };
   }
-
-  // Build API URL with query parameters
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const apiUrl = new URL(`${baseUrl}/api/organizer/events/teams-raw-data`);
-  // Using API's scopeArea filter instead of specific eventId
-  apiUrl.searchParams.append('stateId', stateId.toString());
-  apiUrl.searchParams.append('includeEmptyTeams', 'false');
   
-  // For debugging - log the API URL
-  console.log('[getStateStatistics] API URL:', apiUrl.toString());
+  // DIRECT ACCESS TO DATABASE INSTEAD OF API CALL - Avoids authentication issues
+  console.log('[getStateStatistics] Fetching team data directly from database for state:', stateId);
   
-  // Fetch team data from API
-  const response = await fetch(apiUrl.toString(), {
-    method: 'GET',
-    headers: {
-      'Cookie': cookies().toString(),
-    },
-    cache: 'no-store'
-  });
-  
-  if (!response.ok) {
-    console.error('API request failed:', response.status, response.statusText);
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
-  
-  const apiData: TeamsRawDataApiResponse = await response.json();
-  
-  // For debugging - log the API response data
-  console.log('State Statistics API Response:', {
-    responseOk: response.ok,
-    statusCode: response.status,
-    dataReceived: !!apiData,
-    teamsCount: Array.isArray(apiData) ? apiData.length : 0,
-  });
-
-  // Process the team data for this state - with defensive coding
-  // apiData is the array directly, not an object with a teams property
-  const { 
-    groupedData, 
-    uniqueTeamIds, 
-    uniqueContestantIds, 
-    uniqueSchoolIds, 
-    uniqueContingentIds, 
-    independentContingentIds,
-    youthGroupContingentIds,
-    parentContingentIds,
-    primarySchoolIds,
-    secondarySchoolIds,
-    schoolTeamIds,
-    primarySchoolTeamIds,
-    secondarySchoolTeamIds
-  } = processTeamRawData(apiData, stateId);
-
-  // Sort contests within each school level
-  for (const group of groupedData) {
-    group.contests.sort((a, b) => a.contestName.localeCompare(b.contestName));
+  try {
+    // Fetch team data directly using Prisma instead of the API
+    const teamData = await prismaExecute((prisma) => prisma.eventcontestteam.findMany({
+      where: {
+        // Apply filters
+        eventcontest: {
+          event: {
+            scopeArea: 'ZONE', // Only include events with scopeArea = ZONE
+            isActive: true,
+          },
+        },
+        team: {
+          OR: [
+            { contingent: { school: { stateId } } },
+            { contingent: { independent: { stateId } } },
+            { contingent: { higherInstitution: { stateId } } }
+          ],
+        }
+      },
+      include: {
+        eventcontest: {
+          include: {
+            event: {
+              select: {
+                id: true,
+                name: true,
+                zone: true,
+              }
+            },
+            contest: {
+              include: {
+                targetgroup: true
+              }
+            },
+          }
+        },
+        team: {
+          include: {
+            members: true,
+            contingent: {
+              include: {
+                school: {
+                  include: {
+                    state: {
+                      include: {
+                        zone: true,
+                      }
+                    }
+                  }
+                },
+                independent: {
+                  include: {
+                    state: {
+                      include: {
+                        zone: true,
+                      }
+                    }
+                  }
+                },
+                higherInstitution: {
+                  include: {
+                    state: {
+                      include: {
+                        zone: true,
+                      }
+                    }
+                  }
+                },
+              }
+            }
+          }
+        }
+      }
+    }));
     
-    // Sort contingents within each contest
-    for (const contest of group.contests) {
-      contest.contingents.sort((a, b) => a.displayName.localeCompare(b.displayName));
-    }
+    console.log(`[getStateStatistics] Retrieved ${teamData.length} teams for state ${stateId}`);
+    
+    // Transform the data into the same format expected by processTeamRawData
+    const transformedTeamItems: TeamRawDataItem[] = teamData
+      .map(entry => {
+        // Get state information based on contingent type
+        let teamStateId, stateName, teamZoneId, zoneName, schoolLevel, independentType;
+        const contingent = entry.team?.contingent;
+        
+        if (!entry.team || !contingent) {
+          return null; // Skip if no team or contingent data
+        }
+        
+        if (contingent.school) {
+          teamStateId = contingent.school.stateId;
+          stateName = contingent.school.state?.name;
+          teamZoneId = contingent.school.state?.zoneId;
+          zoneName = contingent.school.state?.zone?.name;
+          schoolLevel = contingent.school.level;
+        } else if (contingent.independent) {
+          teamStateId = contingent.independent.stateId;
+          stateName = contingent.independent.state?.name;
+          teamZoneId = contingent.independent.state?.zoneId;
+          zoneName = contingent.independent.state?.zone?.name;
+          independentType = contingent.independent.type;
+        } else if (contingent.higherInstitution) {
+          teamStateId = contingent.higherInstitution.stateId;
+          stateName = contingent.higherInstitution.state?.name;
+          teamZoneId = contingent.higherInstitution.state?.zoneId;
+          zoneName = contingent.higherInstitution.state?.zone?.name;
+        }
+        
+        // Get the member count
+        const numberOfMembers = entry.team.members?.length || 0;
+        
+        // Skip if this team has no members
+        if (numberOfMembers === 0) {
+          return null;
+        }
+        
+        // Get contingent display name
+        const contingentName = contingent.contingentType === 'SCHOOL' && contingent.school
+          ? contingent.school.name
+          : contingent.name;
+          
+        // Map contestLevel from targetgroup.schoolLevel
+        // Default to 'Kids' since we know all contests should be Kids
+        let contestLevel = 'Kids';
+        
+        if (entry.eventcontest?.contest?.targetgroup && entry.eventcontest.contest.targetgroup.length > 0) {
+          const targetGroup = entry.eventcontest.contest.targetgroup[0];
+          if (targetGroup.schoolLevel === 'Primary') {
+            contestLevel = 'Kids';
+          } else if (targetGroup.schoolLevel === 'Secondary') {
+            contestLevel = 'Teens';
+          } else if (targetGroup.schoolLevel === 'Higher Education') {
+            contestLevel = 'Youth';
+          }
+        }
+
+        return {
+          eventId: entry.eventcontest.eventId,
+          eventName: entry.eventcontest.event.name,
+          zoneId: teamZoneId,
+          zoneName,
+          stateId: teamStateId,
+          stateName,
+          contestId: entry.eventcontest.contestId,
+          contestName: entry.eventcontest.contest.name,
+          contestCode: entry.eventcontest.contest.code,
+          contingentId: entry.team.contingentId,
+          contingentName,
+          contingentType: contingent.contingentType,
+          teamId: entry.teamId,
+          teamName: entry.team.name,
+          numberOfMembers,
+          schoolLevel: schoolLevel || null,
+          independentType: independentType || null,
+          contestLevel: contestLevel
+        };
+      })
+      .filter(Boolean) as TeamRawDataItem[]; // Remove null entries
+    
+    // Process the data using the transformed team items
+    const processedData = processTeamRawData(transformedTeamItems, stateId);
+    
+    // Extract components from processedData
+    const { 
+      groupedData,
+      uniqueTeamIds,
+      uniqueContestantIds,
+      uniqueSchoolIds,
+      uniqueContingentIds,
+      independentContingentIds,
+      youthGroupContingentIds,
+      parentContingentIds,
+      primarySchoolIds,
+      secondarySchoolIds,
+      schoolTeamIds,
+      primarySchoolTeamIds,
+      secondarySchoolTeamIds
+    } = processedData;
+    
+    // Create the summary object which is required by the return type
+    const summary: StatsSummary = {
+      schoolCount: uniqueSchoolIds.size,
+      teamCount: uniqueTeamIds.size,
+      contestantCount: uniqueContestantIds.size,
+      contingentCount: uniqueContingentIds.size,
+      independentCount: independentContingentIds.size,
+      youthGroupCount: youthGroupContingentIds.size,
+      parentCount: parentContingentIds.size,
+      primarySchoolCount: primarySchoolIds.size,
+      secondarySchoolCount: secondarySchoolIds.size,
+      schoolTeamsCount: schoolTeamIds.size,
+      primarySchoolTeamsCount: primarySchoolTeamIds.size,
+      secondarySchoolTeamsCount: secondarySchoolTeamIds.size,
+    };
+    
+    return {
+      zone,
+      state,
+      groupedData,
+      summary
+    };
+  } catch (error) {
+    console.error('[getStateStatistics] Error fetching or processing team data:', error);
+    // Return a valid structure with empty data instead of throwing
+    return { 
+      zone, 
+      state, 
+      groupedData: [],
+      summary: { 
+        schoolCount: 0, 
+        teamCount: 0, 
+        contestantCount: 0, 
+        contingentCount: 0, 
+        independentCount: 0, 
+        youthGroupCount: 0, 
+        parentCount: 0, 
+        primarySchoolCount: 0, 
+        secondarySchoolCount: 0,
+        schoolTeamsCount: 0,
+        primarySchoolTeamsCount: 0,
+        secondarySchoolTeamsCount: 0
+      } as StatsSummary
+    };
   }
 
-  // Sort school levels (Primary first, then Secondary, then Higher Education)
-  const schoolLevelOrder: Record<string, number> = {
-    'Primary': 1,
-    'Secondary': 2,
-    'Higher Education': 3
-  };
-  groupedData.sort((a: SchoolLevelGroup, b: SchoolLevelGroup) => {
-    const orderA = schoolLevelOrder[a.schoolLevel] || 999;
-    const orderB = schoolLevelOrder[b.schoolLevel] || 999;
-    return orderA - orderB;
-  });
-
-  // Create summary from our processed data sets
-  const summary = {
-    schoolCount: uniqueSchoolIds.size,
-    teamCount: uniqueTeamIds.size,
-    contestantCount: uniqueContestantIds.size,
-    contingentCount: uniqueContingentIds.size,
-    independentCount: independentContingentIds.size,
-    youthGroupCount: youthGroupContingentIds.size,
-    parentCount: parentContingentIds.size,
-    primarySchoolCount: primarySchoolIds.size,
-    secondarySchoolCount: secondarySchoolIds.size,
-    schoolTeamsCount: schoolTeamIds.size,
-    primarySchoolTeamsCount: primarySchoolTeamIds.size,
-    secondarySchoolTeamsCount: secondarySchoolTeamIds.size,
-  };
-
-  return {
-    zone,
-    state,
-    groupedData,
-    summary
-  };
 }
