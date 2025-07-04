@@ -454,32 +454,210 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
 
     // Instead of making an API call, fetch team data directly from the database
     // This follows the same query structure as the API endpoint but with direct DB access
+    console.log(`[getZoneStatistics] DEBUG - Query parameters: zoneId=${zoneId}, eventId=${eventId}`);
+    
+    // First check if there are any teams in this zone to confirm our data model is correct
+    const zoneTeamCount = await prismaExecute<number>(async (prisma) => {
+      return prisma.team.count({
+        where: {
+          contingent: {
+            OR: [
+              { school: { state: { zoneId } } },
+              { independent: { state: { zoneId } } }
+            ]
+          }
+        }
+      });
+    });
+    
+    console.log(`[getZoneStatistics] DEBUG - Found ${zoneTeamCount} teams in zone ${zoneId} before applying event filter`);
+    
+    // Check if there are any eventcontestteams for this event
+    const eventTeamCount = await prismaExecute<number>(async (prisma) => {
+      return prisma.eventcontestteam.count({
+        where: {
+          eventcontest: {
+            eventId: eventId,
+          },
+        }
+      });
+    });
+    
+    console.log(`[getZoneStatistics] DEBUG - Found ${eventTeamCount} event contest teams for event ${eventId} before applying zone filter`);
+    
+    // Try a broader query first with less filtering to see what data exists
+    // Let's go back to basics with a simpler approach - first get all teams in the zone
+    const statesInZone = await prismaExecute<{id: number, name: string}[]>(async (prisma) => {
+      return prisma.state.findMany({
+        where: { zoneId },
+        select: { id: true, name: true },
+      });
+    });
+    
+    console.log(`[getZoneStatistics] DEBUG - Found ${statesInZone.length} states in zone ${zoneId}:`, 
+      statesInZone.map(s => `${s.name} (${s.id})`).join(', '));
+    
+    if (statesInZone.length === 0) {
+      console.error(`[getZoneStatistics] ERROR - No states found in zone ${zoneId}`);
+      throw new Error(`No states found in zone ${zoneId}`);
+    }
+    
+    // Get all state IDs in this zone
+    const stateIds = statesInZone.map(s => s.id);
+    
+    // Instead of complex joins, use a direct raw SQL query to ensure data consistency
+    // This will query the primary tables directly
+    const rawTeamData: TeamRawDataItem[] = [];
+    
+    // Implement a fallback mechanism - if we can't get teams through regular prisma query,
+    // use a simpler approach to at least get something to display
+    try {
+      // Get all teams in the active event for this zone via simpler query
+      // Specify Prisma.Prisma.$QueryRawArgs<any> for raw SQL query result
+      // This tells TypeScript that the result will be an array
+      const teamDataFromEvent = await prismaExecute<any[]>(async (prisma) => {
+        // First get teams for this event in these states
+        // Use simpler join approach to ensure we get results
+        // Use Prisma.sql to ensure type safety with the raw query
+        const results = await prisma.$queryRaw<any[]>`
+          -- Raw SQL query to get zone statistics directly
+          SELECT 
+            e.id as eventId, e.name as eventName,
+            z.id as zoneId, z.name as zoneName,
+            s.id as stateId, s.name as stateName, 
+            c.id as contestId, c.name as contestName, c.code as contestCode,
+            cont.id as contingentId, cont.name as contingentName, cont.contingentType,
+            t.id as teamId, t.name as teamName,
+            (SELECT COUNT(*) FROM teammember WHERE teammember.teamId = t.id) as numberOfMembers,
+            tg.schoolLevel
+          FROM team t
+          JOIN contingent cont ON t.contingentId = cont.id
+          LEFT JOIN school sch ON cont.schoolId = sch.id
+          LEFT JOIN independent ind ON cont.independentId = ind.id
+          JOIN state s ON (sch.stateId = s.id OR ind.stateId = s.id)
+          JOIN zone z ON s.zoneId = z.id
+          JOIN eventcontestteam ect ON ect.teamId = t.id
+          JOIN eventcontest ec ON ect.eventcontestId = ec.id
+          JOIN contest c ON ec.contestId = c.id
+          JOIN event e ON ec.eventId = e.id
+          LEFT JOIN contesttargetgroup tg ON c.id = tg.contestId AND tg.active = true
+          WHERE z.id = ${zoneId}
+          AND e.id = ${eventId}
+          AND e.active = true
+        `;
+        
+        return results;
+      });
+      
+      console.log(`[getZoneStatistics] DEBUG - Found ${teamDataFromEvent.length} teams using raw SQL query`);
+      
+      // Transform raw data to expected format
+      if (Array.isArray(teamDataFromEvent) && teamDataFromEvent.length > 0) {
+        for (const row of teamDataFromEvent) {
+          const r = row as any;
+          // Get contest level from school level
+          let contestLevel = null;
+          if (r.schoolLevel === 'Primary') contestLevel = 'Kids';
+          else if (r.schoolLevel === 'Secondary') contestLevel = 'Teens';
+          else if (r.schoolLevel === 'Higher Education') contestLevel = 'Youth';
+          
+          rawTeamData.push({
+            eventId: Number(r.eventId),
+            eventName: r.eventName,
+            zoneId: Number(r.zoneId),
+            zoneName: r.zoneName,
+            stateId: Number(r.stateId),
+            stateName: r.stateName,
+            contestId: Number(r.contestId),
+            contestName: r.contestName,
+            contestCode: r.contestCode,
+            contingentId: Number(r.contingentId),
+            contingentName: r.contingentName,
+            contingentType: r.contingentType,
+            teamId: Number(r.teamId),
+            teamName: r.teamName || `Team ${r.teamId}`,
+            numberOfMembers: Number(r.numberOfMembers),
+            schoolLevel: r.schoolLevel,
+            contestLevel: contestLevel,
+            independentType: r.contingentType === 'INDEPENDENT' ? 'independent' : null
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[getZoneStatistics] Error in raw SQL query:`, error);
+      // Continue execution - we'll try standard query as fallback
+    }
+    
+    // If we got data from raw SQL, skip the complex query
+    if (rawTeamData.length > 0) {
+      console.log(`[getZoneStatistics] Using ${rawTeamData.length} teams from raw SQL query instead of complex query`);
+      // Process data directly
+      const teamData = rawTeamData.filter(team => team.numberOfMembers > 0);
+      
+      console.log(`[getZoneStatistics] After filtering empty teams: ${teamData.length} teams remain from raw SQL`);
+      
+      // Log the team data for debugging
+      logTeamData(teamData);
+
+      // Process the team data 
+      const { 
+        groupedData, 
+        uniqueTeamIds, 
+        uniqueContestantIds, 
+        uniqueSchoolIds, 
+        uniqueContingentIds, 
+        independentContingentIds, 
+        contingentTeams,
+        contingentMembers
+      } = processTeamRawData(teamData);
+
+      // Generate contingent summaries
+      const stateContingentSummaries = generateContingentSummaries(groupedData, contingentTeams, contingentMembers);
+      
+      // Create a summary
+      let totalTeams = 0;
+      let totalContestants = 0;
+      
+      stateContingentSummaries.forEach(state => {
+        state.contingents.forEach(contingent => {
+          totalTeams += contingent.totalTeams;
+          totalContestants += contingent.totalContestants;
+        });
+      });
+      
+      const summary = {
+        schoolCount: uniqueSchoolIds.size,
+        teamCount: totalTeams,
+        contestantCount: totalContestants,
+        contingentCount: uniqueContingentIds.size,
+        independentCount: independentContingentIds.size
+      };
+      
+      return {
+        zone,
+        groupedData,
+        summary,
+        contingentSummary: stateContingentSummaries,
+        rawTeamData: teamData
+      };
+    }
+    
+    // If raw SQL didn't work, try with standard Prisma query as fallback
+    console.log(`[getZoneStatistics] Falling back to standard Prisma query`);
     const eventcontestteams = await prismaExecute(async (prisma) => {
       return prisma.eventcontestteam.findMany({
         where: {
           team: {
             contingent: {
               OR: [
-                {
-                  school: {
-                    state: {
-                      zoneId: zoneId
-                    }
-                  }
-                },
-                {
-                  independent: {
-                    state: {
-                      zoneId: zoneId
-                    }
-                  }
-                }
+                { school: { state: { zoneId } } },
+                { independent: { state: { zoneId } } }
               ]
             }
           },
           eventcontest: {
-            eventId: eventId,
-          },
+            eventId
+          }
         },
         include: {
           team: {
@@ -521,6 +699,63 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
 
     console.log(`[getZoneStatistics] Found ${eventcontestteams.length} event contest teams`);
 
+    console.log(`[getZoneStatistics] DEBUG - Found ${eventcontestteams.length} event contest teams with our query`);
+    
+    // Check if we actually have data in the result
+    if (eventcontestteams.length === 0) {
+      console.log(`[getZoneStatistics] WARNING - No event contest teams found for zone ${zoneId} and event ${eventId}`);
+      console.log(`[getZoneStatistics] Attempting to check if we have teams per state directly...`);
+      
+      // Check each state individually
+      for (const state of statesInZone) {
+        const teamsInState = await prismaExecute<number>(async (prisma) => {
+          return prisma.team.count({
+            where: {
+              contingent: {
+                OR: [
+                  { schoolId: { not: null }, school: { stateId: state.id } },
+                  { independentId: { not: null }, independent: { stateId: state.id } }
+                ]
+              }
+            }
+          });
+        });
+        
+        console.log(`[getZoneStatistics] DEBUG - State ${state.name} (${state.id}) has ${teamsInState} teams`);
+        
+        // Also check eventcontest for this event
+        const eventContests = await prismaExecute<{id: number}[]>(async (prisma) => {
+          return prisma.eventcontest.findMany({
+            where: { eventId },
+            select: { id: true },
+          });
+        });
+        
+        if (eventContests.length > 0) {
+          // Also check events for this state
+          const eventteamsInState = await prismaExecute<number>(async (prisma) => {
+            return prisma.eventcontestteam.count({
+              where: {
+                eventcontestId: { in: eventContests.map((ec: {id: number}) => ec.id) },
+                team: {
+                  contingent: {
+                    OR: [
+                      { schoolId: { not: null }, school: { stateId: state.id } },
+                      { independentId: { not: null }, independent: { stateId: state.id } }
+                    ]
+                  }
+                }
+              }
+            });
+          });
+          
+          console.log(`[getZoneStatistics] DEBUG - State ${state.name} (${state.id}) has ${eventteamsInState} event contest teams`);
+        } else {
+          console.log(`[getZoneStatistics] DEBUG - No eventcontests found for event ${eventId}`);
+        }
+      }
+    }
+    
     // Transform the prisma data to match the expected API response format
     const transformedTeamItems: TeamRawDataItem[] = eventcontestteams.map(ect => {
       // Need to use type assertion since Prisma's type doesn't match our expected structure
@@ -532,6 +767,10 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       const eventcontest = ectAny.eventcontest;
       const contest = eventcontest.contest;
       const event = eventcontest.event;
+      
+      // Log all included data to help debug
+      console.log(`[getZoneStatistics] DEBUG - Processing team ID ${team.id} in contingent ${contingent.name} (${contingent.id})`);
+
       
       // Determine state information based on contingent type
       const stateInfo = contingent.school?.state || contingent.independent?.state;
