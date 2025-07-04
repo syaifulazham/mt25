@@ -6,17 +6,20 @@ import { NextResponse } from "next/server";
  * API handler for fetching raw team data for debugging purposes
  * This endpoint returns the raw data used to generate contest statistics
  */
+// Add the 'export const dynamic = "force-dynamic"' to explicitly mark this route as dynamic
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   // For debugging purposes, we're skipping strict authentication checks
   // In a production environment, you would want to implement proper authentication
   // This endpoint is only for debugging purposes
   
   try {
-    // Parse query parameters
-    const url = new URL(request.url);
-    const eventIdParam = url.searchParams.get("eventId");
-    const zoneIdParam = url.searchParams.get("zoneId");
-    const stateIdParam = url.searchParams.get("stateId");
+    // Parse query parameters using the NextRequest object
+    const { searchParams } = new URL(request.url);
+    const eventIdParam = searchParams.get("eventId");
+    const zoneIdParam = searchParams.get("zoneId");
+    const stateIdParam = searchParams.get("stateId");
     
     // Convert params to numbers if they exist
     const eventId = eventIdParam ? parseInt(eventIdParam, 10) : undefined;
