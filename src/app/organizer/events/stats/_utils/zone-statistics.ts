@@ -428,148 +428,281 @@ function processTeamRawData(teamItems: TeamRawDataItem[]): {
 }
 
 export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult> {
-  // First, get the zone to ensure it exists
-  const zone = await prismaExecute<ZoneData | null>((prisma) => prisma.zone.findUnique({
-    where: { id: zoneId },
-  }));
-  if (!zone) {
-    throw new Error(`Zone ${zoneId} not found.`);
-  }
-  
-  // Get the active event
-  const event = await prismaExecute<{ id: number } | null>((prisma) =>
-    prisma.event.findFirst({
-      where: { isActive: true },
-      select: { id: true },
-    })
-  );
+  try {
+    // First, get the zone to ensure it exists
+    const zone = await prismaExecute<ZoneData | null>((prisma) => prisma.zone.findUnique({
+      where: { id: zoneId },
+    }));
+    if (!zone) {
+      throw new Error(`Zone ${zoneId} not found.`);
+    }
+    
+    // Get the active event
+    const event = await prismaExecute<{ id: number } | null>((prisma) =>
+      prisma.event.findFirst({
+        where: { isActive: true },
+        select: { id: true },
+      })
+    );
 
-  if (!event) {
-    throw new Error("No active event found.");
-  }
-  const eventId = event.id;
+    if (!event) {
+      throw new Error("No active event found.");
+    }
+    const eventId = event.id;
+    
+    console.log(`[getZoneStatistics] Fetching data for zone ${zoneId} and event ${eventId}`);
 
-  // Get cookie for authentication
-  const cookieStore = cookies();
-  const cookieString = cookieStore.getAll()
-    .map((cookie) => `${cookie.name}=${cookie.value}`)
-    .join("; ");
-    
-  // Fetch raw team data from API
-  const apiUrl = new URL(`${process.env.NEXT_PUBLIC_BASE_URL}/api/organizer/events/teams-raw-data`);
-  // Using API's scopeArea filter instead of specific eventId
-  apiUrl.searchParams.append("zoneId", zoneId.toString());
-  apiUrl.searchParams.append("includeEmptyTeams", "false");
-  
-  const response = await fetch(apiUrl.toString(), {
-    headers: {
-      "Cookie": cookieString
-    },
-    cache: "no-store"
-  });
-  
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.statusText}`);
-  }
-  
-  // Parse the API response
-  const apiData = await response.json();
-  
-  // Check what the API actually returned
-  console.log(`[getZoneStatistics] API response structure:`, {
-    isArray: Array.isArray(apiData),
-    length: Array.isArray(apiData) ? apiData.length : (!Array.isArray(apiData) && apiData.teams ? apiData.teams.length : 'N/A'),
-    hasTeamsProperty: !Array.isArray(apiData) && apiData.teams ? true : false
-  });
-  
-  // Log the complete raw data for inspection (use a custom function to avoid console size limits)
-  function logTeamData(data: any): void {
-    console.log(`[getZoneStatistics] ===== COMPLETE RAW TEAM DATA FOR ZONE ${zoneId} =====`);
-    
-    // Log overall stats
-    const dataToUse = Array.isArray(data) ? data : (data.teams || []);
-    
-    // Count teams by contest
-    const teamsByContest: Record<string, number> = {};
-    const teamsByContestLevel: Record<string, number> = {};
-    const teamsByState: Record<string, number> = {};
-    const teamsByContingent: Record<string, number> = {};
-    const teamsByMemberCount: Record<string, number> = {};
-    
-    for (const team of dataToUse) {
-      // By contest
-      teamsByContest[team.contestName] = (teamsByContest[team.contestName] || 0) + 1;
+    // Instead of making an API call, fetch team data directly from the database
+    // This follows the same query structure as the API endpoint but with direct DB access
+    const eventcontestteams = await prismaExecute(async (prisma) => {
+      return prisma.eventcontestteam.findMany({
+        where: {
+          team: {
+            contingent: {
+              OR: [
+                {
+                  school: {
+                    state: {
+                      zoneId: zoneId
+                    }
+                  }
+                },
+                {
+                  independent: {
+                    state: {
+                      zoneId: zoneId
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          eventcontest: {
+            eventId: eventId,
+          },
+        },
+        include: {
+          team: {
+            include: {
+              members: {
+                select: {
+                  contestantId: true
+                }
+              },
+              contingent: {
+                include: {
+                  independent: {
+                    include: {
+                      state: true
+                    }
+                  },
+                  school: {
+                    include: {
+                      state: true
+                    }
+                  },
+                }
+              }
+            }
+          },
+          eventcontest: {
+            include: {
+              contest: {
+                include: {
+                  targetgroup: true
+                }
+              },
+              event: true
+            }
+          }
+        }
+      });
+    });
+
+    console.log(`[getZoneStatistics] Found ${eventcontestteams.length} event contest teams`);
+
+    // Transform the prisma data to match the expected API response format
+    const transformedTeamItems: TeamRawDataItem[] = eventcontestteams.map(ect => {
+      // Need to use type assertion since Prisma's type doesn't match our expected structure
+      // due to complex include patterns
+      const ectAny = ect as any;
+      // Extract needed data from the complex nested structure
+      const team = ectAny.team;
+      const contingent = team.contingent;
+      const eventcontest = ectAny.eventcontest;
+      const contest = eventcontest.contest;
+      const event = eventcontest.event;
       
-      // By contest level
-      teamsByContestLevel[team.contestLevel || 'Undefined'] = (teamsByContestLevel[team.contestLevel || 'Undefined'] || 0) + 1;
+      // Determine state information based on contingent type
+      const stateInfo = contingent.school?.state || contingent.independent?.state;
       
-      // By state
-      teamsByState[team.stateName] = (teamsByState[team.stateName] || 0) + 1;
+      // Handle target group and school level
+      const targetGroup = contest.targetgroup[0];
+      const schoolLevel = targetGroup?.schoolLevel;
       
-      // By contingent type
-      teamsByContingent[team.contingentType] = (teamsByContingent[team.contingentType] || 0) + 1;
+      // Get contest level from school level
+      let contestLevel = null;
+      if (schoolLevel === 'Primary') contestLevel = 'Kids';
+      else if (schoolLevel === 'Secondary') contestLevel = 'Teens';
+      else if (schoolLevel === 'Higher Education') contestLevel = 'Youth';
       
-      // By member count
-      teamsByMemberCount[team.numberOfMembers] = (teamsByMemberCount[team.numberOfMembers] || 0) + 1;
+      // Create an object that matches the expected API response structure
+      return {
+        eventId: event.id,
+        eventName: event.name,
+        zoneId: zoneId,
+        zoneName: zone.name,
+        stateId: stateInfo?.id || 0,
+        stateName: stateInfo?.name || 'Unknown',
+        contestId: contest.id,
+        contestName: contest.name,
+        contestCode: contest.code,
+        contingentId: contingent.id,
+        contingentName: contingent.name,
+        contingentType: contingent.contingentType,
+        teamId: team.id,
+        teamName: team.name || `Team ${team.id}`,
+        numberOfMembers: team.members.length,
+        schoolLevel: schoolLevel || null,
+        contestLevel: contestLevel || schoolLevel || null,
+        independentType: contingent.contingentType === 'INDEPENDENT' ? 'independent' : null,
+      };
+    });
+    
+    // Log transformed data for debugging
+    console.log(`[getZoneStatistics] Transformed ${transformedTeamItems.length} teams`);
+
+    // Filter out teams with no members
+    const teamData = transformedTeamItems.filter(team => team.numberOfMembers > 0);
+    console.log(`[getZoneStatistics] After filtering empty teams: ${teamData.length} teams remain`);
+
+    // Log the team data statistics
+    function logTeamData(data: TeamRawDataItem[]): void {
+      console.log(`[getZoneStatistics] ===== COMPLETE RAW TEAM DATA FOR ZONE ${zoneId} =====`);
+      
+      // Count teams by various properties
+      const teamsByContest: Record<string, number> = {};
+      const teamsByContestLevel: Record<string, number> = {};
+      const teamsByState: Record<string, number> = {};
+      const teamsByContingent: Record<string, number> = {};
+      const teamsByMemberCount: Record<string, number> = {};
+      
+      for (const team of data) {
+        // By contest
+        teamsByContest[team.contestName] = (teamsByContest[team.contestName] || 0) + 1;
+        
+        // By contest level
+        teamsByContestLevel[team.contestLevel || 'Undefined'] = (teamsByContestLevel[team.contestLevel || 'Undefined'] || 0) + 1;
+        
+        // By state
+        teamsByState[team.stateName] = (teamsByState[team.stateName] || 0) + 1;
+        
+        // By contingent type
+        teamsByContingent[team.contingentType] = (teamsByContingent[team.contingentType] || 0) + 1;
+        
+        // By member count
+        teamsByMemberCount[team.numberOfMembers] = (teamsByMemberCount[team.numberOfMembers] || 0) + 1;
+      }
+      
+      console.log(`[getZoneStatistics] TOTAL TEAMS IN RAW DATA: ${data.length}`);
+      console.log(`[getZoneStatistics] Teams by Contest:`, teamsByContest);
+      console.log(`[getZoneStatistics] Teams by Contest Level:`, teamsByContestLevel);
+      console.log(`[getZoneStatistics] Teams by State:`, teamsByState);
+      console.log(`[getZoneStatistics] Teams by Contingent Type:`, teamsByContingent);
+      console.log(`[getZoneStatistics] Teams by Member Count:`, teamsByMemberCount);
+      
+      // Count empty teams
+      const emptyTeams = data.filter(t => t.numberOfMembers === 0);
+      if (data.length > 0) {
+        console.log(`[getZoneStatistics] Teams with no members: ${emptyTeams.length} (${((emptyTeams.length / data.length) * 100).toFixed(1)}%)`);
+      }
+      
+      // Log first few empty teams for debugging
+      if (emptyTeams.length > 0) {
+        console.log(`[getZoneStatistics] Sample empty teams:`, emptyTeams.slice(0, 3));
+      }
     }
     
-    console.log(`[getZoneStatistics] TOTAL TEAMS IN RAW DATA: ${dataToUse.length}`);
-    console.log(`[getZoneStatistics] Teams by Contest:`, teamsByContest);
-    console.log(`[getZoneStatistics] Teams by Contest Level:`, teamsByContestLevel);
-    console.log(`[getZoneStatistics] Teams by State:`, teamsByState);
-    console.log(`[getZoneStatistics] Teams by Contingent Type:`, teamsByContingent);
-    console.log(`[getZoneStatistics] Teams by Member Count:`, teamsByMemberCount);
+      // Log the team data for debugging
+    logTeamData(teamData);
+
+    // Process the team data 
+    const { 
+      groupedData, 
+      uniqueTeamIds, 
+      uniqueContestantIds, 
+      uniqueSchoolIds, 
+      uniqueContingentIds, 
+      independentContingentIds, 
+      contingentTeams, // Get the contingent team map
+      contingentMembers  // Get the contingent members map
+    } = processTeamRawData(teamData);
+
+    // Generate contingent summaries using our helper function with all required parameters
+    const stateContingentSummaries = generateContingentSummaries(groupedData, contingentTeams, contingentMembers);
+
+    // Get all states in this zone (still need this for reference)
+    const states = await prismaExecute<StateData[]>((prisma) => prisma.state.findMany({
+      where: { zoneId },
+      select: {
+        id: true,
+        name: true
+      },
+      orderBy: { name: 'asc' }
+    }));
+
+    // Create a map of state IDs to state names for quick lookup
+    const stateNameMap = new Map<number, string>();
+    states.forEach(state => {
+      stateNameMap.set(state.id, state.name.replace('WILAYAH PERSEKUTUAN', 'WP'));
+    });
     
-    // Count empty teams
-    const emptyTeams = dataToUse.filter((t: TeamRawDataItem) => t.numberOfMembers === 0);
-    console.log(`[getZoneStatistics] Teams with no members: ${emptyTeams.length} (${((emptyTeams.length / dataToUse.length) * 100).toFixed(1)}%)`);
+    // Create the summary by aggregating counts from contingent summaries to ensure consistency
+    // First aggregate the counts from the contingentSummary to ensure they match
+    let totalTeams = 0;
+    let totalContestants = 0;
     
-    // Log first few empty teams for debugging
-    if (emptyTeams.length > 0) {
-      console.log(`[getZoneStatistics] Sample empty teams:`, emptyTeams.slice(0, 3));
-    }
-  }
-  
-  logTeamData(apiData);
-  
-  // Handle both response formats: array of teams or {teams: [...]} object
-  let teamData: TeamRawDataItem[] = [];
-  
-  if (Array.isArray(apiData)) {
-    // API returned array directly
-    teamData = apiData;
-    console.log(`[getZoneStatistics] API returned array of ${teamData.length} teams directly`);
-    // Log the first few items for debugging
-    if (teamData.length > 0) {
-      console.log(`[getZoneStatistics] Raw team data sample (first 2 items):`, 
-        JSON.stringify(teamData.slice(0, 2), null, 2));
-      // Log contestLevel values for debugging groups
-      const contestLevels = [...new Set(teamData.map(item => item.contestLevel || 'null'))];
-      console.log(`[getZoneStatistics] Available contestLevel values:`, contestLevels);
-      // Log schoolLevel values
-      const schoolLevels = [...new Set(teamData.map(item => item.schoolLevel || 'null'))];
-      console.log(`[getZoneStatistics] Available schoolLevel values:`, schoolLevels);
-    }
-  } else if (apiData && typeof apiData === 'object' && apiData.teams && Array.isArray(apiData.teams)) {
-    // API returned {teams: [...]} object
-    teamData = apiData.teams;
-    console.log(`[getZoneStatistics] API returned object with teams property containing ${teamData.length} teams`);
-    // Log the first few items for debugging
-    if (teamData.length > 0) {
-      console.log(`[getZoneStatistics] Raw team data sample (first 2 items):`, 
-        JSON.stringify(teamData.slice(0, 2), null, 2));
-      // Log contestLevel values for debugging groups
-      const contestLevels = [...new Set(teamData.map(item => item.contestLevel || 'null'))];
-      console.log(`[getZoneStatistics] Available contestLevel values:`, contestLevels);
-      // Log schoolLevel values
-      const schoolLevels = [...new Set(teamData.map(item => item.schoolLevel || 'null'))];
-      console.log(`[getZoneStatistics] Available schoolLevel values:`, schoolLevels);
-    }
-  } else {
-    console.error('[getZoneStatistics] API returned unexpected data format', apiData);
-    // Return empty results if data format is invalid
+    // Count across all contingent summaries to ensure numbers match
+    stateContingentSummaries.forEach(state => {
+      state.contingents.forEach(contingent => {
+        totalTeams += contingent.totalTeams;
+        totalContestants += contingent.totalContestants;
+      });
+    });
+    
+    // Now we can create a summary with consistent counts
+    const summary = {
+      schoolCount: uniqueSchoolIds.size,
+      teamCount: totalTeams, // Use aggregated team count from contingent summary
+      contestantCount: totalContestants, // Use aggregated contestant count from contingent summary
+      contingentCount: uniqueContingentIds.size, // Total contingents
+      independentCount: independentContingentIds.size // Independent contingents
+    };
+    
+    // Log the counts for debugging
+    console.log(`[getZoneStatistics] SUMMARY COUNTS:`, {
+      schoolCount: summary.schoolCount,
+      teamCount: summary.teamCount, 
+      contestantCount: summary.contestantCount,
+      contingentCount: summary.contingentCount,
+      independentCount: summary.independentCount,
+      rawUniqueTeamCount: uniqueTeamIds.size,
+      rawUniqueContestantCount: uniqueContestantIds.size
+    });
+
     return {
       zone,
+      groupedData,
+      summary,
+      contingentSummary: stateContingentSummaries,
+      rawTeamData: teamData
+    };
+  } catch (error) {
+    console.error(`[getZoneStatistics] Error processing zone statistics for zone ${zoneId}:`, error);
+    
+    // Return empty results if there's an error
+    return {
+      zone: null,
       groupedData: [],
       summary: {
         schoolCount: 0,
@@ -581,78 +714,4 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       contingentSummary: []
     };
   }
-
-  // Process the team data 
-  const { 
-    groupedData, 
-    uniqueTeamIds, 
-    uniqueContestantIds, 
-    uniqueSchoolIds, 
-    uniqueContingentIds, 
-    independentContingentIds, 
-    contingentTeams, // Get the contingent team map
-    contingentMembers  // Get the contingent members map
-  } = processTeamRawData(teamData);
-
-  // Generate contingent summaries using our helper function with all required parameters
-  const stateContingentSummaries = generateContingentSummaries(groupedData, contingentTeams, contingentMembers);
-
-  // Get all states in this zone (still need this for reference)
-  const states = await prismaExecute<StateData[]>((prisma) => prisma.state.findMany({
-    where: { zoneId },
-    select: {
-      id: true,
-      name: true
-    },
-    orderBy: { name: 'asc' }
-  }));
-
-  // Create a map of state IDs to state names for quick lookup
-  const stateNameMap = new Map<number, string>();
-  states.forEach(state => {
-    stateNameMap.set(state.id, state.name.replace('WILAYAH PERSEKUTUAN', 'WP'));
-  });
-  
-  // Create the summary by aggregating counts from contingent summaries to ensure consistency
-  // First aggregate the counts from the contingentSummary to ensure they match
-  let totalTeams = 0;
-  let totalContestants = 0;
-  
-  // Count across all contingent summaries to ensure numbers match
-  stateContingentSummaries.forEach(state => {
-    state.contingents.forEach(contingent => {
-      totalTeams += contingent.totalTeams;
-      totalContestants += contingent.totalContestants;
-    });
-  });
-  
-  // Now we can create a summary with consistent counts
-  const summary = {
-    schoolCount: uniqueSchoolIds.size,
-    teamCount: totalTeams, // Use aggregated team count from contingent summary
-    contestantCount: totalContestants, // Use aggregated contestant count from contingent summary
-    contingentCount: uniqueContingentIds.size, // Total contingents
-    independentCount: independentContingentIds.size // Independent contingents
-  };
-  
-  // Log the counts for debugging
-  console.log(`[getZoneStatistics] SUMMARY COUNTS:`, {
-    schoolCount: summary.schoolCount,
-    teamCount: summary.teamCount, 
-    contestantCount: summary.contestantCount,
-    contingentCount: summary.contingentCount,
-    independentCount: summary.independentCount,
-    rawUniqueTeamCount: uniqueTeamIds.size,
-    rawUniqueContestantCount: uniqueContestantIds.size
-  });
-
-  // We already have the contingent summaries from our helper function
-
-  return {
-    zone,
-    groupedData,
-    summary,
-    contingentSummary: stateContingentSummaries,
-    rawTeamData: teamData
-  };
 }
