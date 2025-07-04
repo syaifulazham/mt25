@@ -3,6 +3,9 @@ import { compare, hash } from 'bcryptjs';
 import * as jose from 'jose';
 import { cookies } from 'next/headers';
 
+// Re-export authOptions from the correct location
+export { authOptions } from '@/app/api/auth/auth-options';
+
 const prisma = new PrismaClient();
 
 // Types
