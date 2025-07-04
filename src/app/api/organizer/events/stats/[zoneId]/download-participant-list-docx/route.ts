@@ -17,6 +17,8 @@ type ParticipantData = {
   gender: string;
   contingentName: string;
   stateName: string;
+  teamName: string;
+  inMultipleTeams: boolean;
 };
 
 type ContingentGroup = {
@@ -96,8 +98,17 @@ function createHeaderRow() {
       }),
       new TableCell({
         children: [new Paragraph({ text: 'Name', alignment: AlignmentType.LEFT, heading: HeadingLevel.HEADING_4 })],
-
-        width: { size: 50, type: 'pct' }, // Increased from 30% to 50% to provide more space for names
+        width: { size: 30, type: 'pct' }, 
+        borders: {
+          bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+          top: { style: BorderStyle.NONE },
+          left: { style: BorderStyle.NONE },
+          right: { style: BorderStyle.NONE },
+        }
+      }),
+      new TableCell({
+        children: [new Paragraph({ text: 'Team Name', alignment: AlignmentType.LEFT, heading: HeadingLevel.HEADING_4 })],
+        width: { size: 15, type: 'pct' },
         borders: {
           bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
           top: { style: BorderStyle.NONE },
