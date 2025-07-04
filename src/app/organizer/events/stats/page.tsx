@@ -304,10 +304,9 @@ async function ContestStatsServer({ states, zones, searchParams }: {
   
   return (
     <ContestStatsClient 
-      groupedContests={contestStats.groupedContests}
-      summary={contestStats.summary}
-      zoneFilters={zones}
-      stateFilters={statesWithZoneId}
+      initialStats={contestStats}
+      zones={zones}
+      states={statesWithZoneId}
     />
   );
 }

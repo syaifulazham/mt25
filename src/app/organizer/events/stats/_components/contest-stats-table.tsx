@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { 
   Table, 
   TableBody, 
@@ -12,6 +12,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContestItem, ContestLevelGroup, ContestStatsResult } from "../_utils/contest-statistics";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 type FilterOption = { id: number; name: string };
@@ -25,19 +27,16 @@ type ContestStatsTableProps = {
     totalContests: number;
     totalTeams: number;
     totalContingents: number;
-    totalContestants: number;
   };
-  zoneFilters: ZoneFilter[];
-  stateFilters: StateFilter[];
-  onFilterChange?: (filters: { zoneId?: number, stateId?: number }) => void;
-  currentFilters?: { zoneId?: number, stateId?: number };
+  zoneFilters: FilterOption[];
+  onFilterChange?: (filters: { zoneId?: number; stateId?: number }) => void;
+  currentFilters?: { zoneId?: number; stateId?: number };
 };
 
 export function ContestStatsTable({ 
   groupedContests: rawGroupedContests, 
   summary: rawSummary, 
   zoneFilters,
-  stateFilters,
   onFilterChange,
   currentFilters 
 }: ContestStatsTableProps) {
@@ -101,43 +100,80 @@ export function ContestStatsTable({
   
   // In the new structure, we don't use education levels anymore
 
-  // Local state for filters
-  const [selectedZone, setSelectedZone] = useState<string | undefined>(
-    currentFilters?.zoneId ? currentFilters.zoneId.toString() : undefined
-  );
-  
-  const [selectedState, setSelectedState] = useState<string | undefined>(
-    currentFilters?.stateId ? currentFilters.stateId.toString() : undefined
-  );
-  
-  // Filter states based on selected zone
-  const filteredStates = selectedZone === 'all' || !selectedZone
-    ? stateFilters
-    : stateFilters.filter(state => state.zoneId === parseInt(selectedZone, 10));
+  // Local state for filters and loading state
+  const [selectedZone, setSelectedZone] = useState<string>(currentFilters?.zoneId ? currentFilters.zoneId.toString() : "all");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Helper function to render the contest table with provided grouped contests
+  const renderContestTable = (contestGroups: ContestLevelGroup[]) => {
+    return (
+      <div className="space-y-6">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[180px]">Contest Level</TableHead>
+                <TableHead className="min-w-[140px]">Contest</TableHead>
+                <TableHead className="text-right">Contingents</TableHead>
+                <TableHead className="text-right">Teams</TableHead>
+                <TableHead className="text-right">Contestants</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {contestGroups.map((group) => (
+                <React.Fragment key={group.contestLevel}>
+                  {/* Level header row */}
+                  <TableRow className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-default">
+                    <TableCell colSpan={2} className="font-semibold">
+                      {group.contestLevel} Level
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {group.totals.contingentCount}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {group.totals.teamCount}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {group.totals.contestantCount}
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Contest rows */}
+                  {group.contests.map((contest) => (
+                    <TableRow key={contest.contestId} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                      <TableCell></TableCell>
+                      <TableCell>{contest.contestName} ({contest.contestCode})</TableCell>
+                      <TableCell className="text-right">{contest.contingentCount}</TableCell>
+                      <TableCell className="text-right">{contest.teamCount}</TableCell>
+                      <TableCell className="text-right">{contest.contestantCount}</TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
+              ))}
+
+              {/* Total row removed as per user request */}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    );
+  };
 
   // Handle zone filter change
   const handleZoneChange = (value: string) => {
+    console.log(`[ContestStatsTable] Zone tab changed to: ${value}`);
     setSelectedZone(value);
-    setSelectedState(undefined); // Reset state selection when zone changes
+    setIsLoading(true); // Show loading state when changing tabs
     
+    // If the onFilterChange callback exists, call it with the new filter
     if (onFilterChange) {
-      onFilterChange({
-        zoneId: value === "all" ? undefined : parseInt(value, 10),
-        stateId: undefined
-      });
-    }
-  };
-
-  // Handle state filter change
-  const handleStateChange = (value: string) => {
-    setSelectedState(value);
-    
-    if (onFilterChange) {
-      onFilterChange({
-        zoneId: selectedZone === "all" ? undefined : 
-               selectedZone ? parseInt(selectedZone, 10) : undefined,
-        stateId: value === "all" ? undefined : parseInt(value, 10)
-      });
+      const zoneIdFilter = value !== 'all' ? parseInt(value, 10) : undefined;
+      onFilterChange({ zoneId: zoneIdFilter, stateId: currentFilters?.stateId });
+      
+      // Simulate end of loading after a brief delay
+      setTimeout(() => setIsLoading(false), 500);
+    } else {
+      setIsLoading(false);
     }
   };
 
@@ -146,53 +182,44 @@ export function ContestStatsTable({
       {/* Filters */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Filter Options</CardTitle>
-          <CardDescription>Filter contest statistics by state</CardDescription>
+          <CardTitle className="text-lg">Contest Statistics by Zone</CardTitle>
+          <CardDescription>View contest statistics grouped by zone</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-6">
-            <div className="w-full max-w-xs">
-              <label className="text-sm font-medium mb-2 block">Zone</label>
-              <Select
-                value={selectedZone}
-                onValueChange={handleZoneChange}
-                disabled={!onFilterChange}
-              >
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="All Zones" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Zones</SelectItem>
-                  {zoneFilters && zoneFilters.map((zone) => (
-                    <SelectItem key={zone.id} value={zone.id.toString()}>
-                      {zone.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <Tabs defaultValue={selectedZone || 'all'} className="w-full" onValueChange={handleZoneChange}>
+            <TabsList className="mb-4 flex flex-wrap max-w-full overflow-x-auto gap-1">
+              <TabsTrigger value="all">All Zones</TabsTrigger>
+              {zoneFilters.map((zone) => (
+                <TabsTrigger key={zone.id} value={zone.id.toString()}>
+                  {zone.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
             
-            <div className="w-full max-w-xs">
-              <label className="text-sm font-medium mb-2 block">State</label>
-              <Select
-                value={selectedState}
-                onValueChange={handleStateChange}
-                disabled={!onFilterChange || (selectedZone !== 'all' && !selectedZone)}
-              >
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="All States" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All States</SelectItem>
-                  {filteredStates.map((state) => (
-                    <SelectItem key={state.id} value={state.id.toString()}>
-                      {state.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Empty TabsContent to preserve the tab functionality but not render anything inside them */}
+            <TabsContent value="all" />
+            {zoneFilters.map((zone) => (
+              <TabsContent key={zone.id} value={zone.id.toString()} />
+            ))}
+          </Tabs>
+          
+          {/* Contest table is now displayed outside the tabs */}
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="flex items-center justify-center space-x-2">
+                <Skeleton className="h-8 w-8 rounded-full animate-pulse" />
+              </div>
+              <p className="mt-2 text-gray-500">Loading contest statistics...</p>
             </div>
-          </div>
+          ) : groupedContests.length > 0 ? (
+            <div className="mt-6">
+              {renderContestTable(groupedContests)}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No contest data available for the selected filter.
+            </div>
+          )}
         </CardContent>
       </Card>
       
@@ -201,12 +228,10 @@ export function ContestStatsTable({
         <CardHeader className="py-3">
           <CardTitle>Statistics Summary</CardTitle>
           <CardDescription>
-            {currentFilters?.stateId ? (
-              <>Filtered by state: <span className="font-medium">{stateFilters.find(s => s.id === currentFilters.stateId)?.name}</span></>
-            ) : currentFilters?.zoneId ? (
+            {currentFilters?.zoneId ? (
               <>Filtered by zone: <span className="font-medium">{zoneFilters.find(z => z.id === currentFilters.zoneId)?.name}</span></>
             ) : (
-              "All zones and states"
+              "All zones"
             )}
           </CardDescription>
         </CardHeader>
