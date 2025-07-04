@@ -118,7 +118,7 @@ function createHeaderRow() {
       }),
       new TableCell({
         children: [new Paragraph({ text: 'IC', alignment: AlignmentType.CENTER, heading: HeadingLevel.HEADING_4 })],
-        width: { size: 20, type: 'pct' }, // Increased to fit 14 characters at font size 10
+        width: { size: 10, type: 'pct' },
         borders: {
           bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
           top: { style: BorderStyle.NONE },
@@ -154,9 +154,13 @@ function createHeaderRow() {
 function createContingentTable(contingent: ContingentGroup) {
   const rows: TableRow[] = [createHeaderRow()];
   const borderColor = "D9D9D9"; // Much lighter gray (was 808080)
+  const multiTeamColor = "FFDDDD"; // Light red background for multi-team members
 
   // Add participant rows with numbering that resets for each contingent
   contingent.participants.forEach((participant, index) => {
+    // Set background shading for participants in multiple teams
+    const shading = participant.inMultipleTeams ? multiTeamColor : undefined;
+    
     rows.push(
       new TableRow({
         children: [
@@ -170,7 +174,8 @@ function createContingentTable(contingent: ContingentGroup) {
               top: { style: BorderStyle.NONE },
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
-            }
+            },
+            shading: shading ? { fill: shading } : undefined
           }),
           new TableCell({
             children: [new Paragraph(participant.name)],
@@ -179,7 +184,18 @@ function createContingentTable(contingent: ContingentGroup) {
               top: { style: BorderStyle.NONE },
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
-            }
+            },
+            shading: shading ? { fill: shading } : undefined
+          }),
+          new TableCell({
+            children: [new Paragraph(participant.teamName)],
+            borders: {
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
+              top: { style: BorderStyle.NONE },
+              left: { style: BorderStyle.NONE },
+              right: { style: BorderStyle.NONE },
+            },
+            shading: shading ? { fill: shading } : undefined
           }),
           new TableCell({
             children: [new Paragraph(participant.ic)],
@@ -188,7 +204,8 @@ function createContingentTable(contingent: ContingentGroup) {
               top: { style: BorderStyle.NONE },
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
-            }
+            },
+            shading: shading ? { fill: shading } : undefined
           }),
           new TableCell({
             children: [new Paragraph({ 
@@ -200,7 +217,8 @@ function createContingentTable(contingent: ContingentGroup) {
               top: { style: BorderStyle.NONE },
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
-            }
+            },
+            shading: shading ? { fill: shading } : undefined
           }),
           new TableCell({
             children: [new Paragraph({ 
@@ -212,7 +230,8 @@ function createContingentTable(contingent: ContingentGroup) {
               top: { style: BorderStyle.NONE },
               left: { style: BorderStyle.NONE },
               right: { style: BorderStyle.NONE },
-            }
+            },
+            shading: shading ? { fill: shading } : undefined
           }),
         ],
       })
@@ -494,12 +513,16 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
 
     // Transform data for document creation
     const participantData: ParticipantData[] = participants.map(contestant => {
-      // Get the first team (assuming a contestant might be in multiple teams)
+      // Check if contestant is in multiple teams
+      const inMultipleTeams = contestant.teamMembers.length > 1;
+      
+      // Get the first team
       const team = contestant.teamMembers[0]?.team;
       const contingent = team?.contingent;
       
       let stateName = 'Unknown';
       let contingentName = 'Unknown';
+      let teamName = team?.name || 'Unknown';
       
       if (contingent) {
         if (contingent.school) {
@@ -515,9 +538,11 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
         name: contestant.name,
         ic: contestant.ic || 'N/A',
         classGrade: contestant.class_grade || 'N/A',
-        gender: contestant.gender,
+        gender: contestant.gender || 'N/A',
         contingentName,
-        stateName
+        stateName,
+        teamName,
+        inMultipleTeams
       };
     });
 
