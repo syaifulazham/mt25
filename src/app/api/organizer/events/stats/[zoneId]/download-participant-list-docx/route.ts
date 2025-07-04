@@ -21,10 +21,15 @@ type ParticipantData = {
   inMultipleTeams: boolean;
 };
 
+type TeamGroup = {
+  teamName: string;
+  participants: ParticipantData[];
+};
+
 type ContingentGroup = {
   contingentName: string;
   contingentType: string;
-  participants: ParticipantData[];
+  teams: TeamGroup[];
 };
 
 type StateGroup = {
@@ -32,22 +37,34 @@ type StateGroup = {
   contingents: ContingentGroup[];
 };
 
-// Helper function to group participants by state and contingent
+// Helper function to group participants by state, contingent, and team
 function groupParticipantsByStateAndContingent(participants: ParticipantData[]): StateGroup[] {
-  const stateMap = new Map<string, Map<string, ParticipantData[]>>();
+  const stateMap = new Map<string, Map<string, Map<string, ParticipantData[]>>>();
 
-  // Group participants by state and contingent
+  // Group participants by state, contingent, and team
   for (const participant of participants) {
+    // Initialize state if not exists
     if (!stateMap.has(participant.stateName)) {
-      stateMap.set(participant.stateName, new Map<string, ParticipantData[]>());
+      stateMap.set(participant.stateName, new Map<string, Map<string, ParticipantData[]>>());
     }
     
     const contingentMap = stateMap.get(participant.stateName)!;
+    
+    // Initialize contingent if not exists
     if (!contingentMap.has(participant.contingentName)) {
-      contingentMap.set(participant.contingentName, []);
+      contingentMap.set(participant.contingentName, new Map<string, ParticipantData[]>());
     }
     
-    contingentMap.get(participant.contingentName)!.push(participant);
+    const teamMap = contingentMap.get(participant.contingentName)!;
+    
+    // Initialize team if not exists
+    const teamName = participant.teamName || 'Unassigned';
+    if (!teamMap.has(teamName)) {
+      teamMap.set(teamName, []);
+    }
+    
+    // Add participant to team
+    teamMap.get(teamName)!.push(participant);
   }
 
   // Convert map to array structure
@@ -64,10 +81,23 @@ function groupParticipantsByStateAndContingent(participants: ParticipantData[]):
     const sortedContingents = Array.from(contingentMap.keys()).sort();
     
     for (const contingentName of sortedContingents) {
+      const teamMap = contingentMap.get(contingentName)!;
+      const teams: TeamGroup[] = [];
+      
+      // Sort teams alphabetically
+      const sortedTeams = Array.from(teamMap.keys()).sort();
+      
+      for (const teamName of sortedTeams) {
+        teams.push({
+          teamName,
+          participants: teamMap.get(teamName)!.sort((a, b) => a.name.localeCompare(b.name))
+        });
+      }
+      
       contingents.push({
         contingentName,
         contingentType: "N/A", // We'll set this properly when we have the data
-        participants: contingentMap.get(contingentName)!.sort((a, b) => a.name.localeCompare(b.name))
+        teams
       });
     }
     
@@ -150,14 +180,14 @@ function createHeaderRow() {
   });
 }
 
-// Helper function to create a table for a single contingent
-function createContingentTable(contingent: ContingentGroup) {
+// Helper function to create a table for a single team
+function createTeamTable(team: TeamGroup) {
   const rows: TableRow[] = [createHeaderRow()];
   const borderColor = "D9D9D9"; // Much lighter gray (was 808080)
   const multiTeamColor = "FFDDDD"; // Light red background for multi-team members
 
-  // Add participant rows with numbering that resets for each contingent
-  contingent.participants.forEach((participant, index) => {
+  // Add participant rows with numbering that resets for each team
+  team.participants.forEach((participant: ParticipantData, index: number) => {
     // Set background shading for participants in multiple teams
     const shading = participant.inMultipleTeams ? multiTeamColor : undefined;
     
@@ -234,23 +264,48 @@ function createContingentTable(contingent: ContingentGroup) {
             shading: shading ? { fill: shading } : undefined
           }),
         ],
-      })
+      }),
     );
   });
 
-  // Return the complete table
-  return new Table({
-    width: { size: 100, type: 'pct' },
-    borders: {
-      top: { style: BorderStyle.NONE },
-      bottom: { style: BorderStyle.NONE },
-      left: { style: BorderStyle.NONE },
-      right: { style: BorderStyle.NONE },
-      insideHorizontal: { style: BorderStyle.SINGLE, size: 1, color: borderColor },
-      insideVertical: { style: BorderStyle.NONE },
-    },
+  return new Table({ 
+    width: { size: 100, type: WidthType.PERCENTAGE }, 
     rows,
   });
+}
+
+// Helper function to create tables for all teams in a contingent
+function createContingentTables(contingent: ContingentGroup) {
+  const elements: (Paragraph | Table)[] = [];
+  
+  // Create a table for each team in the contingent
+  contingent.teams.forEach((team: TeamGroup) => {
+    // Add team name as a subheading
+    elements.push(
+      new Paragraph({
+        text: `Team: ${team.teamName}`,
+        heading: HeadingLevel.HEADING_3,
+        spacing: {
+          after: 200
+        }
+      })
+    );
+    
+    // Add table for this team
+    elements.push(createTeamTable(team));
+    
+    // Add space after each team section
+    elements.push(
+      new Paragraph({
+        text: "",
+        spacing: {
+          after: 300
+        }
+      })
+    );
+  });
+  
+  return elements;
 }
 
 // Helper function to create summary counts table
@@ -329,8 +384,8 @@ function createStateGroupElements(stateGroup: StateGroup) {
       })
     );
     
-    // Add table for this contingent
-    elements.push(createContingentTable(contingent));
+    // Add tables for all teams in this contingent
+    elements.push(...createContingentTables(contingent));
     
     // Add spacing after table
     elements.push(new Paragraph({ spacing: { after: 300 } }));
