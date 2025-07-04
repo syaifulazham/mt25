@@ -555,6 +555,11 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
                         }
                       }
                     }
+                  },
+                  eventcontestteam: {
+                    include: {
+                      eventcontest: true
+                    }
                   }
                 }
               }
@@ -568,8 +573,51 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
 
     // Transform data for document creation
     const participantData: ParticipantData[] = participants.map(contestant => {
-      // Check if contestant is in multiple teams
-      const inMultipleTeams = contestant.teamMembers.length > 1;
+      // Check if contestant is in multiple teams for the same event
+      let inMultipleTeams = false;
+      
+      // If contestant has multiple team memberships, check if they're for the same event
+      if (contestant.teamMembers.length > 1) {
+        // Get all eventIds that this contestant's teams are registered for
+        const teamEventMap = new Map<number, Set<number>>(); // Map of teamId -> Set of eventIds
+        
+        // Collect all events per team
+        contestant.teamMembers.forEach(teamMember => {
+          if (teamMember.team?.id && teamMember.team.eventcontestteam) {
+            const teamId = teamMember.team.id;
+            if (!teamEventMap.has(teamId)) {
+              teamEventMap.set(teamId, new Set());
+            }
+            
+            // Add all events this team is registered for
+            teamMember.team.eventcontestteam.forEach(ect => {
+              if (ect.eventcontest?.eventId) {
+                teamEventMap.get(teamId)?.add(ect.eventcontest.eventId);
+              }
+            });
+          }
+        });
+        
+        // Check if there are shared events across teams
+        const eventToTeamsMap = new Map<number, Set<number>>(); // Map of eventId -> Set of teamIds
+        
+        // Build the inverse mapping
+        teamEventMap.forEach((eventIds, teamId) => {
+          eventIds.forEach(eventId => {
+            if (!eventToTeamsMap.has(eventId)) {
+              eventToTeamsMap.set(eventId, new Set());
+            }
+            eventToTeamsMap.get(eventId)?.add(teamId);
+          });
+        });
+        
+        // If any event has multiple teams, the contestant is in multiple teams for the same event
+        eventToTeamsMap.forEach((teamIds) => {
+          if (teamIds.size > 1) {
+            inMultipleTeams = true;
+          }
+        });
+      }
       
       // Get the first team
       const team = contestant.teamMembers[0]?.team;
@@ -609,14 +657,27 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
     // Calculate counts for summary table
     let totalContingents = 0;
     let totalTeams = new Set<number>(); // Use Set to track unique team IDs
+    let uniqueContestants = new Set<string>(); // Set to track unique contestid+contestantid combinations
     
-    // Extract unique team IDs
+    // Extract unique team IDs and unique contestant IDs
     // The participants data structure comes from the database query and contains team members
     participants.forEach(participant => {
       // Each contestant can be in multiple teams via team_member records
       participant.teamMembers?.forEach(teamMember => {
         if (teamMember.team?.id) {
           totalTeams.add(teamMember.team.id);
+          
+          // Create unique key for this contestant in this contest
+          if (teamMember.team.eventcontestteam && teamMember.team.eventcontestteam.length > 0) {
+            teamMember.team.eventcontestteam.forEach(ect => {
+              if (ect.eventcontest?.contestId && participant.id) {
+                uniqueContestants.add(`${ect.eventcontest.contestId}-${participant.id}`);
+              }
+            });
+          } else {
+            // If no specific event contest, just add contestant ID
+            uniqueContestants.add(`default-${participant.id}`);
+          }
         }
       });
     });
@@ -626,7 +687,10 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
       totalContingents += stateGroup.contingents.length;
     });
     
-    console.log(`[download-participant-list-docx] Summary counts - Contingents: ${totalContingents}, Teams: ${totalTeams.size}, Contestants: ${participantData.length}`);
+    // Get the number of unique contestants
+    const uniqueContestantCount = uniqueContestants.size;
+    
+    console.log(`[download-participant-list-docx] Summary counts - Contingents: ${totalContingents}, Teams: ${totalTeams.size}, Contestants: ${uniqueContestantCount}`);
 
     // Generate the document
     const doc = new Document({
