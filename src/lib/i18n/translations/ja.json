@@ -127,6 +127,7 @@
   "dashboard.ineligible_members_count": "{count}名のメンバーが年齢要件により参加資格がありません",
   "dashboard.name": "名前",
   "dashboard.role": "役割",
+  "dashboard.trainer": "トレーナー",
   "dashboard.class_grade": "学年/クラス",
   "dashboard.darjah": "学年/",
   "dashboard.tingkatan": "クラス",

@@ -131,6 +131,7 @@
   "dashboard.age": "Age",
   "dashboard.name": "Name",
   "dashboard.role": "Role",
+  "dashboard.trainer": "Trainer",
   "dashboard.no_members": "No team members found",
   "dashboard.empty_team": "This team has no members",
   

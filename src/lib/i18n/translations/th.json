@@ -127,6 +127,7 @@
   "dashboard.ineligible_members_count": "สมาชิก {count} คนไม่มีสิทธิ์เนื่องจากข้อกำหนดด้านอายุ",
   "dashboard.name": "ชื่อ",
   "dashboard.role": "บทบาท",
+  "dashboard.trainer": "ผู้ฝึกสอน",
   "dashboard.class_grade": "ชั้นเรียน/ระดับ",
   "dashboard.darjah": "ชั้นเรียน/",
   "dashboard.tingkatan": "ระดับ",
