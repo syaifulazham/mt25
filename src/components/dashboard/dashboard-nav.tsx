@@ -89,6 +89,10 @@ export const navItems: NavItem[] = [
         href: "/organizer/events",
       },
       {
+        title: "Monitoring",
+        href: "/organizer/events/monitoring",
+      },
+      {
         title: "Stats",
         href: "/organizer/events/stats",
       },

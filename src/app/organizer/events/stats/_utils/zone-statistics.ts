@@ -506,7 +506,7 @@ export async function getZoneStatistics(zoneId: number | string): Promise<ZoneSt
     // Let's go back to basics with a simpler approach - first get all teams in the zone
     const statesInZone = await prismaExecute<{id: number, name: string}[]>(async (prisma) => {
       return prisma.state.findMany({
-        where: { zoneId },
+        where: { zoneId: zoneIdNumber },
         select: { id: true, name: true },
       });
     });
@@ -902,7 +902,7 @@ export async function getZoneStatistics(zoneId: number | string): Promise<ZoneSt
 
     // Get all states in this zone (still need this for reference)
     const states = await prismaExecute<StateData[]>((prisma) => prisma.state.findMany({
-      where: { zoneId },
+      where: { zoneId: zoneIdNumber },
       select: {
         id: true,
         name: true

@@ -115,33 +115,33 @@ model contingent {
 }
 
 model contestant {
-  id           Int                    @id @default(autoincrement())
-  name         String
-  ic           String?
-  email        String?
-  phoneNumber  String?
-  gender       String
-  birthdate    DateTime?
-  age          Int?
-  edu_level    String
-  class_grade  String?
-  class_name   String?
-  hashcode     String?                @unique
-  status       String                 @default("ACTIVE")
-  contingentId Int
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  createdById  Int?
-  updatedById  Int?
-  is_ppki      Boolean                @default(false)
-  contests     contestParticipation[]
-  contingent   contingent             @relation(fields: [contingentId], references: [id], onDelete: Cascade)
-  quizAttempts quiz_attempt[]
-  submissions  submission[]
-  teamMembers  teamMember[]
-  surveyAnswers survey_answer[]
-  surveyCompositions survey_contestants_composition[]
+  id                     Int                              @id @default(autoincrement())
+  name                   String
+  ic                     String?
+  email                  String?
+  phoneNumber            String?
+  gender                 String
+  birthdate              DateTime?
+  age                    Int?
+  edu_level              String
+  class_grade            String?
+  class_name             String?
+  hashcode               String?                          @unique
+  status                 String                           @default("ACTIVE")
+  contingentId           Int
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
+  createdById            Int?
+  updatedById            Int?
+  is_ppki                Boolean                          @default(false)
+  contests               contestParticipation[]
+  contingent             contingent                       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  quizAttempts           quiz_attempt[]
+  submissions            submission[]
+  surveyAnswers          survey_answer[]
+  surveyCompositions     survey_contestants_composition[]
   surveySubmissionStatus survey_submission_status[]
+  teamMembers            teamMember[]
 
   @@index([contingentId], map: "contestant_contingentId_fkey")
 }
@@ -166,6 +166,7 @@ model event {
   name          String
   scopeArea     scope_area     @default(OPEN)
   code          String         @unique(map: "Event_code_key")
+  status        String         @default("OPEN") @db.VarChar(20)
   description   String?
   startDate     DateTime
   endDate       DateTime
@@ -694,8 +695,8 @@ model team {
   evidence_doc           String?            @db.Text
   evidence_submitteddate DateTime?          @db.DateTime(0)
   eventcontestteam       eventcontestteam[]
-  independentManagers    manager[]          @relation("SingleTeam") // Old relation maintained for compatibility
-  managerTeams           manager_team[]     // New many-to-many relation
+  independentManagers    manager[]          @relation("SingleTeam")
+  managerTeams           manager_team[]
   contest                contest            @relation(fields: [contestId], references: [id])
   contingent             contingent         @relation(fields: [contingentId], references: [id])
   eventcontest           eventcontest?      @relation(fields: [eventcontestId], references: [id])
@@ -741,7 +742,7 @@ model manager {
   name        String
   ic          String
   hashcode    String           @unique
-  teamId      Int?             // Keeping for backward compatibility
+  teamId      Int?
   createdAt   DateTime         @default(dbgenerated("(now(3))"))
   updatedAt   DateTime         @updatedAt
   createdBy   Int
@@ -749,7 +750,7 @@ model manager {
   phoneNumber String?
   creator     user_participant @relation(fields: [createdBy], references: [id])
   team        team?            @relation("SingleTeam", fields: [teamId], references: [id])
-  teams       manager_team[]   // Relation to manager_team junction table
+  teams       manager_team[]
 
   @@index([teamId])
   @@index([createdBy])
@@ -769,19 +770,18 @@ model manager_team {
   @@index([teamId])
 }
 
-
 model survey {
-  id                     Int                           @id @default(autoincrement())
+  id                     Int                              @id @default(autoincrement())
   name                   String
-  description            String?                       @db.Text
-  status                 String                        @default("draft")
+  description            String?                          @db.Text
+  status                 String                           @default("draft")
   startDate              DateTime?
   endDate                DateTime?
-  createdAt              DateTime                      @default(now())
-  updatedAt              DateTime                      @updatedAt
-  questions              survey_question[]
-  contestantsComposition survey_contestants_composition[]
+  createdAt              DateTime                         @default(now())
+  updatedAt              DateTime                         @updatedAt
   answers                survey_answer[]
+  contestantsComposition survey_contestants_composition[]
+  questions              survey_question[]
   submissionStatus       survey_submission_status[]
 
   @@index([status])
@@ -797,8 +797,8 @@ model survey_question {
   displayOrder Int             @default(0)
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
-  survey       survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   answers      survey_answer[]
+  survey       survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   @@index([surveyId])
   @@index([surveyId, displayOrder])
@@ -808,8 +808,8 @@ model survey_contestants_composition {
   id           Int        @id @default(autoincrement())
   surveyId     Int
   contestantId Int
-  survey       survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  survey       survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   @@unique([surveyId, contestantId])
   @@index([surveyId])
@@ -823,9 +823,9 @@ model survey_answer {
   contestantId Int
   answer       Json?
   submittedAt  DateTime        @default(now())
-  survey       survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  question     survey_question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   contestant   contestant      @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  question     survey_question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  survey       survey          @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   @@index([surveyId])
   @@index([questionId])
@@ -841,8 +841,8 @@ model survey_submission_status {
   startedAt     DateTime?
   completedAt   DateTime?
   lastUpdatedAt DateTime   @default(now())
-  survey        survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
   contestant    contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+  survey        survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
 
   @@unique([surveyId, contestantId])
   @@index([surveyId])
@@ -851,57 +851,95 @@ model survey_submission_status {
 }
 
 model email_template {
-  id                   Int              @id @default(autoincrement())
-  template_name        String
-  title                String
-  subject              String
-  content              String           @db.Text
-  notes                String?          @db.Text
-  delivery_type        String           @default("MANUAL") // MANUAL or SCHEDULED
-  scheduled_datetime   DateTime?
-  created_at           DateTime         @default(now())
-  updated_at           DateTime         @updatedAt
-  created_by           Int?
-  is_active            Boolean          @default(true)
-  category             String?
-  available_placeholders String?         @db.Text
-  
-  // Relations
-  outgoing_emails      email_outgoing[]
-  campaigns            email_campaign[]
+  id                     Int              @id @default(autoincrement())
+  template_name          String
+  title                  String
+  content                String           @db.Text
+  subject                String
+  notes                  String?          @db.Text
+  delivery_type          String           @default("MANUAL")
+  scheduled_datetime     DateTime?
+  created_at             DateTime         @default(now())
+  updated_at             DateTime         @updatedAt
+  created_by             Int?
+  is_active              Boolean          @default(true)
+  category               String?
+  available_placeholders String?          @db.Text
+  campaigns              email_campaign[]
+  outgoing_emails        email_outgoing[]
 }
 
 model email_outgoing {
-  id               Int            @id @default(autoincrement())
-  campaign_id      Int?
-  recipient_id     Int?           @unique // One recipient can have only one outgoing email per campaign
+  id               Int              @id @default(autoincrement())
   template_id      Int?
   recipient_email  String
   subject          String
-  content          String         @db.Text
-  delivery_status  String         @default("PENDING") // PENDING, SENT, FAILED, SCHEDULED
-  is_delivered     Boolean        @default(false)
-  is_read          Boolean        @default(false)
+  content          String           @db.Text
+  delivery_status  String           @default("PENDING")
+  is_delivered     Boolean          @default(false)
+  is_read          Boolean          @default(false)
   sent_at          DateTime?
   read_at          DateTime?
-  error_message    String?        @db.Text
-  tracking_id      String?        @unique
-  created_at       DateTime       @default(now())
-  open_count       Int            @default(0)
-  click_count      Int            @default(0)
-  first_opened_at  DateTime?
-  last_opened_at   DateTime?
+  error_message    String?          @db.Text
+  tracking_id      String?          @unique
+  created_at       DateTime         @default(now())
+  campaign_id      Int?
+  click_count      Int              @default(0)
   first_clicked_at DateTime?
+  first_opened_at  DateTime?
   last_clicked_at  DateTime?
-  
-  // Relations
-  campaign         email_campaign? @relation(fields: [campaign_id], references: [id])
-  template         email_template? @relation(fields: [template_id], references: [id])
+  last_opened_at   DateTime?
+  open_count       Int              @default(0)
+  recipient_id     Int?             @unique
+  campaign         email_campaign?  @relation(fields: [campaign_id], references: [id])
   recipient        email_recipient? @relation("recipient_to_outgoing", fields: [recipient_id], references: [id])
-  
+  template         email_template?  @relation(fields: [template_id], references: [id])
+
   @@index([campaign_id])
   @@index([template_id])
   @@index([tracking_id])
+}
+
+model email_campaign {
+  id                 Int               @id @default(autoincrement())
+  campaign_name      String
+  description        String?           @db.Text
+  status             String            @default("DRAFT")
+  template_id        Int?
+  created_at         DateTime          @default(now())
+  updated_at         DateTime          @updatedAt
+  scheduled_datetime DateTime?
+  completed_datetime DateTime?
+  created_by         Int?
+  total_recipients   Int               @default(0)
+  successful_sends   Int               @default(0)
+  failed_sends       Int               @default(0)
+  open_count         Int               @default(0)
+  click_count        Int               @default(0)
+  template           email_template?   @relation(fields: [template_id], references: [id])
+  outgoing_emails    email_outgoing[]
+  recipients         email_recipient[]
+
+  @@index([template_id])
+}
+
+model email_recipient {
+  id             Int             @id @default(autoincrement())
+  campaign_id    Int
+  email          String
+  name           String?
+  source         String          @default("MANUAL")
+  source_id      Int?
+  status         String          @default("PENDING")
+  placeholders   Json?
+  sent_at        DateTime?
+  opened_at      DateTime?
+  clicked_at     DateTime?
+  outgoing_email email_outgoing? @relation("recipient_to_outgoing")
+  campaign       email_campaign  @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
+
+  @@index([campaign_id])
+  @@index([email])
 }
 
 enum contest_contestType {
@@ -975,52 +1013,4 @@ enum scope_area {
   STATE
   OPEN
   DISTRICT
-}
-
-// New models for email campaign/project system
-
-model email_campaign {
-  id                   Int                   @id @default(autoincrement())
-  campaign_name        String
-  description          String?               @db.Text
-  status               String                @default("DRAFT") // DRAFT, SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
-  template_id          Int?
-  created_at           DateTime              @default(now())
-  updated_at           DateTime              @updatedAt
-  scheduled_datetime   DateTime?
-  completed_datetime   DateTime?
-  created_by           Int?
-  total_recipients     Int                   @default(0)
-  successful_sends     Int                   @default(0)
-  failed_sends         Int                   @default(0)
-  open_count           Int                   @default(0)
-  click_count          Int                   @default(0)
-  
-  // Relations
-  template             email_template?       @relation(fields: [template_id], references: [id])
-  recipients           email_recipient[]
-  outgoing_emails      email_outgoing[]
-  
-  @@index([template_id])
-}
-
-model email_recipient {
-  id                   Int                   @id @default(autoincrement())
-  campaign_id          Int
-  email                String
-  name                 String?
-  source               String                @default("MANUAL") // CSV, PARTICIPANT, MANAGER, MANUAL
-  source_id            Int?                  // ID from the source table if applicable
-  status               String                @default("PENDING") // PENDING, SENT, FAILED, BOUNCED
-  placeholders         Json?                 // JSON object with placeholders for this recipient
-  sent_at              DateTime?
-  opened_at            DateTime?
-  clicked_at           DateTime?
-  
-  // Relations
-  campaign             email_campaign        @relation(fields: [campaign_id], references: [id], onDelete: Cascade)
-  outgoing_email       email_outgoing?       @relation("recipient_to_outgoing")
-  
-  @@index([campaign_id])
-  @@index([email])
 }
