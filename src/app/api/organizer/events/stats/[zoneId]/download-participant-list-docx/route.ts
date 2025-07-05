@@ -667,12 +667,20 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
     
     // Get the zoneStats to match the top summary numbers exactly
     try {
-      const { summary } = await getZoneStatistics(zoneId);
-      console.log(`[download-participant-list-docx] Got zone statistics summary:`, summary);
+      const zoneIdNumber = parseInt(zoneId, 10);
+      if (isNaN(zoneIdNumber)) {
+        throw new Error(`Invalid zoneId: ${zoneId}`);
+      }
+      
+      const zoneStats = await getZoneStatistics(zoneIdNumber);
+      console.log(`[download-participant-list-docx] Got zone statistics summary:`, zoneStats.summary);
       
       // Use the exact same numbers from the zone statistics summary
-      totalContingents = summary.contingentCount;
-      totalContestantCount = summary.contestantCount;
+      totalContingents = zoneStats.summary.contingentCount;
+      totalTeams = new Set(Array.from({ length: zoneStats.summary.teamCount }, (_, i) => i + 1));
+      totalContestantCount = zoneStats.summary.contestantCount;
+      
+      console.log(`[download-participant-list-docx] Using stats from getZoneStatistics: Contingents=${totalContingents}, Teams=${totalTeams.size}, Contestants=${totalContestantCount}`);
     } catch (error) {
       console.error(`[download-participant-list-docx] Error getting zone statistics:`, error);
       

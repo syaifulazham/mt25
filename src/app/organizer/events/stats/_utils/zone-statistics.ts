@@ -428,14 +428,20 @@ function processTeamRawData(teamItems: TeamRawDataItem[]): {
   };
 }
 
-export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult> {
+export async function getZoneStatistics(zoneId: number | string): Promise<ZoneStatsResult> {
+  // Ensure zoneId is a number
+  const zoneIdNumber = typeof zoneId === 'string' ? parseInt(zoneId, 10) : zoneId;
+  if (isNaN(zoneIdNumber)) {
+    throw new Error(`Invalid zoneId: ${zoneId}`);
+  }
+  // Use zoneIdNumber for all database queries
   try {
     // First, get the zone to ensure it exists
     const zone = await prismaExecute<ZoneData | null>((prisma) => prisma.zone.findUnique({
-      where: { id: zoneId },
+      where: { id: zoneIdNumber },
     }));
     if (!zone) {
-      throw new Error(`Zone ${zoneId} not found.`);
+      throw new Error(`Zone ${zoneIdNumber} not found.`);
     }
     
     // Get all events with scopeArea = ZONE (not just the active event)
@@ -461,11 +467,11 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
     const eventId = eventIds[0];
     
     
-    console.log(`[getZoneStatistics] Fetching data for zone ${zoneId} and event ${eventId}`);
+    console.log(`[getZoneStatistics] Fetching data for zone ${zoneIdNumber} and event ${eventId}`);
 
     // Instead of making an API call, fetch team data directly from the database
     // This follows the same query structure as the API endpoint but with direct DB access
-    console.log(`[getZoneStatistics] DEBUG - Query parameters: zoneId=${zoneId}, eventId=${eventId}`);
+    console.log(`[getZoneStatistics] DEBUG - Query parameters: zoneId=${zoneIdNumber}, eventId=${eventId}`);
     
     // First check if there are any teams in this zone to confirm our data model is correct
     const zoneTeamCount = await prismaExecute<number>(async (prisma) => {
@@ -473,15 +479,15 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
         where: {
           contingent: {
             OR: [
-              { school: { state: { zoneId } } },
-              { independent: { state: { zoneId } } }
+              { school: { state: { zoneId: zoneIdNumber } } },
+              { independent: { state: { zoneId: zoneIdNumber } } }
             ]
           }
         }
       });
     });
     
-    console.log(`[getZoneStatistics] DEBUG - Found ${zoneTeamCount} teams in zone ${zoneId} before applying event filter`);
+    console.log(`[getZoneStatistics] DEBUG - Found ${zoneTeamCount} teams in zone ${zoneIdNumber} before applying event filter`);
     
     // Check if there are any eventcontestteams for this event
     const eventTeamCount = await prismaExecute<number>(async (prisma) => {
@@ -505,12 +511,12 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       });
     });
     
-    console.log(`[getZoneStatistics] DEBUG - Found ${statesInZone.length} states in zone ${zoneId}:`, 
+    console.log(`[getZoneStatistics] DEBUG - Found ${statesInZone.length} states in zone ${zoneIdNumber}:`,  
       statesInZone.map(s => `${s.name} (${s.id})`).join(', '));
     
     if (statesInZone.length === 0) {
-      console.error(`[getZoneStatistics] ERROR - No states found in zone ${zoneId}`);
-      throw new Error(`No states found in zone ${zoneId}`);
+      console.error(`[getZoneStatistics] ERROR - No states found in zone ${zoneIdNumber}`);
+      throw new Error(`No states found in zone ${zoneIdNumber}`);
     }
     
     // Get all state IDs in this zone
@@ -661,8 +667,8 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
           team: {
             contingent: {
               OR: [
-                { school: { state: { zoneId } } },
-                { independent: { state: { zoneId } } }
+                { school: { state: { zoneId: zoneIdNumber } } },
+                { independent: { state: { zoneId: zoneIdNumber } } }
               ]
             }
           },
@@ -717,7 +723,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
     
     // Check if we actually have data in the result
     if (eventcontestteams.length === 0) {
-      console.log(`[getZoneStatistics] WARNING - No event contest teams found for zone ${zoneId} and event ${eventId}`);
+      console.log(`[getZoneStatistics] WARNING - No event contest teams found for zone ${zoneIdNumber} and event ${eventId}`);
       console.log(`[getZoneStatistics] Attempting to check if we have teams per state directly...`);
       
       // Check each state individually
@@ -803,7 +809,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       return {
         eventId: event.id,
         eventName: event.name,
-        zoneId: zoneId,
+        zoneId: zoneIdNumber,
         zoneName: zone.name,
         stateId: stateInfo?.id || 0,
         stateName: stateInfo?.name || 'Unknown',
@@ -831,7 +837,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
 
     // Log the team data statistics
     function logTeamData(data: TeamRawDataItem[]): void {
-      console.log(`[getZoneStatistics] ===== COMPLETE RAW TEAM DATA FOR ZONE ${zoneId} =====`);
+      console.log(`[getZoneStatistics] ===== COMPLETE RAW TEAM DATA FOR ZONE ${zoneIdNumber} =====`);
       
       // Count teams by various properties
       const teamsByContest: Record<string, number> = {};
@@ -951,7 +957,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       rawTeamData: teamData
     };
   } catch (error) {
-    console.error(`[getZoneStatistics] Error processing zone statistics for zone ${zoneId}:`, error);
+    console.error(`[getZoneStatistics] Error processing zone statistics for zone ${zoneIdNumber}:`, error);
     
     // Variables defined in try block won't be accessible here, so we need to handle them carefully
     let zoneData: ZoneData | null = null;
@@ -960,12 +966,12 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
     try {
       // First attempt to get the zone again
       zoneData = await prismaExecute<ZoneData | null>((prisma) => prisma.zone.findUnique({
-        where: { id: zoneId },
+        where: { id: zoneIdNumber },
       }));
       
       // Display more detailed debugging information
       console.error(`[getZoneStatistics] DEBUG - Error stack trace:`, error instanceof Error ? error.stack : 'No stack trace');
-      console.error(`[getZoneStatistics] DEBUG - Zone ID:`, zoneId);
+      console.error(`[getZoneStatistics] DEBUG - Zone ID:`, zoneIdNumber);
       
       // Try to get event ID
       const eventData = await prismaExecute<{ id: number } | null>((prisma) =>
@@ -979,7 +985,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
       // Check for states in zone
       const statesInZoneCheck = await prismaExecute<{id: number, name: string}[]>(async (prisma) => {
         return prisma.state.findMany({
-          where: { zoneId },
+          where: { zoneId: Number(zoneIdNumber) },
           select: { id: true, name: true },
         });
       });
@@ -1010,7 +1016,7 @@ export async function getZoneStatistics(zoneId: number): Promise<ZoneStatsResult
           LEFT JOIN school s ON c.schoolId = s.id
           LEFT JOIN independent i ON c.independentId = i.id
           JOIN state st ON (s.stateId = st.id OR i.stateId = st.id)
-          WHERE st.zoneId = ${zoneId}
+          WHERE st.zoneId = ${Number(zoneIdNumber)}
         `;
       });
       
