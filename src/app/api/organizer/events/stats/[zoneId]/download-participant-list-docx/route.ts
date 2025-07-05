@@ -3,6 +3,7 @@ import { Document, Paragraph, Table, TableRow, TableCell, HeadingLevel, Alignmen
 import { Packer } from "docx";
 import { prismaExecute } from "@/lib/prisma";
 import { authenticateOrganizerApi } from "@/lib/auth";
+import { getZoneStatistics } from "@/app/organizer/events/stats/_utils/zone-statistics";
 import { user_role } from "@prisma/client";
 import { headers } from "next/headers";
 
@@ -662,40 +663,38 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
     // Calculate counts for summary table
     let totalContingents = 0;
     let totalTeams = new Set<number>(); // Use Set to track unique team IDs
-    let uniqueContestants = new Set<string>(); // Set to track unique contestid+contestantid combinations
+    let totalContestantCount = 0; // Direct count of team memberships (not distinct)
     
-    // Extract unique team IDs and unique contestant IDs
-    // The participants data structure comes from the database query and contains team members
-    participants.forEach(participant => {
-      // Each contestant can be in multiple teams via team_member records
-      participant.teamMembers?.forEach(teamMember => {
-        if (teamMember.team?.id) {
-          totalTeams.add(teamMember.team.id);
-          
-          // Create unique key for this contestant in this contest
-          if (teamMember.team.eventcontestteam && teamMember.team.eventcontestteam.length > 0) {
-            teamMember.team.eventcontestteam.forEach(ect => {
-              if (ect.eventcontest?.contestId && participant.id) {
-                uniqueContestants.add(`${ect.eventcontest.contestId}-${participant.id}`);
-              }
-            });
-          } else {
-            // If no specific event contest, just add contestant ID
-            uniqueContestants.add(`default-${participant.id}`);
+    // Get the zoneStats to match the top summary numbers exactly
+    try {
+      const { summary } = await getZoneStatistics(zoneId);
+      console.log(`[download-participant-list-docx] Got zone statistics summary:`, summary);
+      
+      // Use the exact same numbers from the zone statistics summary
+      totalContingents = summary.contingentCount;
+      totalContestantCount = summary.contestantCount;
+    } catch (error) {
+      console.error(`[download-participant-list-docx] Error getting zone statistics:`, error);
+      
+      // Fallback to counting if zoneStatistics fails
+      // Extract unique team IDs and count team memberships directly (not distinct)
+      participants.forEach(participant => {
+        // Each contestant can be in multiple teams via team_member records
+        participant.teamMembers?.forEach(teamMember => {
+          if (teamMember.team?.id) {
+            totalTeams.add(teamMember.team.id);
+            totalContestantCount++; // Count each team membership as a contestant
           }
-        }
+        });
       });
-    });
+      
+      // Count unique contingents from grouped data
+      groupedData.forEach(stateGroup => {
+        totalContingents += stateGroup.contingents.length;
+      });
+    }
     
-    // Count unique contingents from grouped data
-    groupedData.forEach(stateGroup => {
-      totalContingents += stateGroup.contingents.length;
-    });
-    
-    // Get the number of unique contestants
-    const uniqueContestantCount = uniqueContestants.size;
-    
-    console.log(`[download-participant-list-docx] Summary counts - Contingents: ${totalContingents}, Teams: ${totalTeams.size}, Contestants: ${uniqueContestantCount}`);
+    console.log(`[download-participant-list-docx] Summary counts - Contingents: ${totalContingents}, Teams: ${totalTeams.size}, Contestants: ${totalContestantCount}`);
 
     // Generate the document
     const doc = new Document({
@@ -725,7 +724,7 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
               alignment: AlignmentType.CENTER,
               spacing: { after: 400 }, // Add some space after the timestamp
             }),
-            
+
             // Summary heading
             new Paragraph({
               text: `Summary`,
@@ -733,8 +732,8 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
               spacing: { before: 400, after: 200 },
             }),
             
-            // Summary counts table
-            createSummaryTable(totalContingents, totalTeams.size, participantData.length),
+            // Summary counts table - use totalContestantCount to match top summary exactly
+            createSummaryTable(totalContingents, totalTeams.size, totalContestantCount),
             
             // Add spacing after summary table
             new Paragraph({ spacing: { after: 400 } }),

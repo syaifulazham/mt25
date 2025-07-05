@@ -114,7 +114,20 @@ export function CompareTeamDataButton({ zoneId, zoneName }: CompareTeamDataButto
           <DialogHeader>
             <DialogTitle>Team Data Comparison for {zoneName} Zone</DialogTitle>
             <DialogDescription>
-              Comparing teams from teams-raw-data and Participant List
+              This comparison shows teams from both the raw data and participant list sources.
+              <div className="mt-2">
+                <strong>Raw Data Teams:</strong> {comparisonData?.rawDataTeams.length}
+                <br />
+                <strong>Participant List Teams:</strong> {comparisonData?.participantListTeams.length}
+                <br />
+                <strong>Teams in both sources:</strong> {comparisonData?.matchedTeams.filter(team => team.inBoth).length}
+                <br />
+                <strong className="text-blue-600">Note:</strong> Contestant counts may differ between summary views due to different counting methods. 
+                <ul className="list-disc ml-6 text-sm mt-1">
+                  <li>Top summary: Counts all team memberships</li>
+                  <li>Participant list: Counts unique contestant+contest combinations</li>
+                </ul>
+              </div>
             </DialogDescription>
           </DialogHeader>
 
