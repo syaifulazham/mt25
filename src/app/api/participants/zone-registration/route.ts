@@ -4,6 +4,9 @@ import { PrismaClient, team, contestant, contest } from "@prisma/client";
 const db = new PrismaClient();
 import { authOptions } from "@/lib/auth";
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic';
+
 interface TeamMember {
   id: number;
   teamId: number;

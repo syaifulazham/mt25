@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/session";
 
+// Force dynamic rendering for this API route
+export const dynamic = 'force-dynamic';
+
 // Define interface for user with role
 interface UserWithRole {
   id: number;
