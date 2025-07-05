@@ -35,6 +35,24 @@ interface TeamMember {
   mismatchContest: boolean;
 }
 
+interface TeamManager {
+  id: number;
+  participant?: {
+    id: number;
+    name: string;
+  };
+}
+
+interface ManagerTeam {
+  id: number;
+  manager: {
+    id: number;
+    name: string;
+    email?: string;
+    phoneNumber?: string;
+  };
+}
+
 interface Team {
   id: number;
   recordNumber: number;
@@ -47,6 +65,8 @@ interface Team {
   hasMembersOutsideAgeRange?: boolean;
   ineligibleMembersCount?: number;
   members: TeamMember[];
+  managers?: TeamManager[];
+  managerTeams?: ManagerTeam[];
 }
 
 export default function ZoneRegistrationSection({ participantId }: ZoneRegistrationProps) {
@@ -188,6 +208,7 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
               <TableHead className="w-12">#</TableHead>
               <TableHead>{t('dashboard.team_name')}</TableHead>
               <TableHead className="text-center">{t('dashboard.number_of_members')}</TableHead>
+              <TableHead>{t('dashboard.trainer')}</TableHead>
               <TableHead className="text-center">{t('dashboard.status')}</TableHead>
               <TableHead className="text-right">{t('dashboard.actions')}</TableHead>
             </TableRow>
@@ -214,6 +235,24 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
                   </div>
                 </TableCell>
                 <TableCell className="text-center">{team.numberOfMembers}</TableCell>
+                <TableCell>
+                  {team.managerTeams && team.managerTeams.length > 0
+                    ? <div className="flex flex-col">
+                        {team.managerTeams.map((mt, index) => (
+                          <div key={index} className="mb-1">
+                            <div className="font-medium cursor-pointer hover:text-primary hover:underline" 
+                                 onClick={() => mt.manager?.id && router.push(`/participants/managers/${mt.manager.id}/edit`)}>
+                              {index + 1}. {mt.manager?.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground pl-3">
+                              {mt.manager?.email || '-'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    : '-'
+                  }
+                </TableCell>
                 <TableCell className="text-center">
                   <span
                     className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

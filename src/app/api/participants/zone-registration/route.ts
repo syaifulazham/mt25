@@ -32,6 +32,21 @@ interface TeamWithRelations extends team {
     id: number;
     status: string;
   }[];
+  managerTeams?: {
+    id: number;
+    manager: {
+      id: number;
+      name: string;
+      email?: string;
+      phoneNumber?: string;
+    };
+  }[];
+  independentManagers?: {
+    id: number;
+    name: string;
+    email?: string;
+    phoneNumber?: string;
+  }[];
 }
 
 
@@ -117,6 +132,39 @@ export async function GET(req: NextRequest) {
               }
             }
           }
+        },
+        // Include the many-to-many relationship with managers through teamManager table
+        managers: {
+          include: {
+            participant: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        // Include the manager-team many-to-many relation
+        managerTeams: {
+          include: {
+            manager: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phoneNumber: true
+              }
+            }
+          }
+        },
+        // Include independent managers (one-to-many)
+        independentManagers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phoneNumber: true
+          }
         }
       }
     }) as unknown as TeamWithRelations[];
@@ -158,6 +206,19 @@ export async function GET(req: NextRequest) {
 
     // Format the response data
     console.log("Formatting teams data...");
+    
+    // Debug: Log the structure of the first team to check if managers are included
+    if (teams.length > 0) {
+      console.log("First team data structure:", JSON.stringify({
+        id: teams[0].id,
+        name: teams[0].name,
+        managerTeamsCount: teams[0].managerTeams?.length || 0,
+        managerTeams: teams[0].managerTeams,
+        independentManagersCount: teams[0].independentManagers?.length || 0,
+        independentManagers: teams[0].independentManagers
+      }, null, 2));
+    }
+    
     const formattedTeams = teams.map((team, index) => {
       // Check if any team member is in multiple teams
       const hasMultipleTeamMembers = team.members.some(
@@ -219,6 +280,8 @@ export async function GET(req: NextRequest) {
         hasMultipleTeamMembers,
         hasMembersOutsideAgeRange,
         ineligibleMembersCount, // Add count of ineligible members
+        // Include the managerTeams data in the response
+        managerTeams: team.managerTeams || [],
         members: team.members.map((member) => {
           // Use age directly from contestant model
 
