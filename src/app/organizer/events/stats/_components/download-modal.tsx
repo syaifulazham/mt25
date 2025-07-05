@@ -13,6 +13,7 @@ import { Download } from 'lucide-react';
 import { DownloadStatsDocxButton } from './download-stats-docx-button';
 import { DownloadContingentSummaryButton } from './download-contingent-summary-button';
 import { DownloadParticipantListButton } from './download-participant-list-button';
+import { CompareTeamDataButton } from './compare-team-data-button';
 
 interface DownloadModalProps {
   zoneId: number;
@@ -57,7 +58,10 @@ export function DownloadModal({ zoneId, zoneName, hasContingentData }: DownloadM
             <p className="text-xs text-muted-foreground mb-2">
               Download complete list of participants with personal details grouped by state and contingent
             </p>
-            <DownloadParticipantListButton zoneId={zoneId} zoneName={zoneName} />
+            <div className="flex gap-2">
+              <DownloadParticipantListButton zoneId={zoneId} zoneName={zoneName} />
+              <CompareTeamDataButton zoneId={zoneId} zoneName={zoneName} />
+            </div>
           </div>
         </div>
       </DialogContent>
