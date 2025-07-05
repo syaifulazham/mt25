@@ -53,10 +53,18 @@ export default function MonitoringPage() {
   const [events, setEvents] = useState<ZoneEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionInProgress, setActionInProgress] = useState<number | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<{ show: boolean; eventId: number | null; currentStatus: string }>({ 
+  const [confirmDialog, setConfirmDialog] = useState<{ 
+    show: boolean; 
+    eventId: number | null; 
+    currentStatus: string; 
+    verificationCode?: string; 
+    userInput?: string;
+  }>({ 
     show: false, 
     eventId: null, 
-    currentStatus: '' 
+    currentStatus: '', 
+    verificationCode: '',
+    userInput: ''
   });
   
   const fetchEvents = async () => {
@@ -90,13 +98,34 @@ export default function MonitoringPage() {
     return differenceInDays(eventDate, today);
   };
 
+  // Generate random alphanumeric string of specified length
+  const generateRandomString = (length: number): string => {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
   const handleStatusToggleClick = (eventId: number, currentStatus: string) => {
     // Show confirmation dialog when changing from OPEN to CUTOFF_REGISTRATION
     if (currentStatus === "OPEN") {
       setConfirmDialog({
         show: true,
         eventId,
-        currentStatus
+        currentStatus,
+        verificationCode: generateRandomString(5),
+        userInput: ''
+      });
+    } else if (currentStatus === "CUTOFF_REGISTRATION") {
+      // When changing from CUTOFF_REGISTRATION to OPEN, show verification code dialog
+      setConfirmDialog({
+        show: true,
+        eventId,
+        currentStatus,
+        verificationCode: generateRandomString(5),
+        userInput: ''
       });
     } else {
       // For other status changes, proceed directly
@@ -232,7 +261,7 @@ export default function MonitoringPage() {
                           {actionInProgress === event.id ? (
                             <LoadingSpinner size="sm" />
                           ) : (
-                            event.status === "OPEN" ? "OPEN" : "CUTOFF"
+                            event.status
                           )}
                         </Button>
                       </TableCell>
@@ -262,27 +291,64 @@ export default function MonitoringPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Confirm Registration Cutoff
+              {confirmDialog.currentStatus === "OPEN" ? "Confirm Registration Cutoff" : "Confirm Status Change"}
             </DialogTitle>
             <DialogDescription>
-              This will change the event status to CUTOFF_REGISTRATION and automatically approve all registered teams.
-              <br /><br />
-              <span className="font-bold">This action cannot be undone and will prevent new team registrations.</span>
+              {confirmDialog.currentStatus === "OPEN" ? (
+                <>
+                  This will change the event status to CUTOFF_REGISTRATION and automatically approve all registered teams.
+                  <br /><br />
+                  <span className="font-bold">This action cannot be undone and will prevent new team registrations.</span>
+                </>
+              ) : (
+                <>
+                  This will change the event status from CUTOFF_REGISTRATION back to OPEN.
+                  <br /><br />
+                  <span className="font-bold">This action may affect team statuses and should be used with caution.</span>
+                </>
+              )}
+              
+              <div className="mt-4 p-3 border rounded bg-gray-50">
+                <p className="text-sm font-medium mb-2">For security, please enter this verification code: <span className="font-mono bg-gray-200 px-1 rounded">{confirmDialog.verificationCode}</span></p>
+                <div className="flex items-center">
+                  <input 
+                    type="text" 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter code here"
+                    value={confirmDialog.userInput || ''}
+                    onChange={(e) => setConfirmDialog(prev => ({ ...prev, userInput: e.target.value }))}
+                    maxLength={5}
+                  />
+                </div>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button 
               variant="outline" 
-              onClick={() => setConfirmDialog(prev => ({ ...prev, show: false }))}
+              onClick={() => setConfirmDialog(prev => ({ ...prev, show: false, userInput: '' }))}
             >
               Cancel
             </Button>
             <Button 
-              variant="destructive" 
-              onClick={() => confirmDialog.eventId && toggleEventStatus(confirmDialog.eventId, confirmDialog.currentStatus)}
-              disabled={actionInProgress === confirmDialog.eventId}
+              onClick={() => {
+                if (confirmDialog.eventId && confirmDialog.currentStatus) {
+                  if (confirmDialog.userInput === confirmDialog.verificationCode) {
+                    toggleEventStatus(confirmDialog.eventId, confirmDialog.currentStatus);
+                    setConfirmDialog(prev => ({ ...prev, userInput: '' }));
+                  } else {
+                    toast({
+                      title: "Verification Failed",
+                      description: "The verification code you entered is incorrect. Please try again.",
+                      variant: "destructive",
+                    });
+                  }
+                }
+              }}
+              className={`${confirmDialog.currentStatus === "OPEN" ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"}`}
+              disabled={!confirmDialog.userInput || confirmDialog.userInput.length !== 5}
             >
-              {actionInProgress === confirmDialog.eventId ? <LoadingSpinner size="sm" /> : "Continue"}
+              {confirmDialog.currentStatus === "OPEN" ? "Confirm Cutoff" : "Change to Open"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -12,6 +12,7 @@ import VideoGallery from "./video-gallery";
 import PendingRequestsAlert from "./pending-requests-alert";
 import ProfileCompletionAlert from "./profile-completion-alert";
 import UnassignedContestantsAlert from "./unassigned-contestants-alert";
+import ZoneRegistration from "./zone-registration";
 
 interface DashboardClientProps {
   user: any;
@@ -91,6 +92,9 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
         {/* Teams Summary - simplified */}
         <TeamsSummary participantId={Number(user.id)} />
       </div>
+      
+      {/* Zone Physical Event Registration */}
+      <ZoneRegistration participantId={Number(user.id)} />
       
       {/* Video Gallery - now more compact */}
       <div className="p-4 bg-muted/50 rounded-lg mb-6">

@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/session";
 import { Prisma } from "@prisma/client";
 
+// Add export config to mark this route as dynamic
+export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+
 // Define interface for user with role
 interface UserWithRole {
   id: number;
