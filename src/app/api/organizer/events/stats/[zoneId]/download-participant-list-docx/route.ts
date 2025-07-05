@@ -571,8 +571,10 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
 
     console.log(`[download-participant-list-docx] Found ${participants.length} participants`);
 
-    // Transform data for document creation
-    const participantData: ParticipantData[] = participants.map(contestant => {
+    // Transform data for document creation - create multiple entries for contestants in multiple teams
+    const participantData: ParticipantData[] = [];
+    
+    participants.forEach(contestant => {
       // Check if contestant is in multiple teams for the same event
       let inMultipleTeams = false;
       
@@ -619,34 +621,37 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
         });
       }
       
-      // Get the first team
-      const team = contestant.teamMembers[0]?.team;
-      const contingent = team?.contingent;
-      
-      let stateName = 'Unknown';
-      let contingentName = 'Unknown';
-      let teamName = team?.name || 'Unknown';
-      
-      if (contingent) {
-        if (contingent.school) {
-          stateName = contingent.school.state?.name || 'Unknown';
-          contingentName = contingent.school.name;
-        } else if (contingent.independent) {
-          stateName = contingent.independent.state?.name || 'Unknown';
-          contingentName = contingent.independent.name;
+      // Create a separate entry for each team the contestant belongs to
+      contestant.teamMembers.forEach(teamMember => {
+        const team = teamMember.team;
+        const contingent = team?.contingent;
+        
+        let stateName = 'Unknown';
+        let contingentName = 'Unknown';
+        let teamName = team?.name || 'Unknown';
+        
+        if (contingent) {
+          if (contingent.school) {
+            stateName = contingent.school.state?.name || 'Unknown';
+            contingentName = contingent.school.name;
+          } else if (contingent.independent) {
+            stateName = contingent.independent.state?.name || 'Unknown';
+            contingentName = contingent.independent.name;
+          }
         }
-      }
-      
-      return {
-        name: contestant.name,
-        ic: contestant.ic || 'N/A',
-        classGrade: contestant.class_grade || 'N/A',
-        gender: contestant.gender || 'N/A',
-        contingentName,
-        stateName,
-        teamName,
-        inMultipleTeams
-      };
+        
+        // Add this contestant to participantData for each team they're in
+        participantData.push({
+          name: contestant.name,
+          ic: contestant.ic || 'N/A',
+          classGrade: contestant.class_grade || 'N/A',
+          gender: contestant.gender || 'N/A',
+          contingentName,
+          stateName,
+          teamName,
+          inMultipleTeams
+        });
+      });
     });
 
     // Group participants by state and contingent
