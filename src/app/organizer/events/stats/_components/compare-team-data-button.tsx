@@ -110,7 +110,7 @@ export function CompareTeamDataButton({ zoneId, zoneName }: CompareTeamDataButto
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="w-screen max-w-full max-h-[90vh] overflow-y-auto p-8">
+        <DialogContent className="w-[98vw] max-w-full max-h-[90vh] overflow-y-auto p-8 m-0" style={{ width: '98vw', margin: '0 auto' }}>
           <DialogHeader>
             <DialogTitle>Team Data Comparison for {zoneName} Zone</DialogTitle>
             <DialogDescription>
@@ -125,6 +125,7 @@ export function CompareTeamDataButton({ zoneId, zoneName }: CompareTeamDataButto
                 <Table className="border rounded-md">
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="font-bold text-center w-16">#</TableHead>
                       <TableHead className="font-bold text-center">Team ID</TableHead>
                       <TableHead className="font-bold">Team Name</TableHead>
                       <TableHead className="font-bold">Contingent</TableHead>
@@ -132,8 +133,9 @@ export function CompareTeamDataButton({ zoneId, zoneName }: CompareTeamDataButto
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {comparisonData.matchedTeams.map((team) => (
+                    {comparisonData.matchedTeams.map((team, index) => (
                       <TableRow key={team.id}>
+                        <TableCell className="text-center font-medium">{index + 1}</TableCell>
                         <TableCell>{team.id}</TableCell>
                         <TableCell>{team.name}</TableCell>
                         <TableCell>{team.contingentName}</TableCell>
