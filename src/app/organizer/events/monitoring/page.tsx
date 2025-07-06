@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Eye, AlertTriangle } from "lucide-react";
+import { Eye, AlertTriangle, Users } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
@@ -266,14 +266,27 @@ export default function MonitoringPage() {
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => viewEventStats(event.zoneId)}
-                          title="View Statistics"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/organizer/events/monitoring/${event.id}/rawlist`)}
+                            title="View Raw List"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {event.status === "CUTOFF_REGISTRATION" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/organizer/events/monitoring/${event.id}/endlist`)}
+                              title="View End List"
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
