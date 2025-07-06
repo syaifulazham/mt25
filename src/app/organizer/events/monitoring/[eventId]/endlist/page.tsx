@@ -68,6 +68,7 @@ interface TeamMember {
 interface Team {
   id: number;
   teamName: string;
+  contestName: string;
   status: string;
   registrationDate: string;
   contingentName: string;
@@ -562,7 +563,10 @@ export default function EndListPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                               )}
-                              <span className="truncate hover:underline">{team.teamName}</span>
+                              <div className="flex flex-col">
+                                <span className="truncate hover:underline font-medium">{team.teamName}</span>
+                                <span className="text-xs text-muted-foreground truncate">{team.contestName}</span>
+                              </div>
                             </div>
                             <Badge variant="outline" className="text-xs flex-shrink-0">
                               {team.members.length} members

@@ -30,6 +30,7 @@ export async function GET(
       SELECT 
         t.id,
         t.name as teamName,
+        ct.name as contestName,
         ect.status,
         ect.createdAt as registrationDate,
         CASE 

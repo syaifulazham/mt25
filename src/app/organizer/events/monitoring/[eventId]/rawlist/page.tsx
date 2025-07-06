@@ -46,6 +46,7 @@ interface TeamMember {
 interface Team {
   id: number;
   teamName: string;
+  contestName: string;
   status: string;
   registrationDate: string;
   contingentName: string;
@@ -469,9 +470,12 @@ export default function RawlistPage() {
                           <div className="flex flex-col">
                             <button 
                               onClick={() => toggleTeamExpansion(team.id)}
-                              className="text-left hover:text-primary transition-colors truncate w-full"
+                              className="text-left hover:text-primary transition-colors w-full"
                             >
-                              {team.teamName}
+                              <div className="flex flex-col">
+                                <span className="truncate font-medium">{team.teamName}</span>
+                                <span className="text-xs text-muted-foreground truncate">{team.contestName}</span>
+                              </div>
                             </button>
                             {hasAgeMismatch(team) && (
                               <div className="text-xs text-red-600 mt-1 font-normal">
