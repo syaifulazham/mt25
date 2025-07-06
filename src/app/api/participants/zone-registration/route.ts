@@ -50,6 +50,96 @@ interface TeamWithRelations extends team {
 }
 
 
+// Helper function to process teams data
+function processTeams(teams: TeamWithRelations[]) {
+  // Check for members in multiple teams
+  const contestantIds = teams.flatMap(team => 
+    team.members.map((member: any) => member.contestant.id)
+  );
+
+  // Count occurrences of each contestant ID across all teams
+  const contestantOccurrences: { [key: number]: number } = {};
+  teams.forEach(team => {
+    team.members.forEach(member => {
+      const contestantId = member.contestant.id;
+      contestantOccurrences[contestantId] = (contestantOccurrences[contestantId] || 0) + 1;
+    });
+  });
+
+  return teams.map((team, index) => {
+    // Check if any team member is in multiple teams
+    const hasMultipleTeamMembers = team.members.some(
+      (member: any) => contestantOccurrences[member.contestant.id] > 1
+    );
+
+    // Check if any team member is outside the contest's target age range
+    
+    // Get contest min and max age from target groups
+    const teamContest = team.contest;
+    
+    // Initialize min and max age with default values
+    let minAge = 100;
+    let maxAge = 0;
+    
+    // If the contest has target groups, use their age ranges
+    if (teamContest?.targetgroup && teamContest.targetgroup.length > 0) {
+      teamContest.targetgroup.forEach((tg: any) => {
+        if (tg.minAge < minAge) minAge = tg.minAge;
+        if (tg.maxAge > maxAge) maxAge = tg.maxAge;
+      });
+    } else {
+      // Fallback to contest min/max age if no target groups
+      minAge = teamContest?.minAge || 0;
+      maxAge = teamContest?.maxAge || 100;
+    }
+
+    // Flag for team members outside age range
+    const membersOutsideAgeRange = team.members.filter((member: any) => {
+      const memberAge = parseInt(member.contestant.age || '10');
+      return memberAge < minAge || memberAge > maxAge;
+    });
+    const hasMembersOutsideAgeRange = membersOutsideAgeRange.length > 0;
+    const ineligibleMembersCount = membersOutsideAgeRange.length;
+
+    // Get the team's status from eventcontestteam
+    let status = 'PENDING';
+    if (team.eventcontestteam && team.eventcontestteam.length > 0) {
+      status = team.eventcontestteam[0].status;
+    }
+
+    // Override status to INELIGIBLE if there are ineligible members
+    if (hasMembersOutsideAgeRange) {
+      status = 'INELIGIBLE';
+    }
+
+    // Format member data to include only what we need
+    const formattedMembers = team.members.map(member => {
+      return {
+        id: member.contestant.id,
+        name: member.contestant.name,
+        class_grade: member.contestant.class_grade || '',
+        age: member.contestant.age || '10',
+        inMultipleTeams: contestantOccurrences[member.contestant.id] > 1
+      };
+    });
+
+    return {
+      id: team.id,
+      recordNumber: index + 1,
+      teamName: team.name,
+      contestName: team.contest?.name || 'Unknown Contest',
+      contestCode: team.contest?.code || '',
+      numberOfMembers: team.members.length,
+      status,
+      hasMultipleTeamMembers,
+      hasMembersOutsideAgeRange,
+      ineligibleMembersCount,
+      managerTeams: team.managerTeams || [],
+      members: formattedMembers
+    };
+  });
+}
+
 export async function GET(req: NextRequest) {
   try {
     // Check authentication
@@ -77,37 +167,92 @@ export async function GET(req: NextRequest) {
     // Log the participant ID
     console.log("Fetching teams for participant ID:", participantId);
     
-    // Fetch teams managed by this participant with simple query first
-    try {
-      // First, just check if the participant has any teams at all
-      const simpleCheck = await db.team.findMany({
+    // First, find all contingents that this participant belongs to (either as manager or owner)
+    console.log("Finding participant's contingents...");
+    const participantContingents = await db.contingentManager.findMany({
+      where: {
+        participantId: parseInt(participantId)
+      },
+      select: {
+        contingentId: true
+      }
+    });
+
+    const contingentIds = participantContingents.map(cm => cm.contingentId);
+    console.log(`Participant belongs to ${contingentIds.length} contingent(s):`, contingentIds);
+
+    if (contingentIds.length === 0) {
+      console.log("No contingents found for this participant, falling back to directly managed teams");
+      // Fallback to only showing directly managed teams if no contingent relationship found
+      const directlyManagedTeams = await db.team.findMany({
         where: {
           managers: {
             some: {
               participantId: parseInt(participantId)
             }
+          },
+          // Only include teams that exist in eventcontestteam
+          eventcontestteam: {
+            some: {}
           }
         },
-        select: {
-          id: true,
-          name: true
-        },
-        take: 1
-      });
+        include: {
+          contest: {
+            include: {
+              targetgroup: true  // Include target groups relation
+            }
+          },
+          eventcontestteam: true,
+          members: {
+            include: {
+              contestant: {
+                select: {
+                  id: true,
+                  name: true,
+                  age: true,
+                  class_grade: true
+                }
+              }
+            }
+          },
+          managerTeams: {
+            include: {
+              manager: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phoneNumber: true
+                }
+              }
+            }
+          },
+          independentManagers: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phoneNumber: true
+            }
+          }
+        }
+      }) as unknown as TeamWithRelations[];
       
-      console.log("Simple team check result:", simpleCheck);
-    } catch (e) {
-      console.error("Error checking for teams:", e);
+      if (directlyManagedTeams.length === 0) {
+        return NextResponse.json({ teams: [] });
+      }
+      
+      // Process these teams and return them
+      const formattedTeams = processTeams(directlyManagedTeams);
+      return NextResponse.json({ teams: formattedTeams });
     }
     
-    // Now try the full query
-    console.log("Attempting full query...");
-    const teams = await db.team.findMany({
+    // Now try the full query to get all teams in the participant's contingents
+    console.log("Attempting full query for all teams in participant's contingents...");
+    const teamsFromContingents = await db.team.findMany({
       where: {
-        managers: {
-          some: {
-            participantId: parseInt(participantId)
-          }
+        contingentId: {
+          in: contingentIds
         },
         // Only include teams that exist in eventcontestteam
         eventcontestteam: {
@@ -169,27 +314,15 @@ export async function GET(req: NextRequest) {
       }
     }) as unknown as TeamWithRelations[];
     
-    console.log(`Found ${teams.length} teams`);
-    
-    // All contestant data has age values
-    
-    if (!teams || teams.length === 0) {
-      return NextResponse.json([]);
+    console.log(`Found ${teamsFromContingents.length} teams`);
+
+    // If no teams found, return empty array
+    if (teamsFromContingents.length === 0) {
+      return NextResponse.json({ teams: [] });
     }
 
-    // Check for members in multiple teams
-    const contestantIds = teams.flatMap(team => 
-      team.members.map((member: any) => member.contestant.id)
-    );
-
-    // Count occurrences of each contestant ID across all teams
-    const contestantOccurrences: { [key: number]: number } = {};
-    teams.forEach(team => {
-      team.members.forEach(member => {
-        const contestantId = member.contestant.id;
-        contestantOccurrences[contestantId] = (contestantOccurrences[contestantId] || 0) + 1;
-      });
-    });
+    // Process teams using the helper function
+    const formattedTeams = processTeams(teamsFromContingents);
 
     // Function to calculate age based on date of birth
     const calculateAge = (dateOfBirth: Date): number => {
@@ -208,18 +341,30 @@ export async function GET(req: NextRequest) {
     console.log("Formatting teams data...");
     
     // Debug: Log the structure of the first team to check if managers are included
-    if (teams.length > 0) {
+    if (teamsFromContingents.length > 0) {
       console.log("First team data structure:", JSON.stringify({
-        id: teams[0].id,
-        name: teams[0].name,
-        managerTeamsCount: teams[0].managerTeams?.length || 0,
-        managerTeams: teams[0].managerTeams,
-        independentManagersCount: teams[0].independentManagers?.length || 0,
-        independentManagers: teams[0].independentManagers
+        id: teamsFromContingents[0].id,
+        name: teamsFromContingents[0].name,
+        managerTeamsCount: teamsFromContingents[0].managerTeams?.length || 0,
+        managerTeams: teamsFromContingents[0].managerTeams,
+        independentManagersCount: teamsFromContingents[0].independentManagers?.length || 0,
+        independentManagers: teamsFromContingents[0].independentManagers
       }, null, 2));
     }
     
-    const formattedTeams = teams.map((team, index) => {
+    // Count occurrences of each contestant ID across all teams
+    const contestantOccurrences: { [key: number]: number } = {};
+    teamsFromContingents.forEach(team => {
+      team.members.forEach(member => {
+        const contestantId = member.contestant.id;
+        contestantOccurrences[contestantId] = (contestantOccurrences[contestantId] || 0) + 1;
+      });
+    });
+
+    // Format the response data
+    console.log("Formatting teams data...");
+    
+    const formattedTeamsData = teamsFromContingents.map((team, index) => {
       // Check if any team member is in multiple teams
       const hasMultipleTeamMembers = team.members.some(
         (member: any) => contestantOccurrences[member.contestant.id] > 1
@@ -296,11 +441,10 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(formattedTeams);
-    
+    return NextResponse.json({ teams: formattedTeamsData });
+
   } catch (error) {
-    console.error("Error fetching zone registration data:", error);
-    // Add more detailed error information
+    console.error("Error in zone registration API:", error);
     let errorMessage = "Internal server error";
     if (error instanceof Error) {
       errorMessage = `Error: ${error.message}`;
