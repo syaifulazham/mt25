@@ -57,17 +57,35 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Find the team members
+    // First check if user is a manager of this team's contingent
+    const contingentManager = await db.contingentManager.findFirst({
+      where: {
+        participantId: Number(session.user.id),
+        contingentId: team.contingentId
+      }
+    });
+    
+    // If user isn't a contingent manager, check if they're a direct team manager
+    if (!contingentManager) {
+      const directManager = await db.teamManager.findFirst({
+        where: {
+          teamId: parseInt(teamId),
+          participantId: Number(session.user.id)
+        }
+      });
+      
+      if (!directManager) {
+        return NextResponse.json(
+          { error: "Unauthorized: You are not a manager for this team or its contingent" },
+          { status: 403 }
+        );
+      }
+    }
+    
+    // User is authorized, find the team members
     const teamMembers = await db.teamMember.findMany({
       where: { 
-        teamId: parseInt(teamId),
-        team: {
-          managers: {
-            some: {
-              participantId: Number(session.user.id)
-            }
-          }
-        }
+        teamId: parseInt(teamId)
       },
       include: {
         contestant: {
