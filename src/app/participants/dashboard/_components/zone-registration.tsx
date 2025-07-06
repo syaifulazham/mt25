@@ -88,7 +88,8 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
         }
         const data = await response.json();
         console.log("Received teams data:", data); // Debug
-        setTeams(data);
+        // Extract the teams array from the response object
+        setTeams(data.teams || []);
         setLoading(false);
       } catch (err) {
         setError("Error loading registration data");
