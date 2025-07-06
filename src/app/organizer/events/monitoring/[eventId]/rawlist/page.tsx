@@ -36,11 +36,13 @@ interface TeamMember {
   id: number;
   participantName: string;
   email: string;
-  ic: string | null;
+  ic: string;
   edu_level: string | null;
   class_grade: string | null;
   age: number | null;
   formattedClassGrade: string;
+  isDuplicate?: boolean;
+  duplicateTeams?: string[];
 }
 
 interface Team {
@@ -57,6 +59,7 @@ interface Team {
   minAge: number;
   maxAge: number;
   members: TeamMember[];
+  hasDuplicateMembers?: boolean;
 }
 
 export default function RawlistPage() {
@@ -480,6 +483,11 @@ export default function RawlistPage() {
                             {hasAgeMismatch(team) && (
                               <div className="text-xs text-red-600 mt-1 font-normal">
                                 ⚠️ Age mismatch: {getAgeMismatchDetails(team)}
+                              </div>
+                            )}
+                            {team.hasDuplicateMembers && (
+                              <div className="text-xs text-orange-600 mt-1 font-normal flex items-center gap-1">
+                                🚨 Duplicate members: Some members belong to multiple teams
                               </div>
                             )}
                           </div>

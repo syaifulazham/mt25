@@ -114,8 +114,45 @@ export async function GET(
       })
     );
 
+    // Detect duplicate members across teams
+    const memberTeamMap = new Map<string, string[]>(); // ic -> team names
+    const duplicateMembers = new Set<string>(); // ic of duplicate members
+    
+    teamsWithMembers.forEach(team => {
+      team.members.forEach((member: any) => {
+        if (member.ic) {
+          if (!memberTeamMap.has(member.ic)) {
+            memberTeamMap.set(member.ic, []);
+          }
+          memberTeamMap.get(member.ic)!.push(team.teamName);
+          
+          // If this member belongs to more than one team, mark as duplicate
+          if (memberTeamMap.get(member.ic)!.length > 1) {
+            duplicateMembers.add(member.ic);
+          }
+        }
+      });
+    });
+
+    // Add duplicate information to teams and members
+    const teamsWithDuplicateInfo = teamsWithMembers.map(team => {
+      const membersWithDuplicateInfo = team.members.map((member: any) => ({
+        ...member,
+        isDuplicate: member.ic ? duplicateMembers.has(member.ic) : false,
+        duplicateTeams: member.ic ? memberTeamMap.get(member.ic) || [] : []
+      }));
+      
+      const hasDuplicateMembers = membersWithDuplicateInfo.some((member: any) => member.isDuplicate);
+      
+      return {
+        ...team,
+        members: membersWithDuplicateInfo,
+        hasDuplicateMembers
+      };
+    });
+
     // Return ALL teams without any filtering (raw data)
-    return NextResponse.json(teamsWithMembers);
+    return NextResponse.json(teamsWithDuplicateInfo);
     
   } catch (error) {
     console.error("Error fetching rawlist teams:", error);
