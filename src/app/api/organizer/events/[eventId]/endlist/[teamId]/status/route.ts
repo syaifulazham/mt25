@@ -29,7 +29,7 @@ export async function PATCH(
     const body = await request.json();
     const { status } = body;
 
-    if (!status || !['PENDING', 'APPROVED', 'ACCEPTED', 'REJECTED', 'APPROVED_SPECIAL'].includes(status)) {
+    if (!status || !['PENDING', 'CONDITIONAL', 'APPROVED', 'ACCEPTED', 'REJECTED', 'APPROVED_SPECIAL'].includes(status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 

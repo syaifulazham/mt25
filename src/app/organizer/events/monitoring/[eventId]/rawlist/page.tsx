@@ -490,6 +490,11 @@ export default function RawlistPage() {
                                 🚨 Duplicate members: Some members belong to multiple teams
                               </div>
                             )}
+                            {team.members.length === 0 && (
+                              <div className="text-xs text-red-600 mt-1 font-normal flex items-center gap-1">
+                                ❌ Empty team: No members registered
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td 
