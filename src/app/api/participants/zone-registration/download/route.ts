@@ -4,6 +4,8 @@ import { PrismaClient } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, AlignmentType, WidthType, HeadingLevel, BorderStyle, Header, Footer, PageNumber } from "docx";
 
+export const dynamic = 'force-dynamic';
+
 const db = new PrismaClient();
 
 export async function GET(req: NextRequest) {
