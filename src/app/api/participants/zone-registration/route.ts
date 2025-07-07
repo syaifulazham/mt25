@@ -108,7 +108,8 @@ function processTeams(teams: TeamWithRelations[]) {
     }
 
     // Override status to INELIGIBLE if there are ineligible members
-    if (hasMembersOutsideAgeRange) {
+    // BUT preserve APPROVED_SPECIAL status even with target group mismatch
+    if (hasMembersOutsideAgeRange && status !== 'APPROVED_SPECIAL') {
       status = 'INELIGIBLE';
     }
 
@@ -409,10 +410,14 @@ export async function GET(req: NextRequest) {
       // Debug log eligibility information
       console.log(`Team ${team.name}: minAge=${minAge}, maxAge=${maxAge}, ineligibleMembers=${ineligibleMembersCount}, hasMembersOutsideAgeRange=${hasMembersOutsideAgeRange}`);
       
+      // Get the original status from eventcontestteam
+      const originalStatus = team.eventcontestteam[0]?.status || "PENDING";
+      
       // Override status to INELIGIBLE if any member is outside age range
-      const status = hasMembersOutsideAgeRange 
+      // BUT preserve APPROVED_SPECIAL status even with target group mismatch
+      const status = (hasMembersOutsideAgeRange && originalStatus !== 'APPROVED_SPECIAL') 
         ? "INELIGIBLE" 
-        : team.eventcontestteam[0]?.status || "PENDING";
+        : originalStatus;
         
       return {
         id: team.id,

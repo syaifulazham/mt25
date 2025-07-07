@@ -607,10 +607,10 @@ export default function RawlistPage() {
                               <h4 className="font-medium text-sm mb-3 text-muted-foreground">
                                 Team Members ({team.members.length})
                               </h4>
-                              <div className="overflow-x-auto">
+                              <div className="overflow-x-auto bg-yellow-50 border rounded-md">
                                 <table className="w-full text-sm">
                                   <thead>
-                                    <tr className="border-b">
+                                    <tr className="border-b bg-yellow-100">
                                       <th className="text-left p-2 font-medium text-muted-foreground">#</th>
                                       <th className="text-left p-2 font-medium text-muted-foreground">Name</th>
                                       <th className="text-left p-2 font-medium text-muted-foreground">IC</th>
@@ -620,7 +620,7 @@ export default function RawlistPage() {
                                   </thead>
                                   <tbody>
                                     {team.members.map((member, memberIndex) => (
-                                      <tr key={member.id} className="border-b last:border-b-0">
+                                      <tr key={member.id} className="border-b last:border-b-0 hover:bg-yellow-100">
                                         <td className="p-2">{memberIndex + 1}</td>
                                         <td className="p-2 font-medium">{member.participantName}</td>
                                         <td className="p-2 text-muted-foreground">{member.ic || 'N/A'}</td>

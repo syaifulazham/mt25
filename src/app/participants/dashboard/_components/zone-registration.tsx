@@ -273,7 +273,7 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end space-x-2">
-                    {(team.status === 'APPROVED' || (team.status === 'CONDITIONAL' && !team.hasMultipleTeamMembers)) && (
+                    {(team.status === 'APPROVED' || team.status === 'APPROVED_SPECIAL' || (team.status === 'CONDITIONAL' && !team.hasMultipleTeamMembers)) && (
                       <Button
                         variant="default"
                         size="sm"

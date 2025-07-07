@@ -231,9 +231,11 @@ export default function EndListPage() {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case "APPROVED":
-        return "bg-green-100 text-green-800";
-      case "ACCEPTED":
         return "bg-blue-100 text-blue-800";
+      case "APPROVED_SPECIAL":
+        return "bg-blue-100 text-blue-800";
+      case "ACCEPTED":
+        return "bg-green-100 text-green-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -675,8 +677,8 @@ export default function EndListPage() {
                         >
                           <div className="truncate">
                             <Badge
-                              variant={team.status === "APPROVED" ? "default" : "secondary"}
-                              className="text-xs"
+                              variant="outline"
+                              className={`text-xs ${getStatusBadgeColor(team.status)}`}
                             >
                               {team.status}
                             </Badge>
@@ -750,10 +752,10 @@ export default function EndListPage() {
                                   Team Members ({team.members.length})
                                 </h4>
                               </div>
-                              <div className="border rounded-md bg-background">
+                              <div className="border rounded-md bg-yellow-50">
                                 <table className="w-full text-sm">
                                   <thead>
-                                    <tr className="border-b bg-muted/30">
+                                    <tr className="border-b bg-yellow-100">
                                       <th className="text-left py-2 px-3 font-medium text-muted-foreground w-12">#</th>
                                       <th className="text-left py-2 px-3 font-medium text-muted-foreground min-w-[180px]">Participant Name</th>
                                       <th className="text-left py-2 px-3 font-medium text-muted-foreground min-w-[200px]">Email</th>
@@ -764,7 +766,7 @@ export default function EndListPage() {
                                   </thead>
                                   <tbody>
                                     {team.members.map((member, memberIndex) => (
-                                      <tr key={member.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                                      <tr key={member.id} className="border-b last:border-b-0 hover:bg-yellow-100">
                                         <td className="py-2 px-3 text-center font-mono text-xs text-muted-foreground">
                                           {memberIndex + 1}
                                         </td>
