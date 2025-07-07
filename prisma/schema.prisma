@@ -243,6 +243,19 @@ model eventcontestjudge {
   @@index([userId])
 }
 
+model eventcontesttoken {
+  id         Int       @id @default(autoincrement())
+  eventId    Int
+  eventToken String    @db.VarChar(255)
+  consumed   Boolean?  @default(false)
+  emailedTo  String?   @db.VarChar(255)
+  createdAt  DateTime? @default(now()) @db.DateTime(0)
+  updatedAt  DateTime? @updatedAt @db.DateTime(0)
+
+  @@index([eventId], map: "eventId")
+  @@index([eventToken], map: "eventToken")
+}
+
 model higherinstitution {
   id           Int                @id @default(autoincrement())
   name         String

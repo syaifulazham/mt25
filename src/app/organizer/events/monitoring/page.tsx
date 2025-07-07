@@ -220,77 +220,63 @@ export default function MonitoringPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event Start Date</TableHead>
-                  <TableHead>Event Name</TableHead>
-                  <TableHead>Days to D-Day</TableHead>
-                  <TableHead>Registration Status</TableHead>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Zone</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Days Left</TableHead>
+                  <TableHead>Token</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => {
-                  const daysToEvent = calculateDaysToEvent(event.startDate);
-                  const isPast = daysToEvent < 0;
-                  
-                  return (
-                    <TableRow key={event.id}>
-                      <TableCell>{format(new Date(event.startDate), "dd MMM yyyy")}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{event.name}</div>
-                        <div className="text-xs text-muted-foreground">Zone: {event.zoneName}</div>
-                      </TableCell>
-                      <TableCell>
-                        {isPast ? (
-                          <Badge variant="outline" className="bg-gray-100">
-                            Past Event
-                          </Badge>
-                        ) : (
-                          <Badge variant={daysToEvent <= 7 ? "destructive" : "outline"}>
-                            {daysToEvent} days
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
+                {events.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell className="font-medium">{event.name}</TableCell>
+                    <TableCell>{event.zoneName}</TableCell>
+                    <TableCell>
+                      {format(new Date(event.startDate), 'dd MMM yyyy')} - {format(new Date(event.endDate), 'dd MMM yyyy')}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusBadgeColor(event.status)}>
+                        {event.status.replace(/_/g, ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{calculateDaysToEvent(event.startDate)}</TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => router.push(`/organizer/events/monitoring/token/${event.id}`)}
+                      >
+                        Manage Tokens
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => handleStatusToggleClick(event.id, event.status)}
-                          disabled={actionInProgress === event.id}
-                          className={getStatusBadgeColor(event.status)}
+                          onClick={() => router.push(`/organizer/events/monitoring/${event.id}/rawlist`)}
+                          title="View Raw List"
                         >
-                          {actionInProgress === event.id ? (
-                            <LoadingSpinner size="sm" />
-                          ) : (
-                            event.status
-                          )}
+                          <Eye className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
+                        {event.status === "CUTOFF_REGISTRATION" && (
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            onClick={() => router.push(`/organizer/events/monitoring/${event.id}/rawlist`)}
-                            title="View Raw List"
+                            onClick={() => router.push(`/organizer/events/monitoring/${event.id}/endlist`)}
+                            title="View End List"
+                            className="text-blue-600 hover:text-blue-700"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Users className="h-4 w-4" />
                           </Button>
-                          {event.status === "CUTOFF_REGISTRATION" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => router.push(`/organizer/events/monitoring/${event.id}/endlist`)}
-                              title="View End List"
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <Users className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}

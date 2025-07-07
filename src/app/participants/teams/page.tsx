@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { TokenModal } from "./token-modal";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/language-context";
@@ -130,6 +131,11 @@ export default function TeamsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [joiningEvent, setJoiningEvent] = useState<{teamId: number, eventId: number} | null>(null);
   
+  // Token modal state
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [tokenTarget, setTokenTarget] = useState<{teamId: number, eventId: number, maxTeams: number} | null>(null);
+  const [verifyingToken, setVerifyingToken] = useState(false);
+  
   // Fetch the user's teams
   useEffect(() => {
     const fetchTeams = async () => {
@@ -228,23 +234,42 @@ export default function TeamsPage() {
   );
   
   // Handle joining an event
-  const handleJoinEvent = async (teamId: number, eventcontestId: number) => {
+  const handleJoinEvent = async (teamId: number, eventcontestId: number, token?: string) => {
     try {
-      setJoiningEvent({ teamId, eventId: eventcontestId });
+      setJoiningEvent({teamId, eventId: eventcontestId});
+      
+      const body: { eventcontestId: number, token?: string } = { eventcontestId };
+      if (token) body.token = token;
       
       const response = await fetch(`/api/participants/teams/${teamId}/event-registrations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          eventcontestId
-        }),
+        body: JSON.stringify(body),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to join event");
+        
+        // Check if the error is due to maximum teams limit reached
+        if (response.status === 400 && 
+            errorData.error && 
+            errorData.error.includes('Maximum number of teams') && 
+            errorData.maxteampercontingent) {
+          
+          // Show token modal
+          setTokenTarget({
+            teamId,
+            eventId: eventcontestId,
+            maxTeams: errorData.maxteampercontingent
+          });
+          setTokenModalOpen(true);
+          return;
+        }
+        
+        toast.error(errorData.error || 'Failed to register for the event');
+        return;
       }
       
       // Get the response data which includes the teamPriority from the database
@@ -281,12 +306,34 @@ export default function TeamsPage() {
         });
       });
       
-      toast.success(t('team.event_joined_success'));
+      toast.success('Successfully registered for the event');
     } catch (error: any) {
       console.error("Error joining event:", error);
-      toast.error(error.message || t('team.event_joined_error'));
+      toast.error(error.message || 'Failed to register for the event');
     } finally {
       setJoiningEvent(null);
+    }
+  };
+  
+  // Handle token verification and event registration
+  const handleTokenSubmit = async (token: string) => {
+    try {
+      if (!tokenTarget) return;
+      
+      setVerifyingToken(true);
+      const { teamId, eventId } = tokenTarget;
+      
+      // Call the event registration endpoint with the token
+      await handleJoinEvent(teamId, eventId, token);
+      
+      // Close the token modal after submission
+      setTokenModalOpen(false);
+      setTokenTarget(null);
+    } catch (error) {
+      console.error('Error verifying token:', error);
+      toast.error('Failed to verify token');
+    } finally {
+      setVerifyingToken(false);
     }
   };
   
@@ -787,7 +834,20 @@ export default function TeamsPage() {
         </div>
       )}
       
-      {/* Delete confirmation dialog */}
+      {/* Token Modal */}
+      {tokenTarget && (
+        <TokenModal
+          isOpen={tokenModalOpen}
+          onClose={() => setTokenModalOpen(false)}
+          eventId={tokenTarget.eventId}
+          teamId={tokenTarget.teamId}
+          onSubmit={handleTokenSubmit}
+          isLoading={verifyingToken}
+          maxTeams={tokenTarget.maxTeams}
+        />
+      )}
+
+      {/* Team deletion confirmation dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
