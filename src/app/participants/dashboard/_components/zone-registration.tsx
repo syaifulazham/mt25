@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Eye, Users, FileText, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface ZoneRegistrationProps {
@@ -75,6 +75,7 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
   const router = useRouter();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openTeamDetails, setOpenTeamDetails] = useState<Team | null>(null);
 
@@ -199,9 +200,47 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
     );
   }
 
+  const handleDownloadList = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/participants/zone-registration/download?participantId=${participantId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to download list');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'zone-registration-list.docx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading list:', error);
+      alert('Failed to download list. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="p-4 bg-muted/50 rounded-lg mb-6">
-      <h2 className="text-sm font-medium mb-3">{t('dashboard.zone_registration')}</h2>
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-sm font-medium">{t('dashboard.zone_registration')}</h2>
+        <Button
+          onClick={handleDownloadList}
+          disabled={isLoading || teams.length === 0}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="sm"
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          {isLoading ? 'Generating...' : 'Download List'}
+        </Button>
+      </div>
       <div className="overflow-x-auto">
         <Table className="w-full">
           <TableHeader>
