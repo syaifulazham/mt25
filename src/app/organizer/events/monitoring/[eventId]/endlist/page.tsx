@@ -239,7 +239,8 @@ export default function EndListPage() {
     }
   };
 
-  const approvedTeams = teams.filter(team => team.status === "APPROVED");
+  const approvedTeams = teams.filter(team => team.status === "APPROVED" || team.status === "APPROVED_SPECIAL");
+  const specialApprovalTeams = teams.filter(team => team.status === "APPROVED_SPECIAL");
   const acceptedTeams = teams.filter(team => team.status === "ACCEPTED");
   const totalTeams = approvedTeams.length + acceptedTeams.length;
   const totalParticipants = teams.reduce((total, team) => total + team.members.length, 0);
@@ -414,7 +415,14 @@ export default function EndListPage() {
               <CardTitle className="text-2xl font-bold text-green-600">
                 {approvedTeams.length}
               </CardTitle>
-              <CardDescription>Approved Teams</CardDescription>
+              <CardDescription>
+                Approved Teams
+                {specialApprovalTeams.length > 0 && (
+                  <div className="text-xs text-orange-600 mt-1">
+                    ({specialApprovalTeams.length} with special approval)
+                  </div>
+                )}
+              </CardDescription>
             </CardHeader>
           </Card>
           
