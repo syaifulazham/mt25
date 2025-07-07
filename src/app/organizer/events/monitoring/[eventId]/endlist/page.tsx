@@ -245,6 +245,20 @@ export default function EndListPage() {
   const totalTeams = approvedTeams.length + acceptedTeams.length;
   const totalParticipants = teams.reduce((total, team) => total + team.members.length, 0);
 
+  // Calculate additional statistics
+  const schoolContingents = new Set(teams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
+  const schoolTeams = teams.filter(team => team.contingentType === 'SCHOOL');
+  
+  // Group teams by target group and count unique schools
+  const kidsTeams = teams.filter(team => team.targetGroupLabel === 'Kids');
+  const kidsSchools = new Set(kidsTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
+  
+  const teensTeams = teams.filter(team => team.targetGroupLabel === 'Teens');
+  const teensSchools = new Set(teensTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
+  
+  const youthTeams = teams.filter(team => team.targetGroupLabel === 'Youth');
+  const youthSchools = new Set(youthTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
+
   // Filter teams based on search and filters
   const filteredTeams = teams.filter(team => {
     const matchesSearch = searchTerm === "" || 
@@ -409,7 +423,7 @@ export default function EndListPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-2xl font-bold text-green-600">
@@ -450,6 +464,80 @@ export default function EndListPage() {
                 {totalParticipants}
               </CardTitle>
               <CardDescription>Total Participants</CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {/* School Statistics Card with Two Grids */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-700 mb-3 text-center">
+                Schools Participations
+              </CardTitle>
+              <div className="grid grid-cols-2 gap-4 divide-x divide-gray-200">
+                <div className="text-center">
+                  <CardTitle className="text-2xl font-bold text-indigo-600">
+                    {schoolContingents.size}
+                  </CardTitle>
+                  <CardDescription className="text-xs">School Contingents</CardDescription>
+                </div>
+                <div className="text-center pl-4">
+                  <CardTitle className="text-2xl font-bold text-indigo-600">
+                    {schoolTeams.length}
+                  </CardTitle>
+                  <CardDescription className="text-xs">School Teams</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+          
+          {/* Kids Teams Card */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-bold text-pink-600">
+                {kidsTeams.length}
+              </CardTitle>
+              <CardDescription>
+                Total Kids Teams
+                {kidsSchools.size > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    from {kidsSchools.size} schools
+                  </div>
+                )}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {/* Teens Teams Card */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-bold text-cyan-600">
+                {teensTeams.length}
+              </CardTitle>
+              <CardDescription>
+                Total Teens Teams
+                {teensSchools.size > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    from {teensSchools.size} schools
+                  </div>
+                )}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          {/* Youth Teams Card */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-bold text-emerald-600">
+                {youthTeams.length}
+              </CardTitle>
+              <CardDescription>
+                Total Youth Teams
+                {youthSchools.size > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    from {youthSchools.size} schools
+                  </div>
+                )}
+              </CardDescription>
             </CardHeader>
           </Card>
         </div>
