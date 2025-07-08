@@ -667,7 +667,7 @@ export async function GET(request: NextRequest, { params }: { params: { zoneId: 
     
     // Get the zoneStats to match the top summary numbers exactly
     try {
-      const zoneIdNumber = parseInt(zoneId, 10);
+      const zoneIdNumber = typeof zoneId === 'string' ? parseInt(zoneId, 10) : zoneId;
       if (isNaN(zoneIdNumber)) {
         throw new Error(`Invalid zoneId: ${zoneId}`);
       }

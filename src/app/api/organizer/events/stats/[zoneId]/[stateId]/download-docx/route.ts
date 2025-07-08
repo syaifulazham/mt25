@@ -77,7 +77,7 @@ export async function GET(
     }
 
     // Get state statistics data using the shared utility
-    const { zone, state, groupedData, summary } = await getStateStatistics(zoneId, stateId);
+    const { zone, state, groupedData, summary } = await getStateStatistics({ id: zoneId }, stateId);
 
     if (!zone || !state) {
       return NextResponse.json({ error: 'Zone or state not found' }, { status: 404 });
