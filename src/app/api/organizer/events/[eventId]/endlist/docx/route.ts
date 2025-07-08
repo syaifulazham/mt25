@@ -829,23 +829,23 @@ export async function GET(
                 new TableRow({
                   children: [
                     new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true , font: 'Calibri'})] })],
                       shading: { fill: "E6E6E6" }
                     }),
                     new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "IC", bold: true })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "IC", bold: true , font: 'Calibri'})] })],
                       shading: { fill: "E6E6E6" }
                     }),
                     new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "Telefon", bold: true })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Telefon", bold: true , font: 'Calibri'})] })],
                       shading: { fill: "E6E6E6" }
                     }),
                     new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "Email", bold: true })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Email", bold: true , font: 'Calibri'})] })],
                       shading: { fill: "E6E6E6" }
                     }),
                     new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "Teams/Contests", bold: true })] })],
+                      children: [new Paragraph({ children: [new TextRun({ text: "Teams/Contests", bold: true , font: 'Calibri'})] })],
                       shading: { fill: "E6E6E6" }
                     })
                   ]
@@ -887,10 +887,10 @@ export async function GET(
                       new TableCell({
                         children: [
                           new Paragraph({
-                            children: [new TextRun({ text: manager.teamName, bold: true })]
+                            children: [new TextRun({ text: manager.teamName, bold: true, font: 'Calibri' })]
                           }),
                           new Paragraph({
-                            children: [new TextRun({ text: manager.contestName, italics: true })]
+                            children: [new TextRun({ text: manager.contestName, italics: true, font: 'Calibri' })]
                           })
                         ],
                         shading: { fill: "F2F2F2" }
