@@ -15,6 +15,17 @@ interface TeamMember {
   formattedClassGrade: string;
 }
 
+interface Manager {
+  id: number;
+  name: string;
+  ic: string | null;
+  phoneNumber: string | null;
+  email: string | null;
+  teamId: number;
+  teamName: string;
+  contestName: string;
+}
+
 interface Team {
   id: number;
   teamName: string;
@@ -194,6 +205,30 @@ export async function GET(
       
       return acc;
     }, {});
+    
+    // Calculate summary statistics by state and target group (Kids, Teens, Youth)
+    const stateTargetGroupSummary = processedTeams.reduce((acc: Record<string, Record<string, number>>, team: any) => {
+      const state = team.stateName || 'Unknown State';
+      const targetGroup = team.targetGroupLabel || 'Unknown';
+      
+      if (!acc[state]) {
+        acc[state] = {
+          'Kids': 0,
+          'Teens': 0,
+          'Youth': 0,
+          'Unknown': 0
+        };
+      }
+      
+      // Add the number of members/contestants to the appropriate target group
+      if (['Kids', 'Teens', 'Youth'].includes(targetGroup)) {
+        acc[state][targetGroup] += team.members.length;
+      } else {
+        acc[state]['Unknown'] += team.members.length;
+      }
+      
+      return acc;
+    }, {});
 
     // Convert to hierarchical array format for display
     const summaryData: Array<{
@@ -261,6 +296,153 @@ export async function GET(
           });
       });
 
+    // Fetch managers for all teams in processedTeams
+    const teamIds = processedTeams.map(team => team.id);
+    
+    // Query managers directly and get their teams
+    const managers = await prisma.manager.findMany({
+      where: {
+        OR: [
+          // Managers directly associated with a team
+          {
+            teamId: {
+              in: teamIds
+            }
+          },
+          // Managers associated through manager_team
+          {
+            teams: {
+              some: {
+                teamId: {
+                  in: teamIds
+                }
+              }
+            }
+          }
+        ]
+      },
+      include: {
+        team: true,       // Direct team relation
+        teams: {          // Teams through manager_team
+          include: {
+            team: true
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+    
+    // Get all event contests for the teams we're dealing with
+    const eventContestTeams = await prisma.eventcontestteam.findMany({
+      where: {
+        teamId: {
+          in: teamIds
+        }
+      },
+      include: {
+        eventcontest: {
+          include: {
+            contest: true
+          }
+        },
+        team: true
+      }
+    });
+    
+    // Create a map of teamId -> contest names for easy lookup
+    const teamContestsMap: Record<number, {contestNames: string[], teamName: string}> = {};
+    eventContestTeams.forEach(ect => {
+      const teamId = ect.teamId;
+      const contestName = ect.eventcontest.contest.name;
+      
+      if (!teamContestsMap[teamId]) {
+        teamContestsMap[teamId] = {
+          contestNames: [],
+          teamName: ect.team.name
+        };
+      }
+      
+      if (!teamContestsMap[teamId].contestNames.includes(contestName)) {
+        teamContestsMap[teamId].contestNames.push(contestName);
+      }
+    });
+    
+    // Transform the results to match our Manager interface
+    const transformedManagers: Manager[] = [];
+    
+    managers.forEach(manager => {
+      // Get team IDs this manager manages (either directly or through manager_team)
+      const managedTeamIds: number[] = [];
+      
+      // Add direct team if it exists and is in our target teams
+      if (manager.teamId && teamIds.includes(manager.teamId)) {
+        managedTeamIds.push(manager.teamId);
+      }
+      
+      // Add teams from manager_team relationship
+      manager.teams.forEach(mt => {
+        if (teamIds.includes(mt.teamId) && !managedTeamIds.includes(mt.teamId)) {
+          managedTeamIds.push(mt.teamId);
+        }
+      });
+      
+      // If the manager manages any of our teams, include them
+      if (managedTeamIds.length > 0) {
+        // Collect team names and contest names
+        const teamNames: string[] = [];
+        const contestNames: string[] = [];
+        
+        managedTeamIds.forEach(teamId => {
+          if (teamContestsMap[teamId]) {
+            teamNames.push(teamContestsMap[teamId].teamName);
+            contestNames.push(...teamContestsMap[teamId].contestNames);
+          }
+        });
+        
+        // Create unique lists
+        const uniqueTeamNames = [...new Set(teamNames)];
+        const uniqueContestNames = [...new Set(contestNames)];
+        
+        transformedManagers.push({
+          id: manager.id,
+          name: manager.name,
+          ic: manager.ic,
+          phoneNumber: manager.phoneNumber,
+          email: manager.email,
+          teamId: managedTeamIds[0], // Just use the first team ID for reference
+          teamName: uniqueTeamNames.join(", "),
+          contestName: uniqueContestNames.join(", ")
+        });
+      }
+    });
+    
+    // Group managers by contingentName and teamId
+    const managersByContingent = processedTeams.reduce((acc: Record<string, Manager[]>, team: Team) => {
+      const contingent = team.contingentName;
+      
+      if (!acc[contingent]) acc[contingent] = [];
+      
+      const teamManagers = transformedManagers.filter(m => m.teamId === team.id);
+      // Add only unique managers (by id) to avoid duplicates
+      teamManagers.forEach(manager => {
+        const exists = acc[contingent].some(m => m.id === manager.id);
+        if (!exists) {
+          acc[contingent].push(manager);
+        } else {
+          // If manager exists, update their entry to include this team/contest
+          const existingManager = acc[contingent].find(m => m.id === manager.id);
+          if (existingManager && existingManager.teamName !== manager.teamName) {
+            existingManager.teamName += `, ${manager.teamName}`;
+            existingManager.contestName += `, ${manager.contestName}`;
+          }
+        }
+      });
+      
+      return acc;
+    }, {} as Record<string, Manager[]>);
+
     // Group teams by target group, state, PPD, and contingent
     const groupedTeams = processedTeams.reduce((acc: Record<string, Record<string, Record<string, Record<string, Team[]>>>>, team: Team) => {
       const targetGroup = team.targetGroupLabel;
@@ -284,16 +466,194 @@ export async function GET(
     // Title
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `End List - ${event.name}`, bold: true, size: 32 })],
+        children: [new TextRun({ text: `End List - ${event.name}`, bold: true, size: 32, font: 'Calibri' })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 400 }
       })
     );
-
-    // Summary Section
+    
+    // Summary by Target Group (Kids, Teens, Youth) Section
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: "Summary by State", bold: true, size: 24 })],
+        children: [new TextRun({ text: "Summary by Age Group and State", bold: true, size: 24, font: 'Calibri' })],
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 200, after: 200 }
+      })
+    );
+    
+    // Create target group summary table
+    // First, get total for each target group
+    const targetGroupTotals = {
+      'Kids': 0,
+      'Teens': 0,
+      'Youth': 0,
+      'Unknown': 0,
+      'Total': 0
+    };
+    
+    Object.values(stateTargetGroupSummary).forEach(stateSummary => {
+      targetGroupTotals['Kids'] += stateSummary['Kids'] || 0;
+      targetGroupTotals['Teens'] += stateSummary['Teens'] || 0;
+      targetGroupTotals['Youth'] += stateSummary['Youth'] || 0;
+      targetGroupTotals['Unknown'] += stateSummary['Unknown'] || 0;
+    });
+    
+    targetGroupTotals['Total'] = 
+      targetGroupTotals['Kids'] + 
+      targetGroupTotals['Teens'] + 
+      targetGroupTotals['Youth'] + 
+      targetGroupTotals['Unknown'];
+    
+    // Create rows for the table with states and their target group counts
+    const targetGroupRows = [
+      // Header row
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "State", bold: true, font: 'Calibri', color: 'FFFFFF' })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" },
+            verticalAlign: AlignmentType.CENTER
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Kids", bold: true, font: 'Calibri', color: 'FFFFFF' })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Teens", bold: true, font: 'Calibri', color: 'FFFFFF' })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Youth", bold: true, font: 'Calibri', color: 'FFFFFF' })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Total", bold: true, font: 'Calibri', color: 'FFFFFF' })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          })
+        ]
+      })
+    ];
+    
+    // Add rows for each state
+    Object.entries(stateTargetGroupSummary)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([state, counts]) => {
+        const stateTotal = counts['Kids'] + counts['Teens'] + counts['Youth'] + counts['Unknown'];
+        
+        targetGroupRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: state, bold: true, font: 'Calibri' })],
+                  alignment: AlignmentType.LEFT
+                })],
+                shading: { fill: "E6E6E6" }
+              }),
+              new TableCell({
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: counts['Kids'].toString(), font: 'Calibri' })],
+                  alignment: AlignmentType.CENTER
+                })]
+              }),
+              new TableCell({
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: counts['Teens'].toString(), font: 'Calibri' })],
+                  alignment: AlignmentType.CENTER
+                })]
+              }),
+              new TableCell({
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: counts['Youth'].toString(), font: 'Calibri' })],
+                  alignment: AlignmentType.CENTER
+                })]
+              }),
+              new TableCell({
+                children: [new Paragraph({ 
+                  children: [new TextRun({ text: stateTotal.toString(), font: 'Calibri', bold: true })],
+                  alignment: AlignmentType.CENTER
+                })],
+                shading: { fill: "F2F2F2" }
+              })
+            ]
+          })
+        );
+      });
+    
+    // Add a total row
+    targetGroupRows.push(
+      new TableRow({
+        children: [
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: "Total", bold: true, font: 'Calibri', color: 'FFFFFF', size: 24 })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: targetGroupTotals['Kids'].toString(), bold: true, font: 'Calibri', color: 'FFFFFF', size: 24 })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: targetGroupTotals['Teens'].toString(), bold: true, font: 'Calibri', color: 'FFFFFF', size: 24 })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: targetGroupTotals['Youth'].toString(), bold: true, font: 'Calibri', color: 'FFFFFF', size: 24 })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          }),
+          new TableCell({
+            children: [new Paragraph({ 
+              children: [new TextRun({ text: targetGroupTotals['Total'].toString(), bold: true, font: 'Calibri', color: 'FFFFFF', size: 28 })],
+              alignment: AlignmentType.CENTER
+            })],
+            shading: { fill: "829fd1" }
+          })
+        ]
+      })
+    );
+    
+    // Create the target group summary table
+    const targetGroupTable = new Table({
+      rows: targetGroupRows,
+      width: {
+        size: 100,
+        type: WidthType.PERCENTAGE
+      }
+    });
+    
+    children.push(targetGroupTable);
+    children.push(new Paragraph({ text: "", spacing: { after: 400 } })); // Spacer
+
+    // Summary by PPD Section
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: "Summary by State", bold: true, size: 24, font: 'Calibri' })],
         heading: HeadingLevel.HEADING_1,
         spacing: { before: 200, after: 200 }
       })
@@ -347,7 +707,7 @@ export async function GET(
                 })],
                 alignment: AlignmentType.LEFT
               })],
-              shading: item.type === 'state' ? { fill: '4472C4' } : undefined
+              shading: item.type === 'state' ? { fill: '829fd1' } : undefined
             }),
             new TableCell({
               children: [new Paragraph({ 
@@ -360,7 +720,7 @@ export async function GET(
                 })],
                 alignment: AlignmentType.CENTER
               })],
-              shading: item.type === 'state' ? { fill: '4472C4' } : undefined
+              shading: item.type === 'state' ? { fill: '829fd1' } : undefined
             }),
             new TableCell({
               children: [new Paragraph({ 
@@ -373,7 +733,7 @@ export async function GET(
                 })],
                 alignment: AlignmentType.CENTER
               })],
-              shading: item.type === 'state' ? { fill: '4472C4' } : undefined
+              shading: item.type === 'state' ? { fill: '829fd1' } : undefined
             }),
             new TableCell({
               children: [new Paragraph({ 
@@ -386,7 +746,7 @@ export async function GET(
                 })],
                 alignment: AlignmentType.CENTER
               })],
-              shading: item.type === 'state' ? { fill: '4472C4' } : undefined
+              shading: item.type === 'state' ? { fill: '829fd1' } : undefined
             })
           ]
         }))
@@ -405,7 +765,8 @@ export async function GET(
       new Paragraph({
         children: [new TextRun({ 
           text: `Event Period: ${new Date(event.startDate).toLocaleDateString('en-GB')} - ${new Date(event.endDate).toLocaleDateString('en-GB')}`,
-          size: 24
+          size: 24,
+          font: 'Calibri'
         })],
         alignment: AlignmentType.CENTER,
         spacing: { after: 600 }
@@ -417,7 +778,7 @@ export async function GET(
       // Target Group Header
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: targetGroup, bold: true, size: 28 })],
+          children: [new TextRun({ text: targetGroup, bold: true, size: 28, font: 'Calibri' })],
           heading: HeadingLevel.HEADING_1,
           spacing: { before: 400, after: 200 }
         })
@@ -427,7 +788,7 @@ export async function GET(
         // State Header
         children.push(
           new Paragraph({
-            children: [new TextRun({ text: stateName, bold: true, size: 24 })],
+            children: [new TextRun({ text: stateName, bold: true, size: 24, font: 'Calibri' })],
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 300, after: 150 }
           })
@@ -437,7 +798,7 @@ export async function GET(
           // PPD Header
           children.push(
             new Paragraph({
-              children: [new TextRun({ text: ppdName, bold: true, size: 22 })],
+              children: [new TextRun({ text: ppdName, bold: true, size: 22, font: 'Calibri' })],
               heading: HeadingLevel.HEADING_3,
               spacing: { before: 250, after: 125 }
             })
@@ -447,20 +808,123 @@ export async function GET(
             // Contingent Header
             children.push(
               new Paragraph({
-                children: [new TextRun({ text: contingentName, bold: true, size: 20 })],
+                children: [new TextRun({ text: contingentName, bold: true, size: 20, font: 'Calibri' })],
                 heading: HeadingLevel.HEADING_4,
                 spacing: { before: 200, after: 100 }
               })
             );
+            
+            // Add Managers Table if there are managers for this contingent
+            if (managersByContingent[contingentName] && managersByContingent[contingentName].length > 0) {
+              // Add Managers header
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: "Managers", bold: true, font: 'Calibri' })],
+                  spacing: { before: 100, after: 50 }
+                })
+              );
+              
+              // Create managers table
+              const managerTableRows = [
+                new TableRow({
+                  children: [
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true })] })],
+                      shading: { fill: "E6E6E6" }
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "IC", bold: true })] })],
+                      shading: { fill: "E6E6E6" }
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Telefon", bold: true })] })],
+                      shading: { fill: "E6E6E6" }
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Email", bold: true })] })],
+                      shading: { fill: "E6E6E6" }
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Teams/Contests", bold: true })] })],
+                      shading: { fill: "E6E6E6" }
+                    })
+                  ]
+                })
+              ];
+              
+              managersByContingent[contingentName].forEach((manager: Manager) => {
+                // Create a cell for teams and contests
+                const teamContestCell = new TableCell({
+                  children: [
+                    new Paragraph({
+                      children: [new TextRun({ text: manager.teamName, bold: true })]
+                    }),
+                    new Paragraph({
+                      children: [new TextRun({ text: manager.contestName, italics: true })]
+                    })
+                  ]
+                });
+                
+                managerTableRows.push(
+                  new TableRow({
+                    children: [
+                      new TableCell({ 
+                        children: [new Paragraph(manager.name)],
+                        shading: { fill: "F2F2F2" }
+                      }),
+                      new TableCell({ 
+                        children: [new Paragraph(manager.ic || 'N/A')],
+                        shading: { fill: "F2F2F2" }
+                      }),
+                      new TableCell({ 
+                        children: [new Paragraph(manager.phoneNumber || 'N/A')],
+                        shading: { fill: "F2F2F2" }
+                      }),
+                      new TableCell({ 
+                        children: [new Paragraph(manager.email || 'N/A')],
+                        shading: { fill: "F2F2F2" }
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [new TextRun({ text: manager.teamName, bold: true })]
+                          }),
+                          new Paragraph({
+                            children: [new TextRun({ text: manager.contestName, italics: true })]
+                          })
+                        ],
+                        shading: { fill: "F2F2F2" }
+                      })
+                    ]
+                  })
+                );
+              });
+              
+              const managerTable = new Table({
+                rows: managerTableRows,
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                }
+              });
+              
+              children.push(managerTable);
+              children.push(new Paragraph({ text: "", spacing: { after: 100 } })); // Spacer
+            }
 
             (teams as Team[]).forEach((team: Team) => {
               // Team header with record number
               children.push(
                 new Paragraph({
                   children: [
-                    new TextRun({ text: `${teamCounter}. `, bold: true }),
-                    new TextRun({ text: team.teamName, bold: true }),
-                    new TextRun({ text: ` (${team.status})`, italics: true })
+                    new TextRun({ text: `${teamCounter}. `, bold: true, font: 'Calibri' }),
+                    new TextRun({ text: team.teamName, bold: true, font: 'Calibri' }),
+                    new TextRun({ text: ` (${team.status})`, italics: true, font: 'Calibri' })
                   ],
                   spacing: { before: 150, after: 100 }
                 })
@@ -470,11 +934,11 @@ export async function GET(
               const memberTableRows = [
                 new TableRow({
                   children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No.", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "IC", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Class/Grade", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Age", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No.", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "IC", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Class/Grade", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Age", bold: true, font: 'Calibri' })] })] }),
                   ]
                 })
               ];
@@ -483,11 +947,11 @@ export async function GET(
                 memberTableRows.push(
                   new TableRow({
                     children: [
-                      new TableCell({ children: [new Paragraph(String(index + 1))] }),
-                      new TableCell({ children: [new Paragraph(member.participantName)] }),
-                      new TableCell({ children: [new Paragraph(member.ic || 'N/A')] }),
-                      new TableCell({ children: [new Paragraph(member.formattedClassGrade || 'N/A')] }),
-                      new TableCell({ children: [new Paragraph(String(member.age || 'N/A'))] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(index + 1), font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.participantName, font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.ic || 'N/A', font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.formattedClassGrade || 'N/A', font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(member.age || 'N/A'), font: 'Calibri' })] })] }),
                     ]
                   })
                 );
@@ -519,7 +983,7 @@ export async function GET(
     
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: "Summary", bold: true, size: 24 })],
+        children: [new TextRun({ text: "Summary", bold: true, size: 24, font: 'Calibri' })],
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 600, after: 200 }
       })
@@ -527,14 +991,14 @@ export async function GET(
 
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `Total Teams: ${totalTeams}` })],
+        children: [new TextRun({ text: `Total Teams: ${totalTeams}`, font: 'Calibri' })],
         spacing: { after: 100 }
       })
     );
 
     children.push(
       new Paragraph({
-        children: [new TextRun({ text: `Total Participants: ${totalParticipants}` })],
+        children: [new TextRun({ text: `Total Participants: ${totalParticipants}`, font: 'Calibri' })],
         spacing: { after: 100 }
       })
     );
