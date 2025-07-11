@@ -222,7 +222,6 @@ export default function MonitoringPage() {
                 <TableRow>
                   <TableHead>Event</TableHead>
                   <TableHead>Zone</TableHead>
-                  <TableHead>Dates</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Days Left</TableHead>
                   <TableHead>Token</TableHead>
@@ -232,24 +231,47 @@ export default function MonitoringPage() {
               <TableBody>
                 {events.map((event) => (
                   <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div>{event.name}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {format(new Date(event.startDate), 'dd MMM yyyy')} - {format(new Date(event.endDate), 'dd MMM yyyy')}
+                      </div>
+                    </TableCell>
                     <TableCell>{event.zoneName}</TableCell>
                     <TableCell>
-                      {format(new Date(event.startDate), 'dd MMM yyyy')} - {format(new Date(event.endDate), 'dd MMM yyyy')}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadgeColor(event.status)}>
-                        {event.status.replace(/_/g, ' ')}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {/* Status Toggle Button */}
+                        {actionInProgress !== event.id && (event.status === "OPEN" || event.status === "CUTOFF_REGISTRATION") ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusToggleClick(event.id, event.status)}
+                            title={event.status === "OPEN" ? "Cutoff Registration" : "Reset to Open"}
+                            className={event.status === "OPEN" ? "bg-green-600 text-white hover:bg-green-700" : "bg-amber-600 text-white hover:bg-amber-700"}
+                          >
+                            {event.status}
+                          </Button>
+                        ) : actionInProgress === event.id ? (
+                          <Button variant="outline" size="sm" disabled>
+                            <div className="flex items-center justify-center">
+                              <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            </div>
+                          </Button>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell>{calculateDaysToEvent(event.startDate)}</TableCell>
                     <TableCell>
                       <Button 
-                        variant="outline" 
-                        size="sm"
+                        variant="ghost" 
+                        size="icon"
                         onClick={() => router.push(`/organizer/events/monitoring/token/${event.id}`)}
+                        title="Manage Tokens"
                       >
-                        Manage Tokens
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ticket"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
                       </Button>
                     </TableCell>
                     <TableCell>
@@ -271,6 +293,17 @@ export default function MonitoringPage() {
                             className="text-blue-600 hover:text-blue-700"
                           >
                             <Users className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {event.status === "CUTOFF_REGISTRATION" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/organizer/events/${event.id}/attendance`)}
+                            title="Go to Attendance"
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-clipboard-check"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
                           </Button>
                         )}
                       </div>

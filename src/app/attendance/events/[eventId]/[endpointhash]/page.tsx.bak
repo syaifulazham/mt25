@@ -1,0 +1,502 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { Loader2, Camera, Smartphone } from "lucide-react";
+import { useParams } from "next/navigation";
+import { Html5Qrcode } from 'html5-qrcode';
+import { Input } from "@/components/ui/input";
+import Image from "next/image";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
+type EndpointData = {
+  eventId: number;
+  endpointhash: string;
+  exists: boolean;
+};
+
+export default function PublicQRCodeAttendancePage() {
+  const { eventId, endpointhash } = useParams();
+  const { toast } = useToast();
+  const [scanning, setScanning] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ title: string; description: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerDivId = "qr-reader";
+  const [manualHashcode, setManualHashcode] = useState('');
+  const [activeTab, setActiveTab] = useState('camera');
+  const [passcode, setPasscode] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+  const [passcodeDialogOpen, setPasscodeDialogOpen] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [endpointData, setEndpointData] = useState<EndpointData | null>(null);
+  const [endpointLoading, setEndpointLoading] = useState(true);
+  const [endpointError, setEndpointError] = useState('');
+
+  useEffect(() => {
+    // Cleanup function to stop scanner when component unmounts
+    return () => {
+      if (scannerRef.current && scanning) {
+        scannerRef.current.stop().catch(console.error);
+      }
+    };
+  }, [scanning]);
+  
+  // Validate the endpoint when component mounts
+  useEffect(() => {
+    validateEndpoint();
+  }, []);
+  
+  // Function to validate that the endpoint exists
+  const validateEndpoint = async () => {
+    setEndpointLoading(true);
+    try {
+      const response = await fetch(`/api/attendance/validate-endpoint?eventId=${eventId}&endpointhash=${endpointhash}`);
+      const data = await response.json();
+      
+      if (response.ok && data.exists) {
+        setEndpointData(data);
+      } else {
+        setEndpointError('Invalid attendance endpoint. Please check the URL and try again.');
+      }
+    } catch (error) {
+      console.error("Error validating endpoint:", error);
+      setEndpointError('Failed to validate attendance endpoint. Please try again later.');
+    } finally {
+      setEndpointLoading(false);
+    }
+  };
+  
+  // Function to verify passcode
+  const verifyPasscode = async () => {
+    if (!passcode.trim()) {
+      setPasscodeError('Please enter a passcode');
+      return;
+    }
+    
+    setVerifying(true);
+    setPasscodeError('');
+    
+    try {
+      const response = await fetch('/api/attendance/verify-passcode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId,
+          endpointhash,
+          passcode: passcode.trim()
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.valid) {
+        setAuthorized(true);
+        setPasscodeDialogOpen(false);
+        
+        // Store authorization in session storage
+        sessionStorage.setItem(`attendance-auth-${endpointhash}`, 'true');
+        
+        toast({
+          title: "Access Granted",
+          description: "You can now use the QR code scanner.",
+        });
+      } else {
+        setPasscodeError('Invalid passcode. Please try again.');
+      }
+    } catch (error) {
+      console.error("Error verifying passcode:", error);
+      setPasscodeError('Failed to verify passcode. Please try again.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // Check for existing authorization in session storage
+  useEffect(() => {
+    const isAuthorized = sessionStorage.getItem(`attendance-auth-${endpointhash}`);
+    if (isAuthorized === 'true') {
+      setAuthorized(true);
+      setPasscodeDialogOpen(false);
+    }
+  }, [endpointhash]);
+
+  const startScanner = () => {
+    const html5QrCode = new Html5Qrcode(scannerDivId);
+    scannerRef.current = html5QrCode;
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      },
+      onScanSuccess,
+      onScanFailure
+    ).then(() => {
+      setScanning(true);
+    }).catch((err) => {
+      console.error("Error starting scanner:", err);
+      toast({
+        title: "Scanner Error",
+        description: "Could not access camera. Please check permissions.",
+        variant: "destructive",
+      });
+    });
+  };
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.stop().then(() => {
+        setScanning(false);
+      }).catch((err) => {
+        console.error("Error stopping scanner:", err);
+      });
+    }
+  };
+
+  const processHashcode = async (hashcode: string) => {
+    // Prevent duplicate scans
+    if (loading || hashcode === lastScanned) return;
+    
+    setLoading(true);
+    setLastScanned(hashcode);
+    
+    // Reset the last scanned code after 5 seconds to allow rescanning
+    setTimeout(() => {
+      setLastScanned(null);
+    }, 5000);
+    
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/record`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          hashcode,
+          method: 'qrcode',
+          endpointhash, // Include the endpoint hash for verification
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMessage({
+          title: "Check-in Successful!",
+          description: `${data.contingentName} has been marked as present.`,
+          type: 'success'
+        });
+        
+        // Auto-dismiss success message after 5 seconds
+        setTimeout(() => {
+          setMessage(null);
+        }, 5000);
+      } else {
+        setMessage({
+          title: "Check-in Failed",
+          description: data.error || "QR code not recognized.",
+          type: 'error'
+        });
+      }
+    } catch (error) {
+      console.error("Error processing QR code:", error);
+      setMessage({
+        title: "Error",
+        description: "Failed to process QR code. Please try again.",
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onScanSuccess = (hashcode: string) => {
+    processHashcode(hashcode);
+  };
+
+  const onScanFailure = (error: string) => {
+    // Don't show error for normal scan attempts
+    if (error.includes("No QR code found")) return;
+    console.error("QR Scan error:", error);
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (manualHashcode.trim()) {
+      processHashcode(manualHashcode.trim());
+      setManualHashcode(''); // Clear input after submission
+    }
+  };
+  
+  // Function to handle passcode input form submission
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    verifyPasscode();
+  };
+
+  if (endpointLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p>Validating attendance endpoint...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (endpointError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Invalid Endpoint</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center">{endpointError}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-900 via-indigo-900 to-purple-900 text-white">
+      <Dialog open={passcodeDialogOpen} onOpenChange={setPasscodeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Passcode</DialogTitle>
+            <DialogDescription>
+              Please enter the 6-character passcode to access the QR code attendance scanner.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handlePasscodeSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Input
+                  id="passcode"
+                  placeholder="Enter passcode"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  className="font-mono text-center text-xl tracking-wider"
+                  maxLength={6}
+                  autoFocus
+                />
+                {passcodeError && (
+                  <p className="text-sm text-red-500">{passcodeError}</p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="submit"
+                disabled={verifying || !passcode.trim()}
+                className="w-full"
+              >
+                {verifying ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</>
+                ) : (
+                  'Access Scanner'
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <div className="container mx-auto py-6 px-4">
+        <div className="mb-6 text-center">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <Image 
+              src="/images/mt-logo-white.png" 
+              alt="Techlympics 2025 Logo" 
+              width={100} 
+              height={30} 
+              className="h-10 w-auto" 
+              priority 
+            />
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-white leading-none">MALAYSIA</span>
+              <span className="text-xl sm:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-red-500 to-blue-500">TECHLYMPICS 2025</span>
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold">QR Code Attendance</h1>
+          <p className="text-white/70 mt-2">Event Check-in</p>
+        </div>
+        
+        {authorized ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            <Card className="bg-white/10 border-white/20 backdrop-blur-sm text-white shadow-xl">
+              <CardHeader>
+                <CardTitle>QR Code Scanner</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-6 flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="bg-white/20 border-white/30 hover:bg-white/30 text-white">
+                        {activeTab === 'camera' ? (
+                          <><Camera className="h-4 w-4 mr-2" /> Camera Scan</>
+                        ) : (
+                          <><Smartphone className="h-4 w-4 mr-2" /> Device Input</>
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => setActiveTab('camera')} className="cursor-pointer">
+                        <Camera className="h-4 w-4 mr-2" /> Camera Scan
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setActiveTab('manual')} className="cursor-pointer">
+                        <Smartphone className="h-4 w-4 mr-2" /> Device Input
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                {activeTab === 'camera' && (
+                  <>
+                    <div className="mb-4">
+                      <p>Scan the QR code from a contingent's ID or profile to mark their attendance.</p>
+                    </div>
+                    
+                    <div 
+                      id={scannerDivId} 
+                      className="w-full h-[300px] bg-black/20 border border-white/20 rounded-lg flex items-center justify-center mb-4"
+                    >
+                      {!scanning && (
+                        <div className="text-center p-4">
+                          <p className="mb-4">Camera feed will appear here.</p>
+                          <Button onClick={startScanner} className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-none">
+                            Start Scanner
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {scanning ? (
+                      <Button 
+                        onClick={stopScanner} 
+                        variant="destructive" 
+                        className="w-full"
+                      >
+                        Stop Scanner
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={startScanner} 
+                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-none"
+                      >
+                        Start Scanner
+                      </Button>
+                    )}
+                  </>
+                )}
+                
+                {activeTab === 'manual' && (
+                  <>
+                    <div className="mb-4">
+                      <p>Enter the QR code using a keyboard wedge scanner or manually type/paste the code.</p>
+                    </div>
+                    
+                    <form onSubmit={handleManualSubmit} className="space-y-4">
+                      <div className="relative">
+                        <Input
+                          placeholder="Ready for QR code input"
+                          value={manualHashcode}
+                          onChange={(e) => {
+                            setManualHashcode(e.target.value);
+                            // Auto-submit when input is detected via a device
+                            if (e.target.value.trim()) {
+                              const timer = setTimeout(() => {
+                                processHashcode(e.target.value.trim());
+                                setManualHashcode('');
+                              }, 300); // Small delay to ensure complete input
+                              return () => clearTimeout(timer);
+                            }
+                          }}
+                          className="opacity-0 absolute inset-0 h-full w-full cursor-default"
+                          autoFocus={activeTab === 'manual'}
+                        />
+                        <div className="bg-white/10 border border-white/20 rounded-md p-4 text-center min-h-[50px] flex flex-col justify-center items-center">
+                          <Smartphone className="h-8 w-8 mb-2 text-yellow-400" />
+                          <p className="text-white/80 font-medium">Ready to accept QR code input</p>
+                          <p className="text-white/60 text-xs mt-1">Point your device at the QR code</p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white/10 border border-white/20 rounded-md p-4 text-white/80">
+                        <h4 className="font-medium mb-2">Using a QR Scanner Device:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-sm">
+                          <li>Click in the input field to focus it</li>
+                          <li>Scan the QR code with your scanner device</li>
+                          <li>The code will be automatically processed</li>
+                          <li>No need to press submit - it works instantly!</li>
+                        </ul>
+                      </div>
+                    </form>
+                  </>
+                )}
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Check-in Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center p-6">
+                <p className="text-gray-500">Scan a QR code to see check-in results</p>
+                <ol className="list-decimal list-inside space-y-2">
+                  <li>Ensure good lighting for better scanning.</li>
+                  <li>Hold the QR code steady in front of the camera.</li>
+                  <li>The system will automatically register attendance upon successful scan.</li>
+                  <li>Check the status message to confirm successful check-in.</li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="flex justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="text-center">Authentication Required</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-center">
+                Please enter the passcode to access the QR code scanner.
+              </p>
+              <Button 
+                className="w-full mt-4"
+                onClick={() => setPasscodeDialogOpen(true)}
+              >
+                Enter Passcode
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}

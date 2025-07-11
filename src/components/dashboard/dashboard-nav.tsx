@@ -100,6 +100,10 @@ export const navItems: NavItem[] = [
         title: "Raw Data",
         href: "/organizer/events/teams-data",
       },
+      {
+        title: "Attendance",
+        href: "/organizer/events/6/attendance",
+      },
     ],
   },
   {

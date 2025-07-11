@@ -185,6 +185,7 @@ model event {
   state         state?         @relation(fields: [stateId], references: [id])
   zone          zone?          @relation(fields: [zoneId], references: [id])
   eventcontests eventcontest[]
+  attendanceSync eventAttendanceSync[]
 
   @@index([stateId], map: "event_stateId_fkey")
   @@index([zoneId], map: "event_zoneId_fkey")
@@ -248,9 +249,9 @@ model eventcontesttoken {
   eventId    Int
   eventToken String    @db.VarChar(255)
   consumed   Boolean?  @default(false)
-  emailedTo  String?   @db.VarChar(255)
   createdAt  DateTime? @default(now()) @db.DateTime(0)
   updatedAt  DateTime? @updatedAt @db.DateTime(0)
+  emailedTo  String?   @db.VarChar(255)
 
   @@index([eventId], map: "eventId")
   @@index([eventToken], map: "eventToken")
@@ -750,6 +751,144 @@ model teamMember {
   @@index([contestantId])
 }
 
+model attendanceContingent {
+  id               Int      @id @default(autoincrement())
+  hashcode         String   @unique
+  contingentId     Int
+  eventId          Int
+  attendanceDate   DateTime
+  attendanceTime   DateTime
+  attendanceStatus String   @default("Not Present")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  zoneId           Int?
+  stateId          Int?
+  state            String?  @db.VarChar(255)
+
+  @@index([contingentId])
+  @@index([eventId])
+  @@index([stateId], map: "idx_stateId")
+  @@index([zoneId], map: "idx_zoneId")
+}
+
+model attendanceTeam {
+  Id               Int      @id @default(autoincrement())
+  hashcode         String   @unique
+  contingentId     Int
+  teamId           Int
+  eventId          Int
+  attendanceDate   DateTime
+  attendanceTime   DateTime
+  attendanceStatus String   @default("Not Present")
+  attendanceNote   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  zoneId           Int?
+  stateId          Int?
+  state            String?  @db.VarChar(255)
+
+  @@index([contingentId])
+  @@index([eventId])
+  @@index([teamId])
+  @@index([stateId], map: "idx_stateId")
+  @@index([zoneId], map: "idx_zoneId")
+}
+
+model attendanceContestant {
+  id               Int      @id @default(autoincrement())
+  hashcode         String   @unique
+  participantId    Int
+  contingentId     Int
+  eventId          Int
+  teamId           Int
+  contestantId     Int
+  attendanceDate   DateTime
+  attendanceTime   DateTime
+  attendanceStatus String   @default("Not Present")
+  attendanceNote   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  ic               String?  @db.VarChar(255)
+  zoneId           Int?
+  stateId          Int?
+  state            String?  @db.VarChar(255)
+  contestGroup     String?  @db.VarChar(255)
+  contestId        Int?
+  contestName      String?  @db.VarChar(255)
+
+  @@index([contingentId])
+  @@index([eventId])
+  @@index([teamId])
+  @@index([contestantId])
+  @@index([stateId], map: "idx_stateId")
+  @@index([zoneId], map: "idx_zoneId")
+}
+
+model attendanceManager {
+  id               Int      @id @default(autoincrement())
+  hashcode         String   @unique
+  eventId          Int
+  contingentId     Int
+  managerId        Int
+  attendanceDate   DateTime
+  attendanceTime   DateTime
+  attendanceStatus String   @default("Not Present")
+  attendanceNote   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  zoneId           Int?
+  stateId          Int?
+  state            String?  @db.VarChar(255)
+  contestGroup     String?  @db.VarChar(255)
+
+  @@unique([contingentId, eventId, managerId], name: "unique_contingent_event_manager", map: "unique_contingent_event_manager")
+  @@index([contingentId], map: "contingentId_index")
+  @@index([eventId], map: "eventId_index")
+  @@index([managerId], map: "managerId_index")
+  @@index([stateId], map: "stateId_index")
+  @@index([zoneId], map: "zoneId_index")
+}
+
+model attendanceNonParticipant {
+  id               Int      @id @default(autoincrement())
+  hashcode         String   @unique
+  category         String   @default("")
+  eventId          Int
+  name             String
+  organization     String?
+  email            String?
+  phoneNumber      String?
+  attendanceDate   DateTime
+  attendanceTime   DateTime
+  attendanceStatus String   @default("Not Present")
+  attendanceNote   String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+  zoneId           Int?
+  stateId          Int?
+  state            String?  @db.VarChar(255)
+
+  @@index([eventId], map: "idx_eventId")
+  @@index([stateId], map: "idx_stateId")
+  @@index([zoneId], map: "idx_zoneId")
+}
+
+model eventsection {
+  id                 Int      @id @default(autoincrement())
+  eventId            Int
+  contestId          Int
+  sectionName        String
+  sectionCode        String
+  sectionDescription String?
+  sectionStatus      String   @default("Active")
+  sectionType        String   @default("Manual")
+  sectionNote        String?
+  sectionPIC         String?
+  sectionPICPhone    String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @default(now()) @updatedAt
+}
+
 model manager {
   id          Int              @id @default(autoincrement())
   name        String
@@ -827,6 +966,15 @@ model survey_contestants_composition {
   @@unique([surveyId, contestantId])
   @@index([surveyId])
   @@index([contestantId])
+}
+
+model attendance_endpoint {
+  id           Int      @id @default(autoincrement())
+  eventId      Int
+  endpointhash String   @unique
+  passcode     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model survey_answer {
@@ -953,6 +1101,24 @@ model email_recipient {
 
   @@index([campaign_id])
   @@index([email])
+}
+
+model eventAttendanceSync {
+  id               Int       @id @default(autoincrement())
+  eventId          Int
+  status           String    // 'processing', 'completed', 'error'
+  startTime        DateTime  @default(now())
+  endTime          DateTime?
+  totalContingents Int
+  totalTeams       Int
+  completedCount   Int       @default(0)
+  errorCount       Int       @default(0)
+  note             String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  event            event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
 }
 
 enum contest_contestType {

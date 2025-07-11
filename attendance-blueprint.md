@@ -3,6 +3,19 @@
 ## Overview
 this is a blue print to handle a team/contingent attendance check-in
 
+## UI Components
+shadcn ui components (already installed):
+- card
+- button
+- toast
+- modal
+- input
+- select
+- date picker
+- time picker
+- table
+- chart
+- and many more
 
 ## Datasets
 -- create dataset if still not exist in current version. use the following independent prisma models:
@@ -11,27 +24,33 @@ model attendanceContingent {
     hashcode String @unique
     contingentId Int
     eventId Int
-    attendanceDate DateTime @default(now())
-    attendanceTime DateTime @default(now())
-    attendanceStatus String @default("Present")
-    attendanceType String @default("Manual")
-    attendanceNote String?
+    attendanceDate DateTime 
+    attendanceTime DateTime 
+    attendanceStatus String @default("Not Present")
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+
+    @@index([contingentId])
+    @@index([eventId])
+    
 }
 
 model attendanceTeam {
     id Int @id @default(autoincrement())
     hashcode String @unique
     contingentId Int
+    teamId Int
     eventId Int
-    attendanceDate DateTime @default(now())
-    attendanceTime DateTime @default(now())
-    attendanceStatus String @default("Present")
-    attendanceType String @default("Manual")
+    attendanceDate DateTime 
+    attendanceTime DateTime 
+    attendanceStatus String @default("Not Present")
     attendanceNote String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+
+    @@index([contingentId])
+    @@index([eventId])
+    @@index([teamId])
 }
 
 model attendanceContestant {
@@ -42,13 +61,17 @@ model attendanceContestant {
     eventId Int
     teamId Int
     contestantId Int
-    attendanceDate DateTime @default(now())
-    attendanceTime DateTime @default(now())
-    attendanceStatus String @default("Present")
-    attendanceType String @default("Manual")
+    attendanceDate DateTime 
+    attendanceTime DateTime 
+    attendanceStatus String @default("Not Present")
     attendanceNote String?
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+
+    @@index([contingentId])
+    @@index([eventId])
+    @@index([teamId])
+    @@index([contestantId])
 }
 
 model eventsection {
@@ -63,6 +86,15 @@ model eventsection {
     sectionNote String?
     sectionPIC String?
     sectionPICPhone String? 
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model attendance_endpoint {
+    id Int @id @default(autoincrement())
+    eventId Int
+    endpointhash String @unique
+    passcode String
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 }
@@ -98,7 +130,14 @@ sidebar menu: the main menu for this feature shall be placed under 'Events' menu
 -- show syncing progress within the button's card
 
 3. /organizer/events/[eventId]/attendance/log/byqrcode
+this page will be used to create and manage attendance_endpoint dataset. add a button to create a new attendance_endpoint dataset and a table to list all attendance_endpoint datasets. 6 character alphanumeric passcode will be generated for each attendance_endpoint dataset.
+3.1. QR Code Scanner  /attendance/events/[eventId]/[endpointhash]
+-- in order to be authorized to open this page, the user must have a valid passcode. a popup modal will be shown to enter the passcode. if the passcode is correct, the user will be authorized to open this page.
+-- 2 options for qrcode input: a) video camera, b) qrcode reader input device
+-- the qrcode is merely derived from the hashcode of the contingent while syncing from eventcontestteam dataset
 -- qr code scanner to scan the qr code of the contingent (this will mark all participants of the contingent as present)
+-- once scanned, the qrcode will be matched with the attendanceContingent dataset
+-- once matched, the attendanceContingent will be updated with the attendanceStatus as 'Present' and attendanceDate and attendanceTime as current date and time. the other records from attendanceTeam and attendanceContestant that share the same contingentId will be updated with the attendanceStatus as 'Present' and attendanceDate and attendanceTime as current date and time
 -- once scanned, the contingent will be welcomed with a message
 
 4. /organizer/events/[eventId]/attendance/log/bymanual
@@ -107,8 +146,8 @@ sidebar menu: the main menu for this feature shall be placed under 'Events' menu
 
 5. /organizer/events/[eventId]/attendance/dashboard
 -- dashboard to view the attendance of the participants
--- this page will show the attendance of the participants in a table
--- this page will also show the attendance of the participants in a chart
+-- show number of attendance against expected attendancy eg. 50/ 200 participants (25%). might use horizontal bar chart
+-- show number of attendance group by day and hour
 
 6. /organizer/events/[eventId]/attendance/sections
 -- this page will show and register the sections of the event that associate with the competitions (example Competition:CABARAN BIOEKONOMI, section: 'Theatre Room 1', PIC: 'John Doe', PIC Contact: '0123456789')
