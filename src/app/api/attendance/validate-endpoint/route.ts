@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+// Mark this route as dynamic to fix the build error
+export const dynamic = 'force-dynamic';
+
 // GET handler to validate if an attendance endpoint exists
 export async function GET(req: NextRequest) {
   try {
