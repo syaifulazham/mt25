@@ -817,7 +817,50 @@ export default function AttendancePage() {
                 View Reports
               </Button>
             </Link>
-            <Button variant="outline" className="w-full flex items-center justify-center gap-2 bg-green-500 text-white hover:bg-green-600">
+            <Button 
+              variant="outline" 
+              className="w-full flex items-center justify-center gap-2 bg-green-500 text-white hover:bg-green-600"
+              onClick={async () => {
+                try {
+                  const response = await fetch(`/api/organizer/events/${eventId}/attendance/download`);
+                  if (!response.ok) {
+                    throw new Error('Failed to download attendance list');
+                  }
+                  
+                  // Get the filename from the Content-Disposition header if available
+                  const contentDisposition = response.headers.get('Content-Disposition');
+                  let filename = `attendance-list-event-${eventId}.xlsx`;
+                  if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename=\"(.+)\"/i);
+                    if (filenameMatch && filenameMatch[1]) {
+                      filename = filenameMatch[1];
+                    }
+                  }
+                  
+                  // Convert the response to a blob
+                  const blob = await response.blob();
+                  
+                  // Create a URL for the blob and trigger download
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', filename);
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  
+                  // Clean up the URL object
+                  window.URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error('Error downloading attendance list:', error);
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to download attendance list',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+            >
               <FileSpreadsheet className="h-4 w-4" />
               Download List
             </Button>
