@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import crypto from 'crypto';
+
+// Function to create SHA-256 hash from IC, eventId, and contingentId
+function createHashcode(ic: string, eventId: number, contingentId: number): string {
+  // Combine the inputs as a string
+  const input = `${ic}-${eventId}-${contingentId}`;
+  
+  // Create SHA-256 hash
+  return crypto.createHash('sha256').update(input).digest('hex');
+}
 
 export async function POST(request: NextRequest, { params }: { params: { eventId: string } }) {
   const now = new Date();
@@ -622,8 +632,8 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                 continue;
               }
               
-              // Generate contestant hashcode
-              const contestantHashcode = `${contestantId}-${eventId}-${now.toISOString()}`;
+              // Generate contestant hashcode using SHA-256 from ic, eventId, and contingentId
+              const contestantHashcode = createHashcode(contestant.ic || `${contestantId}`, eventId, contingentId);
               
               // Check if contestant attendance record exists
               const existingContestantAttendance = await prisma.$queryRaw`
@@ -706,8 +716,8 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               // Mark as processed
               processedManagerIds.add(managerId);
               
-              // Generate manager hashcode
-              const managerHashcode = `${managerId}-${eventId}-${now.toISOString()}`;
+              // Generate manager hashcode using SHA-256 from ic, eventId, and contingentId
+              const managerHashcode = createHashcode(manager.ic || `${managerId}`, eventId, contingentId);
               
               // Check if manager attendance record exists
               const existingManagerAttendance = await prisma.$queryRaw`
@@ -733,7 +743,9 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                       stateId = ${contingent.stateId || null},
                       zoneId = ${contingent.zoneId || null},
                       state = ${contingent.state || null},
-                      contestGroup = ${contestGroup}
+                      contestGroup = ${contestGroup},
+                      email = ${manager.email || null},
+                      email_status = ${'PENDING'}
                   WHERE id = ${existingManagerAttendance[0].id}
                 `;
                 syncResults.updatedManagers++;
@@ -749,9 +761,9 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                   // Create new attendance record for manager
                   await prisma.$executeRaw`
                     INSERT INTO attendanceManager
-                    (hashcode, contingentId, managerId, eventId, attendanceDate, attendanceTime, attendanceStatus, attendanceNote, stateId, zoneId, state, contestGroup, createdAt, updatedAt)
+                    (hashcode, contingentId, managerId, eventId, attendanceDate, attendanceTime, attendanceStatus, attendanceNote, stateId, zoneId, state, contestGroup, email, email_status, createdAt, updatedAt)
                     VALUES
-                    (${managerHashcode}, ${contingentId}, ${managerId}, ${eventId}, ${now}, ${now}, 'Not Present', NULL, ${contingent.stateId || null}, ${contingent.zoneId || null}, ${contingent.state || null}, ${contestGroup}, ${now}, ${now})
+                    (${managerHashcode}, ${contingentId}, ${managerId}, ${eventId}, ${now}, ${now}, 'Not Present', NULL, ${contingent.stateId || null}, ${contingent.zoneId || null}, ${contingent.state || null}, ${contestGroup}, ${manager.email || null}, ${'PENDING'}, ${now}, ${now})
                   `;
                   
                   syncResults.newManagers++;

@@ -840,6 +840,8 @@ model attendanceManager {
   stateId          Int?
   state            String?  @db.VarChar(255)
   contestGroup     String?  @db.VarChar(255)
+  email            String?  @db.VarChar(255)
+  email_status     String?  @db.VarChar(50)
 
   @@unique([contingentId, eventId, managerId], name: "unique_contingent_event_manager", map: "unique_contingent_event_manager")
   @@index([contingentId], map: "contingentId_index")
