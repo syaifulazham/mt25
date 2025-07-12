@@ -46,6 +46,13 @@ interface TeamData {
 
 type EndlistResponse = TeamData[];
 
+interface MissingTeam {
+  id: number;
+  teamName: string;
+  contingentName: string;
+  contestName: string;
+}
+
 interface SyncStatus {
   isSynced: boolean;
   lastSyncDate: string | null;
@@ -67,6 +74,7 @@ interface SyncStatus {
     contestants: number;
     managers: number;
   };
+  missingTeams?: MissingTeam[];
 }
 
 // Helper function to get the last sync date
@@ -435,6 +443,34 @@ export async function GET(
       // Get last sync date
       const lastSyncDate = await getLastSyncDate(eventId);
       
+      // Find missing teams if there are team differences
+      let missingTeams: MissingTeam[] = [];
+      if (differences.teams > 0) {
+        try {
+          // Get all existing attendance team IDs
+          const existingTeamIds = await prisma.$queryRaw`
+            SELECT teamId FROM attendanceTeam WHERE eventId = ${eventId}
+          ` as { teamId: number }[];
+          
+          const existingTeamIdSet = new Set(existingTeamIds.map(t => Number(t.teamId)));
+          
+          // Find teams that exist in endlist but not in attendance
+          missingTeams = endlistData
+            .filter(team => !existingTeamIdSet.has(team.id))
+            .slice(0, 10) // First 10 missing teams
+            .map(team => ({
+              id: team.id,
+              teamName: team.teamName,
+              contingentName: team.contingentName,
+              contestName: team.contestName
+            }));
+          
+          console.log(`Found ${missingTeams.length} missing teams (showing first 10)`);
+        } catch (error) {
+          console.error('Error finding missing teams:', error);
+        }
+      }
+      
       // Prepare response
       const response: SyncStatus = {
         isSynced,
@@ -451,7 +487,8 @@ export async function GET(
           contestants: expectedContestantCount,
           managers: expectedManagerCount
         },
-        differences
+        differences,
+        missingTeams: missingTeams.length > 0 ? missingTeams : undefined
       };
       
       return NextResponse.json(response);

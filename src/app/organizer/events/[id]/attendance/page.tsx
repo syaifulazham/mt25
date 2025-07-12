@@ -39,6 +39,14 @@ type Mismatches = {
   };
 };
 
+// Type for missing team info
+type MissingTeam = {
+  id: number;
+  teamName: string;
+  contingentName: string;
+  contestName: string;
+};
+
 // Type for API response
 type SyncStatusResponse = {
   isSynced: boolean;
@@ -47,18 +55,22 @@ type SyncStatusResponse = {
     teams: number;
     contestants: number;
     managers: number;
+    contingents: number;
   };
   actualCounts?: {
     teams: number;
     contestants: number;
     managers: number;
+    contingents: number;
   };
   expectedCounts?: {
     teams: number;
     contestants: number;
     managers: number;
+    contingents: number;
   };
   mismatches?: Mismatches;
+  missingTeams?: MissingTeam[];
 };
 
 export default function AttendancePage() {
@@ -530,35 +542,39 @@ export default function AttendancePage() {
                 <div className="space-y-2">
                   <h3 className="text-base font-medium">Teams</h3>
                   
-                  {syncMismatches?.teams?.missingInAttendance?.length ? (
+                  {syncStatusData?.missingTeams?.length ? (
                     <div>
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 mb-2">
-                        Missing in Attendance Records
+                        Missing in Attendance Records (First 10)
                       </Badge>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {syncMismatches.teams.missingInAttendance.map(item => (
-                          <li key={`team-missing-${item.id}`}>{item.name || `ID: ${item.id}`}</li>
+                      <div className="space-y-2">
+                        {syncStatusData.missingTeams.map(team => (
+                          <div key={`team-missing-${team.id}`} className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <div className="font-medium text-amber-800">{team.teamName}</div>
+                            <div className="text-sm text-amber-600">
+                              <span className="font-medium">Contingent:</span> {team.contingentName}
+                            </div>
+                            <div className="text-sm text-amber-600">
+                              <span className="font-medium">Contest:</span> {team.contestName}
+                            </div>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
+                      {syncStatusData.differences?.teams && syncStatusData.differences.teams > syncStatusData.missingTeams.length && (
+                        <p className="text-sm text-amber-600 mt-2">
+                          ... and {syncStatusData.differences.teams - syncStatusData.missingTeams.length} more teams
+                        </p>
+                      )}
                     </div>
-                  ) : null}
-                  
-                  {syncMismatches?.teams?.extraInAttendance?.length ? (
-                    <div className="mt-2">
-                      <Badge variant="outline" className="bg-red-50 text-red-700 mb-2">
-                        Extra in Attendance Records
+                  ) : syncStatusData?.differences?.teams && syncStatusData.differences.teams > 0 ? (
+                    <div>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 mb-2">
+                        {syncStatusData.differences.teams} Teams Missing in Attendance Records
                       </Badge>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {syncMismatches.teams.extraInAttendance.map(item => (
-                          <li key={`team-extra-${item.id}`}>{item.name || `ID: ${item.id}`}</li>
-                        ))}
-                      </ul>
+                      <p className="text-sm text-amber-600">Details not available - please run sync to see specific teams.</p>
                     </div>
-                  ) : null}
-                  
-                  {!syncMismatches?.teams?.missingInAttendance?.length && 
-                   !syncMismatches?.teams?.extraInAttendance?.length && (
-                    <p className="text-green-600 text-sm">No differences</p>
+                  ) : (
+                    <p className="text-green-600 text-sm">No team differences</p>
                   )}
                 </div>
                 
