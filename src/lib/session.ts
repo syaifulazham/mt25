@@ -10,6 +10,28 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 /**
+ * Checks if the user is an organizer or admin
+ * @param userId User ID to check
+ * @returns boolean indicating if the user is an organizer or admin
+ */
+export async function isOrganizerOrAdmin(userId: number): Promise<boolean> {
+  try {
+    // Get user with role information
+    const result = await prismaExecute(prisma => prisma.$queryRaw`
+      SELECT up.id, up.userLevel as role 
+      FROM user_participant up 
+      WHERE up.id = ${userId}
+    `);
+    
+    const user = Array.isArray(result) && result.length > 0 ? result[0] : null;
+    return user?.role === 'ADMIN' || user?.role === 'OPERATOR';
+  } catch (error) {
+    console.error('Error checking if user is organizer or admin:', error);
+    return false;
+  }
+}
+
+/**
  * Options for getting the current user
  */
 interface GetUserOptions {

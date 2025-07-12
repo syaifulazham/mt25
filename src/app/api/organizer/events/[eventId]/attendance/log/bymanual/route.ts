@@ -87,7 +87,6 @@ export async function GET(
         ac.contestGroup,
         CASE 
           WHEN c.contingentType = 'SCHOOL' THEN s.name
-          WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN hi.name
           WHEN c.contingentType = 'INDEPENDENT' THEN i.name
           ELSE 'Unknown'
         END as contingentName,
@@ -105,7 +104,6 @@ export async function GET(
       JOIN contingent c ON ac.contingentId = c.id
       JOIN team t ON ac.teamId = t.id
       LEFT JOIN school s ON c.schoolId = s.id
-      LEFT JOIN higherInstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
       LEFT JOIN eventcontestteam ect ON ect.teamId = t.id
       LEFT JOIN eventcontest ec ON ect.eventcontestId = ec.id AND ec.eventId = ${eventId}
@@ -180,7 +178,6 @@ export async function GET(
         am.contestGroup,
         CASE 
           WHEN c.contingentType = 'SCHOOL' THEN s.name
-          WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN hi.name
           WHEN c.contingentType = 'INDEPENDENT' THEN i.name
           ELSE 'Unknown'
         END as contingentName,
@@ -197,7 +194,6 @@ export async function GET(
       JOIN manager m ON am.managerId = m.id
       JOIN contingent c ON am.contingentId = c.id
       LEFT JOIN school s ON c.schoolId = s.id
-      LEFT JOIN higherInstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
       LEFT JOIN manager_team mt ON mt.managerId = m.id
       LEFT JOIN team t ON mt.teamId = t.id

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/app/api/auth/auth-options";
 
 // DELETE handler to remove an attendance endpoint
 export async function DELETE(
@@ -16,7 +16,7 @@ export async function DELETE(
     }
 
     const { role } = session.user;
-    if (!['ADMIN', 'OPERATOR'].includes(role)) {
+    if (!['ADMIN', 'OPERATOR'].includes(role as string)) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
@@ -28,7 +28,7 @@ export async function DELETE(
     }
 
     // Verify the endpoint exists and belongs to this event
-    const endpoint = await prisma.attendanceEndpoint.findFirst({
+    const endpoint = await prisma.attendance_endpoint.findFirst({
       where: { 
         id: endpointId,
         eventId: eventId
@@ -40,7 +40,7 @@ export async function DELETE(
     }
 
     // Delete the endpoint
-    await prisma.attendanceEndpoint.delete({
+    await prisma.attendance_endpoint.delete({
       where: { id: endpointId },
     });
 
