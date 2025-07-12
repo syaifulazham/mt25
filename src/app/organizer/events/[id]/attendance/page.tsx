@@ -68,6 +68,26 @@ export default function AttendancePage() {
   const [syncNeeded, setSyncNeeded] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   
+  // Chunked sync states
+  const [syncPaused, setSyncPaused] = useState(false);
+  const [syncStopped, setSyncStopped] = useState(false);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [processedTeams, setProcessedTeams] = useState(0);
+  const [totalTeams, setTotalTeams] = useState(0);
+  const [syncMetrics, setSyncMetrics] = useState({
+    newContingents: 0,
+    updatedContingents: 0,
+    newTeams: 0,
+    updatedTeams: 0,
+    newContestants: 0,
+    updatedContestants: 0,
+    newManagers: 0,
+    updatedManagers: 0,
+    errorCount: 0,
+    errors: [] as string[]
+  });
+  
   // Sync differences states
   const [differencesDialogOpen, setDifferencesDialogOpen] = useState(false);
   const [syncMismatches, setSyncMismatches] = useState<Mismatches | null>(null);
@@ -277,57 +297,173 @@ export default function AttendancePage() {
     if (syncing) return;
     
     setSyncing(true);
+    setSyncPaused(false);
+    setSyncStopped(false);
     setSyncProgress(0);
+    setCurrentChunk(0);
+    setProcessedTeams(0);
+    setSyncMetrics({
+      newContingents: 0,
+      updatedContingents: 0,
+      newTeams: 0,
+      updatedTeams: 0,
+      newContestants: 0,
+      updatedContestants: 0,
+      newManagers: 0,
+      updatedManagers: 0,
+      errorCount: 0,
+      errors: []
+    });
     
     try {
-      const res = await fetch(`/api/organizer/events/${eventId}/attendance/sync`, {
-        method: 'POST'
+      // First, get the total count of teams to process
+      const countRes = await fetch(`/api/organizer/events/${eventId}/attendance/sync-chunked`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'count' })
       });
       
-      // Set up a timer to simulate progress - in a real implementation, 
-      // you might use WebSockets or Server-Sent Events for real-time updates
-      const interval = setInterval(() => {
-        setSyncProgress((prev: number) => {
-          if (prev >= 95) {
-            clearInterval(interval);
-            return 95;
-          }
-          return prev + 5;
+      const countData = await countRes.json();
+      if (!countData.success) {
+        throw new Error(countData.error || 'Failed to get team count');
+      }
+      
+      const { totalTeams: totalTeamsCount, totalChunks: totalChunksCount, chunkSize } = countData;
+      setTotalTeams(totalTeamsCount);
+      setTotalChunks(totalChunksCount);
+      
+      if (totalTeamsCount === 0) {
+        toast({
+          title: "No Teams to Sync",
+          description: "No teams found for synchronization.",
         });
-      }, 300);
+        return;
+      }
       
-      const data = await res.json();
+      // Process chunks sequentially
+      let cumulativeMetrics = {
+        newContingents: 0,
+        updatedContingents: 0,
+        newTeams: 0,
+        updatedTeams: 0,
+        newContestants: 0,
+        updatedContestants: 0,
+        newManagers: 0,
+        updatedManagers: 0,
+        errorCount: 0,
+        errors: [] as string[]
+      };
       
-      // Clear the interval and set to 100%
-      clearInterval(interval);
-      setSyncProgress(100);
+      for (let chunkIndex = 0; chunkIndex < totalChunksCount && !syncStopped; chunkIndex++) {
+        // Wait if paused
+        while (syncPaused && !syncStopped) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        if (syncStopped) break;
+        
+        setCurrentChunk(chunkIndex + 1);
+        const offset = chunkIndex * chunkSize;
+        
+        try {
+          const chunkRes = await fetch(`/api/organizer/events/${eventId}/attendance/sync-chunked`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              action: 'chunk', 
+              chunkSize,
+              offset 
+            })
+          });
+          
+          const chunkData = await chunkRes.json();
+          
+          if (chunkData.success && chunkData.syncResults) {
+            const results = chunkData.syncResults;
+            
+            // Update cumulative metrics
+            cumulativeMetrics.newContingents += results.newContingents || 0;
+            cumulativeMetrics.updatedContingents += results.updatedContingents || 0;
+            cumulativeMetrics.newTeams += results.newTeams || 0;
+            cumulativeMetrics.updatedTeams += results.updatedTeams || 0;
+            cumulativeMetrics.newContestants += results.newContestants || 0;
+            cumulativeMetrics.updatedContestants += results.updatedContestants || 0;
+            cumulativeMetrics.newManagers += results.newManagers || 0;
+            cumulativeMetrics.updatedManagers += results.updatedManagers || 0;
+            cumulativeMetrics.errorCount += results.errorCount || 0;
+            
+            if (results.errors && results.errors.length > 0) {
+              cumulativeMetrics.errors.push(...results.errors);
+            }
+            
+            setProcessedTeams(prev => prev + (results.processedTeams || 0));
+            setSyncMetrics({ ...cumulativeMetrics });
+            
+            // Update progress
+            const progress = ((chunkIndex + 1) / totalChunksCount) * 100;
+            setSyncProgress(progress);
+            
+          } else {
+            console.error(`Chunk ${chunkIndex + 1} failed:`, chunkData.error);
+            cumulativeMetrics.errorCount++;
+            cumulativeMetrics.errors.push(`Chunk ${chunkIndex + 1}: ${chunkData.error || 'Unknown error'}`);
+            setSyncMetrics({ ...cumulativeMetrics });
+          }
+        } catch (chunkError) {
+          console.error(`Error processing chunk ${chunkIndex + 1}:`, chunkError);
+          cumulativeMetrics.errorCount++;
+          cumulativeMetrics.errors.push(`Chunk ${chunkIndex + 1}: ${chunkError instanceof Error ? chunkError.message : 'Unknown error'}`);
+          setSyncMetrics({ ...cumulativeMetrics });
+        }
+        
+        // Small delay between chunks to prevent overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       
-      if (data.success) {
+      if (syncStopped) {
+        toast({
+          title: "Synchronization Stopped",
+          description: `Processed ${processedTeams} out of ${totalTeamsCount} teams before stopping.`,
+        });
+      } else {
+        const totalProcessed = cumulativeMetrics.newContingents + cumulativeMetrics.updatedContingents +
+                              cumulativeMetrics.newTeams + cumulativeMetrics.updatedTeams +
+                              cumulativeMetrics.newContestants + cumulativeMetrics.updatedContestants +
+                              cumulativeMetrics.newManagers + cumulativeMetrics.updatedManagers;
+        
         toast({
           title: "Synchronization Complete",
-          description: `Successfully synchronized ${data.teamsCount} teams and ${data.contestantsCount} contestants.`,
+          description: `Successfully processed ${totalProcessed} records across ${processedTeams} teams. ${cumulativeMetrics.errorCount > 0 ? `${cumulativeMetrics.errorCount} errors occurred.` : ''}`,
         });
         setSyncNeeded(false);
-      } else {
-        toast({
-          title: "Synchronization Failed",
-          description: data.message || "An error occurred during synchronization.",
-          variant: "destructive",
-        });
       }
+      
     } catch (error) {
       console.error("Error during sync:", error);
       toast({
         title: "Synchronization Error",
-        description: "Failed to synchronize attendance data. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to synchronize attendance data. Please try again.",
         variant: "destructive",
       });
     } finally {
       setTimeout(() => {
         setSyncing(false);
         setSyncProgress(0);
+        setCurrentChunk(0);
+        setProcessedTeams(0);
+        setSyncPaused(false);
+        setSyncStopped(false);
       }, 500);
     }
+  };
+  
+  const handlePauseSync = () => {
+    setSyncPaused(!syncPaused);
+  };
+  
+  const handleStopSync = () => {
+    setSyncStopped(true);
+    setSyncPaused(false);
   };
 
   return (
@@ -653,13 +789,97 @@ export default function AttendancePage() {
               <p className="text-green-600">Attendance data is up to date</p>
             )}
             
-            {syncProgress > 0 && (
-              <div className="w-full bg-gray-200 rounded-full h-2.5 my-4">
-                <div 
-                  className="bg-blue-600 h-2.5 rounded-full" 
-                  style={{ width: `${syncProgress}%` }}
-                ></div>
-                <p className="text-sm text-gray-500 mt-1">Progress: {syncProgress}%</p>
+            {syncing && (
+              <div className="space-y-4 mt-4">
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-3">
+                  <div 
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300" 
+                    style={{ width: `${syncProgress}%` }}
+                  ></div>
+                </div>
+                
+                {/* Progress Details */}
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="font-medium">Overall Progress</p>
+                    <p className="text-gray-600">{Math.round(syncProgress)}%</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Teams Processed</p>
+                    <p className="text-gray-600">{processedTeams} / {totalTeams}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Current Chunk</p>
+                    <p className="text-gray-600">{currentChunk} / {totalChunks}</p>
+                  </div>
+                  <div>
+                    <p className="font-medium">Status</p>
+                    <p className="text-gray-600">
+                      {syncPaused ? 'Paused' : syncStopped ? 'Stopping...' : 'Processing'}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Sync Metrics */}
+                {(syncMetrics.newContingents + syncMetrics.updatedContingents + 
+                  syncMetrics.newTeams + syncMetrics.updatedTeams + 
+                  syncMetrics.newContestants + syncMetrics.updatedContestants + 
+                  syncMetrics.newManagers + syncMetrics.updatedManagers) > 0 && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="font-medium text-sm mb-2">Processing Results</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>New Contingents: {syncMetrics.newContingents}</div>
+                      <div>Updated Contingents: {syncMetrics.updatedContingents}</div>
+                      <div>New Teams: {syncMetrics.newTeams}</div>
+                      <div>Updated Teams: {syncMetrics.updatedTeams}</div>
+                      <div>New Contestants: {syncMetrics.newContestants}</div>
+                      <div>Updated Contestants: {syncMetrics.updatedContestants}</div>
+                      <div>New Managers: {syncMetrics.newManagers}</div>
+                      <div>Updated Managers: {syncMetrics.updatedManagers}</div>
+                      {syncMetrics.errorCount > 0 && (
+                        <div className="text-red-600 col-span-2">Errors: {syncMetrics.errorCount}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Error Details */}
+                {syncMetrics.errors.length > 0 && (
+                  <div className="bg-red-50 p-3 rounded-lg">
+                    <p className="font-medium text-sm text-red-800 mb-2">Error Details</p>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {syncMetrics.errors.slice(0, 5).map((error, index) => (
+                        <p key={index} className="text-xs text-red-700">{error}</p>
+                      ))}
+                      {syncMetrics.errors.length > 5 && (
+                        <p className="text-xs text-red-600">... and {syncMetrics.errors.length - 5} more errors</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Control Buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePauseSync}
+                    disabled={syncStopped}
+                    className="flex-1"
+                  >
+                    {syncPaused ? 'Resume' : 'Pause'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={handleStopSync}
+                    disabled={syncStopped}
+                    className="flex-1"
+                  >
+                    Stop
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
