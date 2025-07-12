@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       `;
       
       const countResult = await prisma.$queryRawUnsafe(countQuery, eventId) as any[];
-      const totalTeams = countResult[0]?.totalTeams || 0;
+      const totalTeams = Number(countResult[0]?.totalTeams || 0);
 
       return NextResponse.json({
         success: true,
@@ -180,9 +180,22 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
           });
         }
 
+        // Convert BigInt IDs to Numbers to prevent BigInt mixing errors
+        const teamsConverted = teams.map(team => ({
+          ...team,
+          id: Number(team.id),
+          originalContestId: Number(team.originalContestId),
+          contingentId: Number(team.contingentId),
+          contestId: Number(team.contestId),
+          stateId: team.stateId ? Number(team.stateId) : null,
+          zoneId: team.zoneId ? Number(team.zoneId) : null,
+          minAge: team.minAge ? Number(team.minAge) : 0,
+          maxAge: team.maxAge ? Number(team.maxAge) : 100
+        }));
+
         // Get team members for each team in this chunk
         const teamsWithMembers = await Promise.all(
-          teams.map(async (team) => {
+          teamsConverted.map(async (team) => {
             const contestId = team.contestId;
             const contestCode = team.contestCode;
             const contestName = team.contestName;
@@ -226,9 +239,19 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
             `;
             
             const members = await prisma.$queryRawUnsafe(membersQuery, team.id) as any[];
+            
+            // Convert member BigInt IDs to Numbers
+            const membersConverted = (members || []).map(member => ({
+              ...member,
+              id: Number(member.id),
+              contingentId: Number(member.contingentId),
+              contestId: Number(member.contestId),
+              age: member.age ? Number(member.age) : 0
+            }));
+            
             return {
               ...team,
-              members: members || []
+              members: membersConverted
             };
           })
         );
@@ -251,26 +274,37 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
           return allMembersInRange;
         });
 
-        // Process teams data
-        const teamsData = filteredTeams.map(team => ({
-          id: team.id,
-          teamName: team.teamName,
-          originalContestId: team.originalContestId,
-          contestId: team.contestId,
-          contestCode: team.contestCode,
-          contestName: team.contestName,
-          contingentId: team.contingentId,
-          contingentName: team.contingentName,
-          contingentType: team.contingentType,
-          schoolLevel: team.schoolLevel,
-          targetGroupLabel: team.targetGroupLabel,
-          stateName: team.stateName,
-          stateId: team.stateId,
-          zoneId: team.zoneId,
-          ppd: team.ppd,
-          members: team.members || [],
-          managers: typeof team.managers === 'string' ? JSON.parse(team.managers) : team.managers,
-        }));
+        // Process teams data with proper BigInt conversions
+        const teamsData = filteredTeams.map(team => {
+          // Parse managers and convert their IDs to Numbers
+          let managers = typeof team.managers === 'string' ? JSON.parse(team.managers) : team.managers;
+          if (managers && Array.isArray(managers)) {
+            managers = managers.map(manager => ({
+              ...manager,
+              id: manager.id ? Number(manager.id) : null
+            }));
+          }
+          
+          return {
+            id: Number(team.id),
+            teamName: team.teamName,
+            originalContestId: Number(team.originalContestId),
+            contestId: Number(team.contestId),
+            contestCode: team.contestCode,
+            contestName: team.contestName,
+            contingentId: Number(team.contingentId),
+            contingentName: team.contingentName,
+            contingentType: team.contingentType,
+            schoolLevel: team.schoolLevel,
+            targetGroupLabel: team.targetGroupLabel,
+            stateName: team.stateName,
+            stateId: team.stateId ? Number(team.stateId) : null,
+            zoneId: team.zoneId ? Number(team.zoneId) : null,
+            ppd: team.ppd,
+            members: team.members || [],
+            managers: managers || []
+          };
+        });
 
         // Group teams by contingent
         const contingentMap = new Map();
