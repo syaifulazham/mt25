@@ -42,6 +42,7 @@ export default function PublicQRCodeAttendancePage() {
     type: 'success' | 'error' | 'info' 
   } | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerRef = useRef<HTMLDivElement | null>(null);
   const scannerDivId = "qr-reader";
   const [manualHashcode, setManualHashcode] = useState('');
   const [activeTab, setActiveTab] = useState('camera');
@@ -53,6 +54,28 @@ export default function PublicQRCodeAttendancePage() {
   const [endpointData, setEndpointData] = useState<EndpointData | null>(null);
   const [endpointLoading, setEndpointLoading] = useState(true);
   const [endpointError, setEndpointError] = useState('');
+  
+  // Welcome screen state
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeData, setWelcomeData] = useState<{
+    name: string;
+    logoUrl: string | null;
+    contingentName: string;
+  } | null>(null);
+  
+  // Input disable state (5 seconds after any read)
+  const [inputDisabled, setInputDisabled] = useState(false);
+  const [disableTimer, setDisableTimer] = useState<NodeJS.Timeout | null>(null);
+  
+  // API call guards to prevent multiple simultaneous calls
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const lastProcessedHashcode = useRef<string>('');
+  
+  // Focus management for manual input
+  const [windowFocused, setWindowFocused] = useState(true);
+  const [inputFocused, setInputFocused] = useState(false);
+  const manualInputRef = useRef<HTMLInputElement>(null);
 
   // Validate the endpoint when component mounts
   useEffect(() => {
@@ -62,12 +85,116 @@ export default function PublicQRCodeAttendancePage() {
   // Clean up scanner when component unmounts
   useEffect(() => {
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(error => console.error("Failed to stop scanner:", error));
-        scannerRef.current = null;
-      }
+      cleanupScanner();
     };
   }, []);
+  
+  // Focus management for manual input mode
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      setWindowFocused(true);
+      // Auto-focus input if in manual mode
+      if (activeTab === 'manual' && manualInputRef.current) {
+        setTimeout(() => {
+          manualInputRef.current?.focus();
+        }, 100);
+      }
+    };
+    
+    const handleWindowBlur = () => {
+      setWindowFocused(false);
+    };
+    
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('blur', handleWindowBlur);
+    
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [activeTab]);
+  
+  // Auto-focus input when switching to manual tab
+  useEffect(() => {
+    if (activeTab === 'manual' && manualInputRef.current) {
+      setTimeout(() => {
+        manualInputRef.current?.focus();
+        setInputFocused(true);
+      }, 100);
+    }
+  }, [activeTab]);
+
+  // Create isolated scanner container outside React's DOM management
+  const createScannerContainer = () => {
+    // Remove any existing scanner container
+    const existingContainer = document.getElementById(scannerDivId);
+    if (existingContainer) {
+      existingContainer.remove();
+    }
+    
+    // Create new container
+    const container = document.createElement('div');
+    container.id = scannerDivId;
+    container.style.width = '100%';
+    container.style.height = '300px';
+    
+    // Append to the React-managed container
+    if (scannerContainerRef.current) {
+      scannerContainerRef.current.appendChild(container);
+    }
+    
+    return container;
+  };
+
+  // Complete scanner cleanup with DOM isolation
+  const cleanupScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        // Check if scanner is actually running before stopping
+        const scannerState = scannerRef.current.getState();
+        if (scannerState === 2) { // Scanner is running (Html5QrcodeScannerState.SCANNING = 2)
+          // Stop the scanner first (this should stop the video stream)
+          await scannerRef.current.stop();
+          
+          // Additional cleanup: Stop any remaining video streams
+          const scannerElement = document.getElementById(scannerDivId);
+          if (scannerElement) {
+            const videoElements = scannerElement.querySelectorAll('video');
+            videoElements.forEach((video: HTMLVideoElement) => {
+              try {
+                if (video.srcObject) {
+                  const stream = video.srcObject as MediaStream;
+                  stream.getTracks().forEach(track => {
+                    track.stop();
+                  });
+                  video.srcObject = null;
+                }
+                video.pause();
+                video.load(); // Reset video element
+              } catch (videoError) {
+                console.debug("Video cleanup error (safe to ignore):", videoError);
+              }
+            });
+          }
+        }
+      } catch (error) {
+        // Ignore cleanup errors as component is unmounting
+        console.debug("Scanner cleanup error (safe to ignore):", error);
+      } finally {
+        // Completely remove the scanner container to avoid React DOM conflicts
+        try {
+          const scannerElement = document.getElementById(scannerDivId);
+          if (scannerElement && scannerElement.parentNode) {
+            scannerElement.parentNode.removeChild(scannerElement);
+          }
+        } catch (domError) {
+          console.debug("DOM cleanup error (safe to ignore):", domError);
+        }
+        scannerRef.current = null;
+        setScanning(false);
+      }
+    }
+  };
 
   // Validate the attendance endpoint
   const validateEndpoint = async () => {
@@ -90,72 +217,150 @@ export default function PublicQRCodeAttendancePage() {
     }
   };
 
-  // Start the QR scanner
-  const startScanner = () => {
+  // Check camera availability
+  const checkCameraAvailability = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      return videoDevices.length > 0;
+    } catch (error) {
+      console.error('Error checking camera availability:', error);
+      return false;
+    }
+  };
+
+  // Start the QR scanner with enhanced error handling and DOM isolation
+  const startScanner = async () => {
     if (scannerRef.current) {
       setScanning(true);
+      return;
+    }
+
+    // Check if cameras are available
+    const hasCameras = await checkCameraAvailability();
+    if (!hasCameras) {
+      toast({
+        title: "No Camera Found",
+        description: "No camera devices detected. Please ensure your device has a camera and try refreshing the page.",
+        variant: "destructive"
+      });
       return;
     }
 
     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
     try {
+      // Create isolated scanner container
+      createScannerContainer();
+      
       // Create a new scanner instance
       const scanner = new Html5Qrcode(scannerDivId);
       scannerRef.current = scanner;
       
-      // Start the scanner with the camera
-      scanner.start(
-        { facingMode: "environment" },
-        config,
-        onScanSuccess,
-        onScanFailure
-      )
-      .then(() => {
-        setScanning(true);
-      })
-      .catch(err => {
-        console.error("Failed to start scanner:", err);
-        toast({
-          title: "Camera Error",
-          description: "Failed to access camera. Please ensure camera permissions are granted.",
-          variant: "destructive"
-        });
-        setScanning(false);
-      });
-    } catch (error) {
-      console.error("Scanner initialization error:", error);
+      // Try different camera access methods
+      const startWithCamera = async () => {
+        try {
+          // First try with rear camera
+          await scanner.start(
+            { facingMode: "environment" },
+            config,
+            onScanSuccess,
+            onScanFailure
+          );
+          return true;
+        } catch (envError) {
+          console.warn("Rear camera failed, trying front camera:", envError);
+          try {
+            // Fallback to front camera
+            await scanner.start(
+              { facingMode: "user" },
+              config,
+              onScanSuccess,
+              onScanFailure
+            );
+            return true;
+          } catch (userError) {
+            console.warn("Front camera failed, trying any camera:", userError);
+            try {
+              // Final fallback to any available camera
+              await scanner.start(
+                { facingMode: "environment" },
+                config,
+                onScanSuccess,
+                onScanFailure
+              );
+              return true;
+            } catch (anyError) {
+              throw anyError;
+            }
+          }
+        }
+      };
+
+      await startWithCamera();
+      setScanning(true);
       toast({
-        title: "Scanner Error",
-        description: "Failed to initialize QR scanner.",
+        title: "Camera Ready",
+        description: "QR scanner is now active. Point your camera at a QR code.",
+        variant: "default"
+      });
+      
+    } catch (error: any) {
+      console.error("Failed to start scanner:", error);
+      
+      // Provide specific error messages based on error type
+      let errorTitle = "Camera Error";
+      let errorDescription = "Failed to access camera. Please try the following:";
+      
+      if (error.name === 'NotFoundError') {
+        errorTitle = "Camera Not Found";
+        errorDescription = "No camera device found. Please ensure your device has a camera and refresh the page.";
+      } else if (error.name === 'NotAllowedError') {
+        errorTitle = "Camera Permission Denied";
+        errorDescription = "Camera access was denied. Please allow camera permissions in your browser settings and refresh the page.";
+      } else if (error.name === 'NotReadableError') {
+        errorTitle = "Camera In Use";
+        errorDescription = "Camera is being used by another application. Please close other camera apps and try again.";
+      } else if (error.name === 'OverconstrainedError') {
+        errorTitle = "Camera Constraints Error";
+        errorDescription = "Camera doesn't support the requested settings. Try refreshing the page.";
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive"
       });
+      
+      setScanning(false);
+      if (scannerRef.current) {
+        scannerRef.current = null;
+      }
     }
   };
 
   // Stop the QR scanner
-  const stopScanner = () => {
+  const stopScanner = async () => {
     if (scannerRef.current && scanning) {
-      scannerRef.current
-        .stop()
-        .then(() => {
-          setScanning(false);
-        })
-        .catch(err => {
-          console.error("Failed to stop scanner:", err);
-        });
+      await cleanupScanner();
     }
   };
 
-  // Handle successful QR scan
+  // Handle successful QR scan with debounce
   const onScanSuccess = (decodedText: string) => {
-    if (lastScanned === decodedText) return; // Prevent duplicate scans
+    console.log('🎯 onScanSuccess CALLED with:', decodedText);
+    console.log('loading:', loading, 'lastScanned:', lastScanned);
     
+    // Prevent processing if already loading or same code scanned recently
+    if (loading || lastScanned === decodedText) {
+      console.log('❌ onScanSuccess BLOCKED: loading or duplicate');
+      return;
+    }
+    
+    console.log('✅ onScanSuccess PROCEEDING: calling processHashcode');
     setLastScanned(decodedText);
     processHashcode(decodedText);
-    
-    // Auto-stop after successful scan
-    stopScanner();
+    // Don't stop scanner immediately - let it continue for rapid scanning
   };
 
   // Handle QR scan failure
@@ -166,10 +371,65 @@ export default function PublicQRCodeAttendancePage() {
 
   // Process the scanned QR code
   const processHashcode = async (code: string) => {
+    console.log('=== PROCESShashcode CALLED ===');
+    console.log('Code:', code);
+    console.log('inputDisabled:', inputDisabled);
+    console.log('isProcessing:', isProcessing);
+    console.log('lastProcessedHashcode.current:', lastProcessedHashcode.current);
+    
+    // Check if input is disabled
+    if (inputDisabled) {
+      console.log('❌ BLOCKED: Input is disabled, ignoring request');
+      return;
+    }
+    
+    // Prevent multiple simultaneous API calls
+    if (isProcessing) {
+      console.log('❌ BLOCKED: Already processing a request, ignoring duplicate');
+      return;
+    }
+    
+    // Prevent rapid duplicate hashcode processing (only block for 1 second)
+    if (lastProcessedHashcode.current === code) {
+      console.log('❌ BLOCKED: Same hashcode recently processed, ignoring rapid duplicate:', code);
+      return;
+    }
+    
+    console.log('✅ PROCEEDING: All checks passed, processing hashcode...');
+    
+    // Mark as processing and store last processed hashcode
+    setIsProcessing(true);
+    lastProcessedHashcode.current = code;
+    
+    // Disable input for 5 seconds
+    setInputDisabled(true);
+    if (disableTimer) {
+      clearTimeout(disableTimer);
+    }
+    const newTimer = setTimeout(() => {
+      setInputDisabled(false);
+      // CRITICAL: Ensure input ref is restored after re-enabling
+      setTimeout(() => {
+        if (activeTab === 'manual' && manualInputRef.current) {
+          manualInputRef.current.focus();
+          console.log('🔄 REF RESTORED: Input ref reconnected after disable/enable cycle');
+        } else {
+          console.log('⚠️ REF LOST: manualInputRef.current is null after re-enabling');
+        }
+      }, 100);
+    }, 5000);
+    setDisableTimer(newTimer);
+    
     setLoading(true);
     setMessage(null);
     
     try {
+      console.log('Sending check-in request with:', {
+        hashcode: code,
+        eventId: String(eventId), // Ensure it's a string
+        endpointhash: String(endpointhash) // Ensure it's a string
+      });
+      
       const response = await fetch('/api/attendance/check-in', {
         method: 'POST',
         headers: {
@@ -177,23 +437,71 @@ export default function PublicQRCodeAttendancePage() {
         },
         body: JSON.stringify({
           hashcode: code,
-          eventId: eventId,
-          endpointhash: endpointhash,
+          eventId: String(eventId), // Convert to string to ensure it's not undefined
+          endpointhash: String(endpointhash), // Convert to string to ensure it's not undefined
         }),
       });
       
       const data = await response.json();
       
       if (response.ok) {
-        setMessage({
-          title: "Success!",
-          description: data.message || "Attendance registered successfully.",
-          type: "success"
-        });
+        // Show welcome screen with contingent data
+        if (data.contingent) {
+          setWelcomeData({
+            name: data.contingent.name,
+            logoUrl: data.contingent.logoUrl,
+            contingentName: data.contingent.name
+          });
+          setShowWelcome(true);
+          
+          // Hide welcome screen after 5 seconds and show success message
+          setTimeout(() => {
+            setShowWelcome(false);
+            setWelcomeData(null);
+            setMessage({
+              title: "Success!",
+              description: data.message || "Attendance registered successfully.",
+              type: "success"
+            });
+            
+            // Force cursor back to manual input box after welcome screen
+            if (activeTab === 'manual' && manualInputRef.current) {
+              setTimeout(() => {
+                manualInputRef.current?.focus();
+                console.log('Cursor refocused to manual input box after welcome screen');
+              }, 200); // Small delay to ensure welcome screen is fully hidden
+            }
+          }, 5000);
+        } else {
+          // Fallback if no contingent data
+          setMessage({
+            title: "Success!",
+            description: data.message || "Attendance registered successfully.",
+            type: "success"
+          });
+        }
       } else {
+        // Handle specific error cases with user-friendly messages
+        let errorTitle = "Check-in Failed";
+        let errorDescription = data.error || "Failed to register attendance.";
+        
+        if (data.error?.includes("Attendance not available")) {
+          errorTitle = "Outside Check-in Hours";
+          errorDescription = data.message || "Check-in is only allowed within 2 hours before the event starts until the event ends.";
+        } else if (data.error?.includes("Already checked in")) {
+          errorTitle = "Already Checked In";
+          errorDescription = data.message || "This contingent has already been checked in for this event.";
+        } else if (data.error?.includes("Invalid QR code")) {
+          errorTitle = "Invalid QR Code";
+          errorDescription = "This QR code is not registered for this event.";
+        } else if (data.error?.includes("Only manager codes")) {
+          errorTitle = "Manager Code Required";
+          errorDescription = "Please scan a manager's QR code to check in the entire contingent.";
+        }
+        
         setMessage({
-          title: "Failed",
-          description: data.error || "Failed to register attendance.",
+          title: errorTitle,
+          description: errorDescription,
           type: "error"
         });
       }
@@ -206,14 +514,63 @@ export default function PublicQRCodeAttendancePage() {
       });
     } finally {
       setLoading(false);
-      setLastScanned(null); // Reset to allow rescanning the same code
+      
+      // Reset processing state to allow new API calls
+      setIsProcessing(false);
+      
+      // Reset lastScanned immediately to allow rapid scanning of different codes
+      setTimeout(() => {
+        setLastScanned(null);
+        console.log('lastScanned reset - ready for new scans');
+      }, 500); // Quick reset for rapid scanning
+      
+      // Force cursor back to manual input box for rapid scanning - CRITICAL for QR devices
+      if (activeTab === 'manual' && manualInputRef.current) {
+        console.log('🔍 DEBUG: activeTab is manual, manualInputRef exists');
+        
+        // Multiple focus attempts to ensure it works
+        setTimeout(() => {
+          if (manualInputRef.current) {
+            manualInputRef.current.focus();
+            console.log('🎯 FOCUS ATTEMPT 1: Called focus()');
+            console.log('🎯 FOCUS CHECK 1: document.activeElement:', document.activeElement === manualInputRef.current ? 'SUCCESS' : 'FAILED');
+            console.log('🎯 INPUT STATE 1: disabled=', manualInputRef.current.disabled, 'value=', manualInputRef.current.value);
+          }
+        }, 100);
+        
+        setTimeout(() => {
+          if (manualInputRef.current) {
+            manualInputRef.current.focus();
+            console.log('🎯 FOCUS ATTEMPT 2: Called focus()');
+            console.log('🎯 FOCUS CHECK 2: document.activeElement:', document.activeElement === manualInputRef.current ? 'SUCCESS' : 'FAILED');
+            console.log('🎯 INPUT STATE 2: disabled=', manualInputRef.current.disabled, 'value=', manualInputRef.current.value);
+          }
+        }, 600); // After lastScanned reset
+        
+        setTimeout(() => {
+          if (manualInputRef.current) {
+            manualInputRef.current.focus();
+            console.log('🎯 FOCUS ATTEMPT 3: Called focus()');
+            console.log('🎯 FOCUS CHECK 3: document.activeElement:', document.activeElement === manualInputRef.current ? 'SUCCESS' : 'FAILED');
+            console.log('🎯 INPUT STATE 3: disabled=', manualInputRef.current.disabled, 'value=', manualInputRef.current.value);
+          }
+        }, 1200); // After hashcode reset
+      } else {
+        console.log('❌ DEBUG: Focus not attempted - activeTab:', activeTab, 'manualInputRef.current:', !!manualInputRef.current);
+      }
+      
+      // Reset the processed hashcode after short delay to allow different QR codes
+      setTimeout(() => {
+        lastProcessedHashcode.current = '';
+        console.log('Hashcode duplicate protection reset - ready for new scans');
+      }, 1000); // Shorter delay to allow rapid scanning of different codes
     }
   };
 
   // Handle manual QR code submission
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualHashcode.trim()) return;
+    if (!manualHashcode.trim() || inputDisabled) return;
     
     processHashcode(manualHashcode.trim());
     setManualHashcode('');
@@ -295,6 +652,55 @@ export default function PublicQRCodeAttendancePage() {
   // Main component render
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-900 via-indigo-900 to-purple-900 text-white">
+      {/* Animated Welcome Screen Overlay */}
+      {showWelcome && welcomeData && (
+        <div className="fixed inset-0 z-50 bg-gradient-to-b from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center animate-in fade-in duration-500">
+          <div className="text-center px-8 animate-in slide-in-from-bottom-4 duration-700">
+            {/* Main Title */}
+            <h1 className="text-4xl md:text-6xl font-bold text-yellow-400 mb-8 animate-in zoom-in duration-1000">
+              MALAYSIA TECHLYMPICS 2025
+            </h1>
+            
+            {/* Welcome Message */}
+            <h2 className="text-3xl md:text-5xl font-semibold text-white mb-8 animate-in slide-in-from-left duration-1000 delay-300">
+              SELAMAT DATANG
+            </h2>
+            
+            {/* Contingent Logo */}
+            {welcomeData.logoUrl && (
+              <div className="mb-8 animate-in zoom-in duration-1000 delay-500">
+                <img 
+                  src={welcomeData.logoUrl} 
+                  alt="Contingent Logo" 
+                  className="mx-auto w-32 h-32 md:w-48 md:h-48 object-contain rounded-full border-4 border-yellow-400 shadow-2xl"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Contingent Name */}
+            <h3 className="text-2xl md:text-4xl font-bold text-yellow-300 mb-8 animate-in slide-in-from-right duration-1000 delay-700">
+              {welcomeData.contingentName}
+            </h3>
+            
+            {/* Tagline */}
+            <p className="text-xl md:text-2xl font-medium text-gray-200 animate-in fade-in duration-1000 delay-1000">
+              Luar Biasa, Global, Inklusif
+            </p>
+            
+            {/* Success Checkmark Animation */}
+            <div className="mt-8 animate-in zoom-in duration-1000 delay-1200">
+              <div className="mx-auto w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Passcode Dialog */}
       <Dialog open={passcodeDialogOpen} onOpenChange={setPasscodeDialogOpen}>
         <DialogContent>
@@ -373,7 +779,10 @@ export default function PublicQRCodeAttendancePage() {
                 <CardTitle>QR Code Scanner</CardTitle>
                 <div className="flex space-x-2 mt-2">
                   <Button
-                    onClick={() => setActiveTab('camera')}
+                    onClick={() => {
+                      console.log('📷 TAB SWITCH: Switching to Camera Scanner mode');
+                      setActiveTab('camera');
+                    }}
                     variant={activeTab === 'camera' ? "default" : "outline"}
                     size="sm"
                     className={activeTab === 'camera' ? "bg-blue-600" : "bg-transparent"}
@@ -382,8 +791,10 @@ export default function PublicQRCodeAttendancePage() {
                   </Button>
                   <Button
                     onClick={() => {
+                      console.log('📱 TAB SWITCH: Switching to Manual Input mode');
                       setActiveTab('manual');
                       if (scanning) {
+                        console.log('🛑 Stopping camera scanner for manual mode');
                         stopScanner();
                       }
                     }}
@@ -403,7 +814,7 @@ export default function PublicQRCodeAttendancePage() {
                     </div>
                     
                     <div 
-                      id={scannerDivId} 
+                      ref={scannerContainerRef}
                       className={`aspect-square w-full max-w-md mx-auto border-4 border-dashed border-white/20 rounded-lg overflow-hidden relative ${scanning ? 'bg-black' : 'bg-white/10'}`}
                     >
                       {!scanning && (
@@ -447,26 +858,92 @@ export default function PublicQRCodeAttendancePage() {
                     <form onSubmit={handleManualSubmit} className="space-y-4">
                       <div className="relative">
                         <Input
+                          ref={manualInputRef}
                           placeholder="Ready for QR code input"
                           value={manualHashcode}
+                          maxLength={100} // Allow longer hashcodes
                           onChange={(e) => {
-                            setManualHashcode(e.target.value);
-                            // Auto-submit when input is detected via a device
-                            if (e.target.value.trim()) {
-                              const timer = setTimeout(() => {
-                                processHashcode(e.target.value.trim());
-                                setManualHashcode('');
-                              }, 300); // Small delay to ensure complete input
-                              return () => clearTimeout(timer);
+                            const currentValue = e.target.value;
+                            console.log('Manual input onChange:', currentValue, 'Length:', currentValue.length);
+                            
+                            // PROGRAMMATIC DISABLE: Ignore input when disabled (preserve ref)
+                            if (inputDisabled) {
+                              console.log('🚫 INPUT IGNORED: Input is disabled, clearing value');
+                              setManualHashcode('');
+                              return;
                             }
+                            
+                            setManualHashcode(currentValue);
+                            
+                            // Clear existing debounce timer to prevent multiple overlapping calls
+                            if (debounceTimer) {
+                              clearTimeout(debounceTimer);
+                            }
+                            
+                            // Auto-submit when input is detected via a device
+                            if (currentValue.trim()) {
+                              const hashcodeToProcess = currentValue.trim();
+                              console.log('Auto-submitting hashcode (debounced):', hashcodeToProcess, 'Length:', hashcodeToProcess.length);
+                              
+                              // Set new debounce timer
+                              console.log('🕐 Setting debounce timer for:', hashcodeToProcess);
+                              const timer = setTimeout(() => {
+                                console.log('⏰ DEBOUNCE TIMER FIRED - Processing hashcode:', hashcodeToProcess, 'Length:', hashcodeToProcess.length);
+                                processHashcode(hashcodeToProcess);
+                                setManualHashcode('');
+                              }, 1000); // Debounced delay to ensure complete input from QR scanners
+                              
+                              setDebounceTimer(timer);
+                              console.log('✅ Debounce timer set successfully');
+                            }
+                          }}
+                          onFocus={() => {
+                            console.log('🔄 INPUT FOCUS: Manual input focused');
+                            setInputFocused(true);
+                          }}
+                          onBlur={() => {
+                            console.log('🔄 INPUT BLUR: Manual input blurred');
+                            setInputFocused(false);
                           }}
                           className="opacity-0 absolute inset-0 h-full w-full cursor-default"
                           autoFocus={activeTab === 'manual'}
+                          // NEVER disable to preserve ref - handle disabling programmatically
                         />
-                        <div className="bg-white/10 border border-white/20 rounded-md p-4 text-center min-h-[50px] flex flex-col justify-center items-center">
-                          <Smartphone className="h-8 w-8 mb-2 text-yellow-400" />
-                          <p className="text-white/80 font-medium">Ready to accept QR code input</p>
-                          <p className="text-white/60 text-xs mt-1">Point your device at the QR code</p>
+                        <div 
+                          className={`rounded-md p-4 text-center min-h-[50px] flex flex-col justify-center items-center transition-all duration-300 ${
+                            inputDisabled
+                              ? "bg-red-600/80 border border-red-500"
+                              : (!windowFocused || !inputFocused) && activeTab === 'manual'
+                              ? "bg-yellow-600/80 border border-yellow-500 cursor-pointer hover:bg-yellow-600/90"
+                              : "bg-green-600/80 border border-green-500"
+                          }`}
+                          onClick={() => {
+                            if ((!windowFocused || !inputFocused) && activeTab === 'manual' && !inputDisabled) {
+                              manualInputRef.current?.focus();
+                            }
+                          }}
+                        >
+                          <Smartphone className={`h-8 w-8 mb-2 ${
+                            inputDisabled 
+                              ? "text-red-200" 
+                              : (!windowFocused || !inputFocused) && activeTab === 'manual'
+                              ? "text-yellow-200"
+                              : "text-green-200"
+                          }`} />
+                          <p className="text-white font-semibold">
+                            {inputDisabled 
+                              ? "Wait..." 
+                              : (!windowFocused || !inputFocused) && activeTab === 'manual'
+                              ? "Click here to focus for QR scanner input"
+                              : "Ready to accept QR code input"
+                            }
+                          </p>
+                          {!inputDisabled && windowFocused && inputFocused && (
+                            <p className="text-white/80 text-xs mt-1">Point your device at the QR code</p>
+                          )}
+                          {(!windowFocused || !inputFocused) && activeTab === 'manual' && !inputDisabled && (
+                            <p className="text-yellow-200 text-xs mt-1">Window or input field is not focused</p>
+                          )}
                         </div>
                       </div>
                       
