@@ -256,16 +256,34 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
           })
         );
 
-        // Filter teams - only exclude teams with no members (age restrictions should not apply)
-        // Teams with ACCEPTED, APPROVED, APPROVED_SPECIAL status should be included regardless of age
+        // Filter teams with members and validate age range (unless status is APPROVED_SPECIAL or ACCEPTED)
         const filteredTeams = teamsWithMembers.filter(team => {
+          const minAge = team.minAge || 0;
+          const maxAge = team.maxAge || 100;
+          const teamStatus = team.status;
+          
           if (!team.members || !Array.isArray(team.members) || team.members.length === 0) {
             console.log(`Skipping team ${team.id} - no members`);
             return false;
           }
           
-          // All teams with approved status should be included - no age validation needed
-          return true;
+          // Skip age restriction for teams with APPROVED_SPECIAL or ACCEPTED status
+          if (teamStatus === 'APPROVED_SPECIAL' || teamStatus === 'ACCEPTED') {
+            console.log(`Team ${team.id} (${team.teamName}) - Age restriction bypassed due to status: ${teamStatus}`);
+            return true;
+          }
+          
+          // Apply normal age restriction for other statuses
+          const allMembersInRange = team.members.every((member: any) => {
+            const age = member.age || 0;
+            return age >= minAge && age <= maxAge;
+          });
+          
+          if (!allMembersInRange) {
+            console.log(`Team ${team.id} (${team.teamName}) - Age restriction failed. Status: ${teamStatus}, Age range: ${minAge}-${maxAge}`);
+          }
+          
+          return allMembersInRange;
         });
 
         // Process teams data with proper BigInt conversions
