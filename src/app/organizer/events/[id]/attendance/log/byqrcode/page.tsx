@@ -1,15 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Loader2, Scan, Keyboard, Plus, Trash2, Link as LinkIcon, Copy, Check } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Link as LinkIcon, Copy, Check } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Html5Qrcode } from 'html5-qrcode';
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -42,36 +39,36 @@ type AttendanceEndpoint = {
   updatedAt: string;
 };
 
+// Type definitions for attendance agent endpoints
+type AttendanceAgentEndpoint = {
+  id: number;
+  eventId: number;
+  endpointhash: string;
+  passcode: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export default function QRCodeAttendancePage() {
   const { id: eventId } = useParams();
   const { toast } = useToast();
-  const [scanning, setScanning] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [lastScanned, setLastScanned] = useState<string | null>(null);
-  const [message, setMessage] = useState<{ title: string; description: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const scannerDivId = "qr-reader";
-  const [manualHashcode, setManualHashcode] = useState('');
-  const [activeMainTab, setActiveMainTab] = useState('qrscanner');
-  const [activeScannerTab, setActiveScannerTab] = useState('camera');
   const [endpoints, setEndpoints] = useState<AttendanceEndpoint[]>([]);
   const [endpointsLoading, setEndpointsLoading] = useState(true);
   const [creatingEndpoint, setCreatingEndpoint] = useState(false);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [deletingEndpointId, setDeletingEndpointId] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Cleanup function to stop scanner when component unmounts
-    return () => {
-      if (scannerRef.current && scanning) {
-        scannerRef.current.stop().catch(console.error);
-      }
-    };
-  }, [scanning]);
   
+  // State for agent endpoints
+  const [agentEndpoints, setAgentEndpoints] = useState<AttendanceAgentEndpoint[]>([]);
+  const [agentEndpointsLoading, setAgentEndpointsLoading] = useState(true);
+  const [creatingAgentEndpoint, setCreatingAgentEndpoint] = useState(false);
+  const [copiedAgentHash, setCopiedAgentHash] = useState<string | null>(null);
+  const [deletingAgentEndpointId, setDeletingAgentEndpointId] = useState<number | null>(null);
+
   // Fetch attendance endpoints when component mounts
   useEffect(() => {
     fetchAttendanceEndpoints();
+    fetchAttendanceAgentEndpoints();
   }, []);
   
   // Function to fetch attendance endpoints
@@ -110,23 +107,21 @@ export default function QRCodeAttendancePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          eventId: Number(eventId),
-        }),
+        body: JSON.stringify({}),
       });
       
-      const data = await response.json();
-      
       if (response.ok) {
+        const data = await response.json();
         toast({
           title: "Endpoint Created",
-          description: "New QR code endpoint created successfully.",
+          description: "New attendance endpoint has been created successfully.",
         });
         fetchAttendanceEndpoints(); // Refresh the list
       } else {
+        const errorData = await response.json();
         toast({
           title: "Failed to create endpoint",
-          description: data.error || "Could not create QR code endpoint.",
+          description: errorData.error || "Could not create attendance endpoint. Please try again.",
           variant: "destructive",
         });
       }
@@ -134,7 +129,7 @@ export default function QRCodeAttendancePage() {
       console.error("Error creating attendance endpoint:", error);
       toast({
         title: "Error",
-        description: "An error occurred while creating the endpoint.",
+        description: "An error occurred while creating the attendance endpoint.",
         variant: "destructive",
       });
     } finally {
@@ -153,14 +148,14 @@ export default function QRCodeAttendancePage() {
       if (response.ok) {
         toast({
           title: "Endpoint Deleted",
-          description: "QR code endpoint deleted successfully.",
+          description: "Attendance endpoint has been deleted successfully.",
         });
         fetchAttendanceEndpoints(); // Refresh the list
       } else {
-        const data = await response.json();
+        const errorData = await response.json();
         toast({
           title: "Failed to delete endpoint",
-          description: data.error || "Could not delete QR code endpoint.",
+          description: errorData.error || "Could not delete attendance endpoint. Please try again.",
           variant: "destructive",
         });
       }
@@ -168,7 +163,7 @@ export default function QRCodeAttendancePage() {
       console.error("Error deleting attendance endpoint:", error);
       toast({
         title: "Error",
-        description: "An error occurred while deleting the endpoint.",
+        description: "An error occurred while deleting the attendance endpoint.",
         variant: "destructive",
       });
     } finally {
@@ -182,119 +177,114 @@ export default function QRCodeAttendancePage() {
     navigator.clipboard.writeText(url);
     setCopiedHash(endpointHash);
     setTimeout(() => setCopiedHash(null), 2000);
-    toast({
-      title: "URL Copied",
-      description: "Endpoint URL copied to clipboard.",
-    });
   };
-
-  const startScanner = () => {
-    const html5QrCode = new Html5Qrcode(scannerDivId);
-    scannerRef.current = html5QrCode;
-
-    html5QrCode.start(
-      { facingMode: "environment" },
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-      },
-      onScanSuccess,
-      onScanFailure
-    ).then(() => {
-      setScanning(true);
-    }).catch((err) => {
-      console.error("Error starting scanner:", err);
+  
+  // Function to fetch attendance agent endpoints
+  const fetchAttendanceAgentEndpoints = async () => {
+    setAgentEndpointsLoading(true);
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/agentendpoints`);
+      if (response.ok) {
+        const data = await response.json();
+        setAgentEndpoints(data.endpoints);
+      } else {
+        toast({
+          title: "Failed to fetch agent endpoints",
+          description: "Could not load attendance agent endpoints. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching attendance agent endpoints:", error);
       toast({
-        title: "Scanner Error",
-        description: "Could not access camera. Please check permissions.",
+        title: "Error",
+        description: "An error occurred while fetching attendance agent endpoints.",
         variant: "destructive",
       });
-    });
-  };
-
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().then(() => {
-        setScanning(false);
-      }).catch((err) => {
-        console.error("Error stopping scanner:", err);
-      });
+    } finally {
+      setAgentEndpointsLoading(false);
     }
   };
-
-  const processHashcode = async (hashcode: string) => {
-    // Prevent duplicate scans
-    if (loading || hashcode === lastScanned) return;
-    
-    setLoading(true);
-    setLastScanned(hashcode);
-    
-    // Reset the last scanned code after 5 seconds to allow rescanning
-    setTimeout(() => {
-      setLastScanned(null);
-    }, 5000);
-    
+  
+  // Function to create new attendance agent endpoint
+  const createAttendanceAgentEndpoint = async () => {
+    setCreatingAgentEndpoint(true);
     try {
-      const response = await fetch(`/api/organizer/events/${eventId}/attendance/record`, {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/agentendpoints`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          hashcode,
-          method: 'qrcode',
-        }),
+        body: JSON.stringify({}),
       });
       
-      const data = await response.json();
-      
       if (response.ok) {
-        setMessage({
-          title: "Check-in Successful!",
-          description: `${data.contingentName} has been marked as present.`,
-          type: 'success'
+        const data = await response.json();
+        toast({
+          title: "Agent Endpoint Created",
+          description: "New attendance agent endpoint has been created successfully.",
         });
-        
-        // Auto-dismiss success message after 5 seconds
-        setTimeout(() => {
-          setMessage(null);
-        }, 5000);
+        fetchAttendanceAgentEndpoints(); // Refresh the list
       } else {
-        setMessage({
-          title: "Check-in Failed",
-          description: data.error || "QR code not recognized.",
-          type: 'error'
+        const errorData = await response.json();
+        toast({
+          title: "Failed to create agent endpoint",
+          description: errorData.error || "Could not create attendance agent endpoint. Please try again.",
+          variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Error processing QR code:", error);
-      setMessage({
+      console.error("Error creating attendance agent endpoint:", error);
+      toast({
         title: "Error",
-        description: "Failed to process QR code. Please try again.",
-        type: 'error'
+        description: "An error occurred while creating the attendance agent endpoint.",
+        variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setCreatingAgentEndpoint(false);
     }
   };
-
-  const onScanSuccess = (hashcode: string) => {
-    processHashcode(hashcode);
-  };
-
-
-  const onScanFailure = (error: string) => {
-    // Don't show error for normal scan attempts
-    if (error.includes("No QR code found")) return;
-    console.error("QR Scan error:", error);
-  };
-
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (manualHashcode.trim()) {
-      processHashcode(manualHashcode.trim());
-      setManualHashcode(''); // Clear input after submission
+  
+  // Function to delete an attendance agent endpoint
+  const deleteAttendanceAgentEndpoint = async (id: number) => {
+    setDeletingAgentEndpointId(id);
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/agentendpoints/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Agent Endpoint Deleted",
+          description: "Attendance agent endpoint has been deleted successfully.",
+        });
+        fetchAttendanceAgentEndpoints(); // Refresh the list
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Failed to delete agent endpoint",
+          description: errorData.error || "Could not delete attendance agent endpoint. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting attendance agent endpoint:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred while deleting the attendance agent endpoint.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingAgentEndpointId(null);
     }
+  };
+  
+  // Function to copy agent endpoint URL to clipboard
+  const copyAgentEndpointUrl = (endpointHash: string) => {
+    const url = `${window.location.origin}/attendance/events/${eventId}/agent/${endpointHash}`;
+    navigator.clipboard.writeText(url);
+    setCopiedAgentHash(endpointHash);
+    setTimeout(() => setCopiedAgentHash(null), 2000);
   };
 
   return (
@@ -306,270 +296,280 @@ export default function QRCodeAttendancePage() {
             Back
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold">QR Code Attendance</h1>
+        <h1 className="text-3xl font-bold">Manage Endpoints</h1>
       </div>
       
-      <Tabs value={activeMainTab} onValueChange={setActiveMainTab}>
-        <TabsList className="mb-6">
-          <TabsTrigger value="qrscanner">QR Code Scanner</TabsTrigger>
-          <TabsTrigger value="endpoints">Manage Endpoints</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="qrscanner">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>QR Code Scanner</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeScannerTab} onValueChange={setActiveScannerTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="camera" className="flex items-center">
-                      <Scan className="h-4 w-4 mr-2" />
-                      Camera Scan
-                    </TabsTrigger>
-                    <TabsTrigger value="manual" className="flex items-center">
-                      <Keyboard className="h-4 w-4 mr-2" />
-                      Manual Input
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="camera">
-                    <div className="mb-4">
-                      <p>Scan the QR code from a contingent's ID or profile to mark their attendance.</p>
-                    </div>
-                    
-                    <div 
-                      id={scannerDivId} 
-                      className="w-full h-[300px] bg-gray-100 flex items-center justify-center mb-4"
-                    >
-                      {!scanning && (
-                        <div className="text-center p-4">
-                          <p className="mb-4">Camera feed will appear here.</p>
-                          <Button onClick={startScanner}>
-                            Start Scanner
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {scanning ? (
-                      <Button 
-                        onClick={stopScanner} 
-                        variant="destructive" 
-                        className="w-full"
-                      >
-                        Stop Scanner
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={startScanner} 
-                        className="w-full"
-                      >
-                        Start Scanner
-                      </Button>
-                    )}
-                  </TabsContent>
-                  
-                  <TabsContent value="manual">
-                    <div className="mb-4">
-                      <p>Enter the QR code using a keyboard wedge scanner or manually type/paste the code.</p>
-                    </div>
-                    
-                    <form onSubmit={handleManualSubmit} className="space-y-4">
-                      <div className="flex space-x-2">
-                        <Input
-                          placeholder="Scan or enter QR code here"
-                          value={manualHashcode}
-                          onChange={(e) => setManualHashcode(e.target.value)}
-                          className="flex-1"
-                          autoFocus={activeScannerTab === 'manual'}
-                        />
-                        <Button type="submit" disabled={loading || !manualHashcode.trim()}>
-                          Submit
-                        </Button>
-                      </div>
-                      
-                      <div className="bg-amber-50 border border-amber-200 rounded-md p-4 text-amber-800">
-                        <h4 className="font-medium mb-2">Using a QR Scanner Device:</h4>
-                        <ul className="list-disc list-inside space-y-1 text-sm">
-                          <li>Click in the input field to focus it</li>
-                          <li>Scan the QR code with your scanner device</li>
-                          <li>The code will be automatically entered</li>
-                          <li>The system will process the code immediately if configured for auto-enter</li>
-                        </ul>
-                      </div>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>QR Code Endpoints</CardTitle>
+            <CardDescription>
+              Create and manage QR code attendance endpoints. Each endpoint has a unique URL and requires a passcode to access.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Attendance Endpoints</h3>
+              <Button
+                onClick={createAttendanceEndpoint}
+                disabled={creatingEndpoint}
+                className="flex items-center"
+              >
+                {creatingEndpoint ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
+                ) : (
+                  <><Plus className="mr-2 h-4 w-4" /> Create Endpoint</>
+                )}
+              </Button>
+            </div>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Check-in Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center p-6">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                    <p>Processing...</p>
-                  </div>
-                ) : message ? (
-                  <div className={`p-4 rounded-md mb-4 ${
-                    message.type === 'success' 
-                      ? 'bg-green-50 text-green-700 border border-green-200' 
-                      : message.type === 'error'
-                        ? 'bg-red-50 text-red-700 border border-red-200'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200'
-                  }`}>
-                    <h3 className="font-bold mb-1">{message.title}</h3>
-                    <p>{message.description}</p>
-                  </div>
-                ) : (
-                  <div className="text-center p-6">
-                    <p className="text-gray-500">Scan a QR code to see check-in results</p>
-                  </div>
-                )}
-                
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">Instructions:</h3>
-                  <ol className="list-decimal list-inside space-y-2">
-                    <li>Ensure good lighting for better scanning.</li>
-                    <li>Hold the QR code steady in front of the camera.</li>
-                    <li>The system will automatically register attendance upon successful scan.</li>
-                    <li>Check the status message to confirm successful check-in.</li>
-                  </ol>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+            {endpointsLoading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : endpoints.length === 0 ? (
+              <div className="text-center py-8 border rounded-md bg-gray-50">
+                <p className="text-gray-500">No endpoints created yet.</p>
+                <p className="text-sm text-gray-400 mt-2">Create your first endpoint to start managing QR code attendance.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableCaption>List of attendance endpoints for this event.</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Endpoint Hash</TableHead>
+                    <TableHead>Passcode</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {endpoints.map((endpoint) => (
+                    <TableRow key={endpoint.id}>
+                      <TableCell className="font-mono text-sm">
+                        {endpoint.endpointhash}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {endpoint.passcode}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(endpoint.createdAt), 'PPp')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyEndpointUrl(endpoint.endpointhash)}
+                            className="flex items-center"
+                          >
+                            {copiedHash === endpoint.endpointhash ? (
+                              <><Check className="h-3 w-3 mr-1" /> Copied</>
+                            ) : (
+                              <><Copy className="h-3 w-3 mr-1" /> Copy URL</>
+                            )}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <Link href={`/attendance/events/${eventId}/${endpoint.endpointhash}`} target="_blank">
+                              <LinkIcon className="h-3 w-3 mr-1" />
+                              Open
+                            </Link>
+                          </Button>
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingEndpointId === endpoint.id}
+                              >
+                                {deletingEndpointId === endpoint.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Endpoint</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this attendance endpoint? This action cannot be undone.
+                                  The endpoint hash is: <code className="bg-gray-100 px-1 rounded">{endpoint.endpointhash}</code>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteAttendanceEndpoint(endpoint.id)}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <h4 className="font-medium mb-2">How to use QR code endpoints:</h4>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
+                <li>Create an endpoint using the "Create Endpoint" button above.</li>
+                <li>Copy the endpoint URL or click "Open" to access the attendance page.</li>
+                <li>Share the URL and passcode with event organizers or attendees.</li>
+                <li>Attendees can scan QR codes or manually enter attendance data at that endpoint.</li>
+                <li>All attendance records will be centrally tracked for this event.</li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
         
-        <TabsContent value="endpoints">
-          <div className="grid grid-cols-1 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>QR Code Endpoints</CardTitle>
-                <CardDescription>
-                  Create and manage QR code attendance endpoints. Each endpoint has a unique URL and requires a passcode to access.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium">Attendance Endpoints</h3>
-                  <Button
-                    onClick={createAttendanceEndpoint}
-                    disabled={creatingEndpoint}
-                    className="flex items-center"
-                  >
-                    {creatingEndpoint ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
-                    ) : (
-                      <><Plus className="mr-2 h-4 w-4" /> Create Endpoint</>
-                    )}
-                  </Button>
-                </div>
-                
-                {endpointsLoading ? (
-                  <div className="flex justify-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : endpoints.length === 0 ? (
-                  <div className="text-center py-8 border rounded-md bg-gray-50">
-                    <p className="text-gray-500">No endpoints created yet.</p>
-                    <p className="text-gray-500 text-sm mt-2">Create an endpoint to generate a QR code attendance URL.</p>
-                  </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>QR Code Agent Endpoints</CardTitle>
+            <CardDescription>
+              Create and manage QR code attendance agent endpoints. Each endpoint has a unique URL and requires a passcode to access.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Attendance Agent Endpoints</h3>
+              <Button
+                onClick={createAttendanceAgentEndpoint}
+                disabled={creatingAgentEndpoint}
+                className="flex items-center"
+              >
+                {creatingAgentEndpoint ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</>
                 ) : (
-                  <div className="border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Passcode</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {endpoints.map((endpoint) => (
-                          <TableRow key={endpoint.id}>
-                            <TableCell className="font-mono font-medium">{endpoint.passcode}</TableCell>
-                            <TableCell>{format(new Date(endpoint.createdAt), 'MMM d, yyyy h:mm a')}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => copyEndpointUrl(endpoint.endpointhash)}
-                                >
-                                  {copiedHash === endpoint.endpointhash ? (
-                                    <Check className="h-4 w-4" />
-                                  ) : (
-                                    <Copy className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <Link 
-                                  href={`/attendance/events/${eventId}/${endpoint.endpointhash}`} 
-                                  target="_blank"
-                                  className="inline-block"
-                                >
-                                  <Button variant="outline" size="sm">
-                                    <LinkIcon className="h-4 w-4" />
-                                  </Button>
-                                </Link>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Endpoint</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to delete this attendance endpoint? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteAttendanceEndpoint(endpoint.id)}
-                                        disabled={deletingEndpointId === endpoint.id}
-                                        className="bg-red-600 hover:bg-red-700"
-                                      >
-                                        {deletingEndpointId === endpoint.id ? (
-                                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</>
-                                        ) : (
-                                          "Delete"
-                                        )}
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <><Plus className="mr-2 h-4 w-4" /> Create Agent Endpoint</>
                 )}
-                
-                <div className="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4 text-blue-800">
-                  <h4 className="font-medium mb-2">How to use QR code endpoints:</h4>
-                  <ol className="list-decimal list-inside space-y-1 text-sm">
-                    <li>Create a new endpoint using the button above</li>
-                    <li>Copy the generated URL or click the link icon to open it</li>
-                    <li>Share the URL with the attendance operator</li>
-                    <li>They will need the 6-character passcode to access the QR scanner</li>
-                    <li>The operator can then scan QR codes to mark attendance</li>
-                  </ol>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+              </Button>
+            </div>
+            
+            {agentEndpointsLoading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : agentEndpoints.length === 0 ? (
+              <div className="text-center py-8 border rounded-md bg-gray-50">
+                <p className="text-gray-500">No agent endpoints created yet.</p>
+                <p className="text-sm text-gray-400 mt-2">Create your first agent endpoint to start managing QR code attendance for agents.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableCaption>List of attendance agent endpoints for this event.</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Endpoint Hash</TableHead>
+                    <TableHead>Passcode</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {agentEndpoints.map((endpoint) => (
+                    <TableRow key={endpoint.id}>
+                      <TableCell className="font-mono text-sm">
+                        {endpoint.endpointhash}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {endpoint.passcode}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(endpoint.createdAt), 'PPp')}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyAgentEndpointUrl(endpoint.endpointhash)}
+                            className="flex items-center"
+                          >
+                            {copiedAgentHash === endpoint.endpointhash ? (
+                              <><Check className="h-3 w-3 mr-1" /> Copied</>
+                            ) : (
+                              <><Copy className="h-3 w-3 mr-1" /> Copy URL</>
+                            )}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <Link href={`/attendance/events/${eventId}/agent/${endpoint.endpointhash}`} target="_blank">
+                              <LinkIcon className="h-3 w-3 mr-1" />
+                              Open
+                            </Link>
+                          </Button>
+                          
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingAgentEndpointId === endpoint.id}
+                              >
+                                {deletingAgentEndpointId === endpoint.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Agent Endpoint</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this attendance agent endpoint? This action cannot be undone.
+                                  The endpoint hash is: <code className="bg-gray-100 px-1 rounded">{endpoint.endpointhash}</code>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteAttendanceAgentEndpoint(endpoint.id)}
+                                  className="bg-red-500 hover:bg-red-600"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            
+            <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-md">
+              <h4 className="font-medium mb-2">How to use QR code agent endpoints:</h4>
+              <ol className="list-decimal list-inside space-y-1 text-sm text-green-800">
+                <li>Create an agent endpoint using the "Create Agent Endpoint" button above.</li>
+                <li>Copy the endpoint URL or click "Open" to access the agent attendance page.</li>
+                <li>Share the URL and passcode with authorized agents or staff members.</li>
+                <li>Agents can scan QR codes or manually enter attendance data at that endpoint.</li>
+                <li>All agent attendance records will be centrally tracked for this event.</li>
+              </ol>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

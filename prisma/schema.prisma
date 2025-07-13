@@ -162,30 +162,30 @@ model contestParticipation {
 }
 
 model event {
-  id            Int            @id @default(autoincrement())
-  name          String
-  scopeArea     scope_area     @default(OPEN)
-  code          String         @unique(map: "Event_code_key")
-  status        String         @default("OPEN") @db.VarChar(20)
-  description   String?
-  startDate     DateTime
-  endDate       DateTime
-  venue         String?
-  address       String?
-  city          String?
-  addressState  String?
-  zoneId        Int?
-  stateId       Int?
-  latitude      Float?
-  longitude     Float?
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  contests      contest[]      @relation("eventToContest")
-  state         state?         @relation(fields: [stateId], references: [id])
-  zone          zone?          @relation(fields: [zoneId], references: [id])
-  eventcontests eventcontest[]
+  id             Int                   @id @default(autoincrement())
+  name           String
+  scopeArea      scope_area            @default(OPEN)
+  code           String                @unique(map: "Event_code_key")
+  status         String                @default("OPEN") @db.VarChar(20)
+  description    String?
+  startDate      DateTime
+  endDate        DateTime
+  venue          String?
+  address        String?
+  city           String?
+  addressState   String?
+  zoneId         Int?
+  stateId        Int?
+  latitude       Float?
+  longitude      Float?
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  contests       contest[]             @relation("eventToContest")
+  state          state?                @relation(fields: [stateId], references: [id])
+  zone           zone?                 @relation(fields: [zoneId], references: [id])
   attendanceSync eventAttendanceSync[]
+  eventcontests  eventcontest[]
 
   @@index([stateId], map: "event_stateId_fkey")
   @@index([zoneId], map: "event_zoneId_fkey")
@@ -979,6 +979,15 @@ model attendance_endpoint {
   updatedAt    DateTime @updatedAt
 }
 
+model attendanceagent_endpoint {
+  id           Int      @id @default(autoincrement())
+  eventId      Int
+  endpointhash String   @unique
+  passcode     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
 model survey_answer {
   id           Int             @id @default(autoincrement())
   surveyId     Int
@@ -1108,7 +1117,7 @@ model email_recipient {
 model eventAttendanceSync {
   id               Int       @id @default(autoincrement())
   eventId          Int
-  status           String    // 'processing', 'completed', 'error'
+  status           String
   startTime        DateTime  @default(now())
   endTime          DateTime?
   totalContingents Int
