@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/judging/results
@@ -31,11 +31,14 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get event contest
-    const eventContest = await db.eventcontest.findFirst({
+    // Get event contest with associated contest information
+    const eventContest = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId as string),
         contestId: parseInt(contestId as string)
+      },
+      include: {
+        contest: true
       }
     });
 
@@ -47,7 +50,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Get all judges for this event contest
-    const judges = await db.eventcontestjudge.findMany({
+    const judges = await prisma.eventcontestjudge.findMany({
       where: {
         eventcontestId: eventContest.id
       },
@@ -63,13 +66,13 @@ export async function GET(req: NextRequest) {
     });
     
     // Get all completed judging sessions for this event contest
-    const judgingSessions = await db.judgingSession.findMany({
+    const judgingSessions = await prisma.judgingSession.findMany({
       where: {
         eventContestId: eventContest.id,
         status: 'COMPLETED'
       },
       include: {
-        judgingSessionScores: true
+        judgingSessionScore: true
       }
     });
     
@@ -106,15 +109,15 @@ export async function GET(req: NextRequest) {
     // Fetch team and contingent details for each result
     const enhancedResults = await Promise.all(
       results.map(async (result) => {
-        const attendanceTeam = await db.attendanceTeam.findUnique({
+        const attendanceTeam = await prisma.attendanceTeam.findUnique({
           where: { Id: result.attendanceTeamId }
         });
         
-        const team = attendanceTeam ? await db.team.findUnique({
+        const team = attendanceTeam ? await prisma.team.findUnique({
           where: { id: attendanceTeam.teamId }
         }) : null;
         
-        const contingent = attendanceTeam ? await db.contingent.findUnique({
+        const contingent = attendanceTeam ? await prisma.contingent.findUnique({
           where: { id: attendanceTeam.contingentId }
         }) : null;
         
@@ -132,10 +135,10 @@ export async function GET(req: NextRequest) {
       })
     );
     
-    // Get judging template info
-    const judgingTemplate = eventContest.judgingTemplateId ? 
-      await db.judgingtemplate.findUnique({
-        where: { id: eventContest.judgingTemplateId },
+    // Get judging template info from the associated contest
+    const judgingTemplate = eventContest.contest.judgingTemplateId ? 
+      await prisma.judgingtemplate.findUnique({
+        where: { id: eventContest.contest.judgingTemplateId },
         include: {
           judgingtemplatecriteria: true
         }
@@ -189,7 +192,7 @@ export async function HEAD(req: NextRequest) {
     }
 
     // Get event contest
-    const eventContest = await db.eventcontest.findFirst({
+    const eventContest = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId as string),
         contestId: parseInt(contestId as string)
@@ -207,8 +210,23 @@ export async function HEAD(req: NextRequest) {
       );
     }
     
+    // Define type for judging session results
+    type JudgingSession = {
+      id: number;
+      judgeId: number;
+      attendanceTeamId: number;
+      totalScore: number;
+      comments: string | null;
+      createdAt: Date;
+      judgeName: string;
+      teamId: number;
+      teamName: string;
+      contingentId: number;
+      contingentName: string;
+    };
+    
     // Get all completed judging sessions for this event contest
-    const judgingSessions = await db.$queryRaw`
+    const judgingSessions = await prisma.$queryRaw<JudgingSession[]>`
       SELECT
         js.id,
         js.judgeId,

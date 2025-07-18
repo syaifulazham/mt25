@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/judging/results/export
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get event contest
-    const eventContest = await db.eventcontest.findFirst({
+    const eventContest = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId as string),
         contestId: parseInt(contestId as string)
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Get all judges for this event contest
-    const judges = await db.eventcontestjudge.findMany({
+    const judges = await prisma.eventcontestjudge.findMany({
       where: {
         eventcontestId: eventContest.id
       },
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     
     // Get judging template to include criteria in the export
     const judgingTemplate = eventContest.judgingTemplateId ? 
-      await db.judgingtemplate.findUnique({
+      await prisma.judgingtemplate.findUnique({
         where: { id: eventContest.judgingTemplateId },
         include: {
           judgingtemplatecriteria: {
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
       }) : null;
     
     // Get all completed judging sessions with detailed scores
-    const judgingSessions = await db.$queryRaw`
+    const judgingSessions = await prisma.$queryRaw`
       SELECT
         js.id,
         js.judgeId,
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
     
     let criteriaScores = [];
     if (sessionIds.length > 0) {
-      criteriaScores = await db.judgingSessionScore.findMany({
+      criteriaScores = await prisma.judgingSessionScore.findMany({
         where: {
           judgingSessionId: {
             in: sessionIds
