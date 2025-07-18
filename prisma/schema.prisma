@@ -351,7 +351,6 @@ model judgingSession {
   
   eventcontest     eventcontest        @relation(fields: [eventcontestId], references: [id])
   attendanceTeam   attendanceTeam      @relation(fields: [attendanceTeamId], references: [Id])
-  judge            user                @relation(fields: [judgeId], references: [id])
   criteriaScores   judgingSessionScore[]
   
   @@index([eventcontestId])
