@@ -245,14 +245,14 @@ export async function GET(req: NextRequest) {
     const filename = `${eventContest.event.name.replace(/\s+/g, '_')}_${eventContest.contest.name.replace(/\s+/g, '_')}_Results_${new Date().toISOString().split('T')[0]}.csv`;
     
     // Return CSV with appropriate headers
-    const headers = {
+    const responseHeaders = {
       'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Type': 'text/csv',
     };
     
     return new NextResponse(csvContent, { 
       status: 200, 
-      headers: headers 
+      headers: responseHeaders 
     });
     
   } catch (error) {
