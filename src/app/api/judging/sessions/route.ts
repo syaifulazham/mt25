@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/judging/sessions
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Check if the eventContest exists and has a judgingTemplateId
-    const eventContest = await db.eventcontest.findUnique({
+    const eventContest = await prisma.eventcontest.findUnique({
       where: { id: eventContestId }
     });
     
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Check if the attendance team exists and is present
-    const attendanceTeam = await db.attendanceTeam.findUnique({
+    const attendanceTeam = await prisma.attendanceTeam.findUnique({
       where: { Id: attendanceTeamId }
     });
     
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Check if a judging session already exists
-    const existingSession = await db.judgingSession.findFirst({
+    const existingSession = await prisma.judgingSession.findFirst({
       where: {
         judgeId: parseInt(judgeId.toString()),
         attendanceTeamId: attendanceTeamId,
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Create a new judging session
-    const judgingSession = await db.judgingSession.create({
+    const judgingSession = await prisma.judgingSession.create({
       data: {
         judgeId: parseInt(judgeId.toString()),
         attendanceTeamId: attendanceTeamId,
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
     });
     
     // Get judging template criteria to pre-populate score records
-    const judgingTemplate = await db.judgingtemplate.findUnique({
+    const judgingTemplate = await prisma.judgingtemplate.findUnique({
       where: { id: eventContest.judgingTemplateId },
       include: { judgingtemplatecriteria: true }
     });
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     
     // Create empty score records for each criterion
     const scorePromises = judgingTemplate.judgingtemplatecriteria.map(criterion => 
-      db.judgingSessionScore.create({
+      prisma.judgingSessionScore.create({
         data: {
           judgingSessionId: judgingSession.id,
           criterionId: criterion.id,

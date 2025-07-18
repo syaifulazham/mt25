@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/judging/teams
@@ -32,12 +32,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get event contest
-    const eventContest = await db.eventcontest.findFirst({
+    // Get event contest with its related contest to access judgingTemplateId
+    const eventContest = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId as string),
         contestId: parseInt(contestId as string),
-        active: true
+        isActive: true
+      },
+      include: {
+        contest: true
       }
     });
 
@@ -52,7 +55,7 @@ export async function GET(req: NextRequest) {
     const judgeId = searchParams.get('judgeId') || session.user.id;
 
     // Check if the user is a judge for this event contest
-    const isJudge = await db.eventcontestjudge.findFirst({
+    const isJudge = await prisma.eventcontestjudge.findFirst({
       where: {
         eventcontestId: eventContest.id,
         userId: parseInt(judgeId as string),
@@ -67,7 +70,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get teams for this event contest with their judging status
-    const teams = await db.$queryRaw`
+    const teams = await prisma.$queryRaw`
       SELECT
         at.Id as attendanceTeamId,
         at.hashcode,
@@ -113,7 +116,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       teams,
       eventContest,
-      judgingTemplateId: eventContest.judgingTemplateId
+      judgingTemplateId: eventContest.contest.judgingTemplateId
     });
 
   } catch (error) {

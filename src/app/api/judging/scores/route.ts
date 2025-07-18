@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 
 /**
  * PATCH /api/judging/scores
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest) {
     }
     
     // Find the score record
-    const scoreRecord = await db.judgingSessionScore.findUnique({
+    const scoreRecord = await prisma.judgingSessionScore.findUnique({
       where: { id: scoreId },
       include: {
         judgingSession: true
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest) {
     }
     
     // Update the score
-    const updatedScore = await db.judgingSessionScore.update({
+    const updatedScore = await prisma.judgingSessionScore.update({
       where: { id: scoreId },
       data: {
         score: score,
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     
     // First, get the first score to check session permissions
     const firstScoreId = scores[0].scoreId;
-    const firstScoreRecord = await db.judgingSessionScore.findUnique({
+    const firstScoreRecord = await prisma.judgingSessionScore.findUnique({
       where: { id: firstScoreId },
       include: {
         judgingSession: true
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     
     // Update all scores
     const updatePromises = scores.map(scoreUpdate => 
-      db.judgingSessionScore.update({
+      prisma.judgingSessionScore.update({
         where: { id: scoreUpdate.scoreId },
         data: {
           score: scoreUpdate.score,
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     const updatedScores = await Promise.all(updatePromises);
     
     // Calculate the current total score based on weights
-    const allSessionScores = await db.judgingSessionScore.findMany({
+    const allSessionScores = await prisma.judgingSessionScore.findMany({
       where: {
         judgingSessionId: firstScoreRecord.judgingSessionId
       }
@@ -174,12 +174,15 @@ export async function POST(req: NextRequest) {
     
     const calculatedTotalScore = allSessionScores.reduce((acc, score) => {
       // Convert criterion weight (0-100) to decimal (0-1) and multiply by score
-      const weightedScore = (score.criterionWeight / 100) * score.score;
+      // Ensure both values are treated as numbers
+      const criterionWeight = Number(score.criterionWeight);
+      const scoreValue = Number(score.score);
+      const weightedScore = (criterionWeight / 100) * scoreValue;
       return acc + weightedScore;
     }, 0);
     
     // Update the judging session with the current calculated score
-    await db.judgingSession.update({
+    await prisma.judgingSession.update({
       where: { id: firstScoreRecord.judgingSessionId },
       data: {
         totalScore: calculatedTotalScore
