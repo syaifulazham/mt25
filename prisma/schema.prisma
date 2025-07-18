@@ -349,7 +349,6 @@ model judgingSession {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   
-  eventcontest     eventcontest        @relation(fields: [eventcontestId], references: [id])
   attendanceTeam   attendanceTeam      @relation(fields: [attendanceTeamId], references: [Id])
   criteriaScores   judgingSessionScore[]
   
