@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
 
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     // Check authentication
@@ -140,39 +143,56 @@ export async function GET(req: NextRequest) {
 
     // Get unique list of teams that have been judged
     const teamResults: Record<number, any> = {};
+    
+    // Define interface for the attendanceTeam with included relations
+    interface AttendanceTeamWithRelations {
+      Id: number;
+      contingentId: number;
+      teamId: number;
+      team?: { id: number; name: string; };
+      contingent?: {
+        id: number;
+        name: string;
+        school?: { stateId: number; state?: { id: number; name: string; } };
+        higherInstitution?: { stateId: number; state?: { id: number; name: string; } };
+        independent?: { stateId: number; state?: { id: number; name: string; } };
+      };
+      // other properties...
+    }
 
     judgingSessions.forEach(session => {
       const attendanceTeamId = session.attendanceTeamId;
+      // Cast attendanceTeam to the interface with relations
+      const attendanceTeamData = session.attendanceTeam as AttendanceTeamWithRelations;
       
-      // Get state information from contingent
-      const contingent = session.attendanceTeam.contingent;
+      // Get state information from attendanceTeam
       let stateId = null;
       let stateName = null;
       
-      if (contingent.school?.stateId) {
-        stateId = contingent.school.stateId;
-        stateName = contingent.school.state?.name;
-      } else if (contingent.higherInstitution?.stateId) {
-        stateId = contingent.higherInstitution.stateId;
-        stateName = contingent.higherInstitution.state?.name;
-      } else if (contingent.independent?.stateId) {
-        stateId = contingent.independent.stateId;
-        stateName = contingent.independent.state?.name;
+      if (attendanceTeamData.contingent?.school?.stateId) {
+        stateId = attendanceTeamData.contingent.school.stateId;
+        stateName = attendanceTeamData.contingent.school.state?.name;
+      } else if (attendanceTeamData.contingent?.higherInstitution?.stateId) {
+        stateId = attendanceTeamData.contingent.higherInstitution.stateId;
+        stateName = attendanceTeamData.contingent.higherInstitution.state?.name;
+      } else if (attendanceTeamData.contingent?.independent?.stateId) {
+        stateId = attendanceTeamData.contingent.independent.stateId;
+        stateName = attendanceTeamData.contingent.independent.state?.name;
       }
 
       if (!teamResults[attendanceTeamId]) {
+        const teamName = attendanceTeamData.team?.name || 'Unknown Team';
+        let contingentName = attendanceTeamData.contingent?.name || 'Unknown Contingent';
         teamResults[attendanceTeamId] = {
           attendanceTeamId,
-          team: session.attendanceTeam.team,
-          contingent: {
-            id: session.attendanceTeam.contingentId,
-            name: session.attendanceTeam.contingent.name,
-          },
+          team: { id: attendanceTeamData.team?.id || attendanceTeamData.teamId, name: teamName },
+          contingent: { id: attendanceTeamData.contingent?.id || attendanceTeamData.contingentId, name: contingentName },
           stateId,
           state: stateId ? { id: stateId, name: stateName } : undefined,
           sessions: [],
           totalScore: 0,
-          sessionCount: 0,
+          averageScore: 0,
+          count: 0,
         };
       }
 

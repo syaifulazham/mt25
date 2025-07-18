@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
+
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/judging/results/export
@@ -66,18 +70,83 @@ export async function GET(req: NextRequest) {
     });
     
     // Get judging template to include criteria in the export
-    const judgingTemplate = eventContest.judgingTemplateId ? 
+    const judgingTemplate = eventContest.contest.judgingTemplateId ? 
       await prisma.judgingtemplate.findUnique({
-        where: { id: eventContest.judgingTemplateId },
+        where: { id: eventContest.contest.judgingTemplateId },
         include: {
           judgingtemplatecriteria: {
-            orderBy: { order: 'asc' }
+            orderBy: { id: 'asc' }
           }
         }
-      }) : null;
+      }) as ({
+        id: number;
+        name: string;
+        description: string | null;
+        isDefault: boolean;
+        contestType: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        judgingtemplatecriteria: Array<{
+          id: number;
+          name: string;
+          description: string | null;
+          needsJuryCourtesy: boolean;
+          evaluationType: string;
+          weight: number;
+          maxScore: number | null;
+          discreteValues: string | null;
+          templateId: number;
+          createdAt: Date;
+          updatedAt: Date;
+          order?: number;
+        }>;
+      } | null) : null;
+    
+    // Define the interface for judging session results
+    interface JudgingSession {
+      id: number;
+      judgeId: number;
+      attendanceTeamId: number;
+      totalScore: number;
+      comments: string | null;
+      createdAt: Date;
+      judgeName: string;
+      teamId: number;
+      teamName: string;
+      contingentId: number;
+      contingentName: string;
+    }
+    
+    // Define interface for a team session (used in team.sessions)
+    interface TeamSession {
+      id: number;
+      judgeName: string;
+      judgeId: number;
+      score: number;
+      comments: string;
+    }
+    
+    // Define interface for judging session scores
+    interface JudgingSessionScore {
+      id: number;
+      judgingSessionId: number;
+      criterionId: number;  // Note: this is 'criterionId' not 'criteriaId'
+      score: Decimal | number;
+      comments: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+      criterionName: string;
+      criterionDescription: string | null;
+      criterionWeight: number;
+      criterionType: string;
+      maxScore: number;
+    }
+    
+    // Import Decimal type from Prisma
+    type Decimal = Prisma.Decimal;
     
     // Get all completed judging sessions with detailed scores
-    const judgingSessions = await prisma.$queryRaw`
+    const judgingSessions = await prisma.$queryRaw<JudgingSession[]>`
       SELECT
         js.id,
         js.judgeId,
@@ -111,7 +180,7 @@ export async function GET(req: NextRequest) {
     // Get all scores for the completed sessions
     const sessionIds = judgingSessions.map(session => session.id);
     
-    let criteriaScores = [];
+    let criteriaScores: JudgingSessionScore[] = [];
     if (sessionIds.length > 0) {
       criteriaScores = await prisma.judgingSessionScore.findMany({
         where: {
@@ -158,7 +227,7 @@ export async function GET(req: NextRequest) {
     
     // Calculate average scores
     for (const team of teamMap.values()) {
-      const totalScore = team.sessions.reduce((sum, session) => sum + session.score, 0);
+      const totalScore = team.sessions.reduce((sum: number, session: JudgingSession) => sum + session.totalScore, 0);
       team.averageScore = team.sessions.length > 0 ? totalScore / team.sessions.length : 0;
     }
     
@@ -210,19 +279,19 @@ export async function GET(req: NextRequest) {
       
       // Add judge scores
       for (const judge of judges) {
-        const judgeSession = team.sessions.find(session => session.judgeId === judge.userId);
+        const judgeSession = team.sessions.find((session: TeamSession) => session.judgeId === judge.userId);
         row.push(judgeSession ? judgeSession.score.toFixed(2) : 'N/A');
       }
       
       // Add criteria scores if available
       if (judgingTemplate && judgingTemplate.judgingtemplatecriteria.length > 0) {
         for (const judge of judges) {
-          const judgeSession = team.sessions.find(session => session.judgeId === judge.userId);
+          const judgeSession = team.sessions.find((session: TeamSession) => session.judgeId === judge.userId);
           
           for (const criterion of judgingTemplate.judgingtemplatecriteria) {
             if (judgeSession) {
               const criterionScore = team.sessionScores[judgeSession.id]?.find(
-                score => score.criterionId === criterion.id
+                (score: { criterionId: number; score: number }) => score.criterionId === criterion.id
               );
               row.push(criterionScore ? criterionScore.score.toFixed(2) : 'N/A');
             } else {
@@ -234,7 +303,7 @@ export async function GET(req: NextRequest) {
       
       // Add comments
       for (const judge of judges) {
-        const judgeSession = team.sessions.find(session => session.judgeId === judge.userId);
+        const judgeSession = team.sessions.find((session: TeamSession) => session.judgeId === judge.userId);
         row.push(judgeSession && judgeSession.comments ? `"${judgeSession.comments.replace(/"/g, '""')}"` : '');
       }
       
