@@ -187,6 +187,20 @@ async function updateContest(
           : data.themeId;
       }
     }
+    
+    // Add judgingTemplateId if provided
+    if (data.judgingTemplateId !== undefined) {
+      if (data.judgingTemplateId === null || data.judgingTemplateId === '') {
+        // If null or empty, remove judging template association
+        updateData.judgingTemplateId = null;
+      } else {
+        // Otherwise set the judging template ID
+        updateData.judgingTemplateId = typeof data.judgingTemplateId === 'string' 
+          ? parseInt(data.judgingTemplateId) 
+          : data.judgingTemplateId;
+      }
+      console.log('Setting judgingTemplateId to:', updateData.judgingTemplateId);
+    }
 
     // Only include dates if they're provided
     if (startDate) updateData.startDate = startDate;

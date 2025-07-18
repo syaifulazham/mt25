@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateOrganizerApi } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/auth-options';
 import { prismaExecute } from '@/lib/prisma';
 
 /**
@@ -9,10 +10,11 @@ import { prismaExecute } from '@/lib/prisma';
 export async function GET(request: NextRequest) {
   console.log('[teams-raw-data] API request received:', request.nextUrl.toString());
   
-  // Check authorization
-  const auth = await authenticateOrganizerApi(['ADMIN', 'OPERATOR']);
-  if (!auth.success) {
-    console.log('[teams-raw-data] Auth failed:', auth);
+  // Check authorization using NextAuth session
+  const session = await getServerSession(authOptions);
+  
+  if (!session || !session.user || !session.user.role || !['ADMIN', 'OPERATOR'].includes(session.user.role)) {
+    console.log('[teams-raw-data] Auth failed:', { session });
     return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
     });

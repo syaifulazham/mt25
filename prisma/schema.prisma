@@ -192,20 +192,17 @@ model event {
 }
 
 model eventcontest {
-  id                    Int                 @id @default(autoincrement())
-  eventId               Int
-  contestId             Int
-  maxteampercontingent  Int                 @default(1)
-  person_incharge       String?
-  person_incharge_phone String?
-  isActive              Boolean             @default(true)
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  contest               contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  event                 event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  judges                eventcontestjudge[]
-  eventcontestteam      eventcontestteam[]
-  teams                 team[]
+  id              Int                 @id @default(autoincrement())
+  eventId         Int
+  contestId       Int
+  active          Boolean             @default(true)
+  judgingOptions  Json?               @db.Json
+  judgingTemplateId Int?
+  contest         contest             @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  event           event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  judges          eventcontestjudge[]
+  eventcontestteam eventcontestteam[]
+  teams           team[]
 
   @@unique([eventId, contestId])
   @@index([eventId])
@@ -337,6 +334,49 @@ model judgingtemplatecriteria {
   judgingtemplate   judgingtemplate                        @relation(fields: [templateId], references: [id], onDelete: Cascade, map: "JudgingTemplateCriteria_templateId_fkey")
 
   @@index([templateId], map: "JudgingTemplateCriteria_templateId_fkey")
+}
+
+model judgingSession {
+  id               Int                 @id @default(autoincrement())
+  eventcontestId   Int
+  attendanceTeamId Int
+  judgeId          Int
+  status           String              @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, REJECTED
+  totalScore       Float?
+  feedback         String?
+  startedAt        DateTime            @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  
+  eventcontest     eventcontest        @relation(fields: [eventcontestId], references: [id])
+  attendanceTeam   attendanceTeam      @relation(fields: [attendanceTeamId], references: [Id])
+  judge            user                @relation(fields: [judgeId], references: [id])
+  criteriaScores   judgingSessionScore[]
+  
+  @@index([eventcontestId])
+  @@index([attendanceTeamId])
+  @@index([judgeId])
+  @@unique([eventcontestId, attendanceTeamId, judgeId])
+}
+
+model judgingSessionScore {
+  id                  Int                 @id @default(autoincrement())
+  sessionId           Int
+  criteriaId          Int?                // Optional link to original template criteria
+  criteriaName        String              // Store name to preserve even if template changes
+  criteriaDescription String?
+  evaluationType      String              // POINTS, TIME, DISCRETE_VALUE
+  weight              Int
+  score               Float?
+  feedback            String?
+  discreteValue       String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  session             judgingSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
 }
 
 model news {
@@ -786,6 +826,7 @@ model attendanceTeam {
   zoneId           Int?
   stateId          Int?
   state            String?  @db.VarChar(255)
+  judgingSessions  judgingSession[]
 
   @@index([contingentId])
   @@index([eventId])

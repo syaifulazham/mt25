@@ -501,14 +501,21 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
     try {
       setIsSaving(true);
       
+      // Transform template data to match API expectations
+      // API expects criteria in a 'criteria' property, not 'judgingtemplatecriteria'
+      const apiPayload = {
+        ...template,
+        criteria: template.judgingtemplatecriteria
+      };
+      
       if (isNewTemplate) {
         // Create new template
-        const createdTemplate = await judgingTemplateApi.createJudgingTemplate(template);
+        const createdTemplate = await judgingTemplateApi.createJudgingTemplate(apiPayload);
         toast.success('Template created successfully');
         router.push(`/organizer/judging-templates/${createdTemplate.id}`);
       } else {
         // Update existing template
-        await judgingTemplateApi.updateJudgingTemplate(params.id as string, template);
+        await judgingTemplateApi.updateJudgingTemplate(params.id as string, apiPayload);
         toast.success('Template updated successfully');
       }
     } catch (error) {

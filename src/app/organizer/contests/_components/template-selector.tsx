@@ -31,6 +31,10 @@ export default function TemplateSelector({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [currentTemplateId, setCurrentTemplateId] = useState<string | undefined>(initialTemplateId);
+  
+  // Debug log initial state
+  console.log('Initial template ID:', initialTemplateId);
+  console.log('Initial current template ID:', currentTemplateId);
 
   // Fetch templates and current contest template
   useEffect(() => {
@@ -38,19 +42,55 @@ export default function TemplateSelector({
       try {
         setIsLoading(true);
         
-        // Fetch all templates
-        const templatesData = await judgingTemplateApi.getJudgingTemplates(contestType);
+        console.log('TemplateSelector: Fetching templates with contestType:', contestType);
+        console.log('TemplateSelector: ContestId:', contestId);
+        
+        // Fetch all templates without contestType filtering first
+        let templatesData = [];
+        
+        // If contestType is set, try to fetch filtered templates
+        if (contestType) {
+          try {
+            templatesData = await judgingTemplateApi.getJudgingTemplates(contestType);
+            console.log('Templates found with contestType:', templatesData.length);
+            
+            // If no templates found with contestType, fetch all templates
+            if (!templatesData || templatesData.length === 0) {
+              console.log('No templates found with contestType, fetching all templates');
+              templatesData = await judgingTemplateApi.getJudgingTemplates();
+              console.log('All templates fetched:', templatesData.length);
+            }
+          } catch (error) {
+            console.error('Error fetching templates with contestType, trying without filter:', error);
+            templatesData = await judgingTemplateApi.getJudgingTemplates();
+          }
+        } else {
+          // Fetch all templates if no contestType is specified
+          console.log('No contestType specified, fetching all templates');
+          templatesData = await judgingTemplateApi.getJudgingTemplates();
+        }
+        
+        console.log('TemplateSelector: Templates fetched:', templatesData);
         setTemplates(templatesData);
         
         // If no initial template ID was provided, fetch the current contest template
         if (!initialTemplateId) {
           const { template } = await judgingTemplateApi.getContestJudgingTemplate(contestId);
           if (template) {
-            setCurrentTemplateId(template.id);
-            setSelectedTemplateId(template.id);
+            console.log('Template found for contest:', template);
+            // Ensure template ID is treated as string
+            const templateIdStr = String(template.id);
+            setCurrentTemplateId(templateIdStr);
+            setSelectedTemplateId(templateIdStr);
+            console.log('Set template IDs to:', templateIdStr);
+          } else {
+            console.log('No template found for contest');
           }
         } else {
-          setSelectedTemplateId(initialTemplateId);
+          // Ensure template ID is treated as string
+          const templateIdStr = initialTemplateId ? String(initialTemplateId) : '';
+          setSelectedTemplateId(templateIdStr);
+          console.log('Set selected template ID from initialTemplateId:', templateIdStr);
         }
       } catch (error) {
         console.error('Error fetching templates:', error);
@@ -104,8 +144,23 @@ export default function TemplateSelector({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-3">
               <Select
-                value={selectedTemplateId}
-                onValueChange={setSelectedTemplateId}
+                value={selectedTemplateId || ''}
+                onValueChange={(value) => {
+                  console.log('Template selected from dropdown:', value);
+                  setSelectedTemplateId(value);
+                  // Automatically apply the template when selected
+                  if (value) {
+                    onTemplateSelected(value)
+                      .then(() => {
+                        setCurrentTemplateId(value);
+                        toast.success('Judging template applied');
+                      })
+                      .catch(error => {
+                        console.error('Error auto-applying template:', error);
+                        toast.error('Failed to apply template');
+                      });
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a judging template" />
@@ -119,7 +174,7 @@ export default function TemplateSelector({
                     templates.map((template) => (
                       <SelectItem 
                         key={template.id} 
-                        value={template.id}
+                        value={String(template.id)}
                       >
                         {template.name} 
                         {template.isDefault && ' (Default)'} 

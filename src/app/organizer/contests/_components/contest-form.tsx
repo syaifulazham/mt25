@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import TemplateSelector from './template-selector';
 import { 
   Select,
   SelectContent,
@@ -32,6 +33,7 @@ import { toast } from 'sonner';
 import { contestApi } from '@/lib/api-client';
 import { targetGroupApi } from '@/lib/api-client';
 import { themeApi } from '@/lib/api-client';
+import { judgingTemplateApi } from '@/lib/api-client';
 import { format } from 'date-fns';
 
 // Define contest form schema with Zod
@@ -65,6 +67,7 @@ const baseSchema = z.object({
     message: "Please select at least one target group.",
   }),
   themeId: z.number().nullable().optional(),
+  judgingTemplateId: z.string().nullable().optional(),
   participation_mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
   maxMembersPerTeam: z.number().optional(),
 });
@@ -101,6 +104,7 @@ const defaultValues: Partial<ContestFormValues> = {
   accessibility: false,
   targetGroupIds: [],
   themeId: null,
+  judgingTemplateId: null,
   participation_mode: "INDIVIDUAL",
   maxMembersPerTeam: undefined,
 };
@@ -116,6 +120,7 @@ export function ContestForm({ initialData }: ContestFormProps) {
   const [themes, setThemes] = useState<any[]>([]);
   const [selectedTargetGroups, setSelectedTargetGroups] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialData?.judgingTemplateId || null);
   const isEditMode = !!initialData;
 
   // Fetch target groups
@@ -181,11 +186,17 @@ export function ContestForm({ initialData }: ContestFormProps) {
     fetchThemes();
   }, []);
 
-  // Set initial target groups if in edit mode
+  // Set initial target groups and template if in edit mode
   useEffect(() => {
-    if (initialData && initialData.targetgroup) {
-      const targetGroupIds = initialData.targetgroup.map((tg: any) => tg.id);
-      setSelectedTargetGroups(targetGroupIds);
+    if (initialData) {
+      if (initialData.targetgroup) {
+        const targetGroupIds = initialData.targetgroup.map((tg: any) => tg.id);
+        setSelectedTargetGroups(targetGroupIds);
+      }
+      
+      if (initialData.judgingTemplateId) {
+        setSelectedTemplateId(String(initialData.judgingTemplateId));
+      }
     }
   }, [initialData]);
 
@@ -205,6 +216,7 @@ export function ContestForm({ initialData }: ContestFormProps) {
       accessibility: initialData.accessibility || false,
       targetGroupIds: initialData.targetgroup ? initialData.targetgroup.map((tg: any) => tg.id) : [],
       themeId: initialData.themeId || null,
+      judgingTemplateId: initialData.judgingTemplateId ? String(initialData.judgingTemplateId) : null,
       participation_mode: initialData.participation_mode || "INDIVIDUAL",
       maxMembersPerTeam: initialData.maxMembersPerTeam || undefined,
     };
@@ -256,6 +268,9 @@ export function ContestForm({ initialData }: ContestFormProps) {
       
       // Ensure the targetGroupIds in the form data match the selected target groups
       data.targetGroupIds = selectedTargetGroups;
+      
+      // Set the judgingTemplateId from state
+      data.judgingTemplateId = selectedTemplateId;
       
       if (isEditMode) {
         // Update existing contest
@@ -440,7 +455,36 @@ export function ContestForm({ initialData }: ContestFormProps) {
                   </FormItem>
                 )}
               />
-
+              
+              {/* Judging Template Selector */}
+              <div className="col-span-1 md:col-span-2 mb-4">
+                <Label className="text-sm font-medium mb-2 block">Judging Template</Label>
+                {/* Debug info */}
+                <div className="text-xs text-muted-foreground mb-2">
+                  Form contestType: {form.getValues('contestType')}, 
+                  Initial contestType: {initialData?.contestType || 'N/A'}, 
+                  Using: {form.getValues('contestType') || initialData?.contestType || 'SCIENCE_PROJECT'}
+                </div>
+                <TemplateSelector
+                  contestId={initialData?.id || "new"}
+                  contestType={form.getValues('contestType') || initialData?.contestType || 'SCIENCE_PROJECT'}
+                  onTemplateSelected={async (templateId: string) => {
+                    try {
+                      setSelectedTemplateId(templateId);
+                      form.setValue('judgingTemplateId', templateId);
+                      toast.success('Judging template selected');
+                    } catch (error) {
+                      console.error('Error selecting template:', error);
+                      toast.error('Failed to select judging template');
+                    }
+                  }}
+                  onCreateNew={() => {
+                    router.push('/organizer/judging-templates/new');
+                  }}
+                  currentTemplateId={selectedTemplateId || undefined}
+                />
+              </div>
+              
               {/* Accessibility */}
               <FormField
                 control={form.control}
