@@ -32,9 +32,12 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Check if the eventContest exists and has a judgingTemplateId
+    // Check if the eventContest exists and get the associated contest
     const eventContest = await prisma.eventcontest.findUnique({
-      where: { id: eventContestId }
+      where: { id: eventContestId },
+      include: {
+        contest: true
+      }
     });
     
     if (!eventContest) {
@@ -44,7 +47,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    if (!eventContest.judgingTemplateId) {
+    if (!eventContest.contest || !eventContest.contest.judgingTemplateId) {
       return NextResponse.json(
         { error: 'Event contest has no judging template assigned' },
         { status: 400 }
@@ -63,9 +66,21 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    if (attendanceTeam.attendanceStatus !== 'Present') {
+    // Check team member presence instead of relying on attendanceTeam.attendanceStatus
+    // This allows judging as long as at least one team member is present
+    const teamMembers = await prisma.attendanceContestant.findMany({
+      where: {
+        teamId: attendanceTeam.teamId,
+        eventId: attendanceTeam.eventId
+      }
+    });
+    
+    // Check if at least one team member is present
+    const hasAnyPresentMembers = teamMembers.some(member => member.attendanceStatus === 'Present');
+    
+    if (!hasAnyPresentMembers) {
       return NextResponse.json(
-        { error: 'Cannot judge a team that is not present' },
+        { error: 'Cannot judge a team that has no present members' },
         { status: 400 }
       );
     }
@@ -102,7 +117,7 @@ export async function POST(req: NextRequest) {
     
     // Get judging template criteria to pre-populate score records
     const judgingTemplate = await prisma.judgingtemplate.findUnique({
-      where: { id: eventContest.judgingTemplateId },
+      where: { id: eventContest.contest.judgingTemplateId },
       include: { judgingtemplatecriteria: true }
     });
     
@@ -123,7 +138,7 @@ export async function POST(req: NextRequest) {
           criterionName: criterion.name,
           criterionDescription: criterion.description || '',
           criterionWeight: criterion.weight || 0,
-          criterionType: criterion.type || 'NUMERIC',
+          criterionType: criterion.evaluationType || 'NUMERIC',
           maxScore: 10 // Default max score
         }
       })

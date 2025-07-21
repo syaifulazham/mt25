@@ -33,6 +33,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -62,14 +68,108 @@ import {
 } from "@/components/ui/alert-dialog";
 
 // Types
+interface DiscreteValue {
+  text: string;
+  value: number;
+}
+
+interface DiscreteValuesTableProps {
+  values: DiscreteValue[];
+  onChange: (values: DiscreteValue[]) => void;
+}
+
+function DiscreteValuesTable({ values, onChange }: DiscreteValuesTableProps) {
+  // Add a new empty row
+  const handleAddRow = () => {
+    onChange([...values, { text: '', value: 0 }]);
+  };
+
+  // Remove a row at the specified index
+  const handleRemoveRow = (index: number) => {
+    const newValues = [...values];
+    newValues.splice(index, 1);
+    onChange(newValues);
+  };
+
+  // Update a specific field of a discrete value
+  const handleValueChange = (index: number, field: 'text' | 'value', newValue: string | number) => {
+    const newValues = [...values];
+    if (field === 'text') {
+      newValues[index].text = newValue as string;
+    } else {
+      newValues[index].value = Number(newValue);
+    }
+    onChange(newValues);
+  };
+
+  return (
+    <div className="border rounded-md">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[60%]">Text</TableHead>
+            <TableHead className="w-[30%]">Value</TableHead>
+            <TableHead className="w-[10%] text-right"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {values.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
+                No discrete values defined. Click 'Add Value' below to create one.
+              </TableCell>
+            </TableRow>
+          ) : (
+            values.map((value, index) => (
+              <TableRow key={index}>
+                <TableCell>
+                  <Input 
+                    value={value.text} 
+                    onChange={(e) => handleValueChange(index, 'text', e.target.value)}
+                    placeholder="Option text (e.g. Excellent)"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input 
+                    type="number" 
+                    value={value.value} 
+                    onChange={(e) => handleValueChange(index, 'value', e.target.value)}
+                    placeholder="Score value"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => handleRemoveRow(index)}
+                    title="Remove option"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+      <div className="p-2 flex justify-end border-t">
+        <Button variant="outline" size="sm" onClick={handleAddRow}>
+          <PlusIcon className="h-4 w-4 mr-2" />
+          Add Value
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 interface JudgingCriteria {
   id?: string;
   name: string;
   description: string;
   maxScore: number;
   weight: number;
-  evaluationType: string;
-  discreteValues?: string[];
+  evaluationType: string; // POINTS, TIME, DISCRETE_SINGLE, DISCRETE_MULTIPLE
+  discreteValues?: string | DiscreteValue[]; // String for backward compatibility, DiscreteValue[] for new format
   needsJuryCourtesy?: boolean;
 }
 
@@ -111,9 +211,43 @@ function SortableCriteriaItem({
     switch (type) {
       case 'POINTS': return 'Points';
       case 'TIME': return 'Time';
-      case 'DISCRETE': return 'Discrete Values';
+      case 'DISCRETE': return 'Discrete Values'; // For backward compatibility
+      case 'DISCRETE_SINGLE': return 'Discrete (Single)';
+      case 'DISCRETE_MULTIPLE': return 'Discrete (Multiple)';
       default: return type;
     }
+  };
+  
+  const formatDiscreteValues = (discreteValues: string | DiscreteValue[] | undefined) => {
+    if (!discreteValues) return '';
+    
+    // Handle string format (legacy or serialized JSON)
+    if (typeof discreteValues === 'string') {
+      try {
+        // Try to parse as JSON
+        const parsed = JSON.parse(discreteValues);
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 && typeof parsed[0] === 'object' && 'text' in parsed[0]) {
+            // New format: [{text, value}]
+            return parsed.map(item => `${item.text} (${item.value})`).join(', ');
+          } else {
+            // Legacy format: string[]
+            return parsed.join(', ');
+          }
+        }
+        return discreteValues;
+      } catch (e) {
+        // If not valid JSON, treat as legacy comma-separated string
+        return discreteValues;
+      }
+    }
+    
+    // Handle DiscreteValue[] format
+    if (Array.isArray(discreteValues)) {
+      return discreteValues.map(item => `${item.text} (${item.value})`).join(', ');
+    }
+    
+    return '';
   };
 
   return (
@@ -128,20 +262,37 @@ function SortableCriteriaItem({
         </div>
       </TableCell>
       <TableCell className="font-medium">{criteria.name}</TableCell>
-      <TableCell className="max-w-[200px] truncate">{criteria.description}</TableCell>
       <TableCell>{getEvaluationTypeLabel(criteria.evaluationType)}</TableCell>
       <TableCell>
-        {criteria.evaluationType === 'POINTS' && `${criteria.maxScore} points`}
-        {criteria.evaluationType === 'TIME' && 'Time-based'}
-        {criteria.evaluationType === 'DISCRETE' && 
-          criteria.discreteValues?.join(', ')}
+        {(() => {
+          let scaleText = '';
+          if (criteria.evaluationType === 'POINTS') {
+            scaleText = `${criteria.maxScore} points`;
+          } else if (criteria.evaluationType === 'TIME') {
+            scaleText = 'Time-based';
+          } else if (criteria.evaluationType === 'DISCRETE' || 
+                     criteria.evaluationType === 'DISCRETE_SINGLE' || 
+                     criteria.evaluationType === 'DISCRETE_MULTIPLE') {
+            scaleText = formatDiscreteValues(criteria.discreteValues);
+          }
+          
+          const truncatedText = scaleText.length > 15 ? scaleText.substring(0, 15) + '...' : scaleText;
+          
+          return scaleText.length > 15 ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">{truncatedText}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{scaleText}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <span>{scaleText}</span>
+          );
+        })()}
       </TableCell>
-      <TableCell>{criteria.weight}%</TableCell>
-      <TableCell>
-        {criteria.needsJuryCourtesy && (
-          <CheckCircledIcon className="h-4 w-4 text-green-600" />
-        )}
-      </TableCell>
+
       <TableCell className="text-right">
         <div className="flex justify-end gap-2">
           <Button
@@ -189,14 +340,121 @@ function CriteriaEditForm({
   onSave: (criteria: JudgingCriteria) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState<JudgingCriteria>(criteria);
-  const [discreteValuesInput, setDiscreteValuesInput] = useState(
-    criteria.discreteValues?.join(', ') || ''
-  );
+  // Map backend DISCRETE to specific frontend type based on discreteValues
+  const mapDiscreteType = (criteria: JudgingCriteria): string => {
+    // If it's not DISCRETE, return as is
+    if (criteria.evaluationType !== 'DISCRETE') {
+      return criteria.evaluationType;
+    }
+    
+    // Handle existing discreteValues
+    try {
+      // If discreteValues is a string, parse it
+      if (typeof criteria.discreteValues === 'string') {
+        const discreteValuesArray = JSON.parse(criteria.discreteValues);
+        
+        // Check if it's using the text/value object format (new format)
+        if (Array.isArray(discreteValuesArray) && discreteValuesArray.length > 0 && 
+            typeof discreteValuesArray[0] === 'object' && 'text' in discreteValuesArray[0]) {
+          // If we can find evidence it's DISCRETE_MULTIPLE, return that
+          // A good heuristic is to check if multiple values sum to > 1 (meaning multiple selections)
+          let totalPossibleValue = 0;
+          for (const item of discreteValuesArray) {
+            totalPossibleValue += item.value;
+          }
+          
+          // If total possible value > 1, it's likely DISCRETE_MULTIPLE
+          return totalPossibleValue > 1 ? 'DISCRETE_MULTIPLE' : 'DISCRETE_SINGLE';
+        }
+      }
+    } catch (e) {
+      console.log('Error parsing discreteValues:', e);
+    }
+    
+    // Default to DISCRETE_SINGLE if can't determine
+    return 'DISCRETE_SINGLE';
+  };
+  
+  // Initialize form data from criteria
+  const [formData, setFormData] = useState<JudgingCriteria>({
+    ...criteria,
+    name: criteria.name || '',
+    description: criteria.description || '',
+    weight: criteria.weight || 0,
+    maxScore: criteria.maxScore || 10,
+    evaluationType: mapDiscreteType(criteria),
+    needsJuryCourtesy: criteria.needsJuryCourtesy || false
+  });
+
+  // Initialize discrete values input based on the format of criteria.discreteValues
+  const [discreteValues, setDiscreteValues] = useState<DiscreteValue[]>(() => {
+    if (!criteria.discreteValues) return [];
+
+    // If it's a string (either legacy format or JSON string)
+    if (typeof criteria.discreteValues === 'string') {
+      try {
+        // Try to parse as JSON
+        const parsed = JSON.parse(criteria.discreteValues);
+        if (Array.isArray(parsed)) {
+          // Check if it's the new format with text/value objects
+          if (parsed.length > 0 && typeof parsed[0] === 'object' && 'text' in parsed[0]) {
+            return parsed;
+          }
+          // Legacy array format - convert to text/value objects
+          return parsed.map((value: string | number, index: number) => ({
+            text: String(value),
+            value: index,
+          }));
+        }
+        return [];
+      } catch (e) {
+        // Not JSON, assume it's comma-separated string format
+        return criteria.discreteValues.split(',').map((v, i) => ({
+          text: v.trim(),
+          value: i,
+        }));
+      }
+    }
+
+    // If it's already an array of DiscreteValue objects
+    if (Array.isArray(criteria.discreteValues)) {
+      return criteria.discreteValues;
+    }
+
+    return [];
+  });
+
+  // For legacy DISCRETE type only - string input
+  const [discreteValuesInput, setDiscreteValuesInput] = useState<string>(() => {
+    if (!criteria.discreteValues) return '';
+
+    if (typeof criteria.discreteValues === 'string') {
+      try {
+        const parsed = JSON.parse(criteria.discreteValues);
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 && typeof parsed[0] === 'object' && 'text' in parsed[0]) {
+            // Skip object format for legacy input
+            return '';
+          }
+          return parsed.join(', ');
+        }
+        return criteria.discreteValues;
+      } catch (e) {
+        return criteria.discreteValues;
+      }
+    }
+
+    return '';
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  // Handle changes from DiscreteValuesTable
+  const handleDiscreteValuesChange = (values: DiscreteValue[]) => {
+    setDiscreteValues(values);
   };
 
   const handleEvaluationTypeChange = (value: string) => {
@@ -212,13 +470,23 @@ function CriteriaEditForm({
     // Process discrete values if applicable
     let updatedCriteria = { ...formData };
     
-    if (formData.evaluationType === 'DISCRETE') {
-      const values = discreteValuesInput
-        .split(',')
-        .map(v => v.trim())
-        .filter(v => v);
+    if (formData.evaluationType === 'DISCRETE' || 
+        formData.evaluationType === 'DISCRETE_SINGLE' || 
+        formData.evaluationType === 'DISCRETE_MULTIPLE') {
       
-      updatedCriteria.discreteValues = values;
+      if (formData.evaluationType === 'DISCRETE') {
+        // Legacy format for backwards compatibility
+        const values = discreteValuesInput
+          .split(',')
+          .map((v: string) => v.trim())
+          .filter((v: string) => v);
+        
+        updatedCriteria.discreteValues = JSON.stringify(values);
+      } else {
+        // New format for DISCRETE_SINGLE and DISCRETE_MULTIPLE
+        // Use the discrete values from the table UI
+        updatedCriteria.discreteValues = JSON.stringify(discreteValues);
+      }
     }
     
     onSave(updatedCriteria);
@@ -257,7 +525,7 @@ function CriteriaEditForm({
             />
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="evaluationType">Evaluation Type</Label>
               <Select
@@ -270,7 +538,8 @@ function CriteriaEditForm({
                 <SelectContent>
                   <SelectItem value="POINTS">Points</SelectItem>
                   <SelectItem value="TIME">Time</SelectItem>
-                  <SelectItem value="DISCRETE">Discrete Values</SelectItem>
+                  <SelectItem value="DISCRETE_SINGLE">Discrete (Single)</SelectItem>
+                  <SelectItem value="DISCRETE_MULTIPLE">Discrete (Multiple)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -294,36 +563,33 @@ function CriteriaEditForm({
             )}
             
             {formData.evaluationType === 'DISCRETE' && (
-              <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor="discreteValues">Discrete Values</Label>
-                <Input
+              <div className="grid gap-2">
+                <Label htmlFor="discreteValues">Discrete Values (Legacy)</Label>
+                <Textarea
                   id="discreteValues"
                   value={discreteValuesInput}
                   onChange={(e) => setDiscreteValuesInput(e.target.value)}
-                  placeholder="e.g., Excellent, Good, Fair, Poor (comma-separated)"
+                  placeholder="e.g., Excellent, Good, Fair, Poor"
+                  rows={3}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Enter comma-separated values
-                </p>
+                <div className="text-xs text-muted-foreground">
+                  Enter comma-separated values for discrete scoring options
+                </div>
               </div>
             )}
             
-            <div className="grid gap-2">
-              <Label htmlFor="weight">Weight (%)</Label>
-              <Input
-                id="weight"
-                name="weight"
-                type="number"
-                min="1"
-                max="100"
-                value={formData.weight}
-                onChange={(e) => setFormData({ 
-                  ...formData, 
-                  weight: parseInt(e.target.value) || 0 
-                })}
-                placeholder="e.g., 20"
-              />
-            </div>
+            {(formData.evaluationType === 'DISCRETE_SINGLE' || formData.evaluationType === 'DISCRETE_MULTIPLE') && (
+              <div className="grid gap-2">
+                <Label>
+                  {formData.evaluationType === 'DISCRETE_SINGLE' ? 'Discrete Values (Single Selection)' : 'Discrete Values (Multiple Selection)'}
+                </Label>
+                <DiscreteValuesTable 
+                  values={discreteValues}
+                  onChange={handleDiscreteValuesChange}
+                />
+              </div>
+            )}
+
           </div>
           
           <div className="flex items-center space-x-2 mt-2">
@@ -486,17 +752,7 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
       return;
     }
     
-    if (template.judgingtemplatecriteria.length === 0) {
-      toast.error('At least one criterion is required');
-      return;
-    }
-    
-    // Validate criteria weights sum to 100%
-    const totalWeight = template.judgingtemplatecriteria.reduce((sum, c) => sum + (c.weight || 0), 0);
-    if (totalWeight !== 100) {
-      toast.error(`Criteria weights must sum to 100% (currently ${totalWeight}%)`);
-      return;
-    }
+    // Validation removed: Allow templates without criteria and without weight sum requirements
     
     try {
       setIsSaving(true);
@@ -742,16 +998,15 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <Table>
+                <TooltipProvider>
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead>Description</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Scale</TableHead>
-                      <TableHead>Weight</TableHead>
-                      <TableHead>Jury Courtesy</TableHead>
+
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -773,7 +1028,8 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
                       ))}
                     </SortableContext>
                   </TableBody>
-                </Table>
+                  </Table>
+                </TooltipProvider>
               </DndContext>
             )}
           </CardContent>

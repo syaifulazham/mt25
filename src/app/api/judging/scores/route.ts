@@ -90,15 +90,22 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
+// Define interface for score updates
+interface ScoreUpdate {
+  scoreId: number;
+  score: number;
+  comments?: string;
+  selectedDiscreteText?: string;
+  startTime?: Date | string;
+  endTime?: Date | string;
+  totalTime?: number;
+}
+
 /**
  * POST /api/judging/scores/batch
  * Updates multiple scores at once
  * Body:
- *  - scores: Array<{
- *      scoreId: number,
- *      score: number,
- *      comments?: string
- *    }>
+ *  - scores: Array<ScoreUpdate>
  */
 export async function POST(req: NextRequest) {
   try {
@@ -156,15 +163,36 @@ export async function POST(req: NextRequest) {
     }
     
     // Update all scores
-    const updatePromises = scores.map(scoreUpdate => 
-      prisma.judgingSessionScore.update({
+    const updatePromises = scores.map(scoreUpdate => {
+      // Prepare update data object with base properties
+      const updateData: any = {
+        score: scoreUpdate.score,
+        comments: scoreUpdate.comments !== undefined ? scoreUpdate.comments : undefined
+      };
+      
+      // Add new fields for different criterion types if provided
+      if (scoreUpdate.selectedDiscreteText !== undefined) {
+        updateData.selectedDiscreteText = scoreUpdate.selectedDiscreteText;
+      }
+      
+      if (scoreUpdate.startTime !== undefined) {
+        updateData.startTime = new Date(scoreUpdate.startTime);
+      }
+      
+      if (scoreUpdate.endTime !== undefined) {
+        updateData.endTime = new Date(scoreUpdate.endTime);
+      }
+      
+      if (scoreUpdate.totalTime !== undefined) {
+        updateData.totalTime = scoreUpdate.totalTime;
+      }
+      
+      // Return Prisma update operation
+      return prisma.judgingSessionScore.update({
         where: { id: scoreUpdate.scoreId },
-        data: {
-          score: scoreUpdate.score,
-          comments: scoreUpdate.comments !== undefined ? scoreUpdate.comments : undefined
-        }
-      })
-    );
+        data: updateData
+      });
+    });
     
     const updatedScores = await Promise.all(updatePromises);
     

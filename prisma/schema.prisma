@@ -56,6 +56,7 @@ model contest {
   theme              theme?                    @relation(fields: [themeId], references: [id], map: "Contest_themeId_fkey")
   contestants        contestParticipation[]
   eventcontests      eventcontest[]
+  judges_endpoints   judges_endpoints[]
   judging            judging[]
   quizzes            quiz[]
   result             result[]
@@ -162,30 +163,31 @@ model contestParticipation {
 }
 
 model event {
-  id             Int                   @id @default(autoincrement())
-  name           String
-  scopeArea      scope_area            @default(OPEN)
-  code           String                @unique(map: "Event_code_key")
-  status         String                @default("OPEN") @db.VarChar(20)
-  description    String?
-  startDate      DateTime
-  endDate        DateTime
-  venue          String?
-  address        String?
-  city           String?
-  addressState   String?
-  zoneId         Int?
-  stateId        Int?
-  latitude       Float?
-  longitude      Float?
-  isActive       Boolean               @default(true)
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  contests       contest[]             @relation("eventToContest")
-  state          state?                @relation(fields: [stateId], references: [id])
-  zone           zone?                 @relation(fields: [zoneId], references: [id])
-  attendanceSync eventAttendanceSync[]
-  eventcontests  eventcontest[]
+  id               Int                   @id @default(autoincrement())
+  name             String
+  scopeArea        scope_area            @default(OPEN)
+  code             String                @unique(map: "Event_code_key")
+  status           String                @default("OPEN") @db.VarChar(20)
+  description      String?
+  startDate        DateTime
+  endDate          DateTime
+  venue            String?
+  address          String?
+  city             String?
+  addressState     String?
+  zoneId           Int?
+  stateId          Int?
+  latitude         Float?
+  longitude        Float?
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  contests         contest[]             @relation("eventToContest")
+  state            state?                @relation(fields: [stateId], references: [id])
+  zone             zone?                 @relation(fields: [zoneId], references: [id])
+  attendanceSync   eventAttendanceSync[]
+  eventcontests    eventcontest[]
+  judges_endpoints judges_endpoints[]
 
   @@index([stateId], map: "event_stateId_fkey")
   @@index([zoneId], map: "event_zoneId_fkey")
@@ -245,6 +247,27 @@ model eventcontestjudge {
   @@index([userId])
 }
 
+model judges_endpoints {
+  id             Int       @id @default(autoincrement())
+  eventId        Int
+  contestId      Int
+  judge_name     String    @db.VarChar(255)
+  judge_ic       String    @db.VarChar(20)
+  judge_email    String    @db.VarChar(255)
+  judge_phoneNo  String    @db.VarChar(20)
+  judge_passcode String    @db.VarChar(6)
+  hashcode       String    @unique(map: "hashcode") @db.VarChar(255)
+  createdAt      DateTime? @default(now()) @db.DateTime(0)
+  updatedAt      DateTime? @default(now()) @updatedAt @db.DateTime(0)
+  event          event     @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "judges_endpoints_ibfk_1")
+  contest        contest   @relation(fields: [contestId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "judges_endpoints_ibfk_2")
+
+  @@index([contestId], map: "idx_contestId")
+  @@index([eventId], map: "idx_eventId")
+  @@index([hashcode], map: "idx_hashcode")
+  @@index([judge_email], map: "idx_judge_email")
+}
+
 model eventcontesttoken {
   id         Int       @id @default(autoincrement())
   eventId    Int
@@ -296,17 +319,17 @@ model judging {
 }
 
 model judgingcriteriascore {
-  id                  Int                                 @id @default(autoincrement())
+  id                  Int                                  @id @default(autoincrement())
   judgingId           Int
   criteriaName        String
   criteriaDescription String?
-  evaluationType      judgingcriteriascore_evaluationType
+  evaluationType      judgingcriteriascore_evaluationType?
   weight              Int
   score               Float
   feedback            String?
   discreteValue       String?
-  createdAt           DateTime                            @default(now())
-  judging             judging                             @relation(fields: [judgingId], references: [id], map: "JudgingCriteriaScore_judgingId_fkey")
+  createdAt           DateTime                             @default(now())
+  judging             judging                              @relation(fields: [judgingId], references: [id], map: "JudgingCriteriaScore_judgingId_fkey")
 
   @@index([judgingId], map: "JudgingCriteriaScore_judgingId_fkey")
 }
@@ -324,18 +347,18 @@ model judgingtemplate {
 }
 
 model judgingtemplatecriteria {
-  id                Int                                    @id @default(autoincrement())
+  id                Int                                     @id @default(autoincrement())
   name              String
   description       String?
-  needsJuryCourtesy Boolean                                @default(false)
-  evaluationType    judgingtemplatecriteria_evaluationType
-  weight            Int                                    @default(1)
+  needsJuryCourtesy Boolean                                 @default(false)
+  evaluationType    judgingtemplatecriteria_evaluationType?
+  weight            Int                                     @default(1)
   maxScore          Int?
-  discreteValues    String?
+  discreteValues    String?                                 @db.Text
   templateId        Int
-  createdAt         DateTime                               @default(now())
+  createdAt         DateTime                                @default(now())
   updatedAt         DateTime
-  judgingtemplate   judgingtemplate                        @relation(fields: [templateId], references: [id], onDelete: Cascade, map: "JudgingTemplateCriteria_templateId_fkey")
+  judgingtemplate   judgingtemplate                         @relation(fields: [templateId], references: [id], onDelete: Cascade, map: "JudgingTemplateCriteria_templateId_fkey")
 
   @@index([templateId], map: "JudgingTemplateCriteria_templateId_fkey")
 }
@@ -376,6 +399,10 @@ model judgingSessionScore {
   criterionWeight      Int
   criterionType        String         @db.VarChar(50)
   maxScore             Int            @default(10)
+  selectedDiscreteText String?        @db.VarChar(255)
+  startTime            DateTime?      @db.DateTime(0)
+  endTime              DateTime?      @db.DateTime(0)
+  totalTime            Int?
   judgingSession       judgingSession @relation(fields: [judgingSessionId], references: [id], onDelete: Cascade, map: "fk_judgingSessionScore_judgingSessionId")
 
   @@index([criterionId], map: "idx_judgingSessionScore_criterionId")
@@ -1192,6 +1219,8 @@ enum judgingcriteriascore_evaluationType {
   POINTS
   TIME
   DISCRETE
+  DISCRETE_SINGLE
+  DISCRETE_MULTIPLE
 }
 
 enum judgingtemplate_contestType {
@@ -1209,6 +1238,8 @@ enum judgingtemplatecriteria_evaluationType {
   POINTS
   TIME
   DISCRETE
+  DISCRETE_SINGLE
+  DISCRETE_MULTIPLE
 }
 
 enum submission_status {

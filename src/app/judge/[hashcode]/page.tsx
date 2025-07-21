@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, Plus, Award, AlertCircle } from "lucide-react";
+import { Search, Plus, Award, AlertCircle, Lock, LogOut } from "lucide-react";
+import { useJudgeAuth } from "@/hooks/useJudgeAuth";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,63 +47,54 @@ interface Contest {
   name: string;
 }
 
-export default function JudgingTeamsPage({ 
+
+
+export default function JudgeEndpointPage({ 
   params 
 }: { 
   params: { 
-    id: string;
-    contestId: string;
+    hashcode: string;
   } 
 }) {
   const router = useRouter();
-  const eventId = params.id;
-  const contestId = params.contestId;
+  const hashcode = params.hashcode;
   
-  const [loading, setLoading] = useState(true);
+  const { loading, authenticated, judgeEndpoint, authenticate, logout } = useJudgeAuth(hashcode);
+  const [passcode, setPasscode] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [teams, setTeams] = useState<Team[]>([]);
-  const [event, setEvent] = useState<Event | null>(null);
-  const [contest, setContest] = useState<Contest | null>(null);
+
+  // Handle passcode authentication
+  const handleAuthenticate = async () => {
+    const success = await authenticate(passcode);
+    if (success && judgeEndpoint) {
+      await fetchTeamsData(judgeEndpoint.eventId, judgeEndpoint.contestId);
+    }
+  };
+
+  // Fetch teams data when authenticated
+  useEffect(() => {
+    if (authenticated && judgeEndpoint) {
+      fetchTeamsData(judgeEndpoint.eventId, judgeEndpoint.contestId);
+    }
+  }, [authenticated, judgeEndpoint]);
 
   // Fetch teams data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch event details
-        const eventRes = await fetch(`/api/organizer/events/${eventId}`);
-        if (!eventRes.ok) throw new Error('Failed to fetch event');
-        const eventData = await eventRes.json();
-        setEvent(eventData);
-        
-        // Fetch contest details
-        const contestRes = await fetch(`/api/organizer/events/${eventId}/contests/${contestId}`);
-        if (!contestRes.ok) throw new Error('Failed to fetch contest');
-        const contestData = await contestRes.json();
-        setContest(contestData);
-        
-        // Fetch teams for judging
-        const teamsRes = await fetch(`/api/judging/teams?eventId=${eventId}&contestId=${contestId}`);
-        if (!teamsRes.ok) throw new Error('Failed to fetch teams');
-        const teamsData = await teamsRes.json();
-        setTeams(teamsData.teams);
-        
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load teams data');
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [eventId, contestId]);
+  const fetchTeamsData = async (eventId: number, contestId: number) => {
+    try {
+      const res = await fetch(`/api/judge/teams?hashcode=${hashcode}&eventId=${eventId}&contestId=${contestId}`);
+      if (!res.ok) throw new Error('Failed to fetch teams');
+      const teamsData = await res.json();
+      setTeams(teamsData.teams);
+    } catch (error) {
+      console.error('Error fetching teams data:', error);
+      toast.error('Failed to load teams data');
+    }
+  };
 
   // Filter teams based on search term and active tab
   const filteredTeams = teams.filter((team) => {
-    // Add null checks to prevent "Cannot read properties of undefined" errors
     const teamName = team?.teamName || '';
     const contingentName = team?.contingentName || '';
     
@@ -122,12 +114,13 @@ export default function JudgingTeamsPage({
   // Create new judging session
   const createJudgingSession = async (attendanceTeamId: number, eventContestId: number) => {
     try {
-      const res = await fetch('/api/judging/sessions', {
+      const res = await fetch('/api/judge/sessions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          hashcode,
           attendanceTeamId,
           eventContestId,
         }),
@@ -140,8 +133,8 @@ export default function JudgingTeamsPage({
       
       const data = await res.json();
       
-      // Navigate to judging session
-      router.push(`/organizer/judging/session/${data.judgingSession.id}`);
+      // Navigate to judging session with judge context
+      router.push(`/judge/${hashcode}/session/${data.judgingSession.id}`);
     } catch (error) {
       console.error('Error creating judging session:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create judging session');
@@ -153,6 +146,54 @@ export default function JudgingTeamsPage({
   const inProgressCount = teams.filter(team => team.judgingStatus === "IN_PROGRESS").length;
   const completedCount = teams.filter(team => team.judgingStatus === "COMPLETED").length;
 
+  // Authentication screen
+  if (!authenticated) {
+    return (
+      <div className="container mx-auto py-6 space-y-8">
+        <PageHeader 
+          title="Judge Access"
+          description="Enter your passcode to access the judging interface"
+        />
+        
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Authentication Required
+            </CardTitle>
+            <CardDescription>
+              Please enter your 6-character passcode to continue
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Input
+                type="text"
+                placeholder="Enter passcode"
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value.toUpperCase())}
+                maxLength={6}
+                className="text-center text-lg font-mono"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAuthenticate();
+                  }
+                }}
+              />
+            </div>
+            <Button 
+              onClick={handleAuthenticate} 
+              className="w-full"
+              disabled={passcode.length !== 6}
+            >
+              Access Judging Interface
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto py-6 space-y-8">
@@ -163,21 +204,13 @@ export default function JudgingTeamsPage({
     );
   }
   
-  if (!event || !contest) {
+  if (!judgeEndpoint) {
     return (
       <div className="container mx-auto py-6 space-y-8">
-        <PageHeader title="Error" description="Event or contest not found" />
+        <PageHeader title="Error" description="Judge endpoint not found" />
         <Card>
           <CardContent className="pt-6">
-            <p>The specified event or contest could not be found.</p>
-            <div className="mt-4">
-              <Button 
-                variant="outline"
-                onClick={() => router.push(`/organizer/events/${eventId}/judging`)}
-              >
-                Back to Judging
-              </Button>
-            </div>
+            <p>The specified judge endpoint could not be found.</p>
           </CardContent>
         </Card>
       </div>
@@ -187,13 +220,13 @@ export default function JudgingTeamsPage({
   return (
     <div className="container mx-auto py-6 space-y-8">
       <PageHeader 
-        title={`Teams for ${contest.name}`}
-        description={`Judge teams for ${event.name}`}
+        title={`Teams for ${judgeEndpoint.contest.name}`}
+        description={`Judge teams for ${judgeEndpoint.event.name} - ${judgeEndpoint.judge_name || 'Anonymous Judge'}`}
         actions={
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => router.push(`/organizer/events/${eventId}/judging/${contestId}/results`)}
+              onClick={() => router.push(`/judge/${hashcode}/results`)}
               className="gap-2"
             >
               <Award className="h-4 w-4" />
@@ -201,11 +234,11 @@ export default function JudgingTeamsPage({
             </Button>
             <Button
               variant="outline"
-              onClick={() => router.push(`/organizer/events/${eventId}/judging`)}
-              className="gap-2"
+              onClick={logout}
+              className="gap-2 text-red-600 hover:text-red-700"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Contests
+              <LogOut className="h-4 w-4" />
+              Logout
             </Button>
           </div>
         }
@@ -324,7 +357,7 @@ export default function JudgingTeamsPage({
                             asChild
                             disabled={!team?.judgingSessionId}
                           >
-                            <Link href={`/organizer/judging/session/${team?.judgingSessionId || ''}`}>
+                            <Link href={`/judge/${hashcode}/session/${team?.judgingSessionId || ''}`}>
                               {team?.judgingStatus === "IN_PROGRESS" ? "Continue Judging" : "View Judging"}
                             </Link>
                           </Button>

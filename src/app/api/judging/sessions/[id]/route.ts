@@ -29,16 +29,97 @@ export async function GET(
     }
     
     // Get the judging session with scores
-    const judgingSession = await db.judgingSession.findUnique({
+    const judgingSession = await prisma.judgingSession.findUnique({
       where: { id },
       include: {
-        judgingSessionScores: {
+        judgingSessionScore: {
           orderBy: {
-            id: 'asc'
+            criterionId: 'asc'
           }
         }
       }
     });
+    
+    // Get associated event contest and template info
+    let eventContestWithTemplate = null;
+    if (judgingSession) {
+      eventContestWithTemplate = await prisma.eventcontest.findUnique({
+        where: { id: judgingSession.eventContestId },
+        include: {
+          contest: true
+        }
+      });
+    }
+    
+    // Get template ID from contest
+    const templateId = eventContestWithTemplate?.contest?.judgingTemplateId;
+    console.log('Template ID for session:', templateId);
+    
+    // Get the criteria details including discrete values for DISCRETE type
+    let criteriaWithDetails: any[] = [];
+    
+    if (judgingSession && judgingSession.judgingSessionScore.length > 0 && templateId) {
+      // Get template criteria with discrete values
+      const templateCriteria = await prisma.judgingtemplatecriteria.findMany({
+        where: {
+          judgingtemplate: { id: templateId },
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          weight: true,
+          maxScore: true,
+          evaluationType: true,
+          discreteValues: true
+        }
+      });
+      
+      console.log('Template criteria fetched:', JSON.stringify(templateCriteria));
+      
+      // Create a map for quick lookup
+      const criteriaMap = new Map();
+      templateCriteria.forEach(criteria => {
+        criteriaMap.set(criteria.id, criteria);
+      });
+      
+      // Create an array of criteria in the same order as template
+      const sortedTemplateCriteria = templateCriteria.sort((a, b) => a.id - b.id);
+      console.log('Sorted template criteria:', JSON.stringify(sortedTemplateCriteria));
+      
+      // Sort session scores by criterionId to maintain proper order
+      const sortedScores = [...judgingSession.judgingSessionScore].sort(
+        (a, b) => a.criterionId - b.criterionId
+      );
+      
+      // Map session scores to template criteria by their position/index
+      criteriaWithDetails = sortedScores.map((score, index) => {
+        // Find matching template criterion by name or just use index if name match fails
+        const matchingCriterion = sortedTemplateCriteria.find(
+          c => c.name.toLowerCase() === score.criterionName.toLowerCase()
+        ) || sortedTemplateCriteria[index] || null;
+        
+        console.log(`Mapping score criterionId=${score.criterionId} name=${score.criterionName} to template criterion:`, 
+          matchingCriterion ? JSON.stringify(matchingCriterion) : 'null');
+        
+        // Create a new object with the score properties plus details from template
+        return {
+          ...score,
+          criterionType: matchingCriterion?.evaluationType || score.criterionType,
+          // For DISCRETE types, check both the score type and the template type
+          discreteValues: (
+            score.criterionType === 'DISCRETE' || 
+            score.criterionType === 'DISCRETE_SINGLE' || 
+            score.criterionType === 'DISCRETE_MULTIPLE' ||
+            matchingCriterion?.evaluationType === 'DISCRETE' ||
+            matchingCriterion?.evaluationType === 'DISCRETE_SINGLE' ||
+            matchingCriterion?.evaluationType === 'DISCRETE_MULTIPLE'
+          ) ? matchingCriterion?.discreteValues : null
+        };
+      });
+      
+      console.log('Enhanced criteria with details:', JSON.stringify(criteriaWithDetails));
+    }
     
     if (!judgingSession) {
       return NextResponse.json(
@@ -56,30 +137,30 @@ export async function GET(
     }
     
     // Get team and contest details
-    const attendanceTeam = await db.attendanceTeam.findUnique({
+    const attendanceTeam = await prisma.attendanceTeam.findUnique({
       where: { Id: judgingSession.attendanceTeamId }
     });
     
-    const team = attendanceTeam ? await db.team.findUnique({
+    const team = attendanceTeam ? await prisma.team.findUnique({
       where: { id: attendanceTeam.teamId }
     }) : null;
     
-    const contingent = attendanceTeam ? await db.contingent.findUnique({
+    const contingent = attendanceTeam ? await prisma.contingent.findUnique({
       where: { id: attendanceTeam.contingentId }
     }) : null;
     
-    const eventContest = await db.eventcontest.findUnique({
-      where: { id: judgingSession.eventContestId },
-      include: {
-        contest: true
-      }
-    });
+    // We already fetched eventContestWithTemplate earlier
+    
+    // Replace judgingSessionScore with our enhanced version
+    if (judgingSession && criteriaWithDetails.length > 0) {
+      judgingSession.judgingSessionScore = criteriaWithDetails;
+    }
     
     return NextResponse.json({
       judgingSession,
       team,
       contingent,
-      eventContest
+      eventContest: eventContestWithTemplate
     });
     
   } catch (error) {
@@ -124,10 +205,10 @@ export async function PATCH(
     const { status, comments, totalScore } = body;
     
     // Get the current judging session
-    const judgingSession = await db.judgingSession.findUnique({
+    const judgingSession = await prisma.judgingSession.findUnique({
       where: { id },
       include: {
-        judgingSessionScores: true
+        judgingSessionScore: true
       }
     });
     
@@ -148,7 +229,7 @@ export async function PATCH(
     
     // If completing the session, ensure all criteria have scores
     if (status === 'COMPLETED') {
-      const hasEmptyScores = judgingSession.judgingSessionScores.some(score => score.score === 0);
+      const hasEmptyScores = judgingSession.judgingSessionScore.some(score => score.score === null);
       if (hasEmptyScores) {
         return NextResponse.json(
           { error: 'All criteria must have scores before completing the judging session' },
@@ -157,28 +238,74 @@ export async function PATCH(
       }
     }
     
-    // Calculate totalScore if not provided
-    let calculatedTotalScore = totalScore;
-    if (status === 'COMPLETED' && !calculatedTotalScore) {
-      // Calculate weighted score
-      calculatedTotalScore = judgingSession.judgingSessionScores.reduce((acc, score) => {
-        // Convert criterion weight (0-100) to decimal (0-1) and multiply by score
-        const weightedScore = (score.criterionWeight / 100) * score.score;
-        return acc + weightedScore;
-      }, 0);
+    // Calculate total score from individual criteria scores
+    let calculatedTotalScore = 0;
+    console.log('=== TOTALSCORE CALCULATION DEBUG ===');
+    console.log('All scores:', judgingSession.judgingSessionScore?.map(s => ({ id: s.id, score: s.score, type: typeof s.score })));
+    
+    if (judgingSession.judgingSessionScore && judgingSession.judgingSessionScore.length > 0) {
+      const validScores = judgingSession.judgingSessionScore.filter((score: any) => score.score !== null);
+      console.log('Valid scores:', validScores.map(s => ({ id: s.id, score: s.score, type: typeof s.score })));
+      
+      if (validScores.length > 0) {
+        calculatedTotalScore = validScores.reduce((acc: number, score: any) => {
+          // Properly convert Decimal objects to numbers
+          let scoreValue: number;
+          if (typeof score.score === 'string') {
+            scoreValue = parseFloat(score.score);
+          } else if (typeof score.score === 'number') {
+            scoreValue = score.score;
+          } else if (score.score && typeof score.score === 'object') {
+            // Handle Prisma Decimal objects
+            scoreValue = parseFloat(score.score.toString());
+          } else {
+            scoreValue = 0;
+          }
+          
+          // Ensure we have a valid number
+          scoreValue = isNaN(scoreValue) ? 0 : scoreValue;
+          
+          console.log(`Processing score ID ${score.id}: ${score.score} (${typeof score.score}) -> ${scoreValue}, acc: ${acc} -> ${acc + scoreValue}`);
+          return acc + scoreValue;
+        }, 0);
+      }
+    }
+    console.log('Final calculatedTotalScore:', calculatedTotalScore);
+    console.log('=== END DEBUG ===');
+    
+    // Ensure calculatedTotalScore is a valid number and within DECIMAL(10,2) range
+    calculatedTotalScore = isNaN(calculatedTotalScore) ? 0 : calculatedTotalScore;
+    
+    // Ensure totalScore is within DECIMAL(10,2) range (max: 99999999.99)
+    const maxDecimalValue = 99999999.99;
+    if (calculatedTotalScore > maxDecimalValue) {
+      console.warn(`TotalScore ${calculatedTotalScore} exceeds DECIMAL(10,2) limit, capping at ${maxDecimalValue}`);
+      calculatedTotalScore = maxDecimalValue;
+    }
+    if (calculatedTotalScore < -maxDecimalValue) {
+      console.warn(`TotalScore ${calculatedTotalScore} below DECIMAL(10,2) limit, capping at ${-maxDecimalValue}`);
+      calculatedTotalScore = -maxDecimalValue;
     }
     
+    // Debug logging
+    console.log('Debug totalScore calculation:', {
+      requestTotalScore: totalScore,
+      calculatedTotalScore,
+      finalTotalScore: calculatedTotalScore !== undefined ? calculatedTotalScore : judgingSession.totalScore,
+      scoresData: judgingSession.judgingSessionScore.map(s => ({ id: s.id, score: s.score, type: typeof s.score }))
+    });
+    
     // Update the judging session
-    const updatedSession = await db.judgingSession.update({
+    const updatedSession = await prisma.judgingSession.update({
       where: { id },
       data: {
         status: status || judgingSession.status,
         comments: comments !== undefined ? comments : judgingSession.comments,
-        totalScore: calculatedTotalScore !== undefined ? calculatedTotalScore : judgingSession.totalScore,
+        totalScore: calculatedTotalScore, // Always use calculated score from database
         endTime: status === 'COMPLETED' ? new Date() : judgingSession.endTime
       },
       include: {
-        judgingSessionScores: true
+        judgingSessionScore: true
       }
     });
     
@@ -188,8 +315,13 @@ export async function PATCH(
     
   } catch (error) {
     console.error('Error updating judging session:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      sessionId: params.id
+    });
     return NextResponse.json(
-      { error: 'Failed to update judging session' },
+      { error: 'Failed to update judging session', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -221,7 +353,7 @@ export async function DELETE(
     }
     
     // Delete the judging session (cascades to scores)
-    await db.judgingSession.delete({
+    await prisma.judgingSession.delete({
       where: { id }
     });
     

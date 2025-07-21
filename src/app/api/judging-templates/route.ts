@@ -24,33 +24,50 @@ export async function GET(request: Request) {
       where.contestType = contestType;
     }
 
-    // Get all judging templates
-    const templates = await prisma.judgingtemplate.findMany({
-      where,
-      include: {
-        judgingtemplatecriteria: true
-      },
-      orderBy: {
-        name: 'asc'
-      }
-    });
-
-    // Parse discreteValues from JSON string to array for each criterion
-    const templatesWithParsedCriteria = templates.map(template => {
-      const parsedCriteria = template.judgingtemplatecriteria.map((criterion: any) => {
+    // Use raw SQL to avoid Prisma enum validation issues
+    let templatesQuery = `
+      SELECT 
+        jt.id, jt.name, jt.description, jt.isDefault, jt.contestType, jt.createdAt, jt.updatedAt
+      FROM judgingtemplate jt
+    `;
+    
+    const queryParams: any[] = [];
+    if (contestType) {
+      templatesQuery += ` WHERE jt.contestType = ?`;
+      queryParams.push(contestType);
+    }
+    
+    templatesQuery += ` ORDER BY jt.name ASC`;
+    
+    const templates = await prisma.$queryRawUnsafe(templatesQuery, ...queryParams) as any[];
+    
+    // Get criteria for each template using raw SQL
+    const templatesWithCriteria = await Promise.all(
+      templates.map(async (template) => {
+        const criteria = await prisma.$queryRawUnsafe(`
+          SELECT 
+            id, name, description, needsJuryCourtesy, evaluationType, weight, maxScore, discreteValues, templateId, createdAt, updatedAt
+          FROM judgingtemplatecriteria 
+          WHERE templateId = ?
+          ORDER BY id ASC
+        `, template.id) as any[];
+        
+        // Parse discreteValues from JSON string to array for each criterion
+        const parsedCriteria = criteria.map((criterion: any) => {
+          return {
+            ...criterion,
+            discreteValues: criterion.discreteValues ? JSON.parse(criterion.discreteValues) : null
+          };
+        });
+        
         return {
-          ...criterion,
-          discreteValues: criterion.discreteValues ? JSON.parse(criterion.discreteValues) : null
+          ...template,
+          judgingtemplatecriteria: parsedCriteria
         };
-      });
+      })
+    );
 
-      return {
-        ...template,
-        judgingtemplatecriteria: parsedCriteria
-      };
-    });
-
-    return NextResponse.json(templatesWithParsedCriteria);
+    return NextResponse.json(templatesWithCriteria);
   } catch (error) {
     console.error('Error fetching judging templates:', error);
     return NextResponse.json(
@@ -101,7 +118,7 @@ export async function POST(request: Request) {
           create: criteria.map(criterion => ({
             name: criterion.name,
             description: criterion.description || null,
-            needsJuryCourtesy: criterion.requiresJuryCourtesy || false,
+            needsJuryCourtesy: criterion.needsJuryCourtesy || false,
             evaluationType: criterion.evaluationType,
             weight: criterion.weight || 1,
             maxScore: criterion.maxScore || null,

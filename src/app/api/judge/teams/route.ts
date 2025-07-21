@@ -1,37 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-// Mark this route as dynamic to avoid static generation errors
-export const dynamic = 'force-dynamic';
-
-/**
- * GET /api/judging/teams
- * Lists teams for judging with their judging status
- * Query params:
- *  - eventId: number (required)
- *  - contestId: number (required)
- *  - judgeId: number (optional, defaults to current user)
- */
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const { searchParams } = new URL(req.url);
+    const searchParams = request.nextUrl.searchParams;
+    const hashcode = searchParams.get('hashcode');
     const eventId = searchParams.get('eventId');
     const contestId = searchParams.get('contestId');
-    
-    if (!eventId || !contestId) {
+
+    if (!hashcode || !eventId || !contestId) {
       return NextResponse.json(
-        { error: 'eventId and contestId are required' },
+        { error: 'Hashcode, eventId, and contestId are required' },
         { status: 400 }
+      );
+    }
+
+    // Verify judge endpoint exists
+    const judgeEndpoint = await prisma.judges_endpoints.findFirst({
+      where: {
+        hashcode: hashcode,
+        eventId: parseInt(eventId),
+        contestId: parseInt(contestId)
+      }
+    });
+
+    if (!judgeEndpoint) {
+      return NextResponse.json(
+        { error: 'Invalid judge endpoint' },
+        { status: 401 }
       );
     }
 
@@ -40,7 +36,6 @@ export async function GET(req: NextRequest) {
       where: {
         eventId: parseInt(eventId as string),
         contestId: parseInt(contestId as string)
-        // Removed isActive filter to show all contests regardless of status
       },
       include: {
         contest: true
@@ -54,25 +49,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get current user as judge if judgeId not provided
-    const judgeId = searchParams.get('judgeId') || session.user.id;
-
-    // Check if the user is a judge for this event contest
-    const isJudge = await prisma.eventcontestjudge.findFirst({
-      where: {
-        eventcontestId: eventContest.id,
-        userId: parseInt(judgeId as string),
-      }
-    });
-
-    if (!isJudge && session.user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'User is not authorized to judge this contest' },
-        { status: 403 }
-      );
-    }
-
-    // Get teams for this event contest with their judging status
+    // Get teams for this event contest with their judging status (same query as organizer API)
     const teams = await prisma.$queryRaw`
       SELECT
         at.Id as attendanceTeamId,
@@ -83,6 +60,23 @@ export async function GET(req: NextRequest) {
         at.attendanceStatus,
         t.name as teamName,
         c.name as contingentName,
+        c.logoUrl as contingentLogoUrl,
+        c.contingentType as contingentType,
+        e.name as eventName,
+        e.scopeArea as eventScopeArea,
+        CASE
+          WHEN c.contingentType = 'SCHOOL' THEN (
+            SELECT s2.name FROM state s2
+            JOIN school sch ON sch.stateId = s2.id
+            WHERE c.schoolId = sch.id
+          )
+          WHEN c.contingentType = 'INDEPENDENT' THEN (
+            SELECT s2.name FROM state s2
+            JOIN independent ind ON ind.stateId = s2.id
+            WHERE c.independentId = ind.id
+          )
+          ELSE NULL
+        END as stateName,
         ec.id as eventContestId,
         contest.name as contestName,
         CASE
@@ -100,6 +94,8 @@ export async function GET(req: NextRequest) {
       JOIN
         contingent c ON at.contingentId = c.id
       JOIN
+        event e ON at.eventId = e.id
+      JOIN
         eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId as string)}
       JOIN
         contest ON ec.contestId = contest.id
@@ -107,12 +103,9 @@ export async function GET(req: NextRequest) {
         eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
       LEFT JOIN
         judgingSession js ON at.Id = js.attendanceTeamId 
-        AND ec.id = js.eventContestId 
-        AND js.judgeId = ${parseInt(judgeId as string)}
+        AND ec.id = js.eventContestId
       WHERE
         at.eventId = ${parseInt(eventId as string)}
-        -- Temporarily commenting out to debug missing teams for contest ID 14
-        -- AND at.attendanceStatus = 'Present'
       ORDER BY
         judgingStatus DESC,
         t.name ASC
@@ -123,11 +116,10 @@ export async function GET(req: NextRequest) {
       eventContest,
       judgingTemplateId: eventContest.contest.judgingTemplateId
     });
-
   } catch (error) {
-    console.error('Error listing teams for judging:', error);
+    console.error('Error fetching teams for judge:', error);
     return NextResponse.json(
-      { error: 'Failed to list teams for judging' },
+      { error: 'Failed to fetch teams' },
       { status: 500 }
     );
   }

@@ -162,6 +162,9 @@ export async function GET(req: NextRequest) {
           description: eventContest.contest.description,
           judgingTemplateId: judgingTemplateId,
           judgingtemplate: judgingTemplate,
+          contest: {
+            targetgroup: eventContest.contest.targetgroup || []
+          },
           _count: {
             attendanceTeam: totalTeams,
           },
@@ -181,6 +184,9 @@ export async function GET(req: NextRequest) {
           description: eventContest.contest.description,
           judgingTemplateId: null,
           judgingtemplate: null,
+          contest: {
+            targetgroup: eventContest.contest?.targetgroup || []
+          },
           _count: {
             attendanceTeam: 0,
           },

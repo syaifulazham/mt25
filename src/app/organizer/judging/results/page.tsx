@@ -264,7 +264,7 @@ export default function JudgingResultsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push(`/organizer/judging/teams?eventId=${eventId}&contestId=${contestId}`)}
+              onClick={() => router.push(`/organizer/events/${eventId}/judging/${contestId}/teams`)}
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />

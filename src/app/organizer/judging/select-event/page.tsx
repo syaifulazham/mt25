@@ -116,7 +116,7 @@ export default function SelectEventPage() {
       return;
     }
     
-    router.push(`/organizer/judging/teams?eventId=${selectedEventId}&contestId=${selectedContestId}`);
+    router.push(`/organizer/events/${selectedEventId}/judging/${selectedContestId}/teams`);
   };
 
   if (loading) {
