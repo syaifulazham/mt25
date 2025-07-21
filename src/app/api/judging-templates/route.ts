@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, hasRequiredRole } from '@/lib/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/auth-options';
+import { hasRequiredRole } from '@/lib/auth';
 
 // GET /api/judging-templates
 export async function GET(request: Request) {
@@ -11,21 +13,21 @@ export async function GET(request: Request) {
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
       console.log('Auth check starting for judging-templates');
-      const user = await getCurrentUser();
-      console.log('Auth user result:', user ? `${user.username} (${user.role})` : 'No user found');
+      const session = await getServerSession(authOptions);
+      console.log('Auth session result:', session ? `${session.user.email} (${session.user.role})` : 'No session found');
       
-      // Check if user exists and has required role
-      if (!user) {
-        console.log('Authentication failed: No user found');
+      // Check if session exists and has required role
+      if (!session || !session.user) {
+        console.log('Authentication failed: No session found');
         return NextResponse.json({ error: 'Unauthorized - No user found' }, { status: 401 });
       }
       
-      if (!hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-        console.log('Authentication failed: Insufficient permissions', user.role);
+      if (!hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
+        console.log('Authentication failed: Insufficient permissions', session.user.role);
         return NextResponse.json({ error: 'Unauthorized - Insufficient permissions' }, { status: 401 });
       }
       
-      console.log('Authentication successful for', user.username);
+      console.log('Authentication successful for', session.user.email);
     }
 
     // Extract query parameters
@@ -96,8 +98,8 @@ export async function POST(request: Request) {
   try {
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
-      const user = await getCurrentUser();
-      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+      const session = await getServerSession(authOptions);
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }

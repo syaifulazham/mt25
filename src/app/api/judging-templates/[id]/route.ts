@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, hasRequiredRole } from '@/lib/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/auth-options';
+import { hasRequiredRole } from '@/lib/auth';
+
+// Force dynamic route
+export const dynamic = 'force-dynamic';
 
 // GET /api/judging-templates/[id]
 export async function GET(
@@ -10,8 +15,8 @@ export async function GET(
   try {
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
-      const user = await getCurrentUser();
-      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+      const session = await getServerSession(authOptions);
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
@@ -68,8 +73,8 @@ export async function PUT(
   try {
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
-      const user = await getCurrentUser();
-      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+      const session = await getServerSession(authOptions);
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
@@ -247,8 +252,8 @@ export async function DELETE(
   try {
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
-      const user = await getCurrentUser();
-      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+      const session = await getServerSession(authOptions);
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
