@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const hashcode = searchParams.get('hashcode');
-    const eventId = searchParams.get('eventId');
-    const contestId = searchParams.get('contestId');
+    // Use URL constructor instead of nextUrl.searchParams to avoid static generation bailout
+    const url = new URL(request.url);
+    const hashcode = url.searchParams.get('hashcode');
+    const eventId = url.searchParams.get('eventId');
+    const contestId = url.searchParams.get('contestId');
 
     if (!hashcode || !eventId || !contestId) {
       return NextResponse.json(

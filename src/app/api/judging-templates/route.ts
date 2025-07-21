@@ -6,12 +6,26 @@ import { getCurrentUser, hasRequiredRole } from '@/lib/auth';
 // GET /api/judging-templates
 export async function GET(request: Request) {
   try {
+    console.log('Judging templates API request received, env:', process.env.NODE_ENV);
+    
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
+      console.log('Auth check starting for judging-templates');
       const user = await getCurrentUser();
-      if (!user || !hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.log('Auth user result:', user ? `${user.username} (${user.role})` : 'No user found');
+      
+      // Check if user exists and has required role
+      if (!user) {
+        console.log('Authentication failed: No user found');
+        return NextResponse.json({ error: 'Unauthorized - No user found' }, { status: 401 });
       }
+      
+      if (!hasRequiredRole(user, ['ADMIN', 'ORGANIZER'])) {
+        console.log('Authentication failed: Insufficient permissions', user.role);
+        return NextResponse.json({ error: 'Unauthorized - Insufficient permissions' }, { status: 401 });
+      }
+      
+      console.log('Authentication successful for', user.username);
     }
 
     // Extract query parameters
