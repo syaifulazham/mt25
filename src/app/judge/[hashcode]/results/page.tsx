@@ -85,6 +85,7 @@ export default function JudgeResultsPage({
       
       // Setup auto-refresh every 10 seconds
       const intervalId = setInterval(() => {
+        // Pass current selectedStates to preserve state filter during refresh
         fetchTeamsData(judgeEndpoint.eventId, judgeEndpoint.contestId, true);
       }, 10000);
       
@@ -103,6 +104,8 @@ export default function JudgeResultsPage({
       const res = await fetch(`/api/judge/teams?hashcode=${hashcode}&eventId=${eventId}&contestId=${contestId}`);
       if (!res.ok) throw new Error("Failed to fetch teams");
       const teamsData = await res.json();
+      
+      // Update teams while preserving the current filter state
       setTeams(teamsData.teams);
       setLastRefreshed(new Date());
     } catch (error) {
