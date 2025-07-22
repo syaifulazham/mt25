@@ -92,12 +92,12 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
             
             {/* Position indicator */}
             <motion.div 
-              className="py-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-center w-full"
+              className="py-4 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 text-center w-full"
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.4 }}
             >
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-wide">{positionText}</h1>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-wide">{positionText}</h1>
             </motion.div>
             
             {/* Team info */}
@@ -129,10 +129,10 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
                   )}
                 </div>
                 
-                <h2 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-3 text-center">{team.teamName}</h2>
+                <h2 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-3 text-center text-[#ffa400]">{team.teamName}</h2>
                 <div className="flex flex-col items-center">
                   <h3 className="text-3xl md:text-4xl text-gray-200 mb-3 font-semibold">
-                    {team.contingentName}
+                    {team.contingentName ? team.contingentName.replace(/\sContingent$|^Contingent\s/i, '') : ''}
                   </h3>
                 </div>
               </motion.div>
@@ -144,8 +144,8 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
                 transition={{ delay: 0.4 }}
               >
                 <div className="flex items-center justify-center mb-4 mt-8">
-                  <Users className="mr-2 h-5 w-5 text-blue-300" />
-                  <h3 className="text-2xl font-semibold">Ahli Pasukan</h3>
+                  <Users className="mr-2 h-5 w-5 text-[#ffa400]" />
+                  <h3 className="text-2xl font-semibold text-[#ffa400]">Ahli Pasukan</h3>
                 </div>
                 
                 {team.members && team.members.length > 0 ? (
