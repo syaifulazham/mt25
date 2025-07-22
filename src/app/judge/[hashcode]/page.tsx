@@ -30,6 +30,8 @@ interface Team {
   attendanceStatus: string;
   teamName: string;
   contingentName: string;
+  contingentLogoUrl?: string;
+  stateName?: string;
   eventContestId: number;
   contestName: string;
   judgingStatus: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
@@ -97,10 +99,12 @@ export default function JudgeEndpointPage({
   const filteredTeams = teams.filter((team) => {
     const teamName = team?.teamName || '';
     const contingentName = team?.contingentName || '';
+    const stateName = team?.stateName || '';
     
     const matchesSearch = 
       teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contingentName.toLowerCase().includes(searchTerm.toLowerCase());
+      contingentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      stateName.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesTab = 
       activeTab === "all" ||
@@ -110,6 +114,19 @@ export default function JudgeEndpointPage({
     
     return matchesSearch && matchesTab;
   });
+
+  // Group teams by state
+  const teamsByState: Record<string, Team[]> = {};
+  filteredTeams.forEach(team => {
+    const stateName = team.stateName || "Unknown State";
+    if (!teamsByState[stateName]) {
+      teamsByState[stateName] = [];
+    }
+    teamsByState[stateName].push(team);
+  });
+
+  // Sort states alphabetically
+  const sortedStates = Object.keys(teamsByState).sort();
 
   // Create new judging session
   const createJudgingSession = async (attendanceTeamId: number, eventContestId: number) => {
@@ -296,86 +313,93 @@ export default function JudgeEndpointPage({
           <TabsTrigger value="completed">Completed ({completedCount})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="space-y-4 mt-4">
-          {filteredTeams.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Team</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Score</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTeams.map((team) => (
-                    <TableRow key={team?.attendanceTeamId || `team-${Math.random()}`}>
-                      <TableCell className="font-medium">
-                        <div>
-                          <div>{team?.teamName || "Unknown Team"}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {team?.contingentName || "Unknown Contingent"}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge 
-                          className={
-                            team?.judgingStatus === "COMPLETED" ? "bg-green-100 text-green-800" :
-                            team?.judgingStatus === "IN_PROGRESS" ? "bg-amber-100 text-amber-800" :
-                            "bg-gray-100 text-gray-800"
-                          }
-                        >
-                          {(team?.judgingStatus || "NOT_STARTED").replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {team?.totalScore !== null && team?.totalScore !== undefined 
-                          ? Number(team.totalScore).toFixed(1) 
-                          : team?.judgingStatus === "COMPLETED" 
-                            ? "0.0" 
-                            : "-"
-                        }
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {team?.judgingStatus === "NOT_STARTED" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => createJudgingSession(team?.attendanceTeamId, team?.eventContestId)}
-                            className="gap-1"
-                            disabled={!team?.attendanceTeamId}
-                          >
-                            <Plus className="h-4 w-4" />
-                            Start Judging
-                          </Button>
-                        ) : team?.judgingStatus ? (
-                          <Button 
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            disabled={!team?.judgingSessionId}
-                          >
-                            <Link href={`/judge/${hashcode}/session/${team?.judgingSessionId || ''}`}>
-                              {team?.judgingStatus === "IN_PROGRESS" ? "Continue Judging" : "View Judging"}
-                            </Link>
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled
-                          >
-                            Unknown Status
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+        <TabsContent value={activeTab} className="space-y-8 mt-4">
+          {Object.keys(teamsByState).length > 0 ? (
+            <>
+              {sortedStates.map((stateName) => (
+                <div key={stateName} className="space-y-4">
+                  <h3 className="text-lg font-semibold mb-2">{stateName}</h3>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Team</TableHead>
+                          <TableHead className="text-center">Status</TableHead>
+                          <TableHead className="text-center">Score</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {teamsByState[stateName].map((team) => (
+                          <TableRow key={team?.attendanceTeamId || `team-${Math.random()}`}>
+                            <TableCell className="font-medium">
+                              <div>
+                                <div>{team?.teamName || "Unknown Team"}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {team?.contingentName || "Unknown Contingent"}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge 
+                                className={
+                                  team?.judgingStatus === "COMPLETED" ? "bg-green-100 text-green-800" :
+                                  team?.judgingStatus === "IN_PROGRESS" ? "bg-amber-100 text-amber-800" :
+                                  "bg-gray-100 text-gray-800"
+                                }
+                              >
+                                {(team?.judgingStatus || "NOT_STARTED").replace('_', ' ')}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {team?.totalScore !== null && team?.totalScore !== undefined 
+                                ? Number(team.totalScore).toFixed(1) 
+                                : team?.judgingStatus === "COMPLETED" 
+                                  ? "0.0" 
+                                  : "-"
+                              }
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {team?.judgingStatus === "NOT_STARTED" ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => createJudgingSession(team?.attendanceTeamId, team?.eventContestId)}
+                                  className="gap-1"
+                                  disabled={!team?.attendanceTeamId}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Start Judging
+                                </Button>
+                              ) : team?.judgingStatus ? (
+                                <Button 
+                                  variant="outline"
+                                  size="sm"
+                                  asChild
+                                  disabled={!team?.judgingSessionId}
+                                >
+                                  <Link href={`/judge/${hashcode}/session/${team?.judgingSessionId || ''}`}>
+                                    {team?.judgingStatus === "IN_PROGRESS" ? "Continue Judging" : "View Judging"}
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                >
+                                  Unknown Status
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ))}
+            </>
           ) : (
             <Card>
               <CardContent className="pt-6 flex flex-col items-center justify-center text-center py-8">
