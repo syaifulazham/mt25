@@ -911,7 +911,6 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{score.criterionType}</Badge>
-                    <Badge variant="secondary">Max: {score.maxScore}</Badge>
                   </div>
                 </div>
                 {score.criterionDescription && (
@@ -1008,7 +1007,7 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
                 {/* DISCRETE type scoring UI */}
                 {(score.criterionType === 'DISCRETE' || score.criterionType === 'DISCRETE_SINGLE' || score.criterionType === 'DISCRETE_MULTIPLE') && (
                   <div className="mt-4">
-                    <div className="flex flex-wrap gap-2 mb-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
                       {/* Parse discreteValues as JSON if available, otherwise fall back to criterionDescription */}
                       {(() => {
                         let options: Array<string | DiscreteValue> = [];
@@ -1065,7 +1064,7 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
                             }
                           }
                           
-                          console.log('Button selection state:', {
+                          console.log('Card selection state:', {
                             optionText,
                             optionIndex,
                             isSelected,
@@ -1074,23 +1073,29 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
                           });
                           
                           return (
-                            <Button 
+                            <div
                               key={optionIndex}
-                              variant={isSelected ? "default" : "outline"}
                               onClick={() => handleDiscreteSelection(index, optionText, typeof option !== 'string' ? option.value : undefined)}
-                              disabled={judgingSession?.status === 'COMPLETED'}
-                              className={`flex-1 flex items-center justify-center ${
-                                isSelected 
-                                  ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                                  : 'hover:bg-gray-50'
-                              }`}
+                              className={`flex-1 min-w-[120px] cursor-pointer rounded-md border p-3 transition-all ${isSelected 
+                                ? 'bg-green-50 border-green-600 ring-1 ring-green-600' 
+                                : 'bg-white border-gray-200 hover:bg-gray-50'} 
+                                ${judgingSession?.status === 'COMPLETED' ? 'opacity-70 cursor-not-allowed' : ''}`}
+                              aria-disabled={judgingSession?.status === 'COMPLETED'}
                             >
-                              <span className="truncate">{optionText}</span>
-                              {typeof option !== 'string' && (
-                                <span className="ml-1 text-xs opacity-70">({option.value})</span>
-                              )}
-                              {isSelected && <CheckCircle className="ml-1 h-4 w-4 flex-shrink-0" />}
-                            </Button>
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <p className="text-sm font-medium break-words">{optionText}</p>
+                                  {typeof option !== 'string' && (
+                                    <p className="text-xs text-gray-500">Value: {option.value}</p>
+                                  )}
+                                </div>
+                                {isSelected && (
+                                  <div className="ml-2 flex-shrink-0">
+                                    <CheckCircle className="h-5 w-5 text-green-600" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           );
                         });
                       })()}
