@@ -127,14 +127,26 @@ export default function JudgeResultsPage({
     return Array.from(stateSet).sort();
   }, [teams]);
   
-  // Initialize selected states when teams change
+  // Initialize selected states when teams change, but preserve existing selections
   useEffect(() => {
     if (states.length) {
-      const initialSelectedStates: {[key: string]: boolean} = {};
-      states.forEach(state => {
-        initialSelectedStates[state] = true; // All selected by default
+      setSelectedStates(prevSelectedStates => {
+        // Create a copy of previous selections
+        const updatedSelectedStates = { ...prevSelectedStates };
+        
+        // Check if any new states appeared that aren't in the current selection
+        let hasNewStates = false;
+        states.forEach(state => {
+          if (updatedSelectedStates[state] === undefined) {
+            updatedSelectedStates[state] = true; // Initialize new states as selected by default
+            hasNewStates = true;
+          }
+        });
+        
+        // If this is the first load (no states selected yet) or we have new states, return updated states
+        // Otherwise, keep the existing selections intact
+        return hasNewStates || Object.keys(prevSelectedStates).length === 0 ? updatedSelectedStates : prevSelectedStates;
       });
-      setSelectedStates(initialSelectedStates);
     }
   }, [states]);
 
@@ -363,14 +375,19 @@ export default function JudgeResultsPage({
                         </TableHeader>
                         <TableBody>
                           {stateTeams.map((team, index) => {
-                            // Find overall rank of the team
+                            // For ZONE events, use state-specific rank (index + 1)
+                            // For non-ZONE events, continue using overall rank
+                            const stateSpecificRank = index + 1;
                             const overallRank = sortedTeams.findIndex(t => t.attendanceTeamId === team.attendanceTeamId) + 1;
+                            
+                            // Use state-specific rank for ZONE events
+                            const displayRank = team.eventScopeArea === "ZONE" ? stateSpecificRank : overallRank;
                             
                             return (
                               <TableRow key={team.attendanceTeamId} className="border-white/10 hover:bg-white/5">
                                 <TableCell className="font-medium flex items-center text-white">
-                                  {getRankIcon(overallRank)}
-                                  <span className="ml-2">{overallRank}</span>
+                                  {getRankIcon(displayRank)}
+                                  <span className="ml-2">{displayRank}</span>
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-3">
