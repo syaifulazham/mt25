@@ -30,6 +30,13 @@ import {
 import { Toggle } from "@/components/ui/toggle";
 import { toast } from "sonner";
 import Link from "next/link";
+import { AnimatePresence } from 'framer-motion';
+import TeamShowcase from './team-showcase';
+
+interface TeamMember {
+  id: number;
+  name: string;
+}
 
 interface Team {
   attendanceTeamId: number;
@@ -49,6 +56,7 @@ interface Team {
   judgingStatus: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
   judgingSessionId: number | null;
   totalScore: number | null;
+  members?: TeamMember[];
 }
 
 
@@ -69,7 +77,41 @@ export default function JudgeResultsPage({
   const [selectedStates, setSelectedStates] = useState<{[key: string]: boolean}>({});
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [selectedTeamPosition, setSelectedTeamPosition] = useState<number>(0);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
+  // Fetch team members when a team is selected
+  const fetchTeamMembers = async (team: Team, position: number) => {
+    setLoadingMembers(true);
+    try {
+      const res = await fetch(`/api/judge/team-members?teamId=${team.teamId}`);
+      
+      if (!res.ok) {
+        throw new Error("Failed to fetch team members");
+      }
+      
+      const data = await res.json();
+      console.log("Team members fetched:", data.members);
+      
+      // Update the selected team with real members
+      setSelectedTeam({
+        ...team,
+        members: data.members
+      });
+      setSelectedTeamPosition(position);
+    } catch (error) {
+      console.error("Error fetching team members:", error);
+      toast.error("Failed to load team members");
+      
+      // Still show the team even if members couldn't be loaded
+      setSelectedTeam(team);
+      setSelectedTeamPosition(position);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+  
   // Handle passcode authentication
   const handleAuthenticate = async () => {
     const success = await authenticate(passcode);
@@ -101,12 +143,16 @@ export default function JudgeResultsPage({
     }
     
     try {
+      // Fetch teams with basic data
       const res = await fetch(`/api/judge/teams?hashcode=${hashcode}&eventId=${eventId}&contestId=${contestId}`);
       if (!res.ok) throw new Error("Failed to fetch teams");
       const teamsData = await res.json();
       
+      // We'll only fetch members when a specific team is selected for efficiency
+      const teamsWithoutMembers = teamsData.teams;
+      
       // Update teams while preserving the current filter state
-      setTeams(teamsData.teams);
+      setTeams(teamsWithoutMembers);
       setLastRefreshed(new Date());
     } catch (error) {
       console.error("Error fetching teams data:", error);
@@ -384,7 +430,13 @@ export default function JudgeResultsPage({
                             const displayRank = team.eventScopeArea === "ZONE" ? stateSpecificRank : overallRank;
                             
                             return (
-                              <TableRow key={team.attendanceTeamId} className="border-white/10 hover:bg-white/5">
+                              <TableRow 
+                                key={team.attendanceTeamId} 
+                                className="border-white/10 hover:bg-white/5 cursor-pointer transition-all duration-200"
+                                onClick={() => {
+                                  fetchTeamMembers(team, stateSpecificRank);
+                                }}
+                              >
                                 <TableCell className="font-medium flex items-center text-white">
                                   {getRankIcon(displayRank)}
                                   <span className="ml-2">{displayRank}</span>
@@ -455,7 +507,13 @@ export default function JudgeResultsPage({
                       </TableHeader>
                       <TableBody>
                         {sortedTeams.map((team, index) => (
-                          <TableRow key={team.attendanceTeamId} className="border-white/10 hover:bg-white/5">
+                          <TableRow 
+                            key={team.attendanceTeamId} 
+                            className="border-white/10 hover:bg-white/5 cursor-pointer transition-all duration-200"
+                            onClick={() => {
+                              fetchTeamMembers(team, index + 1);
+                            }}
+                          >
                             <TableCell className="font-medium flex items-center text-white">
                               {getRankIcon(index + 1)}
                               <span className="ml-2">{index + 1}</span>
@@ -532,6 +590,17 @@ export default function JudgeResultsPage({
           </Button>
         </div>
       </div>
+      
+      {/* Team showcase view (animation handled by AnimatePresence) */}
+      <AnimatePresence>
+        {selectedTeam && (
+          <TeamShowcase 
+            team={selectedTeam}
+            position={selectedTeamPosition}
+            onClose={() => setSelectedTeam(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

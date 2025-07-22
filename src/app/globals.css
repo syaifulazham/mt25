@@ -2,6 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Aurora Animation Styles */
+.aurora-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  opacity: 0.6;
+}
+
+.aurora-wave {
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  border-radius: 45%;
+  filter: blur(60px);
+  animation: aurora-wave 20s infinite linear;
+  opacity: 0.5;
+}
+
+.aurora-wave-1 {
+  background: radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.5), rgba(59, 130, 246, 0.3), rgba(30, 64, 175, 0.2));
+  transform-origin: 50% 48%;
+  animation-duration: 15s;
+  animation-direction: alternate;
+  top: -50%;
+  left: -10%;
+}
+
+.aurora-wave-2 {
+  background: radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.4), rgba(139, 92, 246, 0.3), rgba(124, 58, 237, 0.2));
+  transform-origin: 49% 52%;
+  animation-duration: 17s;
+  animation-delay: -2s;
+  top: -60%;
+  left: -5%;
+}
+
+.aurora-wave-3 {
+  background: radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.4), rgba(6, 182, 212, 0.3), rgba(8, 145, 178, 0.2));
+  transform-origin: 51% 50%;
+  animation-duration: 20s;
+  animation-delay: -4s;
+  top: -55%;
+  left: -15%;
+}
+
+@keyframes aurora-wave {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
