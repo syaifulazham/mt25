@@ -3,6 +3,9 @@ import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { getToken } from "next-auth/jwt";
 
+// Dynamic route export
+export const dynamic = 'force-dynamic';
+
 interface QuizSubmission {
   quizId: number;
   attemptId: number;
