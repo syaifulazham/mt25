@@ -61,6 +61,10 @@ export default function PublicQRCodeAttendancePage() {
     name: string;
     logoUrl: string | null;
     contingentName: string;
+    stateName?: string;
+    institution?: string;
+    managerCount?: number;
+    contestantCount?: number;
   } | null>(null);
   
   // Input disable state (5 seconds after any read)
@@ -450,7 +454,11 @@ export default function PublicQRCodeAttendancePage() {
           setWelcomeData({
             name: data.contingent.name,
             logoUrl: data.contingent.logoUrl,
-            contingentName: data.contingent.name
+            contingentName: data.contingent.name,
+            stateName: data.contingent.stateName,
+            institution: data.contingent.institution,
+            managerCount: data.contingent.managerCount,
+            contestantCount: data.contingent.contestantCount
           });
           setShowWelcome(true);
           
@@ -656,8 +664,15 @@ export default function PublicQRCodeAttendancePage() {
       {showWelcome && welcomeData && (
         <div className="fixed inset-0 z-50 bg-gradient-to-b from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center animate-in fade-in duration-500">
           <div className="text-center px-8 animate-in slide-in-from-bottom-4 duration-700">
+            {/* State Name */}
+            {welcomeData.stateName && (
+              <h2 className="text-2xl md:text-3xl font-bold text-white mb-4 animate-in fade-in duration-1000">
+                {welcomeData.stateName}
+              </h2>
+            )}
+            
             {/* Main Title */}
-            <h1 className="text-4xl md:text-6xl font-bold text-yellow-400 mb-8 animate-in zoom-in duration-1000">
+            <h1 className="text-4xl md:text-6xl font-bold text-yellow-400 mb-8 animate-in zoom-in duration-1000 delay-200">
               MALAYSIA TECHLYMPICS 2025
             </h1>
             
@@ -681,9 +696,46 @@ export default function PublicQRCodeAttendancePage() {
             )}
             
             {/* Contingent Name */}
-            <h3 className="text-2xl md:text-4xl font-bold text-yellow-300 mb-8 animate-in slide-in-from-right duration-1000 delay-700">
+            <h3 className="text-2xl md:text-4xl font-bold text-yellow-300 mb-4 animate-in slide-in-from-right duration-1000 delay-700">
               {welcomeData.contingentName}
             </h3>
+            
+            {/* Institution */}
+            {welcomeData.institution && (
+              <div className="mb-6 animate-in fade-in duration-1000 delay-800">
+                <p className="text-lg md:text-xl text-blue-200">
+                  {welcomeData.institution}
+                </p>
+              </div>
+            )}
+            
+            {/* Participant Counts */}
+            {(welcomeData.managerCount !== undefined || welcomeData.contestantCount !== undefined) && (
+              <div className="mb-6 animate-in slide-in-from-bottom duration-1000 delay-900">
+                <div className="flex justify-center space-x-8">
+                  {welcomeData.managerCount !== undefined && (
+                    <div className="text-center">
+                      <div className="text-2xl md:text-3xl font-bold text-green-400">
+                        {welcomeData.managerCount}
+                      </div>
+                      <div className="text-sm md:text-base text-gray-300">
+                        Jumlah Pengurus/<br />Pengiring
+                      </div>
+                    </div>
+                  )}
+                  {welcomeData.contestantCount !== undefined && (
+                    <div className="text-center">
+                      <div className="text-2xl md:text-3xl font-bold text-blue-400">
+                        {welcomeData.contestantCount}
+                      </div>
+                      <div className="text-sm md:text-base text-gray-300">
+                        Jumlah Peserta
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             
             {/* Tagline */}
             <p className="text-xl md:text-2xl font-medium text-gray-200 animate-in fade-in duration-1000 delay-1000">

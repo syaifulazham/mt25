@@ -184,6 +184,50 @@ export async function POST(request: NextRequest) {
       const contingents = contingentResult as any[];
       const contingent = contingents.length > 0 ? contingents[0] : null;
       
+      // Get state name directly from attendance tables based on lookup source
+      let stateName = 'Unknown State';
+      try {
+        if (lookupSource === 'attendanceContingent') {
+          const stateResult = await prisma.$queryRaw`
+            SELECT state FROM attendanceContingent WHERE contingentId = ${contingentId} LIMIT 1
+          `;
+          const states = stateResult as any[];
+          if (states.length > 0 && states[0].state) {
+            stateName = states[0].state;
+          }
+        } else if (lookupSource === 'attendanceManager') {
+          const stateResult = await prisma.$queryRaw`
+            SELECT state FROM attendanceManager WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId} LIMIT 1
+          `;
+          const states = stateResult as any[];
+          if (states.length > 0 && states[0].state) {
+            stateName = states[0].state;
+          }
+        } else {
+          // Fallback to attendanceContestant if other sources don't have state
+          const stateResult = await prisma.$queryRaw`
+            SELECT state FROM attendanceContestant WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId} LIMIT 1
+          `;
+          const states = stateResult as any[];
+          if (states.length > 0 && states[0].state) {
+            stateName = states[0].state;
+          }
+        }
+      } catch (error) {
+        console.log('Error fetching state from attendance tables:', error);
+        // Keep default 'Unknown State'
+      }
+      
+      // Get count of managers and contestants for this contingent and event
+      const countsResult = await prisma.$queryRaw`
+        SELECT 
+          (SELECT COUNT(*) FROM attendanceManager WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId}) as managerCount,
+          (SELECT COUNT(*) FROM attendanceContestant WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId}) as contestantCount
+      `;
+      
+      const counts = countsResult as any[];
+      const { managerCount, contestantCount } = counts.length > 0 ? counts[0] : { managerCount: 0, contestantCount: 0 };
+      
       // Format the existing check-in time in Malaysia timezone
       const malaysiaTimeOptions: Intl.DateTimeFormatOptions = {
         timeZone: 'Asia/Kuala_Lumpur',
@@ -202,6 +246,9 @@ export async function POST(request: NextRequest) {
           name: contingent?.contingentName || 'Unknown Contingent',
           logoUrl: contingent?.logoUrl || null,
           institution: contingent?.schoolName || contingent?.institutionName || 'Unknown Institution',
+          stateName: stateName,
+          managerCount: Number(managerCount) || 0,
+          contestantCount: Number(contestantCount) || 0,
           checkedInAt: existingRecord.attendanceDate,
           alreadyPresent: true
         }
@@ -245,6 +292,50 @@ export async function POST(request: NextRequest) {
 
     const contingents = contingentResult as any[];
     const contingent = contingents.length > 0 ? contingents[0] : null;
+    
+    // Get state name directly from attendance tables based on lookup source
+    let stateName = 'Unknown State';
+    try {
+      if (lookupSource === 'attendanceContingent') {
+        const stateResult = await prisma.$queryRaw`
+          SELECT state FROM attendanceContingent WHERE contingentId = ${contingentId} LIMIT 1
+        `;
+        const states = stateResult as any[];
+        if (states.length > 0 && states[0].state) {
+          stateName = states[0].state;
+        }
+      } else if (lookupSource === 'attendanceManager') {
+        const stateResult = await prisma.$queryRaw`
+          SELECT state FROM attendanceManager WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId} LIMIT 1
+        `;
+        const states = stateResult as any[];
+        if (states.length > 0 && states[0].state) {
+          stateName = states[0].state;
+        }
+      } else {
+        // Fallback to attendanceContestant if other sources don't have state
+        const stateResult = await prisma.$queryRaw`
+          SELECT state FROM attendanceContestant WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId} LIMIT 1
+        `;
+        const states = stateResult as any[];
+        if (states.length > 0 && states[0].state) {
+          stateName = states[0].state;
+        }
+      }
+    } catch (error) {
+      console.log('Error fetching state from attendance tables:', error);
+      // Keep default 'Unknown State'
+    }
+    
+    // Get count of managers and contestants for this contingent and event
+    const countsResult = await prisma.$queryRaw`
+      SELECT 
+        (SELECT COUNT(*) FROM attendanceManager WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId}) as managerCount,
+        (SELECT COUNT(*) FROM attendanceContestant WHERE eventId = ${parsedEventId} AND contingentId = ${contingentId}) as contestantCount
+    `;
+    
+    const counts = countsResult as any[];
+    const { managerCount, contestantCount } = counts.length > 0 ? counts[0] : { managerCount: 0, contestantCount: 0 };
 
     // Return success response with contingent details
     return NextResponse.json({
@@ -254,6 +345,9 @@ export async function POST(request: NextRequest) {
         name: contingent?.contingentName || 'Unknown Contingent',
         logoUrl: contingent?.logoUrl || null,
         institution: contingent?.schoolName || contingent?.institutionName || 'Unknown Institution',
+        stateName: stateName,
+        managerCount: Number(managerCount) || 0,
+        contestantCount: Number(contestantCount) || 0,
         checkedInAt: now,
         lookupSource: lookupSource,
         managersUpdated: Number(managerUpdateResult),
