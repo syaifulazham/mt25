@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { AlertTriangle, Eye, Users, FileText, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import QRCodeButton from "./qr-code-button";
 
 interface ZoneRegistrationProps {
   participantId: number;
@@ -231,15 +232,18 @@ export default function ZoneRegistrationSection({ participantId }: ZoneRegistrat
     <div className="p-4 bg-muted/50 rounded-lg mb-6">
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-sm font-medium">{t('dashboard.zone_registration')}</h2>
-        <Button
-          onClick={handleDownloadList}
-          disabled={isLoading || teams.length === 0}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-          size="sm"
-        >
-          <FileText className="h-4 w-4 mr-2" />
-          {isLoading ? 'Generating...' : 'Download List'}
-        </Button>
+        <div className="flex gap-2">
+          <QRCodeButton />
+          <Button
+            onClick={handleDownloadList}
+            disabled={isLoading || teams.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+            size="sm"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            {isLoading ? 'Generating...' : 'Download List'}
+          </Button>
+        </div>
       </div>
       <div className="overflow-x-auto">
         <Table className="w-full">
