@@ -52,6 +52,11 @@ interface Contest {
   id: number;
   contestId: number;
   name: string;
+  contest?: {
+    targetgroup?: {
+      schoolLevel: string;
+    }[];
+  };
 }
 
 interface State {
@@ -73,6 +78,16 @@ interface Event {
   };
 }
 
+// Helper function for school level labels
+const getSchoolLevelLabel = (level: string): string => {
+  const labelMap: Record<string, string> = {
+    'Primary': 'Kids',
+    'Secondary': 'Teens',
+    'Higher Education': 'Youth'
+  };
+  return labelMap[level] || level;
+};
+
 export default function ScoreboardPage({ params }: { params: { id: string } }) {
   const eventId = params.id;
   const router = useRouter();
@@ -93,12 +108,27 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   // Filters
   const [selectedContest, setSelectedContest] = useState<string>("");
   const [selectedState, setSelectedState] = useState<string>("");
+  const [selectedSchoolLevels, setSelectedSchoolLevels] = useState<string[]>([]);
+  const [availableSchoolLevels, setAvailableSchoolLevels] = useState<string[]>([]);
+  
+  // Filter contests based on selected school levels
+  const filteredContests = selectedSchoolLevels.length > 0 
+    ? contests.filter((contest: Contest) => {
+        return contest.contest?.targetgroup?.some((tg: any) => 
+          selectedSchoolLevels.includes(tg.schoolLevel)
+        );
+      })
+    : contests;
+  
+
   
   // Fetch event data
   useEffect(() => {
     const fetchEventData = async () => {
       try {
-        const res = await fetch(`/api/organizer/events/${eventId}`);
+        const res = await fetch(`/api/organizer/events/${eventId}`, {
+          credentials: 'include'
+        });
         if (!res.ok) throw new Error('Failed to fetch event');
         const eventData = await res.json();
         setEvent(eventData);
@@ -116,18 +146,51 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     const fetchFiltersData = async () => {
       try {
         // Fetch contests for this event
-        const contestsRes = await fetch(`/api/judging/contests?eventId=${eventId}`);
+        const contestsRes = await fetch(`/api/judging/contests?eventId=${eventId}`, {
+          credentials: 'include'
+        });
         if (!contestsRes.ok) throw new Error('Failed to fetch contests');
         const contestsData = await contestsRes.json();
-        setContests(contestsData.contests.map((c: any) => ({ 
-          id: c.id, 
+        const contestsWithTargetGroups = contestsData.contests.map((c: any) => ({ 
+          id: c.contestId, 
           contestId: c.contestId, 
-          name: c.name 
-        })));
+          name: c.name,
+          contest: c.contest
+        }));
+        setContests(contestsWithTargetGroups);
+        
+        // Extract unique school levels from all contests
+        console.log('DEBUG: contestsWithTargetGroups:', contestsWithTargetGroups);
+        const schoolLevels = new Set<string>();
+        contestsWithTargetGroups.forEach((contest: any) => {
+          console.log('DEBUG: Processing contest:', contest);
+          if (contest.contest?.targetgroup) {
+            console.log('DEBUG: Found targetgroup:', contest.contest.targetgroup);
+            contest.contest.targetgroup.forEach((tg: any) => {
+              console.log('DEBUG: Processing targetgroup:', tg);
+              if (tg.schoolLevel) {
+                console.log('DEBUG: Found schoolLevel:', tg.schoolLevel);
+                schoolLevels.add(tg.schoolLevel);
+              }
+            });
+          } else {
+            console.log('DEBUG: No targetgroup found for contest:', contest);
+          }
+        });
+        
+        console.log('DEBUG: Extracted school levels:', Array.from(schoolLevels));
+        
+        // Define custom ordering and labels for school levels (using actual database values)
+        const schoolLevelOrder = ['Primary', 'Secondary', 'Higher Education'];
+        const orderedSchoolLevels = schoolLevelOrder.filter(level => schoolLevels.has(level));
+        console.log('DEBUG: Ordered school levels:', orderedSchoolLevels);
+        setAvailableSchoolLevels(orderedSchoolLevels);
         
         // Fetch states if this is a ZONE event
         if (event?.scopeArea === 'ZONE') {
-          const statesRes = await fetch(`/api/organizer/states`);
+          const statesRes = await fetch('/api/organizer/states', {
+            credentials: 'include'
+          });
           if (!statesRes.ok) throw new Error('Failed to fetch states');
           const statesData = await statesRes.json();
           setStates(statesData.states);
@@ -168,7 +231,9 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           queryParams.append('stateId', selectedState);
         }
         
-        const res = await fetch(`/api/judging/scoreboard?${queryParams.toString()}`);
+        const res = await fetch(`/api/judging/scoreboard?${queryParams.toString()}`, {
+          credentials: 'include'
+        });
         
         if (!res.ok) {
           throw new Error('Failed to fetch scoreboard results');
@@ -190,15 +255,34 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     };
     
     fetchScoreboard();
-  }, [eventId, selectedContest, selectedState, contests, event?.scopeArea]);
+  }, [eventId, selectedContest, selectedState, selectedSchoolLevels, contests, event?.scopeArea]);
   
-  // Filter results based on search term
+  // Filter results based on search term and school level
   const filteredResults = results.filter((result) => {
     const matchesSearch = 
       result.team?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       result.contingent?.name.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesSearch;
+    // If no school levels are selected, show all results
+    if (selectedSchoolLevels.length === 0) {
+      return matchesSearch;
+    }
+    
+    // Check if the selected contest has target groups that match selected school levels
+    const selectedContestData = contests.find(c => c.id.toString() === selectedContest);
+    if (!selectedContestData?.contest?.targetgroup) {
+      return matchesSearch;
+    }
+    
+    const contestSchoolLevels = selectedContestData.contest.targetgroup
+      .map(tg => tg.schoolLevel)
+      .filter(Boolean);
+    
+    const matchesSchoolLevel = contestSchoolLevels.some(level => 
+      selectedSchoolLevels.includes(level)
+    );
+    
+    return matchesSearch && matchesSchoolLevel;
   });
   
   // Handle refreshing the results
@@ -217,7 +301,9 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         queryParams.append('stateId', selectedState);
       }
       
-      const res = await fetch(`/api/judging/scoreboard?${queryParams.toString()}`);
+      const res = await fetch(`/api/judging/scoreboard?${queryParams.toString()}`, {
+        credentials: 'include'
+      });
       
       if (!res.ok) {
         throw new Error('Failed to refresh results');
@@ -258,6 +344,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       
       // First check if export is available
       const checkRes = await fetch(`/api/judging/scoreboard/export?${queryParams.toString()}`, {
+        credentials: 'include',
         method: 'HEAD',
       });
       
@@ -322,6 +409,69 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           <CardTitle>Scoreboard Filters</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Competition Category Filter - Full width row above */}
+          {availableSchoolLevels.length > 0 && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">
+                Competition Category
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {availableSchoolLevels.map((level) => (
+                  <Button
+                    key={level}
+                    variant={selectedSchoolLevels.includes(level) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      const newSelectedLevels = selectedSchoolLevels.includes(level)
+                        ? selectedSchoolLevels.filter(l => l !== level)
+                        : [...selectedSchoolLevels, level];
+                      
+                      // Calculate filtered contests based on new selection
+                      const newFilteredContests = newSelectedLevels.length > 0 
+                        ? contests.filter((contest: Contest) => {
+                            return contest.contest?.targetgroup?.some((tg: any) => 
+                              newSelectedLevels.includes(tg.schoolLevel)
+                            );
+                          })
+                        : contests;
+                      
+                      // Update state in batch to prevent conflicts
+                      setSelectedSchoolLevels(newSelectedLevels);
+                      
+                      // Auto-select first available contest
+                      if (newFilteredContests.length > 0) {
+                        setSelectedContest(newFilteredContests[0].id.toString());
+                      } else {
+                        setSelectedContest("");
+                      }
+                    }}
+                    className="h-8 text-xs"
+                  >
+                    {getSchoolLevelLabel(level)}
+                  </Button>
+                ))}
+                {selectedSchoolLevels.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedSchoolLevels([]);
+                      // Auto-select first contest when clearing all categories
+                      if (contests.length > 0) {
+                        setSelectedContest(contests[0].id.toString());
+                      } else {
+                        setSelectedContest("");
+                      }
+                    }}
+                    className="h-8 text-xs text-muted-foreground"
+                  >
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          
           <div className="flex flex-col md:flex-row gap-4">
             {/* Contest Filter */}
             <div className="flex-1">
@@ -336,7 +486,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                   <SelectValue placeholder="Select a contest" />
                 </SelectTrigger>
                 <SelectContent>
-                  {contests.map((contest) => (
+                  {filteredContests.map((contest) => (
                     <SelectItem key={contest.id} value={contest.id.toString()}>
                       {contest.name}
                     </SelectItem>

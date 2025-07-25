@@ -52,194 +52,112 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Event contest not found' }, { status: 404 });
     }
 
-    // Base query for judging sessions
-    let judgingSessionsQuery: any = {
-      eventContestId: eventContest.id,
-      status: 'COMPLETED',
-    };
-
-    // Base include for attendanceTeam
-    let attendanceTeamInclude: any = {
-      team: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      contingent: {
-        select: {
-          id: true,
-          name: true,
-          school: {
-            select: {
-              stateId: true,
-              state: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          higherInstitution: {
-            select: {
-              stateId: true,
-              state: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          independent: {
-            select: {
-              stateId: true,
-              state: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    };
-
-    // Modify queries based on scopeArea
-    if (event.scopeArea === 'ZONE') {
-      if (stateId) {
-        // For ZONE events with state filter, we need to filter teams by state
-        judgingSessionsQuery.attendanceTeam = {
-          OR: [
-            { contingent: { school: { stateId: parseInt(stateId) } } },
-            { contingent: { higherInstitution: { stateId: parseInt(stateId) } } },
-            { contingent: { independent: { stateId: parseInt(stateId) } } },
-          ],
-        };
-      }
-    } else if (event.scopeArea === 'STATE') {
-      // For STATE events, always filter by the event's stateId
-      if (event.stateId) {
-        judgingSessionsQuery.attendanceTeam = {
-          OR: [
-            { contingent: { school: { stateId: event.stateId } } },
-            { contingent: { higherInstitution: { stateId: event.stateId } } },
-            { contingent: { independent: { stateId: event.stateId } } },
-          ],
-        };
-      }
-    }
-    // For NATIONAL events, no additional filtering is needed
-
-    // Fetch judging sessions
-    const judgingSessions = await prisma.judgingSession.findMany({
-      where: judgingSessionsQuery,
-      include: {
-        attendanceTeam: attendanceTeamInclude,
-      },
-    });
-
-    // Get unique list of teams that have been judged
-    const teamResults: Record<number, any> = {};
+    // Simplify the query first to avoid SQL injection issues
+    // We'll handle state filtering in a separate step if needed
     
-    // Define interface for the attendanceTeam with included relations
-    interface AttendanceTeamWithRelations {
-      Id: number;
-      contingentId: number;
-      teamId: number;
-      team?: { id: number; name: string; };
-      contingent?: {
-        id: number;
-        name: string;
-        school?: { stateId: number; state?: { id: number; name: string; } };
-        higherInstitution?: { stateId: number; state?: { id: number; name: string; } };
-        independent?: { stateId: number; state?: { id: number; name: string; } };
-      };
-      // other properties...
-    }
+    // Use raw SQL query to get scoreboard data with proper joins
+    const results = await prisma.$queryRaw`
+      SELECT
+        at.Id as attendanceTeamId,
+        t.id as teamId,
+        t.name as teamName,
+        c.id as contingentId,
+        c.name as contingentName,
+        COUNT(js.id) as sessionCount,
+        COALESCE(SUM(js.totalScore), 0) as totalScore,
+        COALESCE(AVG(js.totalScore), 0) as averageScore
+      FROM
+        attendanceTeam at
+      INNER JOIN
+        team t ON at.teamId = t.id
+      INNER JOIN
+        contingent c ON at.contingentId = c.id
+      INNER JOIN
+        eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+      INNER JOIN
+        eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+      LEFT JOIN
+        judgingSession js ON at.Id = js.attendanceTeamId 
+        AND ec.id = js.eventContestId 
+        AND js.status = 'COMPLETED'
+      WHERE
+        at.eventId = ${parseInt(eventId)}
+      GROUP BY
+        at.Id, t.id, t.name, c.id, c.name
+      HAVING
+        COUNT(js.id) > 0
+      ORDER BY
+        COALESCE(AVG(js.totalScore), 0) DESC
+    `;
 
-    judgingSessions.forEach(session => {
-      const attendanceTeamId = session.attendanceTeamId;
-      // Cast attendanceTeam to the interface with relations
-      const attendanceTeamData = session.attendanceTeam as AttendanceTeamWithRelations;
-      
-      // Get state information from attendanceTeam
-      let stateId = null;
-      let stateName = null;
-      
-      if (attendanceTeamData.contingent?.school?.stateId) {
-        stateId = attendanceTeamData.contingent.school.stateId;
-        stateName = attendanceTeamData.contingent.school.state?.name;
-      } else if (attendanceTeamData.contingent?.higherInstitution?.stateId) {
-        stateId = attendanceTeamData.contingent.higherInstitution.stateId;
-        stateName = attendanceTeamData.contingent.higherInstitution.state?.name;
-      } else if (attendanceTeamData.contingent?.independent?.stateId) {
-        stateId = attendanceTeamData.contingent.independent.stateId;
-        stateName = attendanceTeamData.contingent.independent.state?.name;
-      }
+    // Get judge count
+    const judgeCountResult = await prisma.$queryRaw`
+      SELECT COUNT(DISTINCT js.judgeId) as judgeCount
+      FROM judgingSession js
+      INNER JOIN eventcontest ec ON js.eventContestId = ec.id
+      WHERE ec.eventId = ${parseInt(eventId)}
+        AND ec.contestId = ${parseInt(contestId)}
+        AND js.status = 'COMPLETED'
+    `;
 
-      if (!teamResults[attendanceTeamId]) {
-        const teamName = attendanceTeamData.team?.name || 'Unknown Team';
-        let contingentName = attendanceTeamData.contingent?.name || 'Unknown Contingent';
-        teamResults[attendanceTeamId] = {
-          attendanceTeamId,
-          team: { id: attendanceTeamData.team?.id || attendanceTeamData.teamId, name: teamName },
-          contingent: { id: attendanceTeamData.contingent?.id || attendanceTeamData.contingentId, name: contingentName },
-          stateId,
-          state: stateId ? { id: stateId, name: stateName } : undefined,
-          sessions: [],
-          totalScore: 0,
-          averageScore: 0,
-          count: 0,
-        };
-      }
+    const judgeCount = Array.isArray(judgeCountResult) && judgeCountResult.length > 0 
+      ? Number((judgeCountResult[0] as any).judgeCount) || 0 
+      : 0;
 
-      teamResults[attendanceTeamId].sessions.push({
-        judgeId: session.judgeId,
-        score: session.totalScore,
-        comments: session.comments,
-      });
+    // Get session count
+    const sessionCountResult = await prisma.$queryRaw`
+      SELECT COUNT(*) as sessionCount
+      FROM judgingSession js
+      INNER JOIN eventcontest ec ON js.eventContestId = ec.id
+      WHERE ec.eventId = ${parseInt(eventId)}
+        AND ec.contestId = ${parseInt(contestId)}
+        AND js.status = 'COMPLETED'
+    `;
 
-      teamResults[attendanceTeamId].totalScore += session.totalScore || 0;
-      teamResults[attendanceTeamId].sessionCount += 1;
-    });
+    const sessionCount = Array.isArray(sessionCountResult) && sessionCountResult.length > 0 
+      ? Number((sessionCountResult[0] as any).sessionCount) || 0 
+      : 0;
 
-    // Calculate average scores and create final results array
-    const results = Object.values(teamResults).map((team: any) => {
-      team.averageScore = team.sessionCount > 0 ? team.totalScore / team.sessionCount : 0;
-      return team;
-    });
-
-    // Sort results by averageScore (descending)
-    results.sort((a: any, b: any) => b.averageScore - a.averageScore);
-
-    // Add rank to each team
-    results.forEach((team: any, index: number) => {
-      team.rank = index + 1;
-    });
-
-    // Get unique judge count
-    const uniqueJudges = new Set();
-    judgingSessions.forEach(session => {
-      uniqueJudges.add(session.judgeId);
-    });
+    // Format results and add ranking - Convert BigInt values to numbers
+    const formattedResults = (results as any[])
+      .sort((a, b) => parseFloat(b.averageScore.toString()) - parseFloat(a.averageScore.toString()))
+      .map((result, index) => ({
+        attendanceTeamId: Number(result.attendanceTeamId),
+        team: {
+          id: Number(result.teamId),
+          name: result.teamName
+        },
+        contingent: {
+          id: Number(result.contingentId),
+          name: result.contingentName
+        },
+        totalScore: parseFloat(result.totalScore.toString()),
+        averageScore: parseFloat(result.averageScore.toString()),
+        sessionCount: Number(result.sessionCount),
+        rank: index + 1
+      }));
 
     // Return results
     return NextResponse.json({
-      results,
-      totalTeams: results.length,
-      totalJudges: uniqueJudges.size,
-      totalSessions: judgingSessions.length,
+      results: formattedResults,
+      totalTeams: formattedResults.length,
+      totalJudges: judgeCount,
+      totalSessions: sessionCount,
       eventId: parseInt(eventId),
       contestId: parseInt(contestId),
       scopeArea: event.scopeArea,
     });
   } catch (error) {
     console.error('Error fetching scoreboard:', error);
+    console.error('Full error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
     return NextResponse.json(
-      { error: 'Failed to fetch scoreboard' },
+      { 
+        error: 'Failed to fetch scoreboard',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
