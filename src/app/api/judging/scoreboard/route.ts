@@ -49,7 +49,16 @@ export async function GET(req: NextRequest) {
     });
 
     if (!eventContest) {
-      return NextResponse.json({ error: 'Event contest not found' }, { status: 404 });
+      // Return empty results structure instead of 404 when eventcontest doesn't exist
+      return NextResponse.json({
+        results: [],
+        totalTeams: 0,
+        totalJudges: 0,
+        totalSessions: 0,
+        eventId: parseInt(eventId),
+        contestId: parseInt(contestId),
+        scopeArea: event.scopeArea
+      });
     }
 
     // Simplify the query first to avoid SQL injection issues
