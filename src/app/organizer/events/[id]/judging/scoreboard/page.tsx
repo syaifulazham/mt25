@@ -6,7 +6,7 @@ import Image from "next/image";
 import { PageHeader } from "@/components/page-header-normal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ArrowLeft, Download, Filter, RefreshCw, Medal, Trophy, Award, LogOut, Shield } from "lucide-react";
+import { Search, ArrowLeft, Download, Filter, RefreshCw, Medal, Trophy, Award, LogOut, Shield, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -56,6 +56,7 @@ interface TeamResult {
   } | null;
   averageScore: number;
   sessionCount: number;
+  judgingStatus?: string;
 }
 
 interface Contest {
@@ -713,7 +714,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                           return (
                             <TableRow 
                               key={result.attendanceTeamId} 
-                              className="border-white/10 hover:bg-white/5 cursor-pointer"
+                              className="border-white/10 hover:bg-white/5 cursor-pointer relative"
                               onClick={() => fetchTeamMembers(result, stateSpecificRank)}
                             >
                               <TableCell className="font-medium text-white pl-6">
@@ -749,7 +750,12 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                                 </div>
                               </TableCell>
                               <TableCell className="text-right text-white pr-8">
-                                <div className="text-lg font-bold">{result.averageScore.toFixed(2)}</div>
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="text-lg font-bold">{result.averageScore.toFixed(2)}</div>
+                                  {result.judgingStatus === 'COMPLETED' && (
+                                    <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -778,7 +784,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                     {filteredResults.map((result) => (
                       <TableRow 
                         key={result.attendanceTeamId} 
-                        className="border-white/10 hover:bg-white/5 cursor-pointer"
+                        className="border-white/10 hover:bg-white/5 cursor-pointer relative"
                         onClick={() => fetchTeamMembers(result, result.rank)}
                       >
                         <TableCell className="font-medium text-white pl-6">
@@ -814,7 +820,12 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                           </div>
                         </TableCell>
                         <TableCell className="text-right text-white pr-8">
-                          <div className="text-lg font-bold">{result.averageScore.toFixed(2)}</div>
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="text-lg font-bold">{result.averageScore.toFixed(2)}</div>
+                            {result.judgingStatus === 'COMPLETED' && (
+                              <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

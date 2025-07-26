@@ -77,8 +77,9 @@ export async function GET(req: NextRequest) {
             at.stateId as stateId,
             at.state as stateName,
             COUNT(js.id) as sessionCount,
-            COALESCE(SUM(js.totalScore), 0) as totalScore,
-            COALESCE(AVG(js.totalScore), 0) as averageScore
+            COALESCE(SUM(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE 0 END), 0) as totalScore,
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) as averageScore,
+            MAX(js.status) as judgingStatus
           FROM
             attendanceTeam at
           INNER JOIN
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
           LEFT JOIN
             judgingSession js ON at.Id = js.attendanceTeamId 
             AND ec.id = js.eventContestId 
-            AND js.status = 'COMPLETED'
+            AND js.status IN ('IN_PROGRESS', 'COMPLETED')
           WHERE
             at.eventId = ${parseInt(eventId)}
             AND at.stateId = ${parseInt(stateId)}
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
           HAVING
             COUNT(js.id) > 0
           ORDER BY
-            COALESCE(AVG(js.totalScore), 0) DESC
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) DESC
         `
       : await prisma.$queryRaw`
           SELECT
@@ -114,8 +115,9 @@ export async function GET(req: NextRequest) {
             at.stateId as stateId,
             at.state as stateName,
             COUNT(js.id) as sessionCount,
-            COALESCE(SUM(js.totalScore), 0) as totalScore,
-            COALESCE(AVG(js.totalScore), 0) as averageScore
+            COALESCE(SUM(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE 0 END), 0) as totalScore,
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) as averageScore,
+            MAX(js.status) as judgingStatus
           FROM
             attendanceTeam at
           INNER JOIN
@@ -129,7 +131,7 @@ export async function GET(req: NextRequest) {
           LEFT JOIN
             judgingSession js ON at.Id = js.attendanceTeamId 
             AND ec.id = js.eventContestId 
-            AND js.status = 'COMPLETED'
+            AND js.status IN ('IN_PROGRESS', 'COMPLETED')
           WHERE
             at.eventId = ${parseInt(eventId)}
           GROUP BY
@@ -137,7 +139,7 @@ export async function GET(req: NextRequest) {
           HAVING
             COUNT(js.id) > 0
           ORDER BY
-            COALESCE(AVG(js.totalScore), 0) DESC
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) DESC
         `;
 
     // Get total teams count (filtered by state if provided)
@@ -237,6 +239,7 @@ export async function GET(req: NextRequest) {
         totalScore: parseFloat(result.totalScore.toString()),
         averageScore: parseFloat(result.averageScore.toString()),
         sessionCount: Number(result.sessionCount),
+        judgingStatus: result.judgingStatus,
         rank: index + 1
       }));
 
