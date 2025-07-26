@@ -64,67 +64,132 @@ export async function GET(req: NextRequest) {
     // Simplify the query first to avoid SQL injection issues
     // We'll handle state filtering in a separate step if needed
     
-    // Use raw SQL query to get scoreboard data with proper joins
-    const results = await prisma.$queryRaw`
-      SELECT
-        at.Id as attendanceTeamId,
-        t.id as teamId,
-        t.name as teamName,
-        c.id as contingentId,
-        c.name as contingentName,
-        COUNT(js.id) as sessionCount,
-        COALESCE(SUM(js.totalScore), 0) as totalScore,
-        COALESCE(AVG(js.totalScore), 0) as averageScore
-      FROM
-        attendanceTeam at
-      INNER JOIN
-        team t ON at.teamId = t.id
-      INNER JOIN
-        contingent c ON at.contingentId = c.id
-      INNER JOIN
-        eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
-      INNER JOIN
-        eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-      LEFT JOIN
-        judgingSession js ON at.Id = js.attendanceTeamId 
-        AND ec.id = js.eventContestId 
-        AND js.status = 'COMPLETED'
-      WHERE
-        at.eventId = ${parseInt(eventId)}
-      GROUP BY
-        at.Id, t.id, t.name, c.id, c.name
-      HAVING
-        COUNT(js.id) > 0
-      ORDER BY
-        COALESCE(AVG(js.totalScore), 0) DESC
-    `;
+    // Use conditional raw SQL query to get scoreboard data with proper joins
+    const results = stateId 
+      ? await prisma.$queryRaw`
+          SELECT
+            at.Id as attendanceTeamId,
+            t.id as teamId,
+            t.name as teamName,
+            c.id as contingentId,
+            c.name as contingentName,
+            c.logoUrl as contingentLogoUrl,
+            at.stateId as stateId,
+            at.state as stateName,
+            COUNT(js.id) as sessionCount,
+            COALESCE(SUM(js.totalScore), 0) as totalScore,
+            COALESCE(AVG(js.totalScore), 0) as averageScore
+          FROM
+            attendanceTeam at
+          INNER JOIN
+            team t ON at.teamId = t.id
+          INNER JOIN
+            contingent c ON at.contingentId = c.id
+          INNER JOIN
+            eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN
+            eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          LEFT JOIN
+            judgingSession js ON at.Id = js.attendanceTeamId 
+            AND ec.id = js.eventContestId 
+            AND js.status = 'COMPLETED'
+          WHERE
+            at.eventId = ${parseInt(eventId)}
+            AND at.stateId = ${parseInt(stateId)}
+          GROUP BY
+            at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
+          HAVING
+            COUNT(js.id) > 0
+          ORDER BY
+            COALESCE(AVG(js.totalScore), 0) DESC
+        `
+      : await prisma.$queryRaw`
+          SELECT
+            at.Id as attendanceTeamId,
+            t.id as teamId,
+            t.name as teamName,
+            c.id as contingentId,
+            c.name as contingentName,
+            c.logoUrl as contingentLogoUrl,
+            at.stateId as stateId,
+            at.state as stateName,
+            COUNT(js.id) as sessionCount,
+            COALESCE(SUM(js.totalScore), 0) as totalScore,
+            COALESCE(AVG(js.totalScore), 0) as averageScore
+          FROM
+            attendanceTeam at
+          INNER JOIN
+            team t ON at.teamId = t.id
+          INNER JOIN
+            contingent c ON at.contingentId = c.id
+          INNER JOIN
+            eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN
+            eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          LEFT JOIN
+            judgingSession js ON at.Id = js.attendanceTeamId 
+            AND ec.id = js.eventContestId 
+            AND js.status = 'COMPLETED'
+          WHERE
+            at.eventId = ${parseInt(eventId)}
+          GROUP BY
+            at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
+          HAVING
+            COUNT(js.id) > 0
+          ORDER BY
+            COALESCE(AVG(js.totalScore), 0) DESC
+        `;
 
-    // Get judge count
-    const judgeCountResult = await prisma.$queryRaw`
-      SELECT COUNT(DISTINCT js.judgeId) as judgeCount
-      FROM judgingSession js
-      INNER JOIN eventcontest ec ON js.eventContestId = ec.id
-      WHERE ec.eventId = ${parseInt(eventId)}
-        AND ec.contestId = ${parseInt(contestId)}
-        AND js.status = 'COMPLETED'
-    `;
+    // Get in-progress count (filtered by state if provided)
+    const inProgressResult = stateId
+      ? await prisma.$queryRaw`
+          SELECT COUNT(DISTINCT at.Id) as inProgressCount
+          FROM attendanceTeam at
+          INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          LEFT JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          WHERE at.eventId = ${parseInt(eventId)}
+            AND at.stateId = ${parseInt(stateId)}
+            AND (js.status IS NULL OR js.status IN ('PENDING', 'IN_PROGRESS'))
+        `
+      : await prisma.$queryRaw`
+          SELECT COUNT(DISTINCT at.Id) as inProgressCount
+          FROM attendanceTeam at
+          INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          LEFT JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          WHERE at.eventId = ${parseInt(eventId)}
+            AND (js.status IS NULL OR js.status IN ('PENDING', 'IN_PROGRESS'))
+        `;
 
-    const judgeCount = Array.isArray(judgeCountResult) && judgeCountResult.length > 0 
-      ? Number((judgeCountResult[0] as any).judgeCount) || 0 
+    const inProgressCount = Array.isArray(inProgressResult) && inProgressResult.length > 0 
+      ? Number((inProgressResult[0] as any).inProgressCount) || 0 
       : 0;
 
-    // Get session count
-    const sessionCountResult = await prisma.$queryRaw`
-      SELECT COUNT(*) as sessionCount
-      FROM judgingSession js
-      INNER JOIN eventcontest ec ON js.eventContestId = ec.id
-      WHERE ec.eventId = ${parseInt(eventId)}
-        AND ec.contestId = ${parseInt(contestId)}
-        AND js.status = 'COMPLETED'
-    `;
+    // Get completed count (filtered by state if provided)
+    const completedResult = stateId
+      ? await prisma.$queryRaw`
+          SELECT COUNT(DISTINCT at.Id) as completedCount
+          FROM attendanceTeam at
+          INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          WHERE at.eventId = ${parseInt(eventId)}
+            AND at.stateId = ${parseInt(stateId)}
+            AND js.status = 'COMPLETED'
+        `
+      : await prisma.$queryRaw`
+          SELECT COUNT(DISTINCT at.Id) as completedCount
+          FROM attendanceTeam at
+          INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          WHERE at.eventId = ${parseInt(eventId)}
+            AND js.status = 'COMPLETED'
+        `;
 
-    const sessionCount = Array.isArray(sessionCountResult) && sessionCountResult.length > 0 
-      ? Number((sessionCountResult[0] as any).sessionCount) || 0 
+    const completedCount = Array.isArray(completedResult) && completedResult.length > 0 
+      ? Number((completedResult[0] as any).completedCount) || 0 
       : 0;
 
     // Format results and add ranking - Convert BigInt values to numbers
@@ -138,8 +203,13 @@ export async function GET(req: NextRequest) {
         },
         contingent: {
           id: Number(result.contingentId),
-          name: result.contingentName
+          name: result.contingentName,
+          logoUrl: result.contingentLogoUrl
         },
+        state: result.stateId ? {
+          id: Number(result.stateId),
+          name: result.stateName || 'Unknown State'
+        } : null,
         totalScore: parseFloat(result.totalScore.toString()),
         averageScore: parseFloat(result.averageScore.toString()),
         sessionCount: Number(result.sessionCount),
@@ -150,8 +220,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       results: formattedResults,
       totalTeams: formattedResults.length,
-      totalJudges: judgeCount,
-      totalSessions: sessionCount,
+      totalInProgress: inProgressCount,
+      totalCompleted: completedCount,
       eventId: parseInt(eventId),
       contestId: parseInt(contestId),
       scopeArea: event.scopeArea,

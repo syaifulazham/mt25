@@ -42,6 +42,7 @@ export async function GET(
       startDate: event.startDate,
       endDate: event.endDate,
       status: event.status,
+      scopeArea: event.scopeArea,
       zoneId: event.zoneId,
       zoneName: event.zone?.name || 'Unknown Zone'
     });
