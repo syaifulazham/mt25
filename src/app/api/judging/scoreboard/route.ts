@@ -140,6 +140,30 @@ export async function GET(req: NextRequest) {
             COALESCE(AVG(js.totalScore), 0) DESC
         `;
 
+    // Get total teams count (filtered by state if provided)
+    const totalTeamsResult = stateId
+      ? await prisma.$queryRaw`
+          SELECT COUNT(DISTINCT at.Id) as totalCount
+          FROM attendanceTeam at
+          INNER JOIN team t ON at.teamId = t.id
+          INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          WHERE at.eventId = ${parseInt(eventId)}
+            AND at.stateId = ${parseInt(stateId)}
+        `
+      : await prisma.$queryRaw`
+          SELECT COUNT(DISTINCT at.Id) as totalCount
+          FROM attendanceTeam at
+          INNER JOIN team t ON at.teamId = t.id
+          INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          WHERE at.eventId = ${parseInt(eventId)}
+        `;
+
+    const totalTeamsCount = Array.isArray(totalTeamsResult) && totalTeamsResult.length > 0 
+      ? Number((totalTeamsResult[0] as any).totalCount) || 0 
+      : 0;
+
     // Get in-progress count (filtered by state if provided)
     const inProgressResult = stateId
       ? await prisma.$queryRaw`
@@ -147,19 +171,19 @@ export async function GET(req: NextRequest) {
           FROM attendanceTeam at
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-          LEFT JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
           WHERE at.eventId = ${parseInt(eventId)}
             AND at.stateId = ${parseInt(stateId)}
-            AND (js.status IS NULL OR js.status IN ('PENDING', 'IN_PROGRESS'))
+            AND js.status = 'IN_PROGRESS'
         `
       : await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as inProgressCount
           FROM attendanceTeam at
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-          LEFT JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
           WHERE at.eventId = ${parseInt(eventId)}
-            AND (js.status IS NULL OR js.status IN ('PENDING', 'IN_PROGRESS'))
+            AND js.status = 'IN_PROGRESS'
         `;
 
     const inProgressCount = Array.isArray(inProgressResult) && inProgressResult.length > 0 
@@ -219,7 +243,7 @@ export async function GET(req: NextRequest) {
     // Return results
     return NextResponse.json({
       results: formattedResults,
-      totalTeams: formattedResults.length,
+      totalTeams: totalTeamsCount,
       totalInProgress: inProgressCount,
       totalCompleted: completedCount,
       eventId: parseInt(eventId),
