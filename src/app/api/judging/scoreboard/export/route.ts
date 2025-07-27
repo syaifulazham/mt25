@@ -39,195 +39,121 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
-    // Find the event contest
+    // Find the event contest using the same pattern as main scoreboard API
     const eventContest = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId),
-        id: parseInt(contestId),
-      },
-      include: {
-        contest: true,
+        contestId: parseInt(contestId),
       },
     });
 
     if (!eventContest) {
       return NextResponse.json({ error: 'Event contest not found' }, { status: 404 });
     }
-    
-    // Get the judging template
-    const judgingTemplate = eventContest.judgingTemplateId ? await prisma.judgingtemplate.findUnique({
-      where: { id: eventContest.judgingTemplateId },
-      include: {
-        judgingtemplatecriteria: true,
-      },
-    }) : null;
 
-    // Base query for judging sessions
-    let judgingSessionsQuery: any = {
-      eventContestId: eventContest.id,
-      status: 'COMPLETED',
-    };
+    // Get contest details
+    const contest = await prisma.contest.findUnique({
+      where: { id: parseInt(contestId) },
+      select: { id: true, name: true },
+    });
 
-    // Base include for attendanceTeam
-    let attendanceTeamInclude: any = {
-      team: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      contingent: {
-        select: {
-          id: true,
-          name: true,
-          school: {
-            select: {
-              stateId: true,
-              state: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          higherInstitution: {
-            select: {
-              stateId: true,
-              state: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          independent: {
-            select: {
-              stateId: true,
-              state: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    };
-
-    // Modify queries based on scopeArea
-    if (event.scopeArea === 'ZONE') {
-      if (stateId) {
-        // For ZONE events with state filter, we need to filter teams by state
-        judgingSessionsQuery.attendanceTeam = {
-          OR: [
-            { contingent: { school: { stateId: parseInt(stateId) } } },
-            { contingent: { higherInstitution: { stateId: parseInt(stateId) } } },
-            { contingent: { independent: { stateId: parseInt(stateId) } } },
-          ],
-        };
-      }
-    } else if (event.scopeArea === 'STATE') {
-      // For STATE events, always filter by the event's stateId
-      if (event.stateId) {
-        judgingSessionsQuery.attendanceTeam = {
-          OR: [
-            { contingent: { school: { stateId: event.stateId } } },
-            { contingent: { higherInstitution: { stateId: event.stateId } } },
-            { contingent: { independent: { stateId: event.stateId } } },
-          ],
-        };
-      }
+    if (!contest) {
+      return NextResponse.json({ error: 'Contest not found' }, { status: 404 });
     }
 
-    // Fetch judging sessions with scores
-    const judgingSessions = await prisma.judgingSession.findMany({
-      where: judgingSessionsQuery,
-      include: {
-        attendanceTeam: attendanceTeamInclude,
-        judgingSessionScores: {
-          include: {
-            criterion: true
-          }
-        },
-        judge: {
-          select: {
-            id: true,
-            name: true,
-            username: true
-          }
-        }
-      },
-    });
+    // Use raw SQL query similar to the working scoreboard API
+    // Include both IN_PROGRESS and COMPLETED sessions
+    const results = stateId 
+      ? await prisma.$queryRaw`
+          SELECT
+            at.Id as attendanceTeamId,
+            t.id as teamId,
+            t.name as teamName,
+            c.id as contingentId,
+            c.name as contingentName,
+            at.stateId as stateId,
+            at.state as stateName,
+            COUNT(js.id) as sessionCount,
+            COALESCE(SUM(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE 0 END), 0) as totalScore,
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) as averageScore,
+            GROUP_CONCAT(DISTINCT js.status) as judgingStatuses
+          FROM
+            attendanceTeam at
+          INNER JOIN
+            team t ON at.teamId = t.id
+          INNER JOIN
+            contingent c ON at.contingentId = c.id
+          INNER JOIN
+            eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN
+            eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          LEFT JOIN
+            judgingSession js ON at.Id = js.attendanceTeamId 
+            AND ec.id = js.eventContestId 
+            AND js.status IN ('IN_PROGRESS', 'COMPLETED')
+          WHERE
+            at.eventId = ${parseInt(eventId)}
+            AND at.stateId = ${parseInt(stateId)}
+          GROUP BY
+            at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
+          HAVING
+            COUNT(js.id) > 0
+          ORDER BY
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) DESC
+        `
+      : await prisma.$queryRaw`
+          SELECT
+            at.Id as attendanceTeamId,
+            t.id as teamId,
+            t.name as teamName,
+            c.id as contingentId,
+            c.name as contingentName,
+            at.stateId as stateId,
+            at.state as stateName,
+            COUNT(js.id) as sessionCount,
+            COALESCE(SUM(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE 0 END), 0) as totalScore,
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) as averageScore,
+            GROUP_CONCAT(DISTINCT js.status) as judgingStatuses
+          FROM
+            attendanceTeam at
+          INNER JOIN
+            team t ON at.teamId = t.id
+          INNER JOIN
+            contingent c ON at.contingentId = c.id
+          INNER JOIN
+            eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+          INNER JOIN
+            eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+          LEFT JOIN
+            judgingSession js ON at.Id = js.attendanceTeamId 
+            AND ec.id = js.eventContestId 
+            AND js.status IN ('IN_PROGRESS', 'COMPLETED')
+          WHERE
+            at.eventId = ${parseInt(eventId)}
+          GROUP BY
+            at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
+          HAVING
+            COUNT(js.id) > 0
+          ORDER BY
+            COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) DESC
+        `;
 
-    // Get unique list of teams that have been judged
-    const teamResults: Record<number, any> = {};
+    // Convert BigInt values to numbers and format results
+    const formattedResults = (results as any[]).map((result, index) => ({
+      attendanceTeamId: Number(result.attendanceTeamId),
+      teamName: result.teamName,
+      contingentName: result.contingentName,
+      stateName: result.stateName || 'Unknown',
+      sessionCount: Number(result.sessionCount),
+      totalScore: parseFloat(result.totalScore.toString()),
+      averageScore: parseFloat(result.averageScore.toString()),
+      judgingStatuses: result.judgingStatuses || '',
+      rank: index + 1,
+    }));
 
-    judgingSessions.forEach(session => {
-      const attendanceTeamId = session.attendanceTeamId;
-      
-      // Get state information from contingent
-      const contingent = session.attendanceTeam.contingent;
-      let stateId = null;
-      let stateName = null;
-      
-      if (contingent.school?.stateId) {
-        stateId = contingent.school.stateId;
-        stateName = contingent.school.state?.name;
-      } else if (contingent.higherInstitution?.stateId) {
-        stateId = contingent.higherInstitution.stateId;
-        stateName = contingent.higherInstitution.state?.name;
-      } else if (contingent.independent?.stateId) {
-        stateId = contingent.independent.stateId;
-        stateName = contingent.independent.state?.name;
-      }
-
-      if (!teamResults[attendanceTeamId]) {
-        teamResults[attendanceTeamId] = {
-          attendanceTeamId,
-          teamName: session.attendanceTeam.team.name,
-          contingentName: session.attendanceTeam.contingent.name,
-          stateId,
-          stateName,
-          sessions: [],
-          totalScore: 0,
-          sessionCount: 0,
-        };
-      }
-
-      teamResults[attendanceTeamId].sessions.push({
-        judgeId: session.judgeId,
-        judgeName: session.judge?.name || 'Unknown Judge',
-        score: session.totalScore,
-        comments: session.comments,
-        scores: session.judgingSessionScores.map(score => ({
-          criterionId: score.criterionId,
-          criterionName: score.criterion?.name || 'Unknown Criterion',
-          weight: score.criterion?.weight || 0,
-          score: score.score,
-          comments: score.comments
-        }))
-      });
-
-      teamResults[attendanceTeamId].totalScore += session.totalScore || 0;
-      teamResults[attendanceTeamId].sessionCount += 1;
-    });
-
-    // Calculate average scores and create final results array
-    const results = Object.values(teamResults).map((team: any) => {
-      team.averageScore = team.sessionCount > 0 ? team.totalScore / team.sessionCount : 0;
-      return team;
-    });
-
-    // Sort results by averageScore (descending)
-    results.sort((a: any, b: any) => b.averageScore - a.averageScore);
-
-    // Add rank to each team
-    results.forEach((team: any, index: number) => {
-      team.rank = index + 1;
-    });
+    if (formattedResults.length === 0) {
+      return NextResponse.json({ error: 'No judging sessions found' }, { status: 404 });
+    }
 
     // Create CSV header
     let csvHeader = 'Rank,Team Name,Contingent';
@@ -236,46 +162,18 @@ export async function GET(req: NextRequest) {
       csvHeader += ',State';
     }
     
-    csvHeader += ',Average Score,Session Count';
-    
-    // If we have judging criteria, add them to the header
-    if (judgingTemplate && judgingTemplate.judgingtemplatecriteria.length > 0) {
-      judgingTemplate.judgingtemplatecriteria.forEach(criterion => {
-        csvHeader += `,${criterion.name} (${criterion.weight}%)`;
-      });
-    }
-    
+    csvHeader += ',Average Score,Session Count,Status';
     csvHeader += '\n';
     
     // Create CSV rows
-    const csvRows = results.map((team: any) => {
+    const csvRows = formattedResults.map((team: any) => {
       let row = `${team.rank},"${team.teamName}","${team.contingentName}"`;
       
       if (event.scopeArea === 'ZONE') {
         row += `,"${team.stateName || 'Unknown'}"`;
       }
       
-      row += `,${team.averageScore.toFixed(2)},${team.sessionCount}`;
-      
-      // If we have judging criteria, add average scores per criterion
-      if (judgingTemplate && judgingTemplate.judgingtemplatecriteria.length > 0) {
-        judgingTemplate.judgingtemplatecriteria.forEach(criterion => {
-          // Calculate average score for this criterion across all sessions
-          let criterionScores = 0;
-          let criterionCount = 0;
-          
-          team.sessions.forEach((session: any) => {
-            const criterionScore = session.scores.find((s: any) => s.criterionId === criterion.id);
-            if (criterionScore) {
-              criterionScores += criterionScore.score;
-              criterionCount++;
-            }
-          });
-          
-          const criterionAvg = criterionCount > 0 ? criterionScores / criterionCount : 0;
-          row += `,${criterionAvg.toFixed(2)}`;
-        });
-      }
+      row += `,${team.averageScore.toFixed(2)},${team.sessionCount},"${team.judgingStatuses}"`;
       
       return row + '\n';
     }).join('');
@@ -285,7 +183,7 @@ export async function GET(req: NextRequest) {
     
     // Generate a filename with event name, contest name, and date
     const date = new Date().toISOString().split('T')[0];
-    let filename = `Judging_Results_${event.name}_${eventContest.contest.name}_${date}`;
+    let filename = `Judging_Results_${event.name}_${contest.name}_${date}`;
     
     if (event.scopeArea === 'ZONE' && stateId) {
       const state = await prisma.state.findUnique({
@@ -344,7 +242,7 @@ export async function HEAD(req: NextRequest) {
     const contestExists = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId),
-        id: parseInt(contestId),
+        contestId: parseInt(contestId),
       },
     });
 
@@ -352,16 +250,18 @@ export async function HEAD(req: NextRequest) {
       return new NextResponse(null, { status: 404 });
     }
 
-    // Check if there are any completed judging sessions
+    // Check if there are any judging sessions (IN_PROGRESS or COMPLETED)
     const sessionsCount = await prisma.judgingSession.count({
       where: {
         eventContestId: contestExists.id,
-        status: 'COMPLETED',
+        status: {
+          in: ['IN_PROGRESS', 'COMPLETED']
+        },
       },
     });
 
     if (sessionsCount === 0) {
-      return new NextResponse(null, { status: 404, statusText: 'No completed judging sessions found' });
+      return new NextResponse(null, { status: 404, statusText: 'No judging sessions found' });
     }
 
     return new NextResponse(null, { status: 200 });

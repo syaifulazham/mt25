@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Award, ChevronRight, PlusCircle, User, Users, UserPlus, Copy, Edit, ExternalLink, Settings, Eye, UsersIcon, FileText } from "lucide-react";
+import { AlertCircle, Award, ChevronRight, PlusCircle, User, Users, UserPlus, Copy, Edit, ExternalLink, Settings, Eye, UsersIcon, FileText, QrCode } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -34,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import QRCode from 'qrcode';
 
 interface JudgeEndpoint {
   id: number;
@@ -123,6 +124,9 @@ export default function EventJudgingPage({ params }: { params: { id: string } })
     judge_email: '',
     judge_phoneNo: ''
   });
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [selectedQrEndpoint, setSelectedQrEndpoint] = useState<JudgeEndpoint | null>(null);
 
   // Function to fetch judge endpoints for a specific contest
   const fetchJudgeEndpoints = async (contestId: number) => {
@@ -198,6 +202,27 @@ export default function EventJudgingPage({ params }: { params: { id: string } })
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
       toast.error(`Failed to copy ${label.toLowerCase()}`);
+    }
+  };
+
+  // Function to show QR code for endpoint
+  const showQrCode = async (endpoint: JudgeEndpoint) => {
+    try {
+      const endpointUrl = `${window.location.origin}/judge/${endpoint.hashcode}`;
+      const qrDataUrl = await QRCode.toDataURL(endpointUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeDataUrl(qrDataUrl);
+      setSelectedQrEndpoint(endpoint);
+      setQrDialogOpen(true);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      toast.error('Failed to generate QR code');
     }
   };
 
@@ -575,6 +600,23 @@ export default function EventJudgingPage({ params }: { params: { id: string } })
                                                         </TooltipContent>
                                                       </Tooltip>
                                                     </TooltipProvider>
+                                                    <TooltipProvider>
+                                                      <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                          <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-6 w-6 p-0"
+                                                            onClick={() => showQrCode(endpoint)}
+                                                          >
+                                                            <QrCode className="h-3 w-3" />
+                                                          </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                          <p>Show QR code</p>
+                                                        </TooltipContent>
+                                                      </Tooltip>
+                                                    </TooltipProvider>
                                                   </div>
                                                 </TableCell>
                                                 <TableCell className="text-xs">
@@ -829,6 +871,73 @@ export default function EventJudgingPage({ params }: { params: { id: string } })
               Update Judge Endpoint
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode size={20} />
+              Judge Endpoint QR Code
+            </DialogTitle>
+            <DialogDescription>
+              QR code for judge endpoint access
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {selectedQrEndpoint && (
+              <div className="space-y-4">
+                {/* Judge Information */}
+                <div className="text-sm space-y-1">
+                  <p><strong>Judge:</strong> {selectedQrEndpoint.judge_name || 'Anonymous Judge'}</p>
+                  <p><strong>Passcode:</strong> 
+                    <Badge variant="secondary" className="ml-2 font-mono">
+                      {selectedQrEndpoint.judge_passcode}
+                    </Badge>
+                  </p>
+                </div>
+                
+                {/* QR Code Display */}
+                {qrCodeDataUrl && (
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="bg-white p-4 rounded-lg border">
+                      <img 
+                        src={qrCodeDataUrl} 
+                        alt="Judge Endpoint QR Code" 
+                        className="w-48 h-48"
+                      />
+                    </div>
+                    <div className="text-center text-sm text-gray-600">
+                      <p>Scan this QR code to access the judge endpoint</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Copy Actions */}
+                <div className="flex gap-2 justify-center">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => copyToClipboard(`${window.location.origin}/judge/${selectedQrEndpoint.hashcode}`, 'Endpoint link')}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Link
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => copyToClipboard(selectedQrEndpoint.judge_passcode, 'Passcode')}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Passcode
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
