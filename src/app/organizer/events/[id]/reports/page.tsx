@@ -157,7 +157,7 @@ export default function ReportsPage() {
 
   return (
     <DashboardShell>
-      <div className="space-y-6">
+      <div className="space-y-6 mx-4 md:mx-6 lg:mx-8">
         <PageHeader
           title="Event Reports"
           description={`Generate and download reports for ${eventInfo.name}`}
