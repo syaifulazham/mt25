@@ -106,6 +106,13 @@ export default function AttendancePage() {
   const [syncStatusData, setSyncStatusData] = useState<SyncStatusResponse | null>(null);
   const [loadingDifferences, setLoadingDifferences] = useState(false);
   
+  // Contingent sync states
+  const [contingentSyncDialogOpen, setContingentSyncDialogOpen] = useState(false);
+  const [availableContingents, setAvailableContingents] = useState<any[]>([]);
+  const [selectedContingent, setSelectedContingent] = useState<number | null>(null);
+  const [loadingContingents, setLoadingContingents] = useState(false);
+  const [contingentSyncing, setContingentSyncing] = useState(false);
+  
   // Function to check if there are actual mismatches in the data
   const hasMismatches = () => {
     if (!syncMismatches) return false;
@@ -478,6 +485,88 @@ export default function AttendancePage() {
     setSyncPaused(false);
   };
 
+  // Function to fetch available contingents from endlist
+  const fetchAvailableContingents = async () => {
+    setLoadingContingents(true);
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/endlist-contingents`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch contingents');
+      }
+      const data = await response.json();
+      setAvailableContingents(data.contingents || []);
+    } catch (error) {
+      console.error('Error fetching contingents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch contingents list',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingContingents(false);
+    }
+  };
+
+  // Function to handle contingent sync
+  const handleContingentSync = async () => {
+    if (!selectedContingent) {
+      toast({
+        title: 'Error',
+        description: 'Please select a contingent to sync',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setContingentSyncing(true);
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/sync-contingent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contingentId: selectedContingent,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync contingent');
+      }
+
+      toast({
+        title: 'Success',
+        description: `Contingent sync completed successfully. ${data.syncResults?.newTeams || 0} new teams, ${data.syncResults?.newContestants || 0} new contestants synced.`,
+      });
+
+      // Refresh the sync status and contingents list
+      await checkSyncStatus();
+      await fetchAvailableContingents();
+      
+      // Close the dialog
+      setContingentSyncDialogOpen(false);
+      setSelectedContingent(null);
+
+    } catch (error) {
+      console.error('Error syncing contingent:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to sync contingent',
+        variant: 'destructive',
+      });
+    } finally {
+      setContingentSyncing(false);
+    }
+  };
+
+  // Function to open contingent sync dialog
+  const handleOpenContingentSync = async () => {
+    setContingentSyncDialogOpen(true);
+    await fetchAvailableContingents();
+  };
+
   return (
     <div className="container mx-auto py-6">
       <h1 className="text-3xl font-bold mb-6">Event Attendance Management</h1>
@@ -685,6 +774,101 @@ export default function AttendancePage() {
             </Button>
             <Button onClick={handleSync} disabled={syncing}>
               {syncing ? 'Syncing...' : 'Synchronize Now'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Contingent Sync Dialog */}
+      <Dialog open={contingentSyncDialogOpen} onOpenChange={setContingentSyncDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-500" />
+              Sync by Contingent
+            </DialogTitle>
+            <DialogDescription>
+              Select a specific contingent to sync from the endlist to attendance records.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {loadingContingents ? (
+              <div className="flex items-center justify-center py-4">
+                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                Loading contingents...
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="contingent-select">Select Contingent</Label>
+                <select
+                  id="contingent-select"
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={selectedContingent || ''}
+                  onChange={(e) => setSelectedContingent(e.target.value ? parseInt(e.target.value) : null)}
+                >
+                  <option value="">-- Select a contingent --</option>
+                  {availableContingents.map((contingent) => (
+                    <option key={contingent.id} value={contingent.id}>
+                      {contingent.name} ({contingent.stateName}) - {contingent.teamCount} teams
+                      {contingent.needsSync ? ' ⚠️ Needs Sync' : ' ✅ Synced'}
+                    </option>
+                  ))}
+                </select>
+                
+                {selectedContingent && (
+                  <div className="mt-2 p-3 bg-blue-50 rounded-md">
+                    {(() => {
+                      const contingent = availableContingents.find(c => c.id === selectedContingent);
+                      return contingent ? (
+                        <div className="text-sm">
+                          <p><strong>Institution:</strong> {contingent.institutionName}</p>
+                          <p><strong>State:</strong> {contingent.stateName}</p>
+                          <p><strong>Teams:</strong> {contingent.teamCount}</p>
+                          <p><strong>Contestants:</strong> {contingent.contestantCount}</p>
+                          <p><strong>Status:</strong> 
+                            <span className={contingent.needsSync ? 'text-amber-600' : 'text-green-600'}>
+                              {contingent.needsSync ? ' Needs Sync' : ' Already Synced'}
+                            </span>
+                          </p>
+                          {contingent.needsSync && (
+                            <p className="text-amber-600 text-xs mt-1">
+                              This contingent has {contingent.teamCount - contingent.syncedTeamCount} teams that need to be synced.
+                            </p>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setContingentSyncDialogOpen(false);
+                setSelectedContingent(null);
+              }}
+              disabled={contingentSyncing}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleContingentSync} 
+              disabled={contingentSyncing || !selectedContingent}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {contingentSyncing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  Syncing...
+                </>
+              ) : (
+                'Sync Contingent'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -906,6 +1090,14 @@ export default function AttendancePage() {
               className="w-full"
             >
               {syncing ? 'Syncing...' : 'Synchronize Now'}
+            </Button>
+            <Button 
+              onClick={handleOpenContingentSync}
+              disabled={syncing || resetting}
+              variant="outline"
+              className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100"
+            >
+              Sync by Contingent
             </Button>
             <Button 
               onClick={openResetDialog}
