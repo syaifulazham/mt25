@@ -112,6 +112,7 @@ export default function AttendancePage() {
   const [selectedContingent, setSelectedContingent] = useState<number | null>(null);
   const [loadingContingents, setLoadingContingents] = useState(false);
   const [contingentSyncing, setContingentSyncing] = useState(false);
+  const [contingentSearchText, setContingentSearchText] = useState('');
   
   // Function to check if there are actual mismatches in the data
   const hasMismatches = () => {
@@ -561,9 +562,25 @@ export default function AttendancePage() {
     }
   };
 
+  // Function to filter contingents based on search text
+  const getFilteredContingents = () => {
+    if (!contingentSearchText.trim()) {
+      return availableContingents;
+    }
+    
+    const searchLower = contingentSearchText.toLowerCase();
+    return availableContingents.filter(contingent => 
+      contingent.name.toLowerCase().includes(searchLower) ||
+      contingent.institutionName.toLowerCase().includes(searchLower) ||
+      contingent.stateName.toLowerCase().includes(searchLower)
+    );
+  };
+
   // Function to open contingent sync dialog
   const handleOpenContingentSync = async () => {
     setContingentSyncDialogOpen(true);
+    setContingentSearchText(''); // Reset search when opening
+    setSelectedContingent(null); // Reset selection when opening
     await fetchAvailableContingents();
   };
 
@@ -799,22 +816,42 @@ export default function AttendancePage() {
                 Loading contingents...
               </div>
             ) : (
-              <div className="space-y-2">
-                <Label htmlFor="contingent-select">Select Contingent</Label>
-                <select
-                  id="contingent-select"
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  value={selectedContingent || ''}
-                  onChange={(e) => setSelectedContingent(e.target.value ? parseInt(e.target.value) : null)}
-                >
-                  <option value="">-- Select a contingent --</option>
-                  {availableContingents.map((contingent) => (
-                    <option key={contingent.id} value={contingent.id}>
-                      {contingent.name} ({contingent.stateName}) - {contingent.teamCount} teams
-                      {contingent.needsSync ? ' ⚠️ Needs Sync' : ' ✅ Synced'}
-                    </option>
-                  ))}
-                </select>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="contingent-search">Search Contingents</Label>
+                  <Input
+                    id="contingent-search"
+                    type="text"
+                    placeholder="Search by contingent name, institution, or state..."
+                    value={contingentSearchText}
+                    onChange={(e) => setContingentSearchText(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="contingent-select">Select Contingent</Label>
+                  <select
+                    id="contingent-select"
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={selectedContingent || ''}
+                    onChange={(e) => setSelectedContingent(e.target.value ? parseInt(e.target.value) : null)}
+                  >
+                    <option value="">-- Select a contingent --</option>
+                    {getFilteredContingents().map((contingent) => (
+                      <option key={contingent.id} value={contingent.id}>
+                        {contingent.name} ({contingent.stateName}) - {contingent.teamCount} teams
+                        {contingent.needsSync ? ' ⚠️ Needs Sync' : ' ✅ Synced'}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {contingentSearchText && (
+                    <p className="text-sm text-gray-600">
+                      Showing {getFilteredContingents().length} of {availableContingents.length} contingents
+                    </p>
+                  )}
+                </div>
                 
                 {selectedContingent && (
                   <div className="mt-2 p-3 bg-blue-50 rounded-md">
