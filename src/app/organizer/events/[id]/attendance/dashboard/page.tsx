@@ -54,11 +54,26 @@ type HourlyAttendance = {
   count: number;
 };
 
+type StateStats = {
+  stateId: number;
+  stateName: string;
+  totalContingents: number;
+  totalTeams: number;
+  totalContestants: number;
+  presentContingents: number;
+  presentTeams: number;
+  presentContestants: number;
+  totalParticipants: number;
+  presentParticipants: number;
+  attendanceRate: number;
+};
+
 export default function AttendanceDashboardPage() {
   const { id: eventId } = useParams();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<AttendanceStats | null>(null);
+  const [stateStats, setStateStats] = useState<StateStats[]>([]);
   const [dailyAttendance, setDailyAttendance] = useState<DailyAttendance[]>([]);
   const [hourlyAttendance, setHourlyAttendance] = useState<HourlyAttendance[]>([]);
   const [chartView, setChartView] = useState<'daily' | 'hourly'>('daily');
@@ -115,6 +130,7 @@ export default function AttendanceDashboardPage() {
         console.log('Received statistics data:', data);
         
         setStats(data.stats);
+        setStateStats(data.stateStats || []);
         setDailyAttendance(data.dailyAttendance);
         setHourlyAttendance(data.hourlyAttendance);
       } catch (error) {
@@ -205,112 +221,134 @@ export default function AttendanceDashboardPage() {
         )}
       </div>
 
-      {/* Statistics Cards */}
+      {/* Overall Statistics Summary */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => (
+        <div className="mb-6">
+          <Card className="animate-pulse">
+            <CardHeader>
+              <div className="h-6 bg-gray-200 rounded w-1/3 mb-2"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="text-center">
+                    <div className="h-8 bg-gray-200 rounded mb-1"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="mb-6">
+          <Card className="border-blue-500 border-2">
+            <CardHeader className="bg-blue-50">
+              <CardTitle className="text-lg font-medium text-blue-700">
+                Overall Event Attendance Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {stats?.presentContingents} / {stats?.totalContingents}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Contingents</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {stats?.presentTeams} / {stats?.totalTeams}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Teams</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {stats?.presentContestants} / {stats?.totalContestants}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Contestants</p>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {stats?.attendanceRate}%
+                  </div>
+                  <p className="text-sm text-muted-foreground">Overall Rate</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* State-based Statistics Cards */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <Card key={i} className="animate-pulse">
               <CardHeader>
                 <div className="h-6 bg-gray-200 rounded w-2/3 mb-2"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-12 bg-gray-200 rounded w-1/3 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="h-8 bg-gray-200 rounded mb-1"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="text-center">
+                    <div className="h-8 bg-gray-200 rounded mb-1"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="text-center">
+                    <div className="h-8 bg-gray-200 rounded mb-1"></div>
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded"></div>
               </CardContent>
             </Card>
           ))}
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {stateStats.map((state) => (
+            <Card key={state.stateId} className="border-l-4 border-l-blue-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Contingent Attendance
+                <CardTitle className="text-lg font-medium text-blue-700">
+                  {state.stateName}
                 </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <Users className="h-5 w-5 text-blue-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
-                  {stats?.presentContingents} / {stats?.totalContingents}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-blue-600">
+                      {state.presentContingents}/{state.totalContingents}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Contingents</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-green-600">
+                      {state.presentTeams}/{state.totalTeams}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Teams</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold text-orange-600">
+                      {state.presentContestants}/{state.totalContestants}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Contestants</p>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {stats && stats.totalContingents > 0 ? Math.round((stats.presentContingents / stats.totalContingents) * 100) : 0}% attendance rate
-                </p>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {state.attendanceRate}%
+                  </div>
+                  <p className="text-sm text-muted-foreground">State Attendance Rate</p>
+                </div>
               </CardContent>
             </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Team Attendance
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {stats?.presentTeams} / {stats?.totalTeams}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {stats && stats.totalTeams > 0 ? Math.round((stats.presentTeams / stats.totalTeams) * 100) : 0}% attendance rate
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Contestant Attendance
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {stats?.presentContestants} / {stats?.totalContestants}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {stats && stats.totalContestants > 0 ? Math.round((stats.presentContestants / stats.totalContestants) * 100) : 0}% attendance rate
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Manager Attendance
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {stats?.presentManagers} / {stats?.totalManagers}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {stats && stats.totalManagers > 0 ? Math.round((stats.presentManagers / stats.totalManagers) * 100) : 0}% attendance rate
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-green-500 border-2">
-              <CardHeader className="flex flex-row items-center justify-between pb-2 bg-green-50">
-                <CardTitle className="text-sm font-medium">
-                  Total Participant Attendance
-                </CardTitle>
-                <Users className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold">
-                  {stats?.presentParticipants} / {stats?.totalParticipants}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {stats && stats.totalParticipants > 0 ? Math.round((stats.presentParticipants / stats.totalParticipants) * 100) : 0}% attendance rate
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </>
+          ))}
+        </div>
       )}
 
       {/* Attendance Rate Chart */}

@@ -195,7 +195,7 @@ export async function GET(
         ? prisma.$queryRaw<CountResult>`
             SELECT COUNT(*) as count FROM attendanceManager 
             WHERE eventId = ${eventId}
-            AND contestGroup IN (${contestGroups.map(group => `'${group}'`).join(',')})
+            AND contestGroup IN (${Prisma.join(contestGroups)})
           `
         : prisma.$queryRaw<CountResult>`
             SELECT COUNT(*) as count FROM attendanceManager 
@@ -205,7 +205,7 @@ export async function GET(
         ? prisma.$queryRaw<CountResult>`
             SELECT COUNT(*) as count FROM attendanceManager 
             WHERE eventId = ${eventId} AND attendanceStatus = 'Present'
-            AND contestGroup IN (${contestGroups.map(group => `'${group}'`).join(',')})
+            AND contestGroup IN (${Prisma.join(contestGroups)})
           `
         : prisma.$queryRaw<CountResult>`
             SELECT COUNT(*) as count FROM attendanceManager 
@@ -329,6 +329,70 @@ export async function GET(
         }))
       : [];
 
+    // Get state-based attendance statistics
+    type StateStatsResult = {
+      stateId: number | bigint;
+      stateName: string;
+      totalContingents: number | bigint;
+      totalTeams: number | bigint;
+      totalContestants: number | bigint;
+      presentContingents: number | bigint;
+      presentTeams: number | bigint;
+      presentContestants: number | bigint;
+    }[];
+
+    const stateStats = filterByContestGroup
+      ? await prisma.$queryRaw<StateStatsResult>`
+          SELECT 
+            s.id as stateId,
+            s.name as stateName,
+            COUNT(DISTINCT ac.contingentId) as totalContingents,
+            COUNT(DISTINCT ac.teamId) as totalTeams,
+            COUNT(DISTINCT ac.id) as totalContestants,
+            COUNT(DISTINCT CASE WHEN ac.attendanceStatus = 'Present' THEN ac.contingentId END) as presentContingents,
+            COUNT(DISTINCT CASE WHEN ac.attendanceStatus = 'Present' THEN ac.teamId END) as presentTeams,
+            COUNT(DISTINCT CASE WHEN ac.attendanceStatus = 'Present' THEN ac.id END) as presentContestants
+          FROM attendanceContestant ac
+          JOIN state s ON ac.stateId = s.id
+          WHERE ac.eventId = ${eventId}
+          AND ac.contestGroup IN (${Prisma.join(contestGroups)})
+          GROUP BY s.id, s.name
+          ORDER BY s.name
+        `
+      : await prisma.$queryRaw<StateStatsResult>`
+          SELECT 
+            s.id as stateId,
+            s.name as stateName,
+            COUNT(DISTINCT ac.contingentId) as totalContingents,
+            COUNT(DISTINCT ac.teamId) as totalTeams,
+            COUNT(DISTINCT ac.id) as totalContestants,
+            COUNT(DISTINCT CASE WHEN ac.attendanceStatus = 'Present' THEN ac.contingentId END) as presentContingents,
+            COUNT(DISTINCT CASE WHEN ac.attendanceStatus = 'Present' THEN ac.teamId END) as presentTeams,
+            COUNT(DISTINCT CASE WHEN ac.attendanceStatus = 'Present' THEN ac.id END) as presentContestants
+          FROM attendanceContestant ac
+          JOIN state s ON ac.stateId = s.id
+          WHERE ac.eventId = ${eventId}
+          GROUP BY s.id, s.name
+          ORDER BY s.name
+        `;
+
+    // Format state statistics
+    const formattedStateStats = stateStats.map((state: any) => ({
+      stateId: Number(state.stateId),
+      stateName: state.stateName,
+      totalContingents: Number(state.totalContingents),
+      totalTeams: Number(state.totalTeams),
+      totalContestants: Number(state.totalContestants),
+      presentContingents: Number(state.presentContingents),
+      presentTeams: Number(state.presentTeams),
+      presentContestants: Number(state.presentContestants),
+      totalParticipants: Number(state.totalContestants),
+      presentParticipants: Number(state.presentContestants),
+      attendanceRate: Number(state.totalContestants) > 0 
+        ? Math.round((Number(state.presentContestants) / Number(state.totalContestants)) * 100)
+        : 0
+    }));
+
     return NextResponse.json({
       success: true,
       stats: {
@@ -344,6 +408,7 @@ export async function GET(
         presentParticipants,
         attendanceRate: Math.round(attendanceRate), // Round to whole number
       },
+      stateStats: formattedStateStats,
       dailyAttendance: formattedDailyAttendance,
       hourlyAttendance: formattedHourlyAttendance,
     });
