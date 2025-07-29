@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { hasRequiredRole } from '@/lib/auth';
 import { z } from 'zod';
 
-// Mark this route as dynamic since it uses getCurrentUser() which uses headers()
+// Mark this route as dynamic since it uses getServerSession() which uses headers()
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
@@ -18,11 +19,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Check if user is authenticated
-    const user = await getCurrentUser();
-    if (!user) {
+    // Check if user is authenticated using getServerSession
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const user = session.user;
 
     const eventId = parseInt(params.id);
     if (isNaN(eventId)) {
@@ -99,11 +102,13 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Check if user is authenticated and has required role
-    const user = await getCurrentUser();
-    if (!user) {
+    // Check if user is authenticated and has required role using getServerSession
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const user = session.user;
 
     if (!hasRequiredRole(user, ['ADMIN', 'OPERATOR'])) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -191,6 +196,7 @@ export async function POST(
             maxteampercontingent,
             person_incharge,
             person_incharge_phone,
+            updatedAt: new Date(),
           },
           include: {
             contest: true
