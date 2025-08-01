@@ -414,15 +414,16 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       ` as any[];
 
       if (existingContingentAttendance.length === 0) {
-        // Create new attendanceContingent record
+        // Create new attendanceContingent record with hashcode
+        const contingentHashcode = createHashcode(contingentId.toString(), eventId, contingentId);
         await prisma.$executeRaw`
           INSERT INTO attendanceContingent
-          (contingentId, eventId, attendanceDate, attendanceTime, attendanceStatus, createdAt, updatedAt)
+          (hashcode, contingentId, eventId, attendanceDate, attendanceTime, attendanceStatus, createdAt, updatedAt)
           VALUES
-          (${contingentId}, ${eventId}, ${now}, ${now}, 'Synced', ${now}, ${now})
+          (${contingentHashcode}, ${contingentId}, ${eventId}, ${now}, ${now}, 'Synced', ${now}, ${now})
         `;
         syncResults.newContingents++;
-        console.log(`Created attendanceContingent record for contingent ${contingentId}`);
+        console.log(`Created attendanceContingent record for contingent ${contingentId} with hashcode ${contingentHashcode}`);
       } else {
         // Update existing attendanceContingent record
         await prisma.$executeRaw`
