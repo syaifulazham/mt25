@@ -334,7 +334,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               INSERT INTO attendanceContestant
               (hashcode, contingentId, teamId, contestantId, participantId, eventId, ic, attendanceDate, attendanceTime, attendanceStatus, attendanceNote, stateId, zoneId, state, contestId, contestName, contestGroup, createdAt, updatedAt)
               VALUES
-              (${contestantHashcode}, ${team.contingentId}, ${team.id}, ${member.id}, ${member.id}, ${eventId}, ${member.ic || null}, ${now}, ${now}, 'Not Present', NULL, ${team.stateId}, ${team.zoneId}, ${team.stateName}, ${team.contestId}, ${team.contestName}, ${team.schoolLevel}, ${now}, ${now})
+              (${contestantHashcode}, ${team.contingentId}, ${team.id}, ${member.id}, ${member.id}, ${eventId}, ${member.ic || null}, ${now}, ${now}, 'Not Present', NULL, ${team.stateId}, ${team.zoneId}, ${team.stateName}, ${team.contestId}, ${team.contestName}, ${team.targetGroupLabel}, ${now}, ${now})
             `;
             syncResults.newContestants++;
           } else {
@@ -346,7 +346,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                   stateId = ${team.stateId},
                   zoneId = ${team.zoneId},
                   state = ${team.stateName},
-                  contestGroup = ${team.schoolLevel},
+                  contestGroup = ${team.targetGroupLabel},
                   ic = ${member.ic || null},
                   contestId = ${team.contestId},
                   contestName = ${team.contestName}
@@ -384,7 +384,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               INSERT INTO attendanceManager
               (hashcode, contingentId, managerId, eventId, attendanceDate, attendanceTime, attendanceStatus, attendanceNote, stateId, zoneId, state, contestGroup, email, email_status, createdAt, updatedAt)
               VALUES
-              (${managerHashcode}, ${team.contingentId}, ${manager.id}, ${eventId}, ${now}, ${now}, 'Not Present', NULL, ${team.stateId}, ${team.zoneId}, ${team.stateName}, ${team.schoolLevel}, ${manager.email || null}, ${'PENDING'}, ${now}, ${now})
+              (${managerHashcode}, ${team.contingentId}, ${manager.id}, ${eventId}, ${now}, ${now}, 'Not Present', NULL, ${team.stateId}, ${team.zoneId}, ${team.stateName}, ${team.targetGroupLabel}, ${manager.email || null}, ${'PENDING'}, ${now}, ${now})
             `;
             syncResults.newManagers++;
           } else {
@@ -396,7 +396,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                   stateId = ${team.stateId},
                   zoneId = ${team.zoneId},
                   state = ${team.stateName},
-                  contestGroup = ${team.schoolLevel},
+                  contestGroup = ${team.targetGroupLabel},
                   email = ${manager.email || null},
                   email_status = ${'PENDING'}
               WHERE managerId = ${manager.id} AND eventId = ${eventId}
