@@ -75,9 +75,41 @@ export async function GET(
           WHERE contingentId = ${contingent.id} AND eventId = ${eventId}
         ` as any[];
 
+        // Get the actual count of teams that would be synced (applying same filtering as sync API)
+        const syncableTeamsCount = await prisma.$queryRaw`
+          SELECT COUNT(*) as count
+          FROM eventcontestteam ect
+          JOIN eventcontest ec ON ect.eventcontestId = ec.id
+          JOIN team t ON ect.teamId = t.id
+          JOIN contingent c ON t.contingentId = c.id
+          JOIN contest team_contest ON t.contestId = team_contest.id
+          JOIN contest ct ON ec.contestId = ct.id
+          JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
+          JOIN targetgroup tg ON tg.id = ctg.B
+          WHERE ec.eventId = ${eventId}
+            AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
+            AND c.id = ${contingent.id}
+            AND (
+              ect.status = 'APPROVED_SPECIAL' OR
+              NOT EXISTS (
+                SELECT 1 FROM teamMember tm 
+                JOIN contestant con ON tm.contestantId = con.id 
+                WHERE tm.teamId = t.id 
+                AND (
+                  con.age IS NULL OR 
+                  tg.minAge IS NULL OR 
+                  tg.maxAge IS NULL OR 
+                  CAST(con.age AS SIGNED) < CAST(tg.minAge AS SIGNED) OR 
+                  CAST(con.age AS SIGNED) > CAST(tg.maxAge AS SIGNED)
+                )
+              )
+            )
+        ` as any[];
+
         const isSynced = Number(attendanceRecord[0]?.count || 0) > 0;
         const syncedTeamCount = Number(attendanceTeamCount[0]?.count || 0);
-        const needsSync = !isSynced || syncedTeamCount < Number(contingent.teamCount);
+        const actualSyncableTeamCount = Number(syncableTeamsCount[0]?.count || 0);
+        const needsSync = !isSynced || syncedTeamCount < actualSyncableTeamCount;
 
         return {
           id: Number(contingent.id),
@@ -85,7 +117,7 @@ export async function GET(
           contingentType: contingent.contingentType,
           institutionName: contingent.institutionName,
           stateName: contingent.stateName,
-          teamCount: Number(contingent.teamCount),
+          teamCount: actualSyncableTeamCount, // Use actual syncable team count instead of raw count
           contestantCount: Number(contingent.contestantCount),
           isSynced,
           syncedTeamCount,
