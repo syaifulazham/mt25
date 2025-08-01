@@ -119,6 +119,10 @@ export default function AttendancePage() {
   const [cleaning, setCleaning] = useState(false);
   const [cleanupResults, setCleanupResults] = useState<any>(null);
   
+  // Sync results states
+  const [syncResultsDialogOpen, setSyncResultsDialogOpen] = useState(false);
+  const [syncResults, setSyncResults] = useState<any>(null);
+  
   // Function to check if there are actual mismatches in the data
   const hasMismatches = () => {
     if (!syncMismatches) return false;
@@ -456,9 +460,19 @@ export default function AttendancePage() {
                               cumulativeMetrics.newContestants + cumulativeMetrics.updatedContestants +
                               cumulativeMetrics.newManagers + cumulativeMetrics.updatedManagers;
         
+        // Store sync results and open persistent dialog
+        const syncResultsData = {
+          totalProcessed,
+          processedTeams,
+          metrics: cumulativeMetrics,
+          completedAt: new Date().toLocaleString()
+        };
+        setSyncResults(syncResultsData);
+        setSyncResultsDialogOpen(true);
+        
         toast({
           title: "Synchronization Complete",
-          description: `Successfully processed ${totalProcessed} records across ${processedTeams} teams. ${cumulativeMetrics.errorCount > 0 ? `${cumulativeMetrics.errorCount} errors occurred.` : ''}`,
+          description: `Successfully processed ${totalProcessed} records across ${processedTeams} teams. Click to view detailed results.`,
         });
         setSyncNeeded(false);
       }
@@ -954,6 +968,114 @@ export default function AttendancePage() {
               ) : (
                 'Sync Contingent'
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Sync Results Dialog */}
+      <Dialog open={syncResultsDialogOpen} onOpenChange={setSyncResultsDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <RefreshCw className="h-5 w-5" />
+              Synchronization Complete
+            </DialogTitle>
+            <DialogDescription>
+              Detailed results from the attendance synchronization process.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {syncResults && (
+              <div className="space-y-6">
+                {/* Summary Stats */}
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h3 className="font-medium text-green-800 mb-3">Synchronization Summary</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Total Records Processed:</span> {syncResults.totalProcessed}
+                    </div>
+                    <div>
+                      <span className="font-medium">Teams Processed:</span> {syncResults.processedTeams}
+                    </div>
+                    <div>
+                      <span className="font-medium">Completed At:</span> {syncResults.completedAt}
+                    </div>
+                    <div>
+                      <span className="font-medium">Errors:</span> 
+                      <span className={syncResults.metrics.errorCount > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+                        {syncResults.metrics.errorCount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Detailed Metrics */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Contingents */}
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium mb-2 text-blue-700">Contingents</h4>
+                    <div className="space-y-1 text-sm">
+                      <div>New: <span className="font-medium">{syncResults.metrics.newContingents}</span></div>
+                      <div>Updated: <span className="font-medium">{syncResults.metrics.updatedContingents}</span></div>
+                    </div>
+                  </div>
+                  
+                  {/* Teams */}
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium mb-2 text-purple-700">Teams</h4>
+                    <div className="space-y-1 text-sm">
+                      <div>New: <span className="font-medium">{syncResults.metrics.newTeams}</span></div>
+                      <div>Updated: <span className="font-medium">{syncResults.metrics.updatedTeams}</span></div>
+                    </div>
+                  </div>
+                  
+                  {/* Contestants */}
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium mb-2 text-green-700">Contestants</h4>
+                    <div className="space-y-1 text-sm">
+                      <div>New: <span className="font-medium">{syncResults.metrics.newContestants}</span></div>
+                      <div>Updated: <span className="font-medium">{syncResults.metrics.updatedContestants}</span></div>
+                    </div>
+                  </div>
+                  
+                  {/* Managers */}
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-medium mb-2 text-orange-700">Managers</h4>
+                    <div className="space-y-1 text-sm">
+                      <div>New: <span className="font-medium">{syncResults.metrics.newManagers}</span></div>
+                      <div>Updated: <span className="font-medium">{syncResults.metrics.updatedManagers}</span></div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Errors Section */}
+                {syncResults.metrics.errorCount > 0 && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <h4 className="font-medium mb-2 text-red-700">Errors ({syncResults.metrics.errorCount})</h4>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {syncResults.metrics.errors.map((error: string, index: number) => (
+                        <div key={index} className="text-sm text-red-600 p-2 bg-red-100 rounded border">
+                          {error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                setSyncResultsDialogOpen(false);
+                setSyncResults(null);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
