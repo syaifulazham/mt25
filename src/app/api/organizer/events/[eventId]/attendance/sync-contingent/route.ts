@@ -406,6 +406,37 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
         }
       }
 
+      // Create or update attendanceContingent record to mark this contingent as synced
+      const existingContingentAttendance = await prisma.$queryRaw`
+        SELECT id FROM attendanceContingent 
+        WHERE contingentId = ${contingentId} AND eventId = ${eventId}
+        LIMIT 1
+      ` as any[];
+
+      if (existingContingentAttendance.length === 0) {
+        // Create new attendanceContingent record
+        await prisma.$executeRaw`
+          INSERT INTO attendanceContingent
+          (contingentId, eventId, attendanceDate, attendanceTime, attendanceStatus, createdAt, updatedAt)
+          VALUES
+          (${contingentId}, ${eventId}, ${now}, ${now}, 'Synced', ${now}, ${now})
+        `;
+        syncResults.newContingents++;
+        console.log(`Created attendanceContingent record for contingent ${contingentId}`);
+      } else {
+        // Update existing attendanceContingent record
+        await prisma.$executeRaw`
+          UPDATE attendanceContingent
+          SET attendanceDate = ${now},
+              attendanceTime = ${now},
+              attendanceStatus = 'Synced',
+              updatedAt = ${now}
+          WHERE contingentId = ${contingentId} AND eventId = ${eventId}
+        `;
+        syncResults.updatedContingents++;
+        console.log(`Updated attendanceContingent record for contingent ${contingentId}`);
+      }
+
       console.log(`Contingent sync completed: ${syncResults.newContingents} new contingents, ${syncResults.newTeams} new teams, ${syncResults.newContestants} new contestants, ${syncResults.newManagers} new managers`);
 
       return new NextResponse(JSON.stringify({
