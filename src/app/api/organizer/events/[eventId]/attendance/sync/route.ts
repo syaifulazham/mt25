@@ -5,9 +5,15 @@ import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 // Function to create SHA-256 hash from IC, eventId, and contingentId
-function createHashcode(ic: string, eventId: number, contingentId: number): string {
-  // Combine the inputs as a string
-  const input = `${ic}-${eventId}-${contingentId}`;
+function createHashcode(ic: string, eventId: number, contingentId: number, additionalId?: string | number, role?: string): string {
+  // Add timestamp for additional entropy
+  const timestamp = Date.now();
+  
+  // Add random component for extra uniqueness
+  const randomComponent = Math.random().toString(36).substring(2, 15);
+  
+  // Combine all inputs with separators for maximum uniqueness
+  const input = `${ic || 'no-ic'}-${eventId}-${contingentId}-${additionalId || 'no-id'}-${role || 'unknown'}-${timestamp}-${randomComponent}`;
   
   // Create SHA-256 hash
   return crypto.createHash('sha256').update(input).digest('hex');
@@ -633,7 +639,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               }
               
               // Generate contestant hashcode using SHA-256 from ic, eventId, and contingentId
-              const contestantHashcode = createHashcode(contestant.ic || `${contestantId}`, eventId, contingentId);
+              const contestantHashcode = createHashcode(contestant.ic || `${contestantId}`, eventId, contingentId, contestantId, 'contestant');
               
               // Check if contestant attendance record exists
               const existingContestantAttendance = await prisma.$queryRaw`
@@ -717,12 +723,12 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               processedManagerIds.add(managerId);
               
               // Generate manager hashcode using SHA-256 from ic, eventId, and contingentId
-              const managerHashcode = createHashcode(manager.ic || `${managerId}`, eventId, contingentId);
+              const managerHashcode = createHashcode(manager.ic || `${managerId}`, eventId, contingentId, managerId, 'manager');
               
-              // Check if manager attendance record exists
+              // Check if manager attendance record exists (by managerId/eventId OR by hashcode)
               const existingManagerAttendance = await prisma.$queryRaw`
-                SELECT id FROM attendanceManager
-                WHERE managerId = ${managerId} AND eventId = ${eventId}
+                SELECT id, hashcode FROM attendanceManager
+                WHERE (managerId = ${managerId} AND eventId = ${eventId}) OR hashcode = ${managerHashcode}
                 LIMIT 1
               ` as any[];
               
@@ -768,9 +774,37 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                   
                   syncResults.newManagers++;
                   console.log(`SUCCESS: Created new attendance record for manager ${manager.id}, hashcode: ${managerHashcode}`);
-                } catch (error) {
-                  console.error(`FAILED to insert manager ${managerId}:`, error);
-                  syncResults.errorCount = (syncResults.errorCount || 0) + 1;
+                } catch (error: any) {
+                  // Handle duplicate key error specifically
+                  if (error.code === 'P2002' || (error.message && error.message.includes('Duplicate entry'))) {
+                    console.log(`Manager ${managerId} hashcode already exists, treating as existing record`);
+                    // Try to update the existing record instead
+                    try {
+                      await prisma.$executeRaw`
+                        UPDATE attendanceManager
+                        SET attendanceDate = ${now},
+                            attendanceTime = ${now},
+                            updatedAt = ${now},
+                            stateId = ${contingent.stateId || null},
+                            zoneId = ${contingent.zoneId || null},
+                            state = ${contingent.state || null},
+                            contestGroup = ${contestGroup},
+                            email = ${manager.email || null},
+                            email_status = ${'PENDING'}
+                        WHERE hashcode = ${managerHashcode}
+                      `;
+                      syncResults.updatedManagers++;
+                      console.log(`Updated existing manager record with hashcode: ${managerHashcode}`);
+                    } catch (updateError) {
+                      console.error(`Failed to update existing manager ${managerId}:`, updateError);
+                      syncResults.errorCount = (syncResults.errorCount || 0) + 1;
+                      syncResults.errors.push(`Manager ${managerId}: Failed to update existing record - ${updateError}`);
+                    }
+                  } else {
+                    console.error(`FAILED to insert manager ${managerId}:`, error);
+                    syncResults.errorCount = (syncResults.errorCount || 0) + 1;
+                    syncResults.errors.push(`Manager ${managerId}: ${error.message || error}`);
+                  }
                 }
               }
             }
