@@ -114,6 +114,11 @@ export default function AttendancePage() {
   const [contingentSyncing, setContingentSyncing] = useState(false);
   const [contingentSearchText, setContingentSearchText] = useState('');
   
+  // Cleanup states
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupResults, setCleanupResults] = useState<any>(null);
+  
   // Function to check if there are actual mismatches in the data
   const hasMismatches = () => {
     if (!syncMismatches) return false;
@@ -484,6 +489,49 @@ export default function AttendancePage() {
   const handleStopSync = () => {
     setSyncStopped(true);
     setSyncPaused(false);
+  };
+
+  // Handle cleanup of outdated attendance records
+  const handleCleanup = async () => {
+    setCleaning(true);
+    setCleanupResults(null);
+    
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/cleanup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCleanupResults(data);
+        toast({
+          title: "Cleanup Complete",
+          description: `Removed ${data.totalRemovedRecords} outdated records from attendance tables.`,
+        });
+        
+        // Refresh sync status after cleanup
+        checkSyncStatus();
+      } else {
+        toast({
+          title: "Cleanup Failed",
+          description: data.error || "Failed to cleanup attendance records",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Cleanup error:', error);
+      toast({
+        title: "Cleanup Error",
+        description: "An unexpected error occurred during cleanup",
+        variant: "destructive",
+      });
+    } finally {
+      setCleaning(false);
+    }
   };
 
   // Function to fetch available contingents from endlist
@@ -911,6 +959,114 @@ export default function AttendancePage() {
         </DialogContent>
       </Dialog>
       
+      {/* Cleanup Dialog */}
+      <Dialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertCircle className="h-5 w-5" />
+              Cleanup Outdated Records
+            </DialogTitle>
+            <DialogDescription>
+              This will remove attendance records for teams and contestants that are no longer in the approved endlist.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {cleanupResults ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <h3 className="font-medium text-green-800 mb-2">Cleanup Complete</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="font-medium">Valid Teams in Endlist:</span> {cleanupResults.validTeamsInEndlist}
+                    </div>
+                    <div>
+                      <span className="font-medium">Valid Contestants in Endlist:</span> {cleanupResults.validContestantsInEndlist}
+                    </div>
+                    <div>
+                      <span className="font-medium">Outdated Teams Removed:</span> {cleanupResults.removedTeams}
+                    </div>
+                    <div>
+                      <span className="font-medium">Outdated Contestants Removed:</span> {cleanupResults.removedContestants}
+                    </div>
+                    <div>
+                      <span className="font-medium">Contestants from Removed Teams:</span> {cleanupResults.removedContestantsFromTeams}
+                    </div>
+                    <div>
+                      <span className="font-medium">Total Records Removed:</span> {cleanupResults.totalRemovedRecords}
+                    </div>
+                  </div>
+                </div>
+                
+                {cleanupResults.outdatedTeamsDetails?.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Removed Teams:</h4>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {cleanupResults.outdatedTeamsDetails.map((team: any) => (
+                        <div key={team.teamId} className="text-sm p-2 bg-red-50 rounded border">
+                          Team ID: {team.teamId}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {cleanupResults.outdatedContestantsDetails?.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-2">Removed Contestants:</h4>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {cleanupResults.outdatedContestantsDetails.map((contestant: any) => (
+                        <div key={contestant.contestantId} className="text-sm p-2 bg-red-50 rounded border">
+                          Contestant ID: {contestant.contestantId}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  This operation will:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-600">
+                  <li>Remove contestants from attendance records who are no longer in approved teams</li>
+                  <li>Remove teams from attendance records that are no longer approved/accepted</li>
+                  <li>Remove all contestant records associated with removed teams</li>
+                </ul>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded">
+                  <p className="text-sm text-amber-700">
+                    <strong>Note:</strong> This only removes outdated records. Valid attendance data will remain intact.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                setCleanupDialogOpen(false);
+                setCleanupResults(null);
+              }}
+              variant="outline"
+            >
+              {cleanupResults ? 'Close' : 'Cancel'}
+            </Button>
+            {!cleanupResults && (
+              <Button 
+                onClick={handleCleanup}
+                disabled={cleaning}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                {cleaning ? 'Cleaning...' : 'Start Cleanup'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* Reset Confirmation Dialog */}
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <DialogContent>
@@ -1135,6 +1291,14 @@ export default function AttendancePage() {
               className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100"
             >
               Sync by Contingent
+            </Button>
+            <Button 
+              onClick={() => setCleanupDialogOpen(true)}
+              disabled={syncing || resetting || cleaning}
+              variant="outline"
+              className="w-full bg-orange-50 text-orange-700 hover:bg-orange-100"
+            >
+              {cleaning ? 'Cleaning...' : 'Cleanup Outdated Records'}
             </Button>
             <Button 
               onClick={openResetDialog}
