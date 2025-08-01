@@ -679,7 +679,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                 const contestName = team.contestCode && team.contestName
                   ? `${team.contestCode} ${team.contestName}`.trim()
                   : null;
-                const contestGroup = team.schoolLevel || null;
+                const contestGroup = team.targetGroupLabel || null;
                 
                 console.log(`Team contest fields (insert): Using contestId=${contestId}, contestName=${contestName}, contestGroup=${contestGroup}`);
                 
@@ -752,8 +752,8 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                 console.log(`Updated attendance for manager ${manager.id}, new hashcode: ${managerHashcode}`);
               } else {
                 // Get contestGroup directly from SQL query field - ensure using raw value
-                const contestGroup = team.schoolLevel || null;
-                console.log(`Manager INSERT: Using contestGroup=${contestGroup} from schoolLevel`);
+                const contestGroup = team.targetGroupLabel || null;
+                console.log(`Manager INSERT: Using contestGroup=${contestGroup} from targetGroupLabel`);
                 
                 try {
                   console.log(`TRYING TO INSERT MANAGER: managerId=${managerId}, contingentId=${contingentId}`);
