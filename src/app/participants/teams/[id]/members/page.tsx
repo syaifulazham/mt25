@@ -1620,14 +1620,37 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                       <Table>
                         <TableHeader className="sticky top-0 bg-background z-10">
                           <TableRow>
-                            <TableHead className="w-[60%]">{t('team.members.name')}</TableHead>
-                            <TableHead className="w-[40%] text-right">{t('team.members.action')}</TableHead>
+                            <TableHead className="w-[60px] sm:w-[80px] text-center">{t('team.members.action')}</TableHead>
+                            <TableHead className="flex-1">{t('team.members.name')}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredContestants.map((contestant) => (
                             <TableRow key={contestant.id}>
-                              <TableCell>
+                              <TableCell className="text-center pr-2 w-[60px] sm:w-[80px]">
+                                {contestant.inTeam ? (
+                                  <Badge variant="outline" className="bg-green-50 text-xs p-1">
+                                    <CheckCircle className="h-3 w-3 text-green-500" />
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleAddMember(contestant.id)}
+                                    disabled={isAddingMember || team.members.length >= (team.contestMaxMembers || team.maxMembers)}
+                                    className="h-8 w-8 p-0 sm:h-9 sm:w-auto sm:px-3"
+                                  >
+                                    {isAddingMember ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Plus className="h-4 w-4" />
+                                        <span className="hidden sm:inline sm:ml-1">Add</span>
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </TableCell>
+                              <TableCell className="pl-2">
                                 <div className="font-medium">{contestant.name || "—"}</div>
                                 <div className="text-xs text-muted-foreground">
                                   {contestant.age ? `${t('team.members.age')}: ${contestant.age}` : ''}
@@ -1638,27 +1661,6 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                                   {((contestant.class_grade || contestant.class_name) && contestant.email) ? ' | ' : ''}
                                   {contestant.email ? `${contestant.email}` : ''}
                                 </div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {contestant.inTeam ? (
-                                  <Badge variant="outline" className="bg-green-50">
-                                    <CheckCircle className="h-3 w-3 mr-1 text-green-500" />
-                                    {t('team.members.added')}
-                                  </Badge>
-                                ) : (
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleAddMember(contestant.id)}
-                                    disabled={isAddingMember || team.members.length >= (team.contestMaxMembers || team.maxMembers)}
-                                  >
-                                    {isAddingMember ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Plus className="h-4 w-4 mr-1" />
-                                    )}
-                                    Add
-                                  </Button>
-                                )}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -1680,24 +1682,32 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                 </div>
               )}
               
-              <DialogFooter className="space-x-2 mt-4">
-                <div className="mr-auto text-sm text-muted-foreground">
-                  {t('team.members.contestants_shown')
-                    .replace('{shown}', String(filteredContestants.length))
-                    .replace('{total}', String(contestantsPagination.totalContestants))}
+              <DialogFooter className="mt-4">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 w-full">
+                  <div className="text-sm text-muted-foreground order-2 sm:order-1">
+                    {t('team.members.contestants_shown')
+                      .replace('{shown}', String(filteredContestants.length))
+                      .replace('{total}', String(contestantsPagination.totalContestants))}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 order-1 sm:order-2">
+                    {contestantsPagination.hasMore && !isLoadingContestants && (
+                      <Button 
+                        variant="link" 
+                        onClick={loadMoreContestants}
+                        className="p-0 h-auto w-full sm:w-auto"
+                      >
+                        {t('common.load_more')}
+                      </Button>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setAddMemberDialogOpen(false)}
+                      className="w-full sm:w-auto"
+                    >
+                      {t('team.members.close')}
+                    </Button>
+                  </div>
                 </div>
-                {contestantsPagination.hasMore && !isLoadingContestants && (
-                  <Button 
-                    variant="link" 
-                    onClick={loadMoreContestants}
-                    className="ml-2 p-0 h-auto"
-                  >
-                    {t('common.load_more')}
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
-                  {t('team.members.close')}
-                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
