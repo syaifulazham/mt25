@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { format } from "date-fns";
 import {
   Card,
@@ -86,6 +87,10 @@ export default function ReportsPage() {
           endpoint = `/api/organizer/events/${eventId}/reports/endlist-basic`;
           filename = `endlist-basic-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.docx`;
           break;
+        case "endlist-basic-xlsx":
+          endpoint = `/api/organizer/events/${eventId}/reports/endlist-basic-xlsx`;
+          filename = `endlist-basic-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
+          break;
         case "contingents-list":
           endpoint = `/api/organizer/events/${eventId}/reports/contingents-list`;
           filename = `contingents-list-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.docx`;
@@ -93,6 +98,14 @@ export default function ReportsPage() {
         case "contingents-list-xlsx":
           endpoint = `/api/organizer/events/${eventId}/reports/contingents-list-xlsx`;
           filename = `contingents-list-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
+          break;
+        case "competitions-overview-docx":
+          endpoint = `/api/organizer/events/${eventId}/reports/competitions-overview-docx`;
+          filename = `competitions-overview-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.docx`;
+          break;
+        case "competitions-overview-xlsx":
+          endpoint = `/api/organizer/events/${eventId}/reports/competitions-overview-xlsx`;
+          filename = `competitions-overview-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
           break;
         default:
           throw new Error("Invalid report type");
@@ -224,7 +237,7 @@ export default function ReportsPage() {
                 <Button
                   onClick={() => handleDownloadReport("endlist-full")}
                   disabled={generatingReport === "endlist-full"}
-                  className="w-full"
+                  className="w-full bg-blue-600 hover:bg-blue-700"
                 >
                   {generatingReport === "endlist-full" ? (
                     <>
@@ -262,23 +275,42 @@ export default function ReportsPage() {
                   <p>• Age information</p>
                   <p>• No personal contact details</p>
                 </div>
-                <Button
-                  onClick={() => handleDownloadReport("endlist-basic")}
-                  disabled={generatingReport === "endlist-basic"}
-                  className="w-full"
-                >
-                  {generatingReport === "endlist-basic" ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download DOCX
-                    </>
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleDownloadReport("endlist-basic")}
+                    disabled={generatingReport === "endlist-basic"}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {generatingReport === "endlist-basic" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download DOCX
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => handleDownloadReport("endlist-basic-xlsx")}
+                    disabled={generatingReport === "endlist-basic-xlsx"}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {generatingReport === "endlist-basic-xlsx" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download XLSX
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -307,7 +339,7 @@ export default function ReportsPage() {
                   <Button
                     onClick={() => handleDownloadReport("contingents-list")}
                     disabled={generatingReport === "contingents-list" || generatingReport === "contingents-list-xlsx"}
-                    className="w-full"
+                    className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     {generatingReport === "contingents-list" ? (
                       <>
@@ -327,6 +359,71 @@ export default function ReportsPage() {
                     className="w-full bg-green-600 hover:bg-green-700"
                   >
                     {generatingReport === "contingents-list-xlsx" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download XLSX
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Report 4: Competitions Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Competitions Overview
+              </CardTitle>
+              <CardDescription>
+                Summary of all competitions with participation statistics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  <p>• Competition details by contest group</p>
+                  <p>• Contingent participation counts</p>
+                  <p>• Team and contestant statistics</p>
+                  <p>• Grouped by state (for ZONE events)</p>
+                </div>
+                <div className="space-y-2">
+                  <Link href={`/organizer/events/${eventId}/reports/competitions`} className="w-full block">
+                    <Button className="w-full" variant="outline">
+                      <FileText className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                  </Link>
+                  <Button
+                    onClick={() => handleDownloadReport("competitions-overview-docx")}
+                    disabled={generatingReport === "competitions-overview-docx"}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {generatingReport === "competitions-overview-docx" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download DOCX
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => handleDownloadReport("competitions-overview-xlsx")}
+                    disabled={generatingReport === "competitions-overview-xlsx"}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {generatingReport === "competitions-overview-xlsx" ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Generating...
@@ -363,8 +460,13 @@ export default function ReportsPage() {
                 <strong>Contingents List:</strong> Provides an overview of all participating contingents with their 
                 institutional affiliations and geographical information.
               </p>
+              <p>
+                <strong>Competitions Overview:</strong> Summarizes all competitions with participation statistics 
+                grouped by contest group and state (for ZONE events). Shows contingent, team, and contestant counts 
+                for each competition.
+              </p>
               <p className="text-xs">
-                All reports are generated in Microsoft Word (.docx) format and include only approved and accepted teams.
+                All reports are generated in Microsoft Word (.docx) or Excel (.xlsx) format and include only approved and accepted teams.
               </p>
             </div>
           </CardContent>

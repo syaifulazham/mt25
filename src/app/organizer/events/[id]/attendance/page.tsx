@@ -1678,8 +1678,8 @@ export default function AttendancePage() {
           </CardFooter>
         </Card>
         
-        {/* Sections Management */}
-        <Card>
+        {/* Sections Management - DISABLED */}
+        <Card className="opacity-50 pointer-events-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Map className="h-5 w-5" />
@@ -1691,18 +1691,21 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <p>Create and manage sections, assign PICs for different competition areas</p>
+            <div className="mt-2">
+              <Badge variant="secondary" className="bg-gray-200 text-gray-600">
+                Temporarily Disabled
+              </Badge>
+            </div>
           </CardContent>
           <CardFooter>
-            <Link href={`/organizer/events/${eventId}/attendance/sections`} className="w-full">
-              <Button className="w-full">
-                Manage Sections
-              </Button>
-            </Link>
+            <Button className="w-full" disabled>
+              Manage Sections
+            </Button>
           </CardFooter>
         </Card>
 
-        {/* Email Blasting */}
-        <Card>
+        {/* Email Blasting - DISABLED */}
+        <Card className="opacity-50 pointer-events-none">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -1714,13 +1717,16 @@ export default function AttendancePage() {
           </CardHeader>
           <CardContent>
             <p>Compose and send emails to contestants, teams, and contingents</p>
+            <div className="mt-2">
+              <Badge variant="secondary" className="bg-gray-200 text-gray-600">
+                Temporarily Disabled
+              </Badge>
+            </div>
           </CardContent>
           <CardFooter>
-            <Link href={`/organizer/events/${eventId}/email`} className="w-full">
-              <Button className="w-full">
-                Go to Email Center
-              </Button>
-            </Link>
+            <Button className="w-full" disabled>
+              Go to Email Center
+            </Button>
           </CardFooter>
         </Card>
 
