@@ -111,10 +111,18 @@ export async function GET(
       ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
     ` as any[];
 
+    // Convert BigInt values to numbers to avoid serialization issues
+    const processedTeams = teams.map((team: any) => ({
+      ...team,
+      id: Number(team.id),
+      minAge: team.minAge ? Number(team.minAge) : null,
+      maxAge: team.maxAge ? Number(team.maxAge) : null
+    }));
+
     // Fetch team members for each team
     const teamsWithMembers = await Promise.all(
-      teams.map(async (team: any) => {
-        const members = await prisma.$queryRaw`
+      processedTeams.map(async (team: any) => {
+        const membersRaw = await prisma.$queryRaw`
           SELECT 
             con.id,
             con.name as participantName,
@@ -130,7 +138,14 @@ export async function GET(
           JOIN contestant con ON tm.contestantId = con.id
           WHERE tm.teamId = ${team.id}
           ORDER BY con.name ASC
-        ` as TeamMember[];
+        ` as any[];
+
+        // Convert BigInt values to numbers
+        const members = membersRaw.map((member: any) => ({
+          ...member,
+          id: Number(member.id),
+          age: member.age ? Number(member.age) : null
+        })) as TeamMember[];
 
         return {
           ...team,
