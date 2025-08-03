@@ -49,16 +49,20 @@ export async function GET(
     }
 
     // Get event details
+    console.log("Fetching event details for eventId:", eventId);
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       select: { name: true, startDate: true, endDate: true }
     });
 
     if (!event) {
+      console.log("Event not found for eventId:", eventId);
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
+    console.log("Event found:", event.name);
 
     // Fetch teams using the same structure as the DOCX endpoint
+    console.log("Starting teams query for eventId:", eventId);
     const teams = await prisma.$queryRaw`
       SELECT 
         t.id,
@@ -111,6 +115,8 @@ export async function GET(
       ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
     ` as any[];
 
+    console.log("Teams query completed, found", teams.length, "teams");
+    
     // Convert BigInt values to numbers to avoid serialization issues
     const processedTeams = teams.map((team: any) => ({
       ...team,
@@ -118,43 +124,66 @@ export async function GET(
       minAge: team.minAge ? Number(team.minAge) : null,
       maxAge: team.maxAge ? Number(team.maxAge) : null
     }));
+    
+    console.log("Starting team members queries...");
 
-    // Fetch team members for each team
-    const teamsWithMembers = await Promise.all(
-      processedTeams.map(async (team: any) => {
-        const membersRaw = await prisma.$queryRaw`
-          SELECT 
-            con.id,
-            con.name as participantName,
-            con.edu_level,
-            con.class_grade,
-            con.age,
-            CASE 
-              WHEN con.class_grade IS NOT NULL AND con.class_grade != '' THEN con.class_grade
-              WHEN con.edu_level IS NOT NULL AND con.edu_level != '' THEN con.edu_level
-              ELSE 'N/A'
-            END as formattedClassGrade
-          FROM teammember tm
-          JOIN contestant con ON tm.contestantId = con.id
-          WHERE tm.teamId = ${team.id}
-          ORDER BY con.name ASC
-        ` as any[];
+    // Fetch team members for each team (process in smaller batches for production)
+    const teamsWithMembers = [];
+    const batchSize = 10; // Process teams in smaller batches to avoid memory issues
+    
+    for (let i = 0; i < processedTeams.length; i += batchSize) {
+      const batch = processedTeams.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(processedTeams.length/batchSize)}`);
+      
+      const batchResults = await Promise.all(
+        batch.map(async (team: any) => {
+          try {
+            const membersRaw = await prisma.$queryRaw`
+              SELECT 
+                con.id,
+                con.name as participantName,
+                con.edu_level,
+                con.class_grade,
+                con.age,
+                CASE 
+                  WHEN con.class_grade IS NOT NULL AND con.class_grade != '' THEN con.class_grade
+                  WHEN con.edu_level IS NOT NULL AND con.edu_level != '' THEN con.edu_level
+                  ELSE 'N/A'
+                END as formattedClassGrade
+              FROM teammember tm
+              JOIN contestant con ON tm.contestantId = con.id
+              WHERE tm.teamId = ${team.id}
+              ORDER BY con.name ASC
+            ` as any[];
 
-        // Convert BigInt values to numbers
-        const members = membersRaw.map((member: any) => ({
-          ...member,
-          id: Number(member.id),
-          age: member.age ? Number(member.age) : null
-        })) as TeamMember[];
+            // Convert BigInt values to numbers
+            const members = membersRaw.map((member: any) => ({
+              ...member,
+              id: Number(member.id),
+              age: member.age ? Number(member.age) : null
+            })) as TeamMember[];
 
-        return {
-          ...team,
-          members
-        };
-      })
-    );
+            return {
+              ...team,
+              members
+            };
+          } catch (memberError) {
+            console.error(`Error fetching members for team ${team.id}:`, memberError);
+            return {
+              ...team,
+              members: []
+            };
+          }
+        })
+      );
+      
+      teamsWithMembers.push(...batchResults);
+    }
 
+    console.log("Team members queries completed, found", teamsWithMembers.length, "teams with members");
+    
     // Prepare data for Excel with the specified headers
+    console.log("Starting XLSX data preparation...");
     const worksheetData = [];
     
     // Add headers with the specified columns
@@ -189,68 +218,68 @@ export async function GET(
       });
     });
 
+    console.log("Data preparation completed, creating workbook...");
+    
     // Create workbook and worksheet
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    
+    console.log("Workbook and worksheet created, applying styling...");
 
-    // Set column widths
-    const colWidths = [
-      { wch: 12 }, // Record Number
-      { wch: 15 }, // State
-      { wch: 25 }, // Contingent
-      { wch: 25 }, // Institution
-      { wch: 30 }, // Team
-      { wch: 20 }, // Contest
-      { wch: 25 }, // Name
-      { wch: 8 }   // Age
-    ];
-    worksheet['!cols'] = colWidths;
+    try {
+      // Set column widths
+      const colWidths = [
+        { wch: 12 }, // Record Number
+        { wch: 15 }, // State
+        { wch: 25 }, // Contingent
+        { wch: 25 }, // Institution
+        { wch: 30 }, // Team
+        { wch: 20 }, // Contest
+        { wch: 25 }, // Name
+        { wch: 8 }   // Age
+      ];
+      worksheet['!cols'] = colWidths;
+      console.log("Column widths set");
 
-    // Style the header row with colors
-    const headerRange = XLSX.utils.decode_range('A1:H1');
-    for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-      if (worksheet[cellAddress]) {
-        worksheet[cellAddress].s = {
-          font: { bold: true, color: { rgb: "FFFFFF" } },
-          fill: { fgColor: { rgb: "4472C4" } }, // Blue background
-          alignment: { horizontal: 'center', vertical: 'center' },
-          border: {
-            top: { style: 'thin', color: { rgb: "000000" } },
-            bottom: { style: 'thin', color: { rgb: "000000" } },
-            left: { style: 'thin', color: { rgb: "000000" } },
-            right: { style: 'thin', color: { rgb: "000000" } }
+      // Style the header row with colors (simplified for production)
+      try {
+        const headerRange = XLSX.utils.decode_range('A1:H1');
+        for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+          if (worksheet[cellAddress]) {
+            worksheet[cellAddress].s = {
+              font: { bold: true, color: { rgb: "FFFFFF" } },
+              fill: { fgColor: { rgb: "4472C4" } }, // Blue background
+              alignment: { horizontal: 'center', vertical: 'center' }
+            };
           }
-        };
-      }
-    }
-
-    // Add borders to all data cells
-    const dataRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:H1');
-    for (let row = dataRange.s.r + 1; row <= dataRange.e.r; row++) {
-      for (let col = dataRange.s.c; col <= dataRange.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        if (worksheet[cellAddress]) {
-          worksheet[cellAddress].s = {
-            border: {
-              top: { style: 'thin', color: { rgb: "000000" } },
-              bottom: { style: 'thin', color: { rgb: "000000" } },
-              left: { style: 'thin', color: { rgb: "000000" } },
-              right: { style: 'thin', color: { rgb: "000000" } }
-            }
-          };
         }
+        console.log("Header styling applied");
+      } catch (headerStyleError) {
+        console.warn("Header styling failed, continuing without styling:", headerStyleError);
       }
+
+      // Skip border styling for production to avoid memory issues
+      console.log("Skipping border styling for production compatibility");
+      
+    } catch (stylingError) {
+      console.warn("Styling failed, continuing with basic worksheet:", stylingError);
     }
 
     // Add worksheet to workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Basic Endlist Report');
 
+    console.log("Styling completed, generating buffer...");
+    
     // Generate buffer
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    console.log("Buffer generated successfully, preparing response...");
 
     // Return the file
     const fileName = `endlist-basic-${event.name.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
+    
+    console.log("Returning file:", fileName);
     
     return new NextResponse(buffer, {
       headers: {
@@ -261,8 +290,14 @@ export async function GET(
 
   } catch (error) {
     console.error("Error generating basic endlist XLSX:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+    console.error("Error message:", error instanceof Error ? error.message : String(error));
+    
     return NextResponse.json(
-      { error: "Failed to generate basic endlist XLSX file" },
+      { 
+        error: "Failed to generate basic endlist XLSX file",
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
