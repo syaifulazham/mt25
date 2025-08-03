@@ -61,8 +61,8 @@ export async function GET(
     }
     console.log("Event found:", event.name);
 
-    // Fetch teams using the same structure as the DOCX endpoint
-    console.log("Starting teams query for eventId:", eventId);
+    // Use a simpler query without the problematic targetgroup JOIN for production
+    console.log("Starting simplified teams query for eventId:", eventId);
     const teams = await prisma.$queryRaw`
       SELECT 
         t.id,
@@ -77,13 +77,8 @@ export async function GET(
           ELSE 'Unknown'
         END as contingentName,
         c.contingentType as contingentType,
-        tg.schoolLevel,
-        CASE 
-          WHEN tg.schoolLevel = 'Primary' THEN 'Kids'
-          WHEN tg.schoolLevel = 'Secondary' THEN 'Teens'
-          WHEN tg.schoolLevel = 'Higher Education' THEN 'Youth'
-          ELSE tg.schoolLevel
-        END as targetGroupLabel,
+        'General' as schoolLevel,
+        'General' as targetGroupLabel,
         CASE 
           WHEN c.contingentType = 'SCHOOL' THEN st_s.name
           WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN st_hi.name
@@ -95,15 +90,13 @@ export async function GET(
           WHEN c.contingentType = 'INDEPENDENT' THEN 'INDEPENDENT'
           ELSE 'Unknown PPD'
         END as ppd,
-        tg.minAge,
-        tg.maxAge
+        NULL as minAge,
+        NULL as maxAge
       FROM eventcontestteam ect
       JOIN eventcontest ec ON ect.eventcontestId = ec.id
       JOIN team t ON ect.teamId = t.id
       JOIN contingent c ON t.contingentId = c.id
       JOIN contest ct ON ec.contestId = ct.id
-      JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
-      JOIN targetgroup tg ON tg.id = ctg.B
       LEFT JOIN school s ON c.schoolId = s.id
       LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
@@ -112,10 +105,51 @@ export async function GET(
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
         AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
-      ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
+      ORDER BY st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
     ` as any[];
 
     console.log("Teams query completed, found", teams.length, "teams");
+    
+    if (teams.length === 0) {
+      console.log("No teams found. Checking event data...");
+      
+      // Check if event has any teams at all
+      const allTeamsCheck = await prisma.$queryRaw`
+        SELECT COUNT(*) as total
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${eventId}
+      ` as any[];
+      
+      console.log("Total teams in event (any status):", allTeamsCheck[0]?.total || 0);
+      
+      // Check team statuses
+      const statusCheck = await prisma.$queryRaw`
+        SELECT ect.status, COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${eventId}
+        GROUP BY ect.status
+      ` as any[];
+      
+      console.log("Team statuses in event:", statusCheck);
+      
+      // Check if the complex JOIN is the issue
+      const simpleTeamsCheck = await prisma.$queryRaw`
+        SELECT 
+          t.id,
+          t.name as teamName,
+          ect.status
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        WHERE ec.eventId = ${eventId}
+          AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
+        LIMIT 5
+      ` as any[];
+      
+      console.log("Sample teams with basic query:", simpleTeamsCheck);
+    }
     
     // Convert BigInt values to numbers to avoid serialization issues
     const processedTeams = teams.map((team: any) => ({
