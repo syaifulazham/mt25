@@ -61,8 +61,8 @@ export async function GET(
     }
     console.log("Event found:", event.name);
 
-    // Use a simpler query without the problematic targetgroup JOIN for production
-    console.log("Starting simplified teams query for eventId:", eventId);
+    // Use the exact same query as the working DOCX endpoint
+    console.log("Starting teams query (same as DOCX) for eventId:", eventId);
     const teams = await prisma.$queryRaw`
       SELECT 
         t.id,
@@ -77,8 +77,13 @@ export async function GET(
           ELSE 'Unknown'
         END as contingentName,
         c.contingentType as contingentType,
-        'General' as schoolLevel,
-        'General' as targetGroupLabel,
+        tg.schoolLevel,
+        CASE 
+          WHEN tg.schoolLevel = 'Primary' THEN 'Kids'
+          WHEN tg.schoolLevel = 'Secondary' THEN 'Teens'
+          WHEN tg.schoolLevel = 'Higher Education' THEN 'Youth'
+          ELSE tg.schoolLevel
+        END as targetGroupLabel,
         CASE 
           WHEN c.contingentType = 'SCHOOL' THEN st_s.name
           WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN st_hi.name
@@ -90,13 +95,15 @@ export async function GET(
           WHEN c.contingentType = 'INDEPENDENT' THEN 'INDEPENDENT'
           ELSE 'Unknown PPD'
         END as ppd,
-        NULL as minAge,
-        NULL as maxAge
+        tg.minAge,
+        tg.maxAge
       FROM eventcontestteam ect
       JOIN eventcontest ec ON ect.eventcontestId = ec.id
       JOIN team t ON ect.teamId = t.id
       JOIN contingent c ON t.contingentId = c.id
       JOIN contest ct ON ec.contestId = ct.id
+      JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
+      JOIN targetgroup tg ON tg.id = ctg.B
       LEFT JOIN school s ON c.schoolId = s.id
       LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
@@ -104,8 +111,8 @@ export async function GET(
       LEFT JOIN state st_hi ON hi.stateId = st_hi.id
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
-        AND ect.status IN ('APPROVED', 'ACCEPTED')
-      ORDER BY st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
+        AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
+      ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
     ` as any[];
 
     console.log("Teams query completed, found", teams.length, "teams");
@@ -200,11 +207,12 @@ export async function GET(
                 con.class_grade,
                 con.age,
                 CASE 
-                  WHEN con.class_grade IS NOT NULL AND con.class_grade != '' THEN con.class_grade
-                  WHEN con.edu_level IS NOT NULL AND con.edu_level != '' THEN con.edu_level
-                  ELSE 'N/A'
+                  WHEN LOWER(con.class_grade) = 'ppki' THEN con.class_grade
+                  WHEN con.edu_level = 'sekolah rendah' THEN CONCAT('Darjah ', COALESCE(con.class_grade, ''))
+                  WHEN con.edu_level = 'sekolah menengah' THEN CONCAT('Tingkatan ', COALESCE(con.class_grade, ''))
+                  ELSE CONCAT('Darjah/ Tingkatan ', COALESCE(con.class_grade, ''))
                 END as formattedClassGrade
-              FROM teammember tm
+              FROM teamMember tm
               JOIN contestant con ON tm.contestantId = con.id
               WHERE tm.teamId = ${team.id}
               ORDER BY con.name ASC
