@@ -109,13 +109,15 @@ export async function GET(
       ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
     ` as any[];
 
-    // Fetch team members for each team using the same structure as the working endlist API
+    // Fetch team members for each team using the exact same logic as main endlist API
     const teamsWithMembers = await Promise.all(
       teams.map(async (team: any) => {
         const members = await prisma.$queryRaw`
           SELECT 
             con.id,
             con.name as participantName,
+            con.email,
+            con.ic,
             con.edu_level,
             con.class_grade,
             con.age,
@@ -124,9 +126,20 @@ export async function GET(
               WHEN con.edu_level = 'sekolah rendah' THEN CONCAT('Darjah ', COALESCE(con.class_grade, ''))
               WHEN con.edu_level = 'sekolah menengah' THEN CONCAT('Tingkatan ', COALESCE(con.class_grade, ''))
               ELSE CONCAT('Darjah/ Tingkatan ', COALESCE(con.class_grade, ''))
-            END as formattedClassGrade
+            END as formattedClassGrade,
+            CASE 
+              WHEN c.contingentType = 'SCHOOL' THEN s.name
+              WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN hi.name
+              WHEN c.contingentType = 'INDEPENDENT' THEN i.name
+              ELSE 'Unknown'
+            END as contingentName,
+            c.contingentType as contingentType
           FROM teamMember tm
           JOIN contestant con ON tm.contestantId = con.id
+          JOIN contingent c ON con.contingentId = c.id
+          LEFT JOIN school s ON c.schoolId = s.id
+          LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
+          LEFT JOIN independent i ON c.independentId = i.id
           WHERE tm.teamId = ${team.id}
           ORDER BY con.name ASC
         ` as TeamMember[];
@@ -139,8 +152,8 @@ export async function GET(
     );
 
     // Filter out teams where any member's age doesn't match target group age range
-    // unless the team status is 'APPROVED_SPECIAL'
-    const filteredTeams = teamsWithMembers.filter((team: any) => {
+    // unless the team status is 'APPROVED_SPECIAL' (same logic as main endlist API)
+    const filteredTeams = teamsWithMembers.filter((team) => {
       // If team status is APPROVED_SPECIAL, always include the team
       if (team.status === 'APPROVED_SPECIAL') {
         return true;
@@ -152,11 +165,19 @@ export async function GET(
         const minAge = parseInt(team.minAge);
         const maxAge = parseInt(team.maxAge);
         
+        // If age data is missing or invalid, exclude the team for safety
+        if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) {
+          return false;
+        }
+        
+        // Check if member age is within the target group range
         return memberAge >= minAge && memberAge <= maxAge;
       });
-      
+
       return allMembersAgeValid;
     });
+
+
 
     // Process teams with formatted registration dates
     const processedTeams: Team[] = filteredTeams.map((team: any) => ({

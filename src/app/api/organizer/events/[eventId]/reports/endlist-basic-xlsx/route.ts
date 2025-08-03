@@ -188,61 +188,84 @@ export async function GET(
     
     console.log("Starting team members queries...");
 
-    // Fetch team members for each team (process in smaller batches for production)
-    const teamsWithMembers = [];
-    const batchSize = 10; // Process teams in smaller batches to avoid memory issues
-    
-    for (let i = 0; i < processedTeams.length; i += batchSize) {
-      const batch = processedTeams.slice(i, i + batchSize);
-      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(processedTeams.length/batchSize)}`);
-      
-      const batchResults = await Promise.all(
-        batch.map(async (team: any) => {
-          try {
-            const membersRaw = await prisma.$queryRaw`
-              SELECT 
-                con.id,
-                con.name as participantName,
-                con.edu_level,
-                con.class_grade,
-                con.age,
-                CASE 
-                  WHEN LOWER(con.class_grade) = 'ppki' THEN con.class_grade
-                  WHEN con.edu_level = 'sekolah rendah' THEN CONCAT('Darjah ', COALESCE(con.class_grade, ''))
-                  WHEN con.edu_level = 'sekolah menengah' THEN CONCAT('Tingkatan ', COALESCE(con.class_grade, ''))
-                  ELSE CONCAT('Darjah/ Tingkatan ', COALESCE(con.class_grade, ''))
-                END as formattedClassGrade
-              FROM teamMember tm
-              JOIN contestant con ON tm.contestantId = con.id
-              WHERE tm.teamId = ${team.id}
-              ORDER BY con.name ASC
-            ` as any[];
+    // Fetch team members for each team using the exact same logic as main endlist API
+    const teamsWithMembers = await Promise.all(
+      processedTeams.map(async (team: any) => {
+        const membersRaw = await prisma.$queryRaw`
+          SELECT 
+            con.id,
+            con.name as participantName,
+            con.email,
+            con.ic,
+            con.edu_level,
+            con.class_grade,
+            con.age,
+            CASE 
+              WHEN LOWER(con.class_grade) = 'ppki' THEN con.class_grade
+              WHEN con.edu_level = 'sekolah rendah' THEN CONCAT('Darjah ', COALESCE(con.class_grade, ''))
+              WHEN con.edu_level = 'sekolah menengah' THEN CONCAT('Tingkatan ', COALESCE(con.class_grade, ''))
+              ELSE CONCAT('Darjah/ Tingkatan ', COALESCE(con.class_grade, ''))
+            END as formattedClassGrade,
+            CASE 
+              WHEN c.contingentType = 'SCHOOL' THEN s.name
+              WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN hi.name
+              WHEN c.contingentType = 'INDEPENDENT' THEN i.name
+              ELSE 'Unknown'
+            END as contingentName,
+            c.contingentType as contingentType
+          FROM teamMember tm
+          JOIN contestant con ON tm.contestantId = con.id
+          JOIN contingent c ON con.contingentId = c.id
+          LEFT JOIN school s ON c.schoolId = s.id
+          LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
+          LEFT JOIN independent i ON c.independentId = i.id
+          WHERE tm.teamId = ${team.id}
+          ORDER BY con.name ASC
+        ` as any[];
 
-            // Convert BigInt values to numbers
-            const members = membersRaw.map((member: any) => ({
-              ...member,
-              id: Number(member.id),
-              age: member.age ? Number(member.age) : null
-            })) as TeamMember[];
+        // Convert BigInt values to numbers
+        const members = membersRaw.map((member: any) => ({
+          ...member,
+          id: Number(member.id),
+          age: member.age ? Number(member.age) : null
+        })) as TeamMember[];
 
-            return {
-              ...team,
-              members
-            };
-          } catch (memberError) {
-            console.error(`Error fetching members for team ${team.id}:`, memberError);
-            return {
-              ...team,
-              members: []
-            };
-          }
-        })
-      );
-      
-      teamsWithMembers.push(...batchResults);
-    }
+        return {
+          ...team,
+          members: members || []
+        };
+      })
+    );
 
     console.log("Team members queries completed, found", teamsWithMembers.length, "teams with members");
+    
+    // Filter out teams where any member's age doesn't match target group age range
+    // unless the team status is 'APPROVED_SPECIAL' (same logic as main endlist API)
+    const filteredTeams = teamsWithMembers.filter((team) => {
+      // If team status is APPROVED_SPECIAL, always include the team
+      if (team.status === 'APPROVED_SPECIAL') {
+        return true;
+      }
+
+      // Check if all members' ages are within the target group age range
+      const allMembersAgeValid = team.members.every((member: any) => {
+        const memberAge = parseInt(member.age);
+        const minAge = parseInt(team.minAge);
+        const maxAge = parseInt(team.maxAge);
+        
+        // If age data is missing or invalid, exclude the team for safety
+        if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) {
+          return false;
+        }
+        
+        // Check if member age is within the target group range
+        return memberAge >= minAge && memberAge <= maxAge;
+      });
+
+      return allMembersAgeValid;
+    });
+    
+    console.log("After age validation filtering:", filteredTeams.length, "teams remain");
     
     // Prepare data for Excel with the specified headers
     console.log("Starting XLSX data preparation...");
@@ -263,7 +286,7 @@ export async function GET(
 
     // Add data rows
     let recordNumber = 1;
-    teamsWithMembers.forEach((team: Team) => {
+    filteredTeams.forEach((team: Team) => {
       team.members.forEach((member: TeamMember) => {
         const row = [
           recordNumber,
