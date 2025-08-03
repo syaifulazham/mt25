@@ -104,7 +104,7 @@ export async function GET(
       LEFT JOIN state st_hi ON hi.stateId = st_hi.id
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
-        AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
+        AND ect.status IN ('APPROVED', 'ACCEPTED')
       ORDER BY st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
     ` as any[];
 
@@ -133,6 +133,26 @@ export async function GET(
       ` as any[];
       
       console.log("Team statuses in event:", statusCheck);
+      
+      // Check what statuses we're looking for vs what exists
+      console.log("We are filtering for statuses: APPROVED, ACCEPTED, APPROVED_SPECIAL");
+      
+      // Try a query with ALL statuses to see if we get any results
+      const allStatusTeams = await prisma.$queryRaw`
+        SELECT 
+          t.id,
+          t.name as teamName,
+          ect.status,
+          ct.name as contestName
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        JOIN contest ct ON ec.contestId = ct.id
+        WHERE ec.eventId = ${eventId}
+        LIMIT 10
+      ` as any[];
+      
+      console.log("Sample teams with ANY status:", allStatusTeams);
       
       // Check if the complex JOIN is the issue
       const simpleTeamsCheck = await prisma.$queryRaw`
