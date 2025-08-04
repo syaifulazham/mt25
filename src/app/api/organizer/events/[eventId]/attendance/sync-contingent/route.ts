@@ -376,7 +376,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
           const managerHashcode = createHashcode(manager.ic, eventId, team.contingentId);
 
           const existingManagerAttendance = await prisma.$queryRaw`
-            SELECT id FROM attendanceManager WHERE managerId = ${manager.id} AND eventId = ${eventId}
+            SELECT id FROM attendanceManager WHERE hashcode = ${managerHashcode}
           ` as any[];
 
           if (existingManagerAttendance.length === 0) {
@@ -399,7 +399,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                   contestGroup = ${team.targetGroupLabel},
                   email = ${manager.email || null},
                   email_status = ${'PENDING'}
-              WHERE managerId = ${manager.id} AND eventId = ${eventId}
+              WHERE hashcode = ${managerHashcode}
             `;
             syncResults.updatedManagers++;
           }
