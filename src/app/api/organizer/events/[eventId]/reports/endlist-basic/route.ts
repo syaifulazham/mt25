@@ -13,6 +13,14 @@ interface TeamMember {
   formattedClassGrade: string;
 }
 
+interface Manager {
+  id: number;
+  name: string;
+  teamId: number;
+  teamName: string;
+  contestName: string;
+}
+
 interface Team {
   id: number;
   teamName: string;
@@ -181,7 +189,6 @@ export async function GET(
 
     // Process teams with formatted registration dates
     const processedTeams: Team[] = filteredTeams.map((team: any) => ({
-
       ...team,
       members: team.members,
       registrationDate: new Date(team.registrationDate).toLocaleDateString('en-MY', {
@@ -190,6 +197,143 @@ export async function GET(
         day: 'numeric'
       })
     }));
+
+    // Fetch managers for the teams (same logic as Full Endlist Report)
+    const teamIds = processedTeams.map(team => team.id);
+    
+    // Get managers associated with these teams
+    const managers = await prisma.manager.findMany({
+      where: {
+        OR: [
+          // Managers directly associated with a team
+          {
+            teamId: {
+              in: teamIds
+            }
+          },
+          // Managers associated through manager_team
+          {
+            teams: {
+              some: {
+                teamId: {
+                  in: teamIds
+                }
+              }
+            }
+          }
+        ]
+      },
+      include: {
+        team: true,       // Direct team relation
+        teams: {          // Teams through manager_team
+          include: {
+            team: true
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
+      }
+    });
+    
+    // Get all event contests for the teams we're dealing with
+    const eventContestTeams = await prisma.eventcontestteam.findMany({
+      where: {
+        teamId: {
+          in: teamIds
+        }
+      },
+      include: {
+        eventcontest: {
+          include: {
+            contest: true
+          }
+        },
+        team: true
+      }
+    });
+    
+    // Create a map of team ID to team name and contest names
+    const teamContestsMap: Record<number, { teamName: string; contestNames: string[] }> = {};
+    eventContestTeams.forEach(ect => {
+      if (!teamContestsMap[ect.teamId]) {
+        teamContestsMap[ect.teamId] = {
+          teamName: ect.team.name,
+          contestNames: []
+        };
+      }
+      teamContestsMap[ect.teamId].contestNames.push(ect.eventcontest.contest.name);
+    });
+    
+    // Transform the results to match our Manager interface (without IC, phone, email)
+    const transformedManagers: Manager[] = [];
+    
+    managers.forEach(manager => {
+      // Get team IDs this manager manages (either directly or through manager_team)
+      const managedTeamIds: number[] = [];
+      
+      // Add direct team if it exists and is in our target teams
+      if (manager.teamId && teamIds.includes(manager.teamId)) {
+        managedTeamIds.push(manager.teamId);
+      }
+      
+      // Add teams from manager_team relationship
+      manager.teams.forEach(mt => {
+        if (teamIds.includes(mt.teamId) && !managedTeamIds.includes(mt.teamId)) {
+          managedTeamIds.push(mt.teamId);
+        }
+      });
+      
+      // If the manager manages any of our teams, include them
+      if (managedTeamIds.length > 0) {
+        // Collect team names and contest names
+        const teamNames: string[] = [];
+        const contestNames: string[] = [];
+        
+        managedTeamIds.forEach(teamId => {
+          if (teamContestsMap[teamId]) {
+            teamNames.push(teamContestsMap[teamId].teamName);
+            contestNames.push(...teamContestsMap[teamId].contestNames);
+          }
+        });
+        
+        // Create unique lists
+        const uniqueTeamNames = [...new Set(teamNames)];
+        const uniqueContestNames = [...new Set(contestNames)];
+        
+        transformedManagers.push({
+          id: manager.id,
+          name: manager.name,
+          teamId: managedTeamIds[0], // Just use the first team ID for reference
+          teamName: uniqueTeamNames.join(", "),
+          contestName: uniqueContestNames.join(", ")
+        });
+      }
+    });
+    
+    // Group managers by contingent (same logic as Full Endlist Report)
+    const managersByContingent = processedTeams.reduce((acc: Record<string, Manager[]>, team: Team) => {
+      const contingent = team.contingentName || 'Unknown Contingent';
+      
+      // Find managers for this team
+      const teamManagers = transformedManagers.filter(m => m.teamId === team.id);
+      
+      teamManagers.forEach(manager => {
+        if (!acc[contingent]) {
+          acc[contingent] = [];
+        }
+        // Check if manager already exists for this contingent
+        const existingManager = acc[contingent].find(m => m.id === manager.id);
+        if (existingManager && existingManager.teamName !== manager.teamName) {
+          existingManager.teamName += `, ${manager.teamName}`;
+          existingManager.contestName += `, ${manager.contestName}`;
+        } else if (!existingManager) {
+          acc[contingent].push(manager);
+        }
+      });
+      
+      return acc;
+    }, {} as Record<string, Manager[]>);
 
     // Group teams by target group, state, PPD, and contingent
     const groupedTeams: Record<string, Record<string, Record<string, Record<string, Team[]>>>> = {};
@@ -329,6 +473,73 @@ export async function GET(
               children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
               teamCounter++;
             });
+            
+            // Add Managers Table if there are managers for this contingent
+            if (managersByContingent[contingent] && managersByContingent[contingent].length > 0) {
+              // Add Managers header
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: "Managers", bold: true, font: 'Calibri' })],
+                  spacing: { before: 100, after: 50 }
+                })
+              );
+              
+              // Create managers table (without IC, phone, email columns)
+              const managerTableRows = [
+                new TableRow({
+                  children: [
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true , font: 'Calibri'})] })],
+                      shading: { fill: "E6E6E6" }
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Teams/Contests", bold: true , font: 'Calibri'})] })],
+                      shading: { fill: "E6E6E6" }
+                    })
+                  ]
+                })
+              ];
+              
+              managersByContingent[contingent].forEach((manager: Manager) => {
+                managerTableRows.push(
+                  new TableRow({
+                    children: [
+                      new TableCell({ 
+                        children: [new Paragraph({ children: [new TextRun({ text: manager.name, font: 'Calibri' })] })],
+                        shading: { fill: "F2F2F2" }
+                      }),
+                      new TableCell({
+                        children: [
+                          new Paragraph({
+                            children: [new TextRun({ text: manager.teamName, bold: true, font: 'Calibri' })]
+                          }),
+                          new Paragraph({
+                            children: [new TextRun({ text: manager.contestName, italics: true, font: 'Calibri' })]
+                          })
+                        ],
+                        shading: { fill: "F2F2F2" }
+                      })
+                    ]
+                  })
+                );
+              });
+              
+              const managerTable = new Table({
+                rows: managerTableRows,
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                }
+              });
+              
+              children.push(managerTable);
+              children.push(new Paragraph({ text: "", spacing: { after: 100 } })); // Spacer
+            }
           });
         });
       });
