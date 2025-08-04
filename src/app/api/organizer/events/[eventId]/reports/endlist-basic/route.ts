@@ -413,68 +413,8 @@ export async function GET(
                 spacing: { before: 200, after: 100 }
               })
             );
-
-            groupedTeams[targetGroup][state][ppd][contingent].forEach((team: Team) => {
-              // Team header
-              children.push(
-                new Paragraph({
-                  children: [new TextRun({ text: `${teamCounter}. ${team.teamName}`, bold: true, size: 16, font: 'Calibri' })],
-                  spacing: { before: 200, after: 100 }
-                })
-              );
-
-              // Team info
-              children.push(
-                new Paragraph({
-                  children: [new TextRun({ text: `Registration Date: ${team.registrationDate}`, font: 'Calibri' })],
-                  spacing: { after: 100 }
-                })
-              );
-
-              // Members table (without IC, phone, email)
-              const memberTableRows = [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No.", bold: true, font: 'Calibri' })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true, font: 'Calibri' })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Class/Grade", bold: true, font: 'Calibri' })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Age", bold: true, font: 'Calibri' })] })] }),
-                  ]
-                })
-              ];
-
-              team.members.forEach((member: TeamMember, index: number) => {
-                memberTableRows.push(
-                  new TableRow({
-                    children: [
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(index + 1), font: 'Calibri' })] })] }),
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.participantName, font: 'Calibri' })] })] }),
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.formattedClassGrade || 'N/A', font: 'Calibri' })] })] }),
-                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(member.age || 'N/A'), font: 'Calibri' })] })] }),
-                    ]
-                  })
-                );
-              });
-
-              const memberTable = new Table({
-                rows: memberTableRows,
-                width: { size: 100, type: WidthType.PERCENTAGE },
-                borders: {
-                  top: { style: BorderStyle.SINGLE, size: 1 },
-                  bottom: { style: BorderStyle.SINGLE, size: 1 },
-                  left: { style: BorderStyle.SINGLE, size: 1 },
-                  right: { style: BorderStyle.SINGLE, size: 1 },
-                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
-                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
-                }
-              });
-
-              children.push(memberTable);
-              children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
-              teamCounter++;
-            });
             
-            // Add Managers Table if there are managers for this contingent
+            // Add Managers Table FIRST if there are managers for this contingent
             if (managersByContingent[contingent] && managersByContingent[contingent].length > 0) {
               // Add Managers header
               children.push(
@@ -538,8 +478,68 @@ export async function GET(
               });
               
               children.push(managerTable);
-              children.push(new Paragraph({ text: "", spacing: { after: 100 } })); // Spacer
+              children.push(new Paragraph({ text: "", spacing: { after: 200 } })); // Spacer
             }
+
+            groupedTeams[targetGroup][state][ppd][contingent].forEach((team: Team) => {
+              // Team header
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: `${teamCounter}. ${team.teamName}`, bold: true, size: 16, font: 'Calibri' })],
+                  spacing: { before: 200, after: 100 }
+                })
+              );
+
+              // Team info
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: `Registration Date: ${team.registrationDate}`, font: 'Calibri' })],
+                  spacing: { after: 100 }
+                })
+              );
+
+              // Members table (without IC, phone, email)
+              const memberTableRows = [
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No.", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Class/Grade", bold: true, font: 'Calibri' })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Age", bold: true, font: 'Calibri' })] })] }),
+                  ]
+                })
+              ];
+
+              team.members.forEach((member: TeamMember, index: number) => {
+                memberTableRows.push(
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(index + 1), font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.participantName, font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: member.formattedClassGrade || 'N/A', font: 'Calibri' })] })] }),
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(member.age || 'N/A'), font: 'Calibri' })] })] }),
+                    ]
+                  })
+                );
+              });
+
+              const memberTable = new Table({
+                rows: memberTableRows,
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1 },
+                  bottom: { style: BorderStyle.SINGLE, size: 1 },
+                  left: { style: BorderStyle.SINGLE, size: 1 },
+                  right: { style: BorderStyle.SINGLE, size: 1 },
+                  insideHorizontal: { style: BorderStyle.SINGLE, size: 1 },
+                  insideVertical: { style: BorderStyle.SINGLE, size: 1 },
+                }
+              });
+
+              children.push(memberTable);
+              children.push(new Paragraph({ text: "", spacing: { after: 200 } }));
+              teamCounter++;
+            });
           });
         });
       });
