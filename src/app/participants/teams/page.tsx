@@ -252,10 +252,10 @@ export default function TeamsPage() {
       if (!response.ok) {
         const errorData = await response.json();
         
-        // Check if the error is due to maximum teams limit reached
+        // Check if the error requires a token (either due to team limit or cutoff registration)
         if (response.status === 400 && 
             errorData.error && 
-            errorData.error.includes('Maximum number of teams') && 
+            (errorData.error.includes('Maximum number of teams') || errorData.requiresToken) && 
             errorData.maxteampercontingent) {
           
           // Show token modal

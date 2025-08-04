@@ -273,6 +273,7 @@ model eventcontesttoken {
   eventId    Int
   eventToken String    @db.VarChar(255)
   consumed   Boolean?  @default(false)
+  notes      String?   @db.Text
   createdAt  DateTime? @default(now()) @db.DateTime(0)
   updatedAt  DateTime? @updatedAt @db.DateTime(0)
   emailedTo  String?   @db.VarChar(255)

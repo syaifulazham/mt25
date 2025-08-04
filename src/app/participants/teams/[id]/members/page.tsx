@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/language-context";
+import { TokenModal } from "../../token-modal";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -183,6 +184,16 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false);
+  
+  // Token modal state for member operations
+  const [tokenModalOpen, setTokenModalOpen] = useState(false);
+  const [tokenTarget, setTokenTarget] = useState<{
+    operation: 'add' | 'remove';
+    contestantId?: number;
+    teamMemberId?: number;
+    cutoffEvents: Array<{id: number, name: string}>;
+  } | null>(null);
+  const [verifyingToken, setVerifyingToken] = useState(false);
   
   // Survey status states
   const [surveyStatuses, setSurveyStatuses] = useState<Record<number, SurveyStatus[]>>({});
@@ -820,21 +831,37 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   }, [searchTerm, educationFilter, contestants, team]);
   
   // Handle adding a contestant to the team
-  const handleAddMember = async (contestantId: number) => {
+  const handleAddMember = async (contestantId: number, token?: string) => {
     try {
       setIsAddingMember(true);
+      
+      const body: { contestantId: number, token?: string } = { contestantId };
+      if (token) body.token = token;
       
       const response = await fetch(`/api/participants/teams/${params.id}/members`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ contestantId }),
+        body: JSON.stringify(body),
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to add contestant to team");
+        const errorData = await response.json();
+        
+        // Check if the error requires a token
+        if (response.status === 400 && errorData.requiresToken) {
+          // Show token modal for adding member
+          setTokenTarget({
+            operation: 'add',
+            contestantId,
+            cutoffEvents: errorData.cutoffEvents || []
+          });
+          setTokenModalOpen(true);
+          return;
+        }
+        
+        throw new Error(errorData.error || "Failed to add contestant to team");
       }
       
       // Update local state
@@ -860,23 +887,39 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
   };
   
   // Handle removing a contestant from the team
-  const handleRemoveMember = async () => {
+  const handleRemoveMember = async (token?: string) => {
     if (!memberToRemove) return;
     
     try {
       setIsRemoving(true);
+      
+      const body: { teamMemberId: number, token?: string } = { teamMemberId: memberToRemove.id };
+      if (token) body.token = token;
       
       const response = await fetch(`/api/participants/teams/${params.id}/members`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ teamMemberId: memberToRemove.id }),
+        body: JSON.stringify(body),
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to remove contestant from team");
+        const errorData = await response.json();
+        
+        // Check if the error requires a token
+        if (response.status === 400 && errorData.requiresToken) {
+          // Show token modal for removing member
+          setTokenTarget({
+            operation: 'remove',
+            teamMemberId: memberToRemove.id,
+            cutoffEvents: errorData.cutoffEvents || []
+          });
+          setTokenModalOpen(true);
+          return;
+        }
+        
+        throw new Error(errorData.error || "Failed to remove contestant from team");
       }
       
       // Update local state
@@ -899,6 +942,32 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       toast.error(error.message || t('team.members.remove_error'));
     } finally {
       setIsRemoving(false);
+    }
+  };
+
+  // Handle token verification and member operation
+  const handleTokenSubmit = async (token: string) => {
+    try {
+      if (!tokenTarget) return;
+      
+      setVerifyingToken(true);
+      
+      if (tokenTarget.operation === 'add' && tokenTarget.contestantId) {
+        // Call add member with token
+        await handleAddMember(tokenTarget.contestantId, token);
+      } else if (tokenTarget.operation === 'remove') {
+        // Call remove member with token
+        await handleRemoveMember(token);
+      }
+      
+      // Close the token modal after submission
+      setTokenModalOpen(false);
+      setTokenTarget(null);
+    } catch (error) {
+      console.error('Error verifying token:', error);
+      toast.error('Failed to verify token');
+    } finally {
+      setVerifyingToken(false);
     }
   };
   
@@ -1747,7 +1816,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                 </Button>
                 <Button 
                   variant="destructive" 
-                  onClick={handleRemoveMember}
+                  onClick={() => handleRemoveMember()}
                   disabled={isRemoving}
                 >
                   {isRemoving ? (
@@ -1958,6 +2027,19 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
             </DialogContent>
           </Dialog>
         </div>
+      )}
+      
+      {/* Token Modal for Member Operations */}
+      {tokenTarget && (
+        <TokenModal
+          isOpen={tokenModalOpen}
+          onClose={() => setTokenModalOpen(false)}
+          eventId={tokenTarget.cutoffEvents[0]?.id || 0}
+          teamId={parseInt(params.id)}
+          onSubmit={handleTokenSubmit}
+          isLoading={verifyingToken}
+          maxTeams={0}
+        />
       )}
     </div>
   );

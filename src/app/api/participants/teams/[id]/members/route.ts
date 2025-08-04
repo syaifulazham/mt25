@@ -11,7 +11,8 @@ const addMemberSchema = z.object({
     required_error: "Contestant ID is required",
     invalid_type_error: "Contestant ID must be a number"
   }),
-  role: z.string().optional()
+  role: z.string().optional(),
+  token: z.string().optional()
 });
 
 // Schema for removing a contestant from a team
@@ -19,7 +20,8 @@ const removeMemberSchema = z.object({
   teamMemberId: z.number({
     required_error: "Team Member ID is required",
     invalid_type_error: "Team Member ID must be a number"
-  })
+  }),
+  token: z.string().optional()
 });
 
 // POST handler - Add a contestant to a team
@@ -96,6 +98,21 @@ export async function POST(
         { status: 403 }
       );
     }
+
+    // Check if team is registered for any upcoming events with CUTOFF_REGISTRATION status
+    const upcomingCutoffEvents = await prisma.$queryRaw`
+      SELECT DISTINCT e.id, e.name, e.status
+      FROM event e
+      JOIN eventcontest ec ON e.id = ec.eventId
+      JOIN eventcontestteam ect ON ec.id = ect.eventcontestId
+      WHERE ect.teamId = ${teamId}
+        AND e.status = 'CUTOFF_REGISTRATION'
+        AND e.startDate > NOW()
+        AND e.isActive = 1
+        AND ec.isActive = 1
+    ` as any[];
+
+    const isRegistrationCutoff = upcomingCutoffEvents.length > 0;
     
     // Check if the team is already at maximum capacity
     // Use contest's maxMembersPerTeam if available, otherwise fall back to team's maxMembers
@@ -120,7 +137,53 @@ export async function POST(
       );
     }
     
-    const { contestantId, role } = validationResult.data;
+    const { contestantId, role, token } = validationResult.data;
+    let tokenData: any = null;
+
+    // If registration is in cutoff period, require token
+    if (isRegistrationCutoff && !token) {
+      return NextResponse.json(
+        { 
+          error: 'Team member changes are restricted during registration cutoff period. A valid token is required.',
+          requiresToken: true,
+          cutoffEvents: upcomingCutoffEvents.map(e => ({ id: e.id, name: e.name }))
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate token if provided and cutoff is active
+    if (isRegistrationCutoff && token) {
+      // Get the first cutoff event for token validation
+      const eventId = upcomingCutoffEvents[0].id;
+      
+      const tokenCheck = await prisma.$queryRaw`
+        SELECT id, consumed FROM eventcontesttoken 
+        WHERE eventToken = ${token} AND eventId = ${eventId}
+      ` as any[];
+      
+      const validToken = tokenCheck.length > 0;
+      
+      if (!validToken) {
+        return NextResponse.json(
+          { error: 'Invalid token for this event' },
+          { status: 400 }
+        );
+      }
+      
+      tokenData = tokenCheck[0];
+      
+      // Check if token is already consumed
+      if (tokenData.consumed) {
+        return NextResponse.json(
+          { error: 'Token has already been used' },
+          { status: 400 }
+        );
+      }
+      
+      // Store token data for later consumption (after we get contestant info)
+      console.log(`Valid token found for adding member to team ${teamId}`);
+    }
     
     // Verify the contestant exists
     const contestant = await prisma.contestant.findUnique({
@@ -132,6 +195,16 @@ export async function POST(
     
     if (!contestant) {
       return NextResponse.json({ error: "Contestant not found" }, { status: 404 });
+    }
+    
+    // If token was required, mark it as consumed with descriptive notes
+    if (tokenData) {
+      const noteText = `add ${contestant.name} to team ${team.name}`;
+      await prisma.$executeRaw`
+        UPDATE eventcontesttoken SET consumed = true, notes = ${noteText}, updatedAt = NOW()
+        WHERE id = ${tokenData.id}
+      `;
+      console.log(`Token consumed for adding ${contestant.name} to team ${team.name}`);
     }
     
     // Verify the contestant belongs to the same contingent as the team
@@ -345,6 +418,7 @@ export async function DELETE(
     }
     
     const { teamMemberId } = validationResult.data;
+    let tokenData: any = null;
     
     if (isNaN(teamMemberId)) {
       return NextResponse.json({ error: "Invalid Team Member ID" }, { status: 400 });
@@ -400,12 +474,77 @@ export async function DELETE(
         { status: 403 }
       );
     }
+
+    // Check if team is registered for any upcoming events with CUTOFF_REGISTRATION status
+    const upcomingCutoffEvents = await prisma.$queryRaw`
+      SELECT DISTINCT e.id, e.name, e.status
+      FROM event e
+      JOIN eventcontest ec ON e.id = ec.eventId
+      JOIN eventcontestteam ect ON ec.id = ect.eventcontestId
+      WHERE ect.teamId = ${teamId}
+        AND e.status = 'CUTOFF_REGISTRATION'
+        AND e.startDate > NOW()
+        AND e.isActive = 1
+        AND ec.isActive = 1
+    ` as any[];
+
+    const isRegistrationCutoff = upcomingCutoffEvents.length > 0;
+
+    const { token } = validationResult.data;
+
+    // If registration is in cutoff period, require token
+    if (isRegistrationCutoff && !token) {
+      return NextResponse.json(
+        { 
+          error: 'Team member changes are restricted during registration cutoff period. A valid token is required.',
+          requiresToken: true,
+          cutoffEvents: upcomingCutoffEvents.map(e => ({ id: e.id, name: e.name }))
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate token if provided and cutoff is active
+    if (isRegistrationCutoff && token) {
+      // Get the first cutoff event for token validation
+      const eventId = upcomingCutoffEvents[0].id;
+      
+      const tokenCheck = await prisma.$queryRaw`
+        SELECT id, consumed FROM eventcontesttoken 
+        WHERE eventToken = ${token} AND eventId = ${eventId}
+      ` as any[];
+      
+      const validToken = tokenCheck.length > 0;
+      
+      if (!validToken) {
+        return NextResponse.json(
+          { error: 'Invalid token for this event' },
+          { status: 400 }
+        );
+      }
+      
+      tokenData = tokenCheck[0];
+      
+      // Check if token is already consumed
+      if (tokenData.consumed) {
+        return NextResponse.json(
+          { error: 'Token has already been used' },
+          { status: 400 }
+        );
+      }
+      
+      // Store token data for later consumption (after we get team member info)
+      console.log(`Valid token found for removing member from team ${teamId}`);
+    }
     
     // Verify the team member exists and belongs to this team
     const teamMember = await prisma.teamMember.findFirst({
       where: {
         id: teamMemberId,
         teamId: teamId
+      },
+      include: {
+        contestant: true
       }
     });
     
@@ -414,6 +553,16 @@ export async function DELETE(
         { error: "Team member not found or does not belong to this team" },
         { status: 404 }
       );
+    }
+    
+    // If token was required, mark it as consumed with descriptive notes
+    if (tokenData) {
+      const noteText = `remove ${teamMember.contestant.name} from team ${team.name}`;
+      await prisma.$executeRaw`
+        UPDATE eventcontesttoken SET consumed = true, notes = ${noteText}, updatedAt = NOW()
+        WHERE id = ${tokenData.id}
+      `;
+      console.log(`Token consumed for removing ${teamMember.contestant.name} from team ${team.name}`);
     }
     
     // Remove the contestant from the team

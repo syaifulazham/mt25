@@ -62,6 +62,19 @@ export async function POST(
       return NextResponse.json({ error: 'Team contest does not match event contest' }, { status: 400 });
     }
 
+    // Check if event is in CUTOFF_REGISTRATION status - if so, token is always required
+    const isRegistrationCutoff = eventcontest.event.status === 'CUTOFF_REGISTRATION';
+    if (isRegistrationCutoff && !token) {
+      return NextResponse.json(
+        { 
+          error: 'Registration is in cutoff period. A valid token is required to register teams.',
+          requiresToken: true,
+          maxteampercontingent: eventcontest.maxteampercontingent 
+        },
+        { status: 400 }
+      );
+    }
+
     // Check for existing registration using direct database query
     try {
       // Use raw SQL to check for existing registration
@@ -109,55 +122,56 @@ export async function POST(
       const contingentTeamsCount = Array.isArray(contingentTeamsResult) && contingentTeamsResult.length > 0 
         ? (contingentTeamsResult[0] as any).count : 0;
       
-      // Check if the count has reached the maximum allowed per contingent
-      if (contingentTeamsCount >= eventcontest.maxteampercontingent) {
-        // If token is provided, validate it
-        if (token) {
-          // Check if the token exists, matches the event ID, and is not consumed
-          const tokenCheck = `
-            SELECT id, consumed FROM eventcontesttoken 
-            WHERE eventToken = ? AND eventId = ?
-          `;
-          
-          const tokenResult = await prisma.$queryRawUnsafe(tokenCheck, token, eventcontest.eventId);
-          const validToken = Array.isArray(tokenResult) && tokenResult.length > 0;
-          
-          if (!validToken) {
-            return NextResponse.json(
-              { error: 'Invalid token for this event' },
-              { status: 400 }
-            );
-          }
-          
-          const tokenData = tokenResult[0] as any;
-          
-          // Check if token is already consumed
-          if (tokenData.consumed) {
-            return NextResponse.json(
-              { error: 'Token has already been used' },
-              { status: 400 }
-            );
-          }
-          
-          // Mark the token as consumed
-          const markTokenConsumed = `
-            UPDATE eventcontesttoken SET consumed = true, updatedAt = NOW()
-            WHERE id = ?
-          `;
-          await prisma.$queryRawUnsafe(markTokenConsumed, tokenData.id);
-          
-          // Allow registration to proceed (token is valid)
-          console.log(`Valid token used for team ${teamId} to register for event contest ${eventcontestId}`);
-        } else {
-          // No token provided, return error with maxteampercontingent value
+      // Check if token is required (either due to cutoff registration or team limit exceeded)
+      const teamLimitExceeded = contingentTeamsCount >= eventcontest.maxteampercontingent;
+      const tokenRequired = isRegistrationCutoff || teamLimitExceeded;
+      
+      if (tokenRequired && token) {
+        // Validate the provided token
+        const tokenCheck = `
+          SELECT id, consumed FROM eventcontesttoken 
+          WHERE eventToken = ? AND eventId = ?
+        `;
+        
+        const tokenResult = await prisma.$queryRawUnsafe(tokenCheck, token, eventcontest.eventId);
+        const validToken = Array.isArray(tokenResult) && tokenResult.length > 0;
+        
+        if (!validToken) {
           return NextResponse.json(
-            { 
-              error: `Maximum number of teams (${eventcontest.maxteampercontingent}) from this contingent has already been reached`, 
-              maxteampercontingent: eventcontest.maxteampercontingent 
-            },
+            { error: 'Invalid token for this event' },
             { status: 400 }
           );
         }
+        
+        const tokenData = tokenResult[0] as any;
+        
+        // Check if token is already consumed
+        if (tokenData.consumed) {
+          return NextResponse.json(
+            { error: 'Token has already been used' },
+            { status: 400 }
+          );
+        }
+        
+        // Mark the token as consumed with descriptive notes
+        const noteText = `register extra team (${team.name}) to the ${eventcontest.event.name}`;
+        const markTokenConsumed = `
+          UPDATE eventcontesttoken SET consumed = true, notes = ?, updatedAt = NOW()
+          WHERE id = ?
+        `;
+        await prisma.$queryRawUnsafe(markTokenConsumed, noteText, tokenData.id);
+        
+        // Allow registration to proceed (token is valid)
+        console.log(`Valid token used for team ${teamId} to register for event contest ${eventcontestId}`);
+      } else if (teamLimitExceeded && !isRegistrationCutoff) {
+        // Team limit exceeded but not in cutoff period - show team limit error
+        return NextResponse.json(
+          { 
+            error: `Maximum number of teams (${eventcontest.maxteampercontingent}) from this contingent has already been reached`, 
+            maxteampercontingent: eventcontest.maxteampercontingent 
+          },
+          { status: 400 }
+        );
       }
       
       // Simple SQL insert using queryRawUnsafe

@@ -51,7 +51,7 @@ export function TokenModal({
         <DialogHeader>
           <DialogTitle>Token Required</DialogTitle>
           <DialogDescription>
-            Maximum number of teams ({maxTeams}) has been reached. Please enter a valid token to register an additional team.
+            A valid token is required to register this team. This may be due to registration cutoff period or maximum team limit ({maxTeams}) being reached.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">

@@ -18,7 +18,7 @@ export async function GET(
   try {
     // Use Prisma client with dynamic access to work around TypeScript issues
     const tokens = await prisma.$queryRaw`
-      SELECT id, eventId, eventToken, consumed, emailedTo, createdAt, updatedAt 
+      SELECT id, eventId, eventToken, consumed, emailedTo, notes, createdAt, updatedAt 
       FROM eventcontesttoken
       WHERE eventId = ${parseInt(eventId)}
       ORDER BY createdAt DESC

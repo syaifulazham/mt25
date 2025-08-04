@@ -27,6 +27,7 @@ type Token = {
   eventToken: string;
   consumed: boolean;
   emailedTo?: string;
+  notes?: string;
   createdAt: string;
 };
 
@@ -261,7 +262,12 @@ export default function EventTokenManagementPage() {
                       {token.emailedTo ? (
                         <span className="font-medium text-green-600">{token.emailedTo}</span>
                       ) : token.consumed ? (
-                        <span className="text-red-600">Consumed</span>
+                        <div className="text-red-600">
+                          <div className="font-medium">Consumed</div>
+                          {token.notes && (
+                            <div className="text-sm text-gray-600 mt-1">{token.notes}</div>
+                          )}
+                        </div>
                       ) : (
                         <Button
                           variant="outline"
