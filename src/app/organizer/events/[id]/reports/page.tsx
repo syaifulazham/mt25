@@ -107,6 +107,10 @@ export default function ReportsPage() {
           endpoint = `/api/organizer/events/${eventId}/reports/competitions-overview-xlsx`;
           filename = `competitions-overview-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
           break;
+        case "endlist-full-xlsx":
+          endpoint = `/api/organizer/events/${eventId}/reports/endlist-full-xlsx`;
+          filename = `endlist-full-${eventInfo?.name?.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.xlsx`;
+          break;
         default:
           throw new Error("Invalid report type");
       }
@@ -234,23 +238,42 @@ export default function ReportsPage() {
                   <p>• Phone numbers and emails</p>
                   <p>• Class/Grade information</p>
                 </div>
-                <Button
-                  onClick={() => handleDownloadReport("endlist-full")}
-                  disabled={generatingReport === "endlist-full"}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                >
-                  {generatingReport === "endlist-full" ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download DOCX
-                    </>
-                  )}
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleDownloadReport("endlist-full")}
+                    disabled={generatingReport === "endlist-full"}
+                    className="w-full bg-blue-600 hover:bg-blue-700"
+                  >
+                    {generatingReport === "endlist-full" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download DOCX
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => handleDownloadReport("endlist-full-xlsx")}
+                    disabled={generatingReport === "endlist-full-xlsx"}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                  >
+                    {generatingReport === "endlist-full-xlsx" ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download XLSX
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
