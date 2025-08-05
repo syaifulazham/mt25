@@ -136,7 +136,15 @@ export async function GET(
     
     // Get team members with IC and email (Full Endlist includes sensitive data)
     const teamIds = processedTeams.map((team: Team) => team.id);
-    const teamMembers = await prisma.$queryRaw`
+    console.log("Team IDs for member query:", teamIds.length, "teams");
+    
+    if (teamIds.length === 0) {
+      console.log("No team IDs found, returning empty result");
+      return NextResponse.json({ error: "No teams found for member query" }, { status: 404 });
+    }
+    
+    // Use $queryRawUnsafe for proper IN clause with array
+    const teamMembers = await prisma.$queryRawUnsafe(`
       SELECT 
         tm.teamId,
         c.id,
@@ -159,7 +167,7 @@ export async function GET(
       JOIN contestant c ON tm.contestantId = c.id
       WHERE tm.teamId IN (${teamIds.join(',')})
       ORDER BY c.name ASC
-    ` as any[];
+    `) as any[];
 
     console.log("Team members query completed, found", teamMembers.length, "members");
 
@@ -254,6 +262,17 @@ export async function GET(
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     
     console.log("Workbook and worksheet created, applying styling...");
+    console.log("Total data rows in worksheetData:", worksheetData.length);
+    console.log("Sample data:", worksheetData.slice(0, 3));
+    
+    // Check xlsx library version and capabilities
+    console.log("XLSX library version check:");
+    try {
+      const xlsxVersion = require('xlsx/package.json').version;
+      console.log("XLSX version:", xlsxVersion);
+    } catch (e) {
+      console.log("Could not determine XLSX version");
+    }
 
     try {
       // Set optimized column widths for professional appearance
@@ -272,93 +291,98 @@ export async function GET(
       worksheet['!cols'] = colWidths;
       console.log("Column widths set");
 
-      // Apply professional styling to the entire table
+      // Test minimal styling approach with extensive debugging
       try {
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:J1');
+        console.log("Starting styling test...");
+        console.log("Worksheet keys:", Object.keys(worksheet).slice(0, 10));
+        console.log("Worksheet range:", worksheet['!ref']);
         
-        // Style the header row with professional colors
-        const headerRange = XLSX.utils.decode_range('A1:J1');
-        for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+        // Test styling on just the first cell (A1)
+        const testCell = 'A1';
+        console.log("Testing cell A1:", worksheet[testCell]);
+        
+        if (worksheet[testCell]) {
+          // Try the most basic styling possible
+          worksheet[testCell].s = {
+            font: { bold: true }
+          };
+          console.log("Applied basic bold to A1");
+          
+          // Try adding background color
+          worksheet[testCell].s.fill = { fgColor: { rgb: "FF0000" } }; // Red background for testing
+          console.log("Applied red background to A1");
+          
+          console.log("Final A1 cell:", JSON.stringify(worksheet[testCell], null, 2));
+        } else {
+          console.error("Cell A1 not found in worksheet!");
+        }
+        
+        // Try styling all header cells with minimal approach
+        for (let col = 0; col < 10; col++) {
           const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+          console.log(`Styling cell ${cellAddress}`);
+          
           if (worksheet[cellAddress]) {
             worksheet[cellAddress].s = {
-              font: { 
-                bold: true, 
-                color: { rgb: "FFFFFF" },
-                size: 12,
-                name: "Calibri"
-              },
-              fill: { fgColor: { rgb: "2F5597" } }, // Professional dark blue
-              alignment: { 
-                horizontal: 'center', 
-                vertical: 'center',
-                wrapText: false
-              },
-              border: {
-                top: { style: 'thin', color: { rgb: "000000" } },
-                bottom: { style: 'thin', color: { rgb: "000000" } },
-                left: { style: 'thin', color: { rgb: "000000" } },
-                right: { style: 'thin', color: { rgb: "000000" } }
-              }
+              font: { bold: true },
+              fill: { fgColor: { rgb: "4472C4" } }
             };
+            console.log(`Styled ${cellAddress}:`, worksheet[cellAddress].s);
+          } else {
+            console.warn(`Cell ${cellAddress} not found`);
           }
         }
         
-        // Style data rows with alternating colors and borders
-        for (let row = 1; row <= range.e.r; row++) {
-          const isEvenRow = row % 2 === 0;
-          for (let col = range.s.c; col <= range.e.c; col++) {
-            const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+        console.log("Header styling test completed");
+      } catch (headerStyleError) {
+        console.error("Header styling failed:", headerStyleError);
+        console.error("Error stack:", headerStyleError instanceof Error ? headerStyleError.stack : 'No stack trace');
+        
+        // If styling fails completely, at least ensure proper data formatting
+        console.log("Styling not supported - ensuring data integrity only");
+        
+        // Ensure IC column is at least formatted as text (most important feature)
+        try {
+          for (let row = 1; row <= 100; row++) { // Test first 100 rows
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: 7 });
             if (worksheet[cellAddress]) {
-              worksheet[cellAddress].s = {
-                font: {
-                  size: 11,
-                  name: "Calibri",
-                  color: { rgb: "000000" }
-                },
-                fill: { 
-                  fgColor: { 
-                    rgb: isEvenRow ? "F8F9FA" : "FFFFFF" // Light gray for even rows, white for odd
-                  } 
-                },
-                alignment: {
-                  horizontal: col === 0 ? 'center' : (col === 9 ? 'center' : 'left'), // Center for Record# and Age, left for others
-                  vertical: 'center',
-                  wrapText: false
-                },
-                border: {
-                  top: { style: 'thin', color: { rgb: "D1D5DB" } },
-                  bottom: { style: 'thin', color: { rgb: "D1D5DB" } },
-                  left: { style: 'thin', color: { rgb: "D1D5DB" } },
-                  right: { style: 'thin', color: { rgb: "D1D5DB" } }
-                }
-              };
+              worksheet[cellAddress].t = 's'; // Force string type
+              break; // If this works, we know text formatting is possible
             }
           }
+          console.log("Text formatting for IC column is supported");
+        } catch (textError) {
+          console.error("Even text formatting is not supported:", textError);
         }
-        
-        console.log("Professional table styling applied");
-      } catch (headerStyleError) {
-        console.warn("Table styling failed, continuing without styling:", headerStyleError);
       }
 
       // Format IC column (column H, index 7) as text to preserve leading zeros
       try {
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:J1');
-        for (let row = 1; row <= range.e.r; row++) { // Start from row 1 (skip header)
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: 7 }); // Column H (IC)
-          if (worksheet[cellAddress]) {
-            worksheet[cellAddress].z = '@'; // Text format
-            if (!worksheet[cellAddress].s) {
-              worksheet[cellAddress].s = {};
+        const actualRange = worksheet['!ref'];
+        if (actualRange) {
+          const range = XLSX.utils.decode_range(actualRange);
+          console.log(`Formatting IC column for ${range.e.r} data rows`);
+          
+          for (let row = 1; row <= range.e.r; row++) { // Start from row 1 (skip header)
+            const cellAddress = XLSX.utils.encode_cell({ r: row, c: 7 }); // Column H (IC)
+            if (worksheet[cellAddress]) {
+              worksheet[cellAddress].z = '@'; // Text format
+              if (!worksheet[cellAddress].s) {
+                worksheet[cellAddress].s = {};
+              }
+              worksheet[cellAddress].s.numFmt = '@'; // Ensure text format
             }
-            worksheet[cellAddress].s.numFmt = '@'; // Ensure text format
           }
+          console.log(`IC column formatted as text for ${range.e.r} rows`);
         }
-        console.log("IC column formatted as text");
       } catch (formatError) {
         console.warn("IC column formatting failed, continuing without formatting:", formatError);
       }
+
+      // Skip additional styling for production compatibility (following Basic Endlist pattern)
+      console.log("Skipping additional styling for production compatibility");
+
+
 
       // Add freeze panes to keep header visible when scrolling
       try {
@@ -377,8 +401,15 @@ export async function GET(
 
     console.log("Styling completed, generating buffer...");
     
-    // Generate buffer
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Generate buffer with cellStyles option to ensure styling is included
+    console.log("Generating XLSX buffer with styling options...");
+    const buffer = XLSX.write(workbook, { 
+      type: 'buffer', 
+      bookType: 'xlsx',
+      cellStyles: true,
+      sheetStubs: false
+    });
+    console.log("Buffer generated with styling options");
     
     console.log("Buffer generated successfully, preparing response...");
 
