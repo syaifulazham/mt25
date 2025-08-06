@@ -23,17 +23,6 @@ type Quiz = {
   publishedAt: Date | null;
 };
 
-// Mock quiz data
-const mockQuiz = {
-  id: 1,
-  quiz_name: "Science Knowledge Quiz",
-  description: "Test your understanding of basic scientific concepts",
-  target_group: "SECONDARY",
-  time_limit: 30,
-  status: "created",
-  publishedAt: null
-};
-
 export default function EditQuizPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const quizId = parseInt(params.id);
@@ -50,16 +39,77 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
   
   const [loading, setLoading] = useState(false);
   const [loadingQuiz, setLoadingQuiz] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [targetGroups, setTargetGroups] = useState<Array<{value: string, label: string}>>([]);
 
-  // Simulate fetching quiz data
+  // Fetch quiz data from API
   useEffect(() => {
-    setLoadingQuiz(true);
-    
-    // In a real implementation, this would be a fetch call to your API
-    setTimeout(() => {
-      setQuiz(mockQuiz);
+    const fetchQuiz = async () => {
+      try {
+        setLoadingQuiz(true);
+        setError(null);
+        
+        // Fetch quiz data and target groups in parallel
+        const [quizResponse, targetGroupsResponse] = await Promise.all([
+          fetch(`/api/organizer/quizzes/${quizId}`),
+          fetch('/api/organizer/targetgroups')
+        ]);
+        
+        if (!quizResponse.ok) {
+          if (quizResponse.status === 404) {
+            throw new Error('Quiz not found');
+          } else if (quizResponse.status === 401) {
+            throw new Error('Unauthorized - Please log in');
+          } else if (quizResponse.status === 403) {
+            throw new Error('Unauthorized - Only organizers can access this page');
+          } else {
+            throw new Error(`Failed to fetch quiz: ${quizResponse.status}`);
+          }
+        }
+        
+        if (!targetGroupsResponse.ok) {
+          console.warn('Failed to fetch target groups, using fallback options');
+        }
+        
+        const quizData = await quizResponse.json();
+        setQuiz({
+          id: quizData.id,
+          quiz_name: quizData.quiz_name,
+          description: quizData.description,
+          target_group: quizData.target_group,
+          time_limit: quizData.time_limit,
+          status: quizData.status,
+          publishedAt: quizData.publishedAt
+        });
+        
+        // Set target groups if successfully fetched
+        if (targetGroupsResponse.ok) {
+          const targetGroupsData = await targetGroupsResponse.json();
+          setTargetGroups(targetGroupsData);
+        } else {
+          // Fallback to hardcoded options if API fails
+          setTargetGroups([
+            { value: "PRIMARY", label: "Primary School" },
+            { value: "SECONDARY", label: "Secondary School" },
+            { value: "UNIVERSITY", label: "University" },
+            { value: "PROFESSIONAL", label: "Professional" },
+            { value: "ALL", label: "All Groups" }
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch quiz:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load quiz');
+      } finally {
+        setLoadingQuiz(false);
+      }
+    };
+
+    if (quizId && !isNaN(quizId)) {
+      fetchQuiz();
+    } else {
+      setError('Invalid quiz ID');
       setLoadingQuiz(false);
-    }, 500);
+    }
   }, [quizId]);
 
   const handleChange = (field: keyof Quiz, value: string | number | null) => {
@@ -74,23 +124,43 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
     setLoading(true);
     
     try {
-      // In a real implementation, this would be a fetch call to your API
-      // const response = await fetch(`/api/organizer/quizzes/${quizId}`, {
-      //   method: "PUT",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //   },
-      //   body: JSON.stringify(quiz),
-      // });
+      const response = await fetch(`/api/organizer/quizzes/${quizId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quiz_name: quiz.quiz_name,
+          description: quiz.description,
+          target_group: quiz.target_group,
+          time_limit: quiz.time_limit,
+          status: quiz.status
+        }),
+      });
       
-      // Simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Quiz not found');
+        } else if (response.status === 401) {
+          throw new Error('Unauthorized - Please log in');
+        } else if (response.status === 403) {
+          throw new Error('Unauthorized - Only organizers can update quizzes');
+        } else if (response.status === 400) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Invalid quiz data');
+        } else {
+          throw new Error(`Failed to update quiz: ${response.status}`);
+        }
+      }
+      
+      const updatedQuiz = await response.json();
       
       toast.success("Quiz updated successfully");
       router.push(`/organizer/quizzes/${quizId}`);
     } catch (error) {
       console.error("Error updating quiz:", error);
-      toast.error("Failed to update quiz. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update quiz. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -130,6 +200,21 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
             </div>
           </div>
         </div>
+      ) : error ? (
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <div className="text-red-600 text-lg font-medium mb-2">Error Loading Quiz</div>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.reload()}
+              >
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <form onSubmit={handleSubmit}>
           <Card className="max-w-2xl mx-auto">
@@ -181,11 +266,11 @@ export default function EditQuizPage({ params }: { params: { id: string } }) {
                     <SelectValue placeholder="Select target group" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PRIMARY">Primary School</SelectItem>
-                    <SelectItem value="SECONDARY">Secondary School</SelectItem>
-                    <SelectItem value="UNIVERSITY">University</SelectItem>
-                    <SelectItem value="PROFESSIONAL">Professional</SelectItem>
-                    <SelectItem value="ALL">All Groups</SelectItem>
+                    {targetGroups.map((group) => (
+                      <SelectItem key={group.value} value={group.value}>
+                        {group.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

@@ -90,6 +90,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [targetGroups, setTargetGroups] = useState<Array<{code: string, name: string, minAge: number, maxAge: number}>>([]);
 
   // Load quiz details and assigned questions
   useEffect(() => {
@@ -114,13 +115,29 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         const questionsData = await questionsResponse.json();
         setAssignedQuestions(questionsData);
         
-        // Fetch question bank
-        const questionBankResponse = await fetch('/api/organizer/questions');
+        // Fetch question bank and target groups
+        const [questionBankResponse, targetGroupsResponse] = await Promise.all([
+          fetch('/api/organizer/questions'),
+          fetch('/api/organizer/targetgroups')
+        ]);
+        
         if (!questionBankResponse.ok) {
           throw new Error('Failed to load question bank');
         }
+        if (!targetGroupsResponse.ok) {
+          throw new Error('Failed to load target groups');
+        }
+        
         const questionBankData = await questionBankResponse.json();
+        const targetGroupsData = await targetGroupsResponse.json();
+        
         setQuestionBank(questionBankData);
+        setTargetGroups(targetGroupsData.map((tg: any) => ({
+          code: tg.value,
+          name: tg.label,
+          minAge: tg.minAge,
+          maxAge: tg.maxAge
+        })));
       } catch (error) {
         console.error('Error loading quiz data:', error);
         setError(error instanceof Error ? error.message : 'An unknown error occurred');
@@ -134,14 +151,30 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
     }
   }, [quizId]);
   
+  // Helper function to check if two age ranges overlap
+  const ageRangesOverlap = (quizTargetGroup: string, questionTargetGroup: string) => {
+    const quizTG = targetGroups.find(tg => tg.code === quizTargetGroup);
+    const questionTG = targetGroups.find(tg => tg.code === questionTargetGroup);
+    
+    if (!quizTG || !questionTG) {
+      // Fallback to direct code comparison if target group data not found
+      return quizTargetGroup === questionTargetGroup;
+    }
+    
+    // Check if age ranges overlap
+    // Two ranges overlap if: max1 >= min2 && max2 >= min1
+    return quizTG.maxAge >= questionTG.minAge && questionTG.maxAge >= quizTG.minAge;
+  };
+
   // Filter question bank questions, excluding ones already assigned
   const filterQuestionBank = (questions: Question[]) => {
     const assignedIds = assignedQuestions.map(q => q.id);
     
     return questions.filter(q => 
       !assignedIds.includes(q.id) && // Not already assigned
-      quiz && q.target_group === quiz.target_group && // Matches quiz target group
-      (q.question.toLowerCase().includes(searchTerm.toLowerCase()) || // Matches search
+      quiz && ageRangesOverlap(quiz.target_group, q.target_group) && // Age ranges overlap
+      (searchTerm === '' || // No search term OR matches search
+       q.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
        q.knowledge_field.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   };
@@ -336,7 +369,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                     Add Questions
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+                <DialogContent className="max-w-none w-[98vw] h-[95vh] flex flex-col m-0 p-6 !max-w-none !w-[98vw] left-[1vw] top-[2.5vh] transform-none">
                   <DialogHeader>
                     <DialogTitle>Add Questions to Quiz</DialogTitle>
                     <DialogDescription>

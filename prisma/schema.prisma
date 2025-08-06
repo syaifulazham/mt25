@@ -143,6 +143,7 @@ model contestant {
   surveyCompositions     survey_contestants_composition[]
   surveySubmissionStatus survey_submission_status[]
   teamMembers            teamMember[]
+  microsites             microsite[]
 
   @@index([contingentId], map: "contestant_contingentId_fkey")
 }
@@ -1203,6 +1204,19 @@ model eventAttendanceSync {
   event            event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([eventId])
+}
+
+model microsite {
+  id           Int        @id @default(autoincrement())
+  contestantId Int
+  passcode     String
+  avatar       String?
+  loginCounter Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  contestant   contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@index([contestantId])
 }
 
 enum contest_contestType {

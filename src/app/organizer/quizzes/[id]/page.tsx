@@ -71,6 +71,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
   const [assignedQuestions, setAssignedQuestions] = useState<QuizQuestion[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+  const [isRetractDialogOpen, setIsRetractDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,6 +178,47 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("Error publishing quiz:", error);
       toast.error(error instanceof Error ? error.message : "Failed to publish quiz");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const retractQuiz = async () => {
+    setActionLoading(true);
+
+    try {
+      // Send the request to retract the quiz by updating its status
+      const response = await fetch(`/api/organizer/quizzes/${quizId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quiz_name: quiz!.quiz_name,
+          description: quiz!.description,
+          target_group: quiz!.target_group,
+          time_limit: quiz!.time_limit,
+          status: 'created'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to retract quiz');
+      }
+
+      toast.success("Quiz retracted successfully!");
+      setIsRetractDialogOpen(false);
+
+      // Refresh quiz data
+      const updatedQuizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+      if (updatedQuizResponse.ok) {
+        const updatedQuizData = await updatedQuizResponse.json();
+        setQuiz(updatedQuizData);
+      }
+    } catch (error) {
+      console.error("Error retracting quiz:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to retract quiz");
     } finally {
       setActionLoading(false);
     }
@@ -344,6 +386,57 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                           </Button>
                           <Button onClick={publishQuiz} disabled={actionLoading}>
                             {actionLoading ? "Publishing..." : "Publish Quiz"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    
+                    {/* Retract Quiz Dialog */}
+                    <Dialog open={isRetractDialogOpen} onOpenChange={setIsRetractDialogOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Retract Quiz</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to retract this quiz? This will change its status back to draft and make it unavailable to participants.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <div className="flex items-start gap-2 bg-red-50 p-4 rounded-md text-red-800">
+                            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-medium">Warning</p>
+                              <p className="text-sm">
+                                Retracting this quiz will change its status back to draft and make it immediately unavailable to all participants. You can then edit and republish it if needed.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-3">
+                            <div className="flex justify-between">
+                              <span>Quiz Name:</span>
+                              <span className="font-medium">{quiz.quiz_name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Current Status:</span>
+                              <span className="font-medium">Published → Draft</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Published On:</span>
+                              <span className="font-medium">
+                                {quiz.publishedAt ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") : 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsRetractDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            onClick={retractQuiz} 
+                            disabled={actionLoading}
+                          >
+                            {actionLoading ? "Retracting..." : "Retract Quiz"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -581,8 +674,13 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
               )}
               
               {quiz.status === 'published' && (
-                <Button variant="outline" className="w-full bg-red-50 hover:bg-red-100 text-red-600 border-red-200">
-                  Retract Quiz
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                  onClick={() => setIsRetractDialogOpen(true)}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Processing...' : 'Retract Quiz'}
                 </Button>
               )}
             </CardFooter>

@@ -51,7 +51,7 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
       <UnassignedContestantsAlert />
       
       {/* Quick Action Buttons */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 mb-6">
         <Button variant="outline" size="sm" className="h-auto py-3 flex flex-col items-center justify-center gap-1" asChild>
           <Link href="/participants/teams">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -74,6 +74,12 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
           <Link href="/participants/contests">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             <span className="text-xs">{t('dashboard.contests')}</span>
+          </Link>
+        </Button>
+        <Button variant="outline" size="sm" className="h-auto py-3 flex flex-col items-center justify-center gap-1" asChild>
+          <Link href="/participants/microsites">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="m7 11 2-7 2 7 2-7 2 7"/></svg>
+            <span className="text-xs">{t('dashboard.microsites')}</span>
           </Link>
         </Button>
       </div>

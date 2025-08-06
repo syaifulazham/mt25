@@ -280,7 +280,7 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
               </FormControl>
               <FormDescription className="flex items-center gap-1 mt-1">
                 <Calculator className="h-4 w-4" />
-                <span>For mathematical equations, use LaTeX syntax: inline with single dollar signs (e.g. $E=mc^2$) or block with double dollar signs (e.g. $$\frac{x}{y}$$)</span>
+                <span>For mathematical equations, use LaTeX syntax: inline with single dollar signs (e.g. $E=mc^2$) or block with double dollar signs (e.g. {`$$\frac{x}{y}$$`})</span>
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -459,7 +459,7 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
                           </div>
                         </FormControl>
                         <FormDescription className="ml-10 text-xs mt-1">
-                          You can use LaTeX for math formulas: e.g. $x^2$ or $$\sum_{n=1}^{10} n$$
+                          You can use LaTeX for math formulas: e.g. $x^2$ or {`$$\sum_{n=1}^{10} n$$`}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
