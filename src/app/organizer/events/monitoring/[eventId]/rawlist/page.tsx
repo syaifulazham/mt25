@@ -40,6 +40,7 @@ interface TeamMember {
   edu_level: string | null;
   class_grade: string | null;
   age: number | null;
+  joinedAt: string | null;
   formattedClassGrade: string;
   isDuplicate?: boolean;
   duplicateTeams?: string[];
@@ -94,6 +95,19 @@ export default function RawlistPage() {
     teamName: string;
     newStatus: string;
   }>({ isOpen: false, teamId: null, teamName: '', newStatus: '' });
+
+  // Helper function to format joinedAt date in Malaysia timezone (GMT+8)
+  const formatJoinedAt = (joinedAt: string | null) => {
+    if (!joinedAt) return null;
+    try {
+      const date = new Date(joinedAt);
+      // Add 8 hours for Malaysia timezone (GMT+8)
+      const malaysiaDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+      return format(malaysiaDate, "dd/MM/yyyy HH:mm");
+    } catch (error) {
+      return null;
+    }
+  };
 
   // Helper function to get icon for target group
   const getTargetGroupIcon = (targetGroupLabel: string) => {
@@ -622,7 +636,14 @@ export default function RawlistPage() {
                                     {team.members.map((member, memberIndex) => (
                                       <tr key={member.id} className="border-b last:border-b-0 hover:bg-yellow-100">
                                         <td className="p-2">{memberIndex + 1}</td>
-                                        <td className="p-2 font-medium">{member.participantName}</td>
+                                        <td className="p-2">
+                                          <div className="font-medium">{member.participantName}</div>
+                                          {formatJoinedAt(member.joinedAt) && (
+                                            <div className="text-xs text-muted-foreground mt-1">
+                                              Joined: {formatJoinedAt(member.joinedAt)}
+                                            </div>
+                                          )}
+                                        </td>
                                         <td className="p-2 text-muted-foreground">{member.ic || 'N/A'}</td>
                                         <td className="p-2">{member.formattedClassGrade}</td>
                                         <td className="p-2">{member.age || 'N/A'}</td>

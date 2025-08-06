@@ -84,6 +84,7 @@ export async function GET(
             con.edu_level,
             con.class_grade,
             con.age,
+            tm.joinedAt,
             CASE 
               WHEN LOWER(con.class_grade) = 'ppki' THEN con.class_grade
               WHEN con.edu_level = 'sekolah rendah' THEN CONCAT('Darjah ', COALESCE(con.class_grade, ''))
