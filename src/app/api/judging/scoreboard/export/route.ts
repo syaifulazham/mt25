@@ -96,8 +96,6 @@ export async function GET(req: NextRequest) {
             AND at.stateId = ${parseInt(stateId)}
           GROUP BY
             at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
-          HAVING
-            COUNT(js.id) > 0
           ORDER BY
             COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) DESC
         `
@@ -132,8 +130,6 @@ export async function GET(req: NextRequest) {
             at.eventId = ${parseInt(eventId)}
           GROUP BY
             at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
-          HAVING
-            COUNT(js.id) > 0
           ORDER BY
             COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) DESC
         `;

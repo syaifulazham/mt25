@@ -1838,7 +1838,7 @@ export default function AttendancePage() {
             <p>Access detailed scoring information and contest results</p>
           </CardContent>
           <CardFooter>
-            <Link href={`/organizer/events/${eventId}/scorecard`} className="w-full">
+            <Link href={`/organizer/events/${eventId}/judging/scoreboard`} className="w-full">
               <Button className="w-full">
                 View Scorecard
               </Button>

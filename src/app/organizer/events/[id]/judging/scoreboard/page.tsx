@@ -38,6 +38,24 @@ import Link from "next/link";
 import { AnimatePresence } from 'framer-motion';
 import TeamShowcase from './team-showcase';
 
+// Cookie utilities
+const setCookie = (name: string, value: string, days: number = 30) => {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+};
+
+const getCookie = (name: string): string | null => {
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+};
+
 interface TeamResult {
   rank: number;
   attendanceTeamId: number;
@@ -116,6 +134,36 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   const eventId = params.id;
   const router = useRouter();
   
+  // Cookie keys for this specific event
+  const cookieKeys = {
+    contest: `scoreboard_contest_${eventId}`,
+    state: `scoreboard_state_${eventId}`,
+    schoolLevels: `scoreboard_schoolLevels_${eventId}`,
+    search: `scoreboard_search_${eventId}`
+  };
+  
+  // Functions to save/load filter state from cookies
+  const saveFiltersToCookies = () => {
+    setCookie(cookieKeys.contest, selectedContest);
+    setCookie(cookieKeys.state, selectedFilterState);
+    setCookie(cookieKeys.schoolLevels, JSON.stringify(selectedSchoolLevels));
+    setCookie(cookieKeys.search, searchTerm);
+  };
+  
+  const loadFiltersFromCookies = () => {
+    const savedContest = getCookie(cookieKeys.contest);
+    const savedState = getCookie(cookieKeys.state);
+    const savedSchoolLevels = getCookie(cookieKeys.schoolLevels);
+    const savedSearch = getCookie(cookieKeys.search);
+    
+    return {
+      contest: savedContest,
+      state: savedState,
+      schoolLevels: savedSchoolLevels ? JSON.parse(savedSchoolLevels) : [],
+      search: savedSearch || ""
+    };
+  };
+  
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [results, setResults] = useState<TeamResult[]>([]);
@@ -140,6 +188,20 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
   const [selectedTeamPosition, setSelectedTeamPosition] = useState<number>(0);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  
+  // Initialize filters from cookies on component mount
+  useEffect(() => {
+    const savedFilters = loadFiltersFromCookies();
+    if (savedFilters.contest) setSelectedContest(savedFilters.contest);
+    if (savedFilters.state) setSelectedFilterState(savedFilters.state);
+    if (savedFilters.schoolLevels.length > 0) setSelectedSchoolLevels(savedFilters.schoolLevels);
+    if (savedFilters.search) setSearchTerm(savedFilters.search);
+  }, []);
+  
+  // Save filters to cookies whenever they change
+  useEffect(() => {
+    saveFiltersToCookies();
+  }, [selectedContest, selectedFilterState, selectedSchoolLevels, searchTerm]);
   
   // Fetch team members when a team is selected
   const fetchTeamMembers = async (result: TeamResult, position: number) => {
@@ -264,6 +326,17 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         const orderedSchoolLevels = schoolLevelOrder.filter(level => schoolLevels.has(level));
         console.log('DEBUG: Ordered school levels:', orderedSchoolLevels);
         setAvailableSchoolLevels(orderedSchoolLevels);
+        
+        // Set default values when data is loaded (only if no saved values exist)
+        const savedFilters = loadFiltersFromCookies();
+        
+        if (contestsWithTargetGroups.length > 0 && !selectedContest && !savedFilters.contest) {
+          setSelectedContest(contestsWithTargetGroups[0].id.toString());
+        }
+        
+        if (orderedSchoolLevels.length > 0 && selectedSchoolLevels.length === 0 && savedFilters.schoolLevels.length === 0) {
+          setSelectedSchoolLevels([orderedSchoolLevels[0]]);
+        }
       } catch (error) {
         console.error('Error fetching filter data:', error);
         toast.error('Failed to load filter data');
@@ -286,6 +359,12 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           if (response.ok) {
             const data = await response.json();
             setAvailableStates(data);
+            
+            // Set default state value when states are loaded (only if no saved value exists)
+            const savedFilters = loadFiltersFromCookies();
+            if (data.length > 0 && !selectedFilterState && !savedFilters.state) {
+              setSelectedFilterState(data[0].id.toString());
+            }
           }
         } catch (error) {
           console.error("Error fetching available states:", error);
@@ -301,9 +380,6 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       try {
         if (!selectedContest) {
           // Don't fetch results until a contest is selected
-          if (contests.length > 0) {
-            setSelectedContest(contests[0].id.toString());
-          }
           return;
         }
         
@@ -821,9 +897,23 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                         </TableCell>
                         <TableCell className="text-right text-white pr-8">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="text-lg font-bold">{result.averageScore.toFixed(2)}</div>
-                            {result.judgingStatus === 'COMPLETED' && (
-                              <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            {result.sessionCount > 0 ? (
+                              <>
+                                <div className="text-lg font-bold">{result.averageScore.toFixed(2)}</div>
+                                {result.judgingStatus === 'COMPLETED' && (
+                                  <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0" />
+                                )}
+                                {result.judgingStatus === 'IN_PROGRESS' && (
+                                  <div className="w-5 h-5 rounded-full border-2 border-yellow-400 border-t-transparent animate-spin flex-shrink-0" />
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-lg font-bold text-gray-500">-</div>
+                                <Badge variant="outline" className="text-xs text-gray-400 border-gray-600">
+                                  Not Started
+                                </Badge>
+                              </>
                             )}
                           </div>
                         </TableCell>
