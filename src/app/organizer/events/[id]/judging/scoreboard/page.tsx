@@ -539,7 +539,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   
   if (!event) {
     return (
-      <div className="container mx-auto py-6 space-y-8">
+      <div className="container mx-auto py-6">
         <PageHeader title="Loading..." description="Getting event data" />
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -549,7 +549,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   }
   
   return (
-    <div className="container mx-auto py-6 space-y-8">
+    <div className="container mx-auto py-6">
       <PageHeader 
         title={`Keputusan: ${selectedContest ? contests.find(c => c.id.toString() === selectedContest)?.name || 'No Contest Selected' : 'No Contest Selected'}`}
         description={event.name}
