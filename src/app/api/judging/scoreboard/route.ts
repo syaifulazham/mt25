@@ -80,8 +80,8 @@ export async function GET(req: NextRequest) {
             COALESCE(SUM(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE 0 END), 0) as totalScore,
             COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) as averageScore,
             MAX(js.status) as judgingStatus
-          FROM
-            attendanceTeam at
+           FROM
+            attendanceteam at
           INNER JOIN
             team t ON at.teamId = t.id
           INNER JOIN
@@ -91,12 +91,13 @@ export async function GET(req: NextRequest) {
           INNER JOIN
             eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
           LEFT JOIN
-            judgingSession js ON at.Id = js.attendanceTeamId 
+            judgingsession js ON at.Id = js.attendanceTeamId 
             AND ec.id = js.eventContestId 
             AND js.status IN ('IN_PROGRESS', 'COMPLETED')
           WHERE
             at.eventId = ${parseInt(eventId)}
             AND at.stateId = ${parseInt(stateId)}
+            AND at.attendanceStatus = 'PRESENT'
           GROUP BY
             at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
           ORDER BY
@@ -117,7 +118,7 @@ export async function GET(req: NextRequest) {
             COALESCE(AVG(CASE WHEN js.status = 'COMPLETED' THEN js.totalScore ELSE NULL END), 0) as averageScore,
             MAX(js.status) as judgingStatus
           FROM
-            attendanceTeam at
+            attendanceteam at
           INNER JOIN
             team t ON at.teamId = t.id
           INNER JOIN
@@ -127,11 +128,12 @@ export async function GET(req: NextRequest) {
           INNER JOIN
             eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
           LEFT JOIN
-            judgingSession js ON at.Id = js.attendanceTeamId 
+            judgingsession js ON at.Id = js.attendanceTeamId 
             AND ec.id = js.eventContestId 
             AND js.status IN ('IN_PROGRESS', 'COMPLETED')
           WHERE
             at.eventId = ${parseInt(eventId)}
+            AND at.attendanceStatus = 'PRESENT'
           GROUP BY
             at.Id, t.id, t.name, c.id, c.name, at.stateId, at.state
           ORDER BY
@@ -142,20 +144,22 @@ export async function GET(req: NextRequest) {
     const totalTeamsResult = stateId
       ? await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as totalCount
-          FROM attendanceTeam at
+          FROM attendanceteam at
           INNER JOIN team t ON at.teamId = t.id
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
           WHERE at.eventId = ${parseInt(eventId)}
             AND at.stateId = ${parseInt(stateId)}
+            AND at.attendanceStatus = 'PRESENT'
         `
       : await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as totalCount
-          FROM attendanceTeam at
+          FROM attendanceteam at
           INNER JOIN team t ON at.teamId = t.id
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
           WHERE at.eventId = ${parseInt(eventId)}
+            AND at.attendanceStatus = 'PRESENT'
         `;
 
     const totalTeamsCount = Array.isArray(totalTeamsResult) && totalTeamsResult.length > 0 
@@ -166,21 +170,23 @@ export async function GET(req: NextRequest) {
     const inProgressResult = stateId
       ? await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as inProgressCount
-          FROM attendanceTeam at
+          FROM attendanceteam at
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          INNER JOIN judgingsession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
           WHERE at.eventId = ${parseInt(eventId)}
             AND at.stateId = ${parseInt(stateId)}
+            AND at.attendanceStatus = 'PRESENT'
             AND js.status = 'IN_PROGRESS'
         `
       : await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as inProgressCount
-          FROM attendanceTeam at
+          FROM attendanceteam at
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          INNER JOIN judgingsession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
           WHERE at.eventId = ${parseInt(eventId)}
+            AND at.attendanceStatus = 'PRESENT'
             AND js.status = 'IN_PROGRESS'
         `;
 
@@ -192,21 +198,23 @@ export async function GET(req: NextRequest) {
     const completedResult = stateId
       ? await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as completedCount
-          FROM attendanceTeam at
+          FROM attendanceteam at
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          INNER JOIN judgingsession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
           WHERE at.eventId = ${parseInt(eventId)}
             AND at.stateId = ${parseInt(stateId)}
+            AND at.attendanceStatus = 'PRESENT'
             AND js.status = 'COMPLETED'
         `
       : await prisma.$queryRaw`
           SELECT COUNT(DISTINCT at.Id) as completedCount
-          FROM attendanceTeam at
+          FROM attendanceteam at
           INNER JOIN eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
           INNER JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-          INNER JOIN judgingSession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
+          INNER JOIN judgingsession js ON at.Id = js.attendanceTeamId AND ec.id = js.eventContestId
           WHERE at.eventId = ${parseInt(eventId)}
+            AND at.attendanceStatus = 'PRESENT'
             AND js.status = 'COMPLETED'
         `;
 
