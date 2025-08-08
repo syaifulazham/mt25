@@ -60,16 +60,21 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Get ALL teams for this event/contest - exactly like judge results API
-    // NO state filtering to match judge results behavior exactly
+    // Get teams with their judging results - using exact same query as judge teams API
     const results = await prisma.$queryRaw`
-      SELECT 
-        at.id as attendanceTeamId,
-        t.id as teamId,
+      SELECT
+        at.Id as attendanceTeamId,
+        at.hashcode,
+        at.contingentId,
+        at.teamId,
+        at.eventId,
+        at.attendanceStatus,
         t.name as teamName,
-        c.id as contingentId,
         c.name as contingentName,
         c.logoUrl as contingentLogoUrl,
+        c.contingentType as contingentType,
+        e.name as eventName,
+        e.scopeArea as eventScopeArea,
         CASE
           WHEN c.contingentType = 'SCHOOL' THEN (
             SELECT s2.name FROM state s2
@@ -96,17 +101,36 @@ export async function GET(req: NextRequest) {
           )
           ELSE NULL
         END as stateId,
-        COALESCE(js.status, 'NOT_STARTED') as judgingStatus,
+        ec.id as eventContestId,
+        contest.name as contestName,
+        CASE
+          WHEN js.id IS NULL THEN 'NOT_STARTED'
+          WHEN js.status = 'IN_PROGRESS' THEN 'IN_PROGRESS'
+          WHEN js.status = 'COMPLETED' THEN 'COMPLETED'
+          ELSE 'NOT_STARTED'
+        END as judgingStatus,
+        js.id as judgingSessionId,
         js.totalScore
-      FROM attendanceteam at
-      JOIN team t ON at.teamId = t.id
-      JOIN contingent c ON at.contingentId = c.id
-      JOIN event e ON at.eventId = e.id
-      JOIN eventcontest ec ON ec.eventId = at.eventId AND ec.contestId = ${parseInt(contestId)}
-      JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
-      LEFT JOIN judgingsession js ON js.attendanceTeamId = at.id AND js.eventContestId = ec.id
-      WHERE at.eventId = ${parseInt(eventId)}
-      ORDER BY 
+      FROM
+        attendanceTeam at
+      JOIN
+        team t ON at.teamId = t.id
+      JOIN
+        contingent c ON at.contingentId = c.id
+      JOIN
+        event e ON at.eventId = e.id
+      JOIN
+        eventcontest ec ON at.eventId = ec.eventId AND ec.contestId = ${parseInt(contestId)}
+      JOIN
+        contest ON ec.contestId = contest.id
+      JOIN
+        eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
+      LEFT JOIN
+        judgingSession js ON at.Id = js.attendanceTeamId 
+        AND ec.id = js.eventContestId
+      WHERE
+        at.eventId = ${parseInt(eventId)}
+      ORDER BY
         CASE 
           WHEN js.totalScore IS NULL THEN 1 
           ELSE 0 
@@ -145,7 +169,10 @@ export async function GET(req: NextRequest) {
         averageScore: result.totalScore ? parseFloat(result.totalScore.toString()) : 0,
         sessionCount: 1, // Since we're showing individual sessions now
         judgingStatus: result.judgingStatus || 'NOT_STARTED',
-        rank: result.totalScore ? (index + 1) : 0
+        rank: result.totalScore ? (index + 1) : 0,
+        eventContestId: Number(result.eventContestId),
+        contestName: result.contestName,
+        attendanceStatus: result.attendanceStatus
       }));
 
     // Return results
