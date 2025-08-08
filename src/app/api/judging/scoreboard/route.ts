@@ -103,6 +103,7 @@ export async function GET(req: NextRequest) {
       JOIN contingent c ON at.contingentId = c.id
       JOIN event e ON at.eventId = e.id
       JOIN eventcontest ec ON ec.eventId = at.eventId AND ec.contestId = ${parseInt(contestId)}
+      JOIN eventcontestteam ect ON ect.eventcontestId = ec.id AND ect.teamId = at.teamId
       LEFT JOIN judgingsession js ON js.attendanceTeamId = at.id AND js.eventContestId = ec.id
       WHERE at.eventId = ${parseInt(eventId)}
       ORDER BY 
