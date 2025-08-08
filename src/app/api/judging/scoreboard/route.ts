@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     const eventContest = await prisma.eventcontest.findFirst({
       where: {
         eventId: parseInt(eventId),
-        id: parseInt(contestId),
+        contestId: parseInt(contestId),
       },
     });
 
