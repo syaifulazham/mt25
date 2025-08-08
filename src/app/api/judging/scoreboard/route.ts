@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get teams with their judging results - using exact same query as judge teams API
-    const results = await prisma.$queryRaw`
+    let querySQL = `
       SELECT
         at.Id as attendanceTeamId,
         at.hashcode,
@@ -129,8 +129,12 @@ export async function GET(req: NextRequest) {
         judgingSession js ON at.Id = js.attendanceTeamId 
         AND ec.id = js.eventContestId
       WHERE
-        at.eventId = ${parseInt(eventId)}
-        ${stateId ? `AND (
+        at.eventId = ${parseInt(eventId)}`;
+
+    // Add state filtering if stateId is provided
+    if (stateId) {
+      querySQL += `
+        AND (
           CASE
             WHEN c.contingentType = 'SCHOOL' THEN (
               SELECT s2.id FROM state s2
@@ -144,15 +148,19 @@ export async function GET(req: NextRequest) {
             )
             ELSE NULL
           END = ${parseInt(stateId)}
-        )` : ''}
+        )`;
+    }
+
+    querySQL += `
       ORDER BY
         CASE 
           WHEN js.totalScore IS NULL THEN 1 
           ELSE 0 
         END,
         js.totalScore DESC,
-        t.name ASC
-    ` as any[];
+        t.name ASC`;
+
+    const results = await prisma.$queryRawUnsafe(querySQL) as any[];
 
     // Get total teams count
     const totalTeamsCount = results.length;
