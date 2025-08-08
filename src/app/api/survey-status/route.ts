@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { getSessionUser } from "@/lib/session";
 
-const prisma = new PrismaClient();
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
 
 // POST /api/survey-status
 export async function POST(

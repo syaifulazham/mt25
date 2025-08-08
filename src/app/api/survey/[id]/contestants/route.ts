@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { getSessionUser } from "@/lib/session";
 
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
+
 const prisma = new PrismaClient();
 
 // GET /api/survey/[id]/contestants

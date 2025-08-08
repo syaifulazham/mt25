@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 import { NextResponse, NextRequest } from 'next/server';
 import { getSessionUser } from '@/lib/session';
 
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
+
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {

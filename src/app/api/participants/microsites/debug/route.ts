@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/session';
 import { prismaExecute } from '@/lib/prisma';
 
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     console.log('Debug API: Starting...');

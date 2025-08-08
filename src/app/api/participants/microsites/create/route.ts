@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/session';
 import { prismaExecute } from '@/lib/prisma';
 
+// Mark this route as dynamic to avoid static generation errors
+export const dynamic = 'force-dynamic';
+
 // Generate random 6-character alphanumeric passcode (uppercase)
 function generatePasscode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
