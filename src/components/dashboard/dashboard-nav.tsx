@@ -10,6 +10,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 type SubMenuItem = {
   title: string;
   href: string;
+  icon?: React.ReactNode;
 };
 
 type NavItemBase = {
@@ -87,23 +88,42 @@ export const navItems: NavItem[] = [
       {
         title: "Management",
         href: "/organizer/events",
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        ),
       },
       {
         title: "Monitoring",
         href: "/organizer/events/monitoring",
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        ),
       },
       {
         title: "Stats",
         href: "/organizer/events/stats",
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        ),
       },
       {
         title: "Raw Data",
         href: "/organizer/events/teams-data",
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+          </svg>
+        ),
       },
-      {
-        title: "Attendance",
-        href: "/organizer/events/6/attendance",
-      },
+
     ],
   },
   {
@@ -210,6 +230,25 @@ export function DashboardNav({ user }: DashboardNavProps) {
   // State to track which dropdown is open
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
+  // Filter navigation items based on user role
+  const getFilteredNavItems = () => {
+    // VIEWER users can only see Dashboard
+    if (user.role === 'VIEWER') {
+      return navItems.filter(item => item.title === 'Dashboard');
+    }
+    
+    // OPERATOR users can only access specific menus (no Dashboard)
+    if (user.role === 'OPERATOR') {
+      const allowedTitles = ['Competitions', 'Quizzes', 'Events', 'Judging Templates', 'Contents'];
+      return navItems.filter(item => allowedTitles.includes(item.title));
+    }
+    
+    // ADMIN and other roles get all navigation items
+    return navItems;
+  };
+
+  const filteredNavItems = getFilteredNavItems();
+
   // Toggle dropdown state
   const toggleDropdown = (title: string) => {
     setOpenDropdown(openDropdown === title ? null : title);
@@ -292,16 +331,8 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
       {/* Navigation */}
       <nav className="mt-6 px-4 space-y-1">
-        {/* Filter navItems based on user role - VIEWER users only see Dashboard */}
-        {navItems
-          .filter(item => {
-            // If user is VIEWER, only show Dashboard
-            if (user.role === 'VIEWER') {
-              return item.title === 'Dashboard';
-            }
-            // For ADMIN and OPERATOR roles, show all menu items
-            return true;
-          })
+        {/* Use filtered navigation items based on user role */}
+        {filteredNavItems
           .map((item) => {
             // Handle dropdown menu items
             if ('subItems' in item && item.subItems) {
@@ -345,8 +376,12 @@ export function DashboardNav({ user }: DashboardNavProps) {
                                 : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                             }`}
                           >
-                            <div className="w-1 h-1 rounded-full bg-current mr-2"></div>
-                            <span className="hidden lg:inline">{subItem.title}</span>
+                            {subItem.icon ? (
+                              <span className="flex-shrink-0">{subItem.icon}</span>
+                            ) : (
+                              <div className="w-1 h-1 rounded-full bg-current mr-2"></div>
+                            )}
+                            {!isCollapsed && <span className="hidden lg:inline ml-2">{subItem.title}</span>}
                           </Link>
                         );
                       })}
