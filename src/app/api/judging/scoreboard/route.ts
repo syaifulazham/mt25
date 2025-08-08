@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const eventId = searchParams.get('eventId');
     const contestId = searchParams.get('contestId');
-    const stateId = searchParams.get('stateId'); // We'll ignore this to match judge results
+    const stateId = searchParams.get('stateId'); // Optional state filter
 
     if (!eventId || !contestId) {
       return NextResponse.json({ error: 'Event ID and Contest ID are required' }, { status: 400 });
@@ -130,6 +130,21 @@ export async function GET(req: NextRequest) {
         AND ec.id = js.eventContestId
       WHERE
         at.eventId = ${parseInt(eventId)}
+        ${stateId ? `AND (
+          CASE
+            WHEN c.contingentType = 'SCHOOL' THEN (
+              SELECT s2.id FROM state s2
+              JOIN school sch ON sch.stateId = s2.id
+              WHERE c.schoolId = sch.id
+            )
+            WHEN c.contingentType = 'INDEPENDENT' THEN (
+              SELECT s2.id FROM state s2
+              JOIN independent ind ON ind.stateId = s2.id
+              WHERE c.independentId = ind.id
+            )
+            ELSE NULL
+          END = ${parseInt(stateId)}
+        )` : ''}
       ORDER BY
         CASE 
           WHEN js.totalScore IS NULL THEN 1 
