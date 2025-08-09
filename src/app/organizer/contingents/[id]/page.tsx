@@ -40,6 +40,7 @@ import { DirectAdminChanger } from "../_components/direct-admin-changer";
 import { ForcePrimaryManagerChanger } from "../_components/force-primary-manager-changer";
 import { EmergencyPrimaryManagerForm } from "../_components/emergency-primary-manager-form";
 import BulkAssignContestsButton from "../../participants/_components/bulk-assign-contests-button";
+import { IndependentStateChanger } from "../_components/independent-state-changer";
 import { prismaExecute } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
@@ -118,6 +119,8 @@ interface ContingentWithDetails {
   managedByParticipant: boolean;
   schoolId: number | null;
   higherInstId: number | null;
+  independentId: number | null;
+  contingentType: string;
   school?: {
     id: number;
     name: string;
@@ -131,6 +134,21 @@ interface ContingentWithDetails {
     name: string;
     state: string | StateObject;
     address: string | null;
+  } | null;
+  independent?: {
+    id: number;
+    name: string;
+    address: string | null;
+    town: string | null;
+    postcode: string | null;
+    stateId: number;
+    institution: string | null;
+    type: string;
+    state: {
+      id: number;
+      name: string;
+      zoneId: number;
+    };
   } | null;
   managers: Array<{
     id: number;
@@ -229,6 +247,25 @@ export default async function ContingentDetailPage({ params }: PageProps) {
             address: true,
           }
         },
+        independent: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
+            town: true,
+            postcode: true,
+            stateId: true,
+            institution: true,
+            type: true,
+            state: {
+              select: {
+                id: true,
+                name: true,
+                zoneId: true
+              }
+            }
+          }
+        },
         contestants: {
           select: {
             id: true,
@@ -319,6 +356,30 @@ export default async function ContingentDetailPage({ params }: PageProps) {
       return Number(result[0]?.count || 0);
     });
 
+    // Debug logging for contingent type
+    console.log('Contingent Debug Info:', {
+      id: contingent.id,
+      name: contingent.name,
+      contingentType: contingent.contingentType,
+      schoolId: contingent.schoolId,
+      higherInstId: contingent.higherInstId,
+      independentId: contingent.independentId,
+      hasIndependent: !!contingent.independent
+    });
+
+    // Fetch all states for the state selector (if contingent has independentId)
+    const allStates = contingent.independentId ? 
+      await prismaExecute(prisma => prisma.state.findMany({
+        select: {
+          id: true,
+          name: true,
+          zoneId: true
+        },
+        orderBy: {
+          name: 'asc'
+        }
+      })) : [];
+
     // Get pagination from searchParams or use defaults
     const pageSize = 5; // Number of items per page
 
@@ -406,6 +467,32 @@ export default async function ContingentDetailPage({ params }: PageProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Left column - Contingent details */}
           <div className="space-y-6">
+            {/* Debug info for troubleshooting */}
+            {isAdmin && (
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardHeader>
+                  <CardTitle className="text-sm">Debug Info (Admin Only)</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs">
+                  <div>Contingent Type: {contingentWithDetails.contingentType}</div>
+                  <div>School ID: {contingentWithDetails.schoolId}</div>
+                  <div>Higher Inst ID: {contingentWithDetails.higherInstId}</div>
+                  <div>Independent ID: {contingentWithDetails.independentId}</div>
+                  <div>Has Independent Data: {contingentWithDetails.independent ? 'Yes' : 'No'}</div>
+                  <div>Is Admin: {isAdmin ? 'Yes' : 'No'}</div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* State Change Card for contingents with independent data (Admin only) */}
+            {isAdmin && contingentWithDetails.independentId && contingentWithDetails.independent && (
+              <IndependentStateChanger
+                contingentId={contingentWithDetails.id}
+                independent={contingentWithDetails.independent}
+                allStates={allStates}
+              />
+            )}
+
             {/* Contingent info card */}
             <Card>
               <CardHeader>
