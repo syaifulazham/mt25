@@ -16,7 +16,7 @@ export async function GET(
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
       const session = await getServerSession(authOptions);
-      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER', 'OPERATOR'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
@@ -74,7 +74,7 @@ export async function PUT(
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
       const session = await getServerSession(authOptions);
-      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER', 'OPERATOR'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
@@ -253,7 +253,7 @@ export async function DELETE(
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
       const session = await getServerSession(authOptions);
-      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER', 'OPERATOR'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }

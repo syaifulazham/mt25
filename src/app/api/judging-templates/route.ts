@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Unauthorized - No user found' }, { status: 401 });
       }
       
-      if (!hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER', 'OPERATOR'])) {
+      if (!hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
         console.log('Authentication failed: Insufficient permissions', session.user.role);
         return NextResponse.json({ error: 'Unauthorized - Insufficient permissions' }, { status: 401 });
       }
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     // Skip authentication in development mode
     if (process.env.NODE_ENV !== 'development') {
       const session = await getServerSession(authOptions);
-      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
+      if (!session || !session.user || !hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER', 'OPERATOR'])) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
