@@ -569,11 +569,6 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
   
   // Complete session
   const handleCompleteSession = async () => {
-    if (!allCriteriaScored) {
-      toast.error('Please score all criteria before completing the session');
-      return;
-    }
-    
     try {
       setCompleting(true);
       
@@ -840,8 +835,8 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
             {judgingSession.status === 'IN_PROGRESS' && (
               <Button 
                 onClick={() => setShowCompleteConfirm(true)}
-                disabled={!allCriteriaScored || completing}
-                variant={allCriteriaScored ? 'default' : 'secondary'}
+                disabled={completing}
+                variant="default"
                 className="w-full gap-2"
               >
                 <CheckCircle className="h-4 w-4" />
