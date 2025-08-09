@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Unauthorized - No user found' }, { status: 401 });
       }
       
-      if (!hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER'])) {
+      if (!hasRequiredRole(session.user, ['ADMIN', 'ORGANIZER', 'OPERATOR'])) {
         console.log('Authentication failed: Insufficient permissions', session.user.role);
         return NextResponse.json({ error: 'Unauthorized - Insufficient permissions' }, { status: 401 });
       }
