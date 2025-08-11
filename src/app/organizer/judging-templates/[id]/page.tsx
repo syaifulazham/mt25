@@ -461,8 +461,8 @@ function CriteriaEditForm({
     setFormData({ 
       ...formData, 
       evaluationType: value,
-      // Reset maxScore for non-points evaluation types
-      ...(value !== 'POINTS' && { maxScore: 0 })
+      // Reset maxScore for evaluation types that don't use it as a score
+      ...(value !== 'POINTS' && value !== 'TIME' && { maxScore: 0 })
     });
   };
 
@@ -559,6 +559,27 @@ function CriteriaEditForm({
                   })}
                   placeholder="e.g., 10"
                 />
+              </div>
+            )}
+            
+            {formData.evaluationType === 'TIME' && (
+              <div className="grid gap-2">
+                <Label htmlFor="maxScore">Max Minutes</Label>
+                <Input
+                  id="maxScore"
+                  name="maxScore"
+                  type="number"
+                  min="1"
+                  value={formData.maxScore}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    maxScore: parseInt(e.target.value) || 0 
+                  })}
+                  placeholder="e.g., 10"
+                />
+                <div className="text-xs text-muted-foreground">
+                  Maximum time limit in minutes for this criterion
+                </div>
               </div>
             )}
             

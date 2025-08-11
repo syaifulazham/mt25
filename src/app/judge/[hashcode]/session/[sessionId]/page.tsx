@@ -465,9 +465,11 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
       const totalSeconds = calculateTotalTime(startTime, now);
       updatedScores[index].totalTime = totalSeconds;
       
-      const maxTime = 600; // 10 minutes
-      const timeScore = Math.max(0, Math.min(updatedScores[index].maxScore, 
-        updatedScores[index].maxScore * (1 - totalSeconds / maxTime)));
+      // Use maxScore as max minutes, convert to seconds
+      const maxTimeMinutes = updatedScores[index].maxScore || 10; // Default to 10 minutes if not set
+      const maxTimeSeconds = maxTimeMinutes * 60;
+      const timeScore = Math.max(0, Math.min(100, 
+        100 * (1 - totalSeconds / maxTimeSeconds)));
       
       updatedScores[index].score = timeScore;
       setScores(updatedScores);
@@ -482,6 +484,74 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
     updatedScores[index].score = 0;
     setScores(updatedScores);
     setUnsavedChanges(true);
+  };
+
+  // Handle manual total time input changes (HH:MM:SS format)
+  const handleManualTotalTimeChange = (index: number, timeUnit: 'hours' | 'minutes' | 'seconds', value: string) => {
+    const updatedScores = [...scores];
+    
+    // Remove non-numeric characters and limit length
+    const cleanValue = value.replace(/\D/g, '');
+    
+    // Parse current totalTime to get individual components
+    const currentTotalSeconds = updatedScores[index].totalTime || 0;
+    const currentHours = Math.floor(currentTotalSeconds / 3600);
+    const currentMinutes = Math.floor((currentTotalSeconds % 3600) / 60);
+    const currentSeconds = currentTotalSeconds % 60;
+    
+    // Parse the input value and validate
+    const numValue = parseInt(cleanValue) || 0;
+    let newHours = currentHours;
+    let newMinutes = currentMinutes;
+    let newSeconds = currentSeconds;
+    
+    // Update the specific time unit with validation
+    switch (timeUnit) {
+      case 'hours':
+        newHours = Math.max(0, Math.min(23, numValue)); // 0-23 hours
+        break;
+      case 'minutes':
+        newMinutes = Math.max(0, Math.min(59, numValue)); // 0-59 minutes
+        break;
+      case 'seconds':
+        newSeconds = Math.max(0, Math.min(59, numValue)); // 0-59 seconds
+        break;
+    }
+    
+    // Calculate total seconds
+    const totalSeconds = (newHours * 3600) + (newMinutes * 60) + newSeconds;
+    updatedScores[index].totalTime = totalSeconds;
+    
+    // Calculate score using same logic as automatic timer
+    // Use maxScore as max minutes, convert to seconds
+    const maxTimeMinutes = updatedScores[index].maxScore || 10; // Default to 10 minutes if not set
+    const maxTimeSeconds = maxTimeMinutes * 60;
+    const timeScore = Math.max(0, Math.min(100, 
+      100 * (1 - totalSeconds / maxTimeSeconds)));
+    
+    updatedScores[index].score = timeScore;
+    
+    // Set dummy start/end times for consistency with backend expectations
+    if (totalSeconds > 0) {
+      const now = new Date();
+      const startTime = new Date(now.getTime() - (totalSeconds * 1000));
+      updatedScores[index].startTime = startTime.toISOString();
+      updatedScores[index].endTime = now.toISOString();
+    } else {
+      updatedScores[index].startTime = undefined;
+      updatedScores[index].endTime = undefined;
+    }
+    
+    setScores(updatedScores);
+    setUnsavedChanges(true);
+  };
+
+  // Get individual time components from totalTime
+  const getTimeComponents = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return { hours, minutes, seconds };
   };
   
   // Handle score comment change
@@ -953,46 +1023,56 @@ export default function JudgeJudgingSessionPage({ params }: { params: { hashcode
                 {/* Time Criterion */}
                 {score.criterionType === 'TIME' && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                      {!score.startTime && (
-                        <Button
-                          onClick={() => handleStartTimer(index)}
-                          className="gap-2"
-                          variant="outline"
-                        >
-                          <Play className="h-4 w-4" />
-                          Start Timer
-                        </Button>
-                      )}
-                      
-                      {score.startTime && !score.endTime && (
-                        <Button
-                          onClick={() => handleEndTimer(index)}
-                          className="gap-2"
-                          variant="default"
-                        >
-                          <Square className="h-4 w-4" />
-                          Stop Timer
-                        </Button>
-                      )}
-                      
-                      {score.startTime && score.endTime && (
+                    {/* Manual Time Input */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3">Time Entry</h4>
+                      <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <div className="text-lg font-semibold">
-                            {formatTime(score.totalTime || 0)}
+                          <label className="text-sm font-medium min-w-[80px]">Time Taken:</label>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={getTimeComponents(score.totalTime || 0).hours}
+                              onChange={(e) => handleManualTotalTimeChange(index, 'hours', e.target.value)}
+                              className="w-16 text-center"
+                              min={0}
+                              max={23}
+                              placeholder="0"
+                            />
+                            <span className="text-sm font-medium">:</span>
+                            <Input
+                              type="number"
+                              value={getTimeComponents(score.totalTime || 0).minutes}
+                              onChange={(e) => handleManualTotalTimeChange(index, 'minutes', e.target.value)}
+                              className="w-16 text-center"
+                              min={0}
+                              max={59}
+                              placeholder="0"
+                            />
+                            <span className="text-sm font-medium">:</span>
+                            <Input
+                              type="number"
+                              value={getTimeComponents(score.totalTime || 0).seconds}
+                              onChange={(e) => handleManualTotalTimeChange(index, 'seconds', e.target.value)}
+                              className="w-16 text-center"
+                              min={0}
+                              max={59}
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-gray-500 ml-2">(HH:MM:SS)</span>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Score: {(score.score || 0).toFixed(2)}
+                        </div>
+                      </div>
+                      {score.totalTime && score.totalTime > 0 && (
+                        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-green-700 font-medium">Total Time:</span>
+                            <span className="font-bold text-green-800">{formatTime(score.totalTime)}</span>
                           </div>
-                          <Button
-                            onClick={() => handleResetTimer(index)}
-                            size="sm"
-                            variant="outline"
-                            className="gap-1"
-                          >
-                            <RotateCcw className="h-3 w-3" />
-                            Reset
-                          </Button>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-sm text-green-700">Score:</span>
+                            <span className="font-bold text-green-800">{(score.score || 0).toFixed(2)} / 100</span>
+                          </div>
                         </div>
                       )}
                     </div>
