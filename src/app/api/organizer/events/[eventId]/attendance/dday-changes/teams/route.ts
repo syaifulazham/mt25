@@ -62,9 +62,9 @@ export async function GET(request: NextRequest, { params }: { params: { eventId:
           ELSE 'Unknown'
         END as stateName
       FROM eventcontestteam ect
+      JOIN eventcontest ec ON ect.eventcontestId = ec.id
       JOIN team t ON ect.teamId = t.id
-      JOIN contest c ON t.contestId = c.id
-      JOIN eventcontest ec ON ec.contestId = c.id AND ec.eventId = ?
+      JOIN contest c ON ec.contestId = c.id
       JOIN teamMember tm ON t.id = tm.teamId
       JOIN contestant con ON tm.contestantId = con.id
       JOIN contingent cont ON con.contingentId = cont.id
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest, { params }: { params: { eventId:
       ORDER BY cont.name ASC, t.name ASC
     `;
 
-    const teams = await prisma.$queryRawUnsafe(teamsQuery, eventId, eventId) as any[];
+    const teams = await prisma.$queryRawUnsafe(teamsQuery, eventId) as any[];
 
     // Get member counts separately to avoid complex GROUP BY issues
     const teamsWithMemberCounts = await Promise.all(
