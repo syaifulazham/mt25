@@ -50,9 +50,11 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       totalContestants: number;
       newContestants: number;
       updatedContestants: number;
+      removedContestants: number;
       totalManagers: number;
       newManagers: number;
       updatedManagers: number;
+      removedManagers: number;
       errorCount: number;
       errors: string[];
     }
@@ -67,9 +69,11 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       totalContestants: 0,
       newContestants: 0,
       updatedContestants: 0,
+      removedContestants: 0,
       totalManagers: 0,
       newManagers: 0,
       updatedManagers: 0,
+      removedManagers: 0,
       errorCount: 0,
       errors: [] as string[]
     };
@@ -320,7 +324,54 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
           syncResults.updatedTeams++;
         }
 
-        // Process contestants
+        // STEP 1: Clean up attendance records for contestants no longer in this team
+        if (members.length > 0) {
+          const currentMemberIds = members.map(m => m.id);
+          const placeholders = currentMemberIds.map(() => '?').join(',');
+          
+          // Find contestants in attendance who are no longer in this team
+          const removedContestantsQuery = `
+            SELECT contestantId, id FROM attendanceContestant 
+            WHERE teamId = ? AND eventId = ? AND contestantId NOT IN (${placeholders})
+          `;
+          const removedContestants = await prisma.$queryRawUnsafe(
+            removedContestantsQuery, 
+            team.id, 
+            eventId, 
+            ...currentMemberIds
+          ) as any[];
+
+          if (removedContestants.length > 0) {
+            console.log(`Removing ${removedContestants.length} contestants no longer in team ${team.id}`);
+            
+            // Delete attendance records for removed contestants
+            const deleteQuery = `
+              DELETE FROM attendanceContestant 
+              WHERE teamId = ? AND eventId = ? AND contestantId NOT IN (${placeholders})
+            `;
+            await prisma.$queryRawUnsafe(deleteQuery, team.id, eventId, ...currentMemberIds);
+            syncResults.removedContestants += removedContestants.length;
+            
+            console.log(`Removed attendance records for contestants: ${removedContestants.map(c => c.contestantId).join(', ')}`);
+          }
+        } else {
+          // If team has no members, remove all attendance records for this team
+          const allTeamContestants = await prisma.$queryRaw`
+            SELECT contestantId FROM attendanceContestant 
+            WHERE teamId = ${team.id} AND eventId = ${eventId}
+          ` as any[];
+          
+          if (allTeamContestants.length > 0) {
+            await prisma.$executeRaw`
+              DELETE FROM attendanceContestant 
+              WHERE teamId = ${team.id} AND eventId = ${eventId}
+            `;
+            syncResults.removedContestants += allTeamContestants.length;
+            console.log(`Removed all ${allTeamContestants.length} attendance records for empty team ${team.id}`);
+          }
+        }
+
+        // STEP 2: Process current team members (add new or update existing)
         for (const member of members) {
           syncResults.totalContestants++;
           const contestantHashcode = createHashcode(member.ic, eventId, team.contingentId);
@@ -337,6 +388,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               (${contestantHashcode}, ${team.contingentId}, ${team.id}, ${member.id}, ${member.id}, ${eventId}, ${member.ic || null}, ${now}, ${now}, 'Not Present', NULL, ${team.stateId}, ${team.zoneId}, ${team.stateName}, ${team.contestId}, ${team.contestName}, ${team.targetGroupLabel}, ${now}, ${now})
             `;
             syncResults.newContestants++;
+            console.log(`Added new contestant ${member.id} to attendance for team ${team.id}`);
           } else {
             await prisma.$executeRaw`
               UPDATE attendanceContestant
@@ -349,10 +401,12 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
                   contestGroup = ${team.targetGroupLabel},
                   ic = ${member.ic || null},
                   contestId = ${team.contestId},
-                  contestName = ${team.contestName}
+                  contestName = ${team.contestName},
+                  teamId = ${team.id}
               WHERE contestantId = ${member.id} AND eventId = ${eventId}
             `;
             syncResults.updatedContestants++;
+            console.log(`Updated contestant ${member.id} attendance record for team ${team.id}`);
           }
         }
 
@@ -371,6 +425,61 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
 
         const managers = await prisma.$queryRawUnsafe(managersQuery, team.id) as any[];
 
+        // STEP 1: Clean up attendance records for managers no longer assigned to this team
+        if (managers.length > 0) {
+          const currentManagerIds = managers.map(m => m.id);
+          const placeholders = currentManagerIds.map(() => '?').join(',');
+          
+          // Find managers in attendance who are no longer assigned to this team
+          // Note: We need to check by managerId and contingentId since managers can be shared across teams
+          const removedManagersQuery = `
+            SELECT managerId, id FROM attendanceManager 
+            WHERE contingentId = ? AND eventId = ? AND managerId NOT IN (${placeholders})
+            AND managerId IN (
+              SELECT DISTINCT managerId FROM attendanceManager 
+              WHERE contingentId = ? AND eventId = ?
+            )
+          `;
+          const removedManagers = await prisma.$queryRawUnsafe(
+            removedManagersQuery, 
+            team.contingentId, 
+            eventId, 
+            ...currentManagerIds,
+            team.contingentId,
+            eventId
+          ) as any[];
+
+          if (removedManagers.length > 0) {
+            console.log(`Removing ${removedManagers.length} managers no longer assigned to contingent ${team.contingentId}`);
+            
+            // Delete attendance records for removed managers
+            const deleteManagerQuery = `
+              DELETE FROM attendanceManager 
+              WHERE contingentId = ? AND eventId = ? AND managerId NOT IN (${placeholders})
+            `;
+            await prisma.$queryRawUnsafe(deleteManagerQuery, team.contingentId, eventId, ...currentManagerIds);
+            syncResults.removedManagers += removedManagers.length;
+            
+            console.log(`Removed attendance records for managers: ${removedManagers.map(m => m.managerId).join(', ')}`);
+          }
+        } else {
+          // If team has no managers, remove all manager attendance records for this contingent
+          const allContingentManagers = await prisma.$queryRaw`
+            SELECT managerId FROM attendanceManager 
+            WHERE contingentId = ${team.contingentId} AND eventId = ${eventId}
+          ` as any[];
+          
+          if (allContingentManagers.length > 0) {
+            await prisma.$executeRaw`
+              DELETE FROM attendanceManager 
+              WHERE contingentId = ${team.contingentId} AND eventId = ${eventId}
+            `;
+            syncResults.removedManagers += allContingentManagers.length;
+            console.log(`Removed all ${allContingentManagers.length} manager attendance records for contingent ${team.contingentId}`);
+          }
+        }
+
+        // STEP 2: Process current managers (add new or update existing)
         for (const manager of managers) {
           syncResults.totalManagers++;
           const managerHashcode = createHashcode(manager.ic, eventId, team.contingentId);
@@ -387,6 +496,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               (${managerHashcode}, ${team.contingentId}, ${manager.id}, ${eventId}, ${now}, ${now}, 'Not Present', NULL, ${team.stateId}, ${team.zoneId}, ${team.stateName}, ${team.targetGroupLabel}, ${manager.email || null}, ${'PENDING'}, ${now}, ${now})
             `;
             syncResults.newManagers++;
+            console.log(`Added new manager ${manager.id} to attendance for contingent ${team.contingentId}`);
           } else {
             await prisma.$executeRaw`
               UPDATE attendanceManager
@@ -402,6 +512,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
               WHERE hashcode = ${managerHashcode}
             `;
             syncResults.updatedManagers++;
+            console.log(`Updated manager ${manager.id} attendance record for contingent ${team.contingentId}`);
           }
         }
       }
@@ -438,7 +549,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
         console.log(`Updated attendanceContingent record for contingent ${contingentId}`);
       }
 
-      console.log(`Contingent sync completed: ${syncResults.newContingents} new contingents, ${syncResults.newTeams} new teams, ${syncResults.newContestants} new contestants, ${syncResults.newManagers} new managers`);
+      console.log(`Contingent sync completed: ${syncResults.newContingents} new contingents, ${syncResults.newTeams} new teams, ${syncResults.newContestants} new contestants (${syncResults.removedContestants} removed), ${syncResults.newManagers} new managers (${syncResults.removedManagers} removed)`);
 
       return new NextResponse(JSON.stringify({
         success: true,
