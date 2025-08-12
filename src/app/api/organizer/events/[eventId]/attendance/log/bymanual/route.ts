@@ -93,7 +93,7 @@ export async function GET(
         t.name as teamName,
         c.contingentType,
         ac.attendanceStatus,
-        ec.contestId,
+        ac.contestId,
         ct.code as contestCode,
         ct.name as contestName,
         ac.attendanceNote,
@@ -105,9 +105,7 @@ export async function GET(
       JOIN team t ON ac.teamId = t.id
       LEFT JOIN school s ON c.schoolId = s.id
       LEFT JOIN independent i ON c.independentId = i.id
-      LEFT JOIN eventcontestteam ect ON ect.teamId = t.id
-      LEFT JOIN eventcontest ec ON ect.eventcontestId = ec.id AND ec.eventId = ${eventId}
-      LEFT JOIN contest ct ON ec.contestId = ct.id
+      LEFT JOIN contest ct ON ac.contestId = ct.id
       WHERE ac.eventId = ${eventId}
     `;
 

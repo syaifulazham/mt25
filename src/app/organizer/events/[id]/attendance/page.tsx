@@ -1845,6 +1845,29 @@ export default function AttendancePage() {
             </Link>
           </CardFooter>
         </Card>
+
+        {/* Manage changes on D-Day */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              Manage changes on D-Day
+            </CardTitle>
+            <CardDescription>
+              Handle last-minute participant changes on event day
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p>Manage team member replacements, withdrawals, and other changes that occur on the day of the event</p>
+          </CardContent>
+          <CardFooter>
+            <Link href={`/organizer/events/${eventId}/attendance/dday-changes`} className="w-full">
+              <Button className="w-full">
+                Manage D-Day Changes
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );
