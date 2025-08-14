@@ -951,20 +951,19 @@ export default function TeamDetailPage({ params }: { params: { id: string } }) {
                               <div className="flex-1 overflow-hidden rounded-md border">
                                 {team.evidence_doc?.toLowerCase().endsWith('.pdf') ? (
                                   <iframe 
-                                    src={team.evidence_doc} 
-                                    className="w-full h-full" 
+                                    src={`/api/files/evidence/${team.evidence_doc.split('/').pop()}`}
+                                    className="w-full h-96 border rounded"
                                     title="Evidence Document"
                                   />
                                 ) : (
-                                  <div className="flex items-center justify-center h-full bg-gray-100">
+                                  <div className="flex justify-center">
                                     <img 
-                                      src={team.evidence_doc?.startsWith('/') ? team.evidence_doc : `/${team.evidence_doc}`} 
+                                      src={`/api/files/evidence/${team.evidence_doc?.split('/').pop()}`}
                                       alt="Evidence Document" 
-                                      className="max-w-full max-h-full object-contain"
+                                      className="max-w-full max-h-96 object-contain rounded"
                                       onError={(e) => {
                                         console.error("Image failed to load:", team.evidence_doc);
-                                        e.currentTarget.onerror = null;
-                                        e.currentTarget.src = "/images/document-placeholder.png";
+                                        e.currentTarget.style.display = 'none';
                                       }}
                                     />
                                   </div>
