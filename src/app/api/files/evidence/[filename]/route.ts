@@ -24,8 +24,9 @@ export async function GET(
     }
 
     // Sanitize filename to prevent directory traversal attacks
-    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-_]/g, '');
-    if (sanitizedFilename !== filename) {
+    // Allow alphanumeric, dots, hyphens, underscores, spaces, and commas
+    const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.\-_\s,]/g, '');
+    if (sanitizedFilename !== filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return new NextResponse('Invalid filename', { status: 400 });
     }
 
