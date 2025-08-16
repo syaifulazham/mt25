@@ -35,11 +35,13 @@ import {
   Search,
   Filter,
   Eye,
+  ArrowRight,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
+import TeamTransferModal from '@/components/team-transfer-modal';
 
 // Loading spinner component
 function LoadingSpinner({ size = "default" }: { size?: "default" | "sm" | "lg" }) {
@@ -109,7 +111,7 @@ export default function EndListPage() {
     ppd: 120,
     contingent: 150,
     registrationDate: 140,
-    actions: 120,
+    actions: 180,
   });
   const [isResizing, setIsResizing] = useState<string | null>(null);
   const [expandedTeams, setExpandedTeams] = useState<Set<number>>(new Set());
@@ -118,6 +120,11 @@ export default function EndListPage() {
     teamId: number | null;
     teamName: string;
   }>({ isOpen: false, teamId: null, teamName: '' });
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [selectedTeamForTransfer, setSelectedTeamForTransfer] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
   // Helper function to get icon for target group
   const getTargetGroupIcon = (targetGroupLabel: string) => {
@@ -290,10 +297,23 @@ export default function EndListPage() {
   };
 
   const handleSetToPending = (teamId: number, teamName: string) => {
-    setConfirmationModal({
-      isOpen: true,
-      teamId,
-      teamName
+    setConfirmationModal({ isOpen: true, teamId, teamName });
+  };
+
+  const handleTransferTeam = (teamId: number, teamName: string) => {
+    setSelectedTeamForTransfer({ id: teamId, name: teamName });
+    setTransferModalOpen(true);
+  };
+
+  const handleTransferComplete = () => {
+    // Refresh the teams list after transfer
+    fetchTeams();
+    setSelectedTeamForTransfer(null);
+    setTransferModalOpen(false);
+    
+    toast({
+      title: "Transfer Complete",
+      description: "Team has been successfully transferred to the new event.",
     });
   };
 
@@ -725,7 +745,7 @@ export default function EndListPage() {
                           className="px-4 py-3"
                           style={{ width: columnWidths.actions + 'px' }}
                         >
-                          <div className="flex items-center justify-center">
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="outline"
                               size="sm"
@@ -733,6 +753,15 @@ export default function EndListPage() {
                               onClick={() => handleSetToPending(team.id, team.teamName)}
                             >
                               Set to Pending
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 px-2 text-blue-600 border-blue-300 hover:bg-blue-50"
+                              onClick={() => handleTransferTeam(team.id, team.teamName)}
+                            >
+                              <ArrowRight className="h-3 w-3 mr-1" />
+                              Transfer
                             </Button>
                           </div>
                         </td>
@@ -843,6 +872,21 @@ export default function EndListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Team Transfer Modal */}
+      {selectedTeamForTransfer && (
+        <TeamTransferModal
+          isOpen={transferModalOpen}
+          onClose={() => {
+            setTransferModalOpen(false);
+            setSelectedTeamForTransfer(null);
+          }}
+          eventId={eventId}
+          teamId={selectedTeamForTransfer.id}
+          teamName={selectedTeamForTransfer.name}
+          onTransferComplete={handleTransferComplete}
+        />
       )}
     </DashboardShell>
   );

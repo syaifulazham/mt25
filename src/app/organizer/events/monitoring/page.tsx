@@ -38,19 +38,22 @@ function LoadingSpinner({ size = "default" }: { size?: "default" | "sm" | "lg" }
   return <Loader2 className={`${sizeClass} animate-spin`} />;
 }
 
-type ZoneEvent = {
+type Event = {
   id: number;
   name: string;
   startDate: string;
   endDate: string;
   status: string;
-  zoneId: number;
-  zoneName: string;
+  scopeArea: string;
+  zoneId: number | null;
+  zoneName: string | null;
+  stateId: number | null;
+  stateName: string | null;
 };
 
 export default function MonitoringPage() {
   const router = useRouter();
-  const [events, setEvents] = useState<ZoneEvent[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionInProgress, setActionInProgress] = useState<number | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{ 
@@ -70,9 +73,9 @@ export default function MonitoringPage() {
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/organizer/events/zone");
+      const response = await fetch("/api/organizer/events/all");
       if (!response.ok) {
-        throw new Error("Failed to fetch zone events");
+        throw new Error("Failed to fetch events");
       }
       const data = await response.json();
       setEvents(data);
@@ -80,7 +83,7 @@ export default function MonitoringPage() {
       console.error("Error fetching events:", error);
       toast({
         title: "Error",
-        description: "Failed to load zone events. Please try again later.",
+        description: "Failed to load events. Please try again later.",
         variant: "destructive",
       });
     } finally {
@@ -213,15 +216,16 @@ export default function MonitoringPage() {
               <LoadingSpinner size="lg" />
             </div>
           ) : events.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 text-center">
-              <p className="text-sm text-muted-foreground">No zone events found</p>
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">No events found</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Event</TableHead>
-                  <TableHead>Zone</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Days Left</TableHead>
                   <TableHead>Token</TableHead>
@@ -237,7 +241,29 @@ export default function MonitoringPage() {
                         {format(new Date(event.startDate), 'dd MMM yyyy')} - {format(new Date(event.endDate), 'dd MMM yyyy')}
                       </div>
                     </TableCell>
-                    <TableCell>{event.zoneName}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={`
+                        ${event.scopeArea === 'ZONE' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
+                        ${event.scopeArea === 'STATE' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                        ${event.scopeArea === 'NATIONAL' ? 'bg-purple-50 text-purple-700 border-purple-200' : ''}
+                        ${event.scopeArea === 'OPEN' ? 'bg-orange-50 text-orange-700 border-orange-200' : ''}
+                      `}>
+                        {event.scopeArea}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {event.scopeArea === 'ZONE' && event.zoneName ? (
+                        <span className="text-sm">{event.zoneName}</span>
+                      ) : event.scopeArea === 'STATE' && event.stateName ? (
+                        <span className="text-sm">{event.stateName}</span>
+                      ) : event.scopeArea === 'NATIONAL' ? (
+                        <span className="text-sm text-muted-foreground">National</span>
+                      ) : event.scopeArea === 'OPEN' ? (
+                        <span className="text-sm text-muted-foreground">Open</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {/* Status Toggle Button */}

@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useParams } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
-import { Calendar, Users, UserCheck, Building2, User, Search, Plus, Loader2, Trash2, AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Calendar, Users, UserCheck, Building2, User, Search, Plus, Loader2, Trash2, AlertTriangle, ArrowLeft, RefreshCw, ArrowRight } from 'lucide-react';
 import Link from "next/link";
+import TeamTransferModal from '@/components/team-transfer-modal';
 
 // Types
 interface Team {
@@ -108,6 +109,7 @@ export default function DdayChangesPage() {
   const [addMemberModalOpen, setAddMemberModalOpen] = useState(false);
   const [teamSelectionModalOpen, setTeamSelectionModalOpen] = useState(false);
   const [addingMember, setAddingMember] = useState<number | null>(null);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
 
   // Fetch available teams on component mount
   useEffect(() => {
@@ -418,8 +420,34 @@ export default function DdayChangesPage() {
   };
 
   const handleTeamSelect = (teamId: string) => {
-    const team = availableTeams.find(t => t.id.toString() === teamId);
-    setSelectedTeam(team || null);
+    const team = availableTeams.find(t => t.id === parseInt(teamId));
+    if (team) {
+      setSelectedTeam(team);
+      setTeamSelectionModalOpen(false);
+      
+      // Fetch data for the selected team
+      fetchTeamData(team.id);
+      fetchEndlistData(team.id);
+      fetchAttendanceData(team.id);
+      fetchManagersData(team.id);
+      fetchContingentContestantsData(team.id);
+    }
+  };
+
+  const handleTransferComplete = () => {
+    // Refresh the teams list and clear selection
+    fetchAvailableTeams();
+    setSelectedTeam(null);
+    setEndlistMembers([]);
+    setAttendanceMembers([]);
+    setManagers([]);
+    setContingentContestants(null);
+    
+    toast({
+      title: "Transfer Complete",
+      description: "Team has been successfully transferred to the new event.",
+      variant: "default",
+    });
   };
 
   return (
@@ -804,6 +832,18 @@ export default function DdayChangesPage() {
             Please search and select a team to view D-Day change management options
           </p>
         </div>
+      )}
+
+      {/* Team Transfer Modal */}
+      {selectedTeam && (
+        <TeamTransferModal
+          isOpen={transferModalOpen}
+          onClose={() => setTransferModalOpen(false)}
+          eventId={eventId as string}
+          teamId={selectedTeam.id}
+          teamName={selectedTeam.name}
+          onTransferComplete={handleTransferComplete}
+        />
       )}
     </div>
   );
