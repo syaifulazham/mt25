@@ -969,7 +969,7 @@ export const eventApi = {
     address?: string | null;
     city?: string | null;
     addressState?: string | null;
-    scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN';
+    scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN' | 'DISTRICT' | 'ONLINE_NATIONAL' | 'ONLINE_ZONE' | 'ONLINE_STATE' | 'ONLINE_OPEN';
     zoneId?: number | null;
     stateId?: number | null;
     latitude?: number | null;
@@ -993,7 +993,7 @@ export const eventApi = {
     address?: string | null;
     city?: string | null;
     addressState?: string | null;
-    scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN';
+    scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN' | 'DISTRICT' | 'ONLINE_NATIONAL' | 'ONLINE_ZONE' | 'ONLINE_STATE' | 'ONLINE_OPEN';
     zoneId?: number | null;
     stateId?: number | null;
     latitude?: number | null;

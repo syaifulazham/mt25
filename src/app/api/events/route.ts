@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
-import { hasRequiredRole } from '@/lib/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
 
 /**
@@ -12,8 +12,8 @@ import { z } from 'zod';
 export async function GET(request: NextRequest) {
   try {
     // Check if user is authenticated
-    const user = await getCurrentUser();
-    if (!user) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -71,12 +71,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Check if user is authenticated and has required role
-    const user = await getCurrentUser();
-    if (!user) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!hasRequiredRole(user, ['ADMIN', 'OPERATOR'])) {
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'OPERATOR') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       address: z.string().optional().nullable(),
       city: z.string().optional().nullable(),
       addressState: z.string().optional().nullable(),
-      scopeArea: z.enum(['NATIONAL', 'ZONE', 'STATE', 'OPEN']).default('OPEN'),
+      scopeArea: z.enum(['NATIONAL', 'ZONE', 'STATE', 'OPEN', 'DISTRICT', 'ONLINE_NATIONAL', 'ONLINE_ZONE', 'ONLINE_STATE', 'ONLINE_OPEN']).default('OPEN'),
       zoneId: z.number().optional().nullable(),
       stateId: z.number().optional().nullable(),
       latitude: z.number().or(z.string()).optional().nullable(),
@@ -101,14 +101,29 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
+    console.log('Request body received:', JSON.stringify(body, null, 2));
     
     // Validate request body
     const result = eventSchema.safeParse(body);
     if (!result.success) {
+      console.log('Validation failed:', result.error.issues);
       return NextResponse.json(
         { error: 'Invalid request body', details: result.error.issues },
         { status: 400 }
       );
+    }
+    
+    console.log('Validation passed, scopeArea value:', body.scopeArea);
+
+    // Handle zone and state IDs based on scope area (same logic as PATCH route)
+    let processedZoneId = body.zoneId !== null && body.zoneId !== undefined ? body.zoneId : null;
+    let processedStateId = body.stateId !== null && body.stateId !== undefined ? body.stateId : null;
+    
+    // Special case: If 'Online State' selected and 'National' selected as 'State',
+    // then stateId shall save as NULL (open to all states)
+    // Check for both string "national" and numeric 0 (which represents "National" selection)
+    if (body.scopeArea === 'ONLINE_STATE' && (body.stateId === 'national' || body.stateId === 0)) {
+      processedStateId = null;
     }
 
     // Create event
@@ -124,8 +139,8 @@ export async function POST(request: NextRequest) {
         city: body.city,
         addressState: body.addressState,
         scopeArea: body.scopeArea,
-        zoneId: body.zoneId !== null && body.zoneId !== undefined ? body.zoneId : null,
-        stateId: body.stateId !== null && body.stateId !== undefined ? body.stateId : null,
+        zoneId: processedZoneId,
+        stateId: processedStateId,
         latitude: body.latitude ? parseFloat(body.latitude) : null,
         longitude: body.longitude ? parseFloat(body.longitude) : null,
         isActive: body.isActive ?? true,

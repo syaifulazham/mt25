@@ -233,8 +233,15 @@ export default function MonitoringPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => (
-                  <TableRow key={event.id}>
+                {events.map((event) => {
+                  // Check if this is an online event
+                  const isOnlineEvent = event.scopeArea.startsWith('ONLINE_');
+                  
+                  return (
+                  <TableRow 
+                    key={event.id} 
+                    className={isOnlineEvent ? 'bg-blue-50 hover:bg-blue-100' : ''}
+                  >
                     <TableCell className="font-medium">
                       <div>{event.name}</div>
                       <div className="text-xs text-muted-foreground mt-1">
@@ -247,18 +254,22 @@ export default function MonitoringPage() {
                         ${event.scopeArea === 'STATE' ? 'bg-green-50 text-green-700 border-green-200' : ''}
                         ${event.scopeArea === 'NATIONAL' ? 'bg-purple-50 text-purple-700 border-purple-200' : ''}
                         ${event.scopeArea === 'OPEN' ? 'bg-orange-50 text-orange-700 border-orange-200' : ''}
+                        ${event.scopeArea === 'ONLINE_ZONE' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : ''}
+                        ${event.scopeArea === 'ONLINE_STATE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ''}
+                        ${event.scopeArea === 'ONLINE_NATIONAL' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : ''}
+                        ${event.scopeArea === 'ONLINE_OPEN' ? 'bg-pink-50 text-pink-700 border-pink-200' : ''}
                       `}>
-                        {event.scopeArea}
+                        {event.scopeArea.replace('_', ' ')}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {event.scopeArea === 'ZONE' && event.zoneName ? (
+                      {(event.scopeArea === 'ZONE' || event.scopeArea === 'ONLINE_ZONE') && event.zoneName ? (
                         <span className="text-sm">{event.zoneName}</span>
-                      ) : event.scopeArea === 'STATE' && event.stateName ? (
+                      ) : (event.scopeArea === 'STATE' || event.scopeArea === 'ONLINE_STATE') && event.stateName ? (
                         <span className="text-sm">{event.stateName}</span>
-                      ) : event.scopeArea === 'NATIONAL' ? (
+                      ) : (event.scopeArea === 'NATIONAL' || event.scopeArea === 'ONLINE_NATIONAL') ? (
                         <span className="text-sm text-muted-foreground">National</span>
-                      ) : event.scopeArea === 'OPEN' ? (
+                      ) : (event.scopeArea === 'OPEN' || event.scopeArea === 'ONLINE_OPEN') ? (
                         <span className="text-sm text-muted-foreground">Open</span>
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>
@@ -266,7 +277,6 @@ export default function MonitoringPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {/* Status Toggle Button */}
                         {actionInProgress !== event.id && (event.status === "OPEN" || event.status === "CUTOFF_REGISTRATION") ? (
                           <Button
                             variant="outline"
@@ -333,9 +343,10 @@ export default function MonitoringPage() {
                           </Button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                     </TableCell>
+                   </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

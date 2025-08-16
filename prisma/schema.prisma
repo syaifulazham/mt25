@@ -1294,6 +1294,10 @@ enum scope_area {
   STATE
   OPEN
   DISTRICT
+  ONLINE_NATIONAL
+  ONLINE_ZONE
+  ONLINE_STATE
+  ONLINE_OPEN
 }
 
 enum judgingSession_status {

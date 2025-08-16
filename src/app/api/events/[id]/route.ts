@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser } from '@/lib/session';
-import { hasRequiredRole } from '@/lib/auth';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
 
 // Mark this route as dynamic since it uses getCurrentUser() which uses headers()
@@ -19,8 +19,8 @@ export async function GET(
 ) {
   try {
     // Check if user is authenticated
-    const user = await getCurrentUser();
-    if (!user) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -72,12 +72,12 @@ export async function PATCH(
 ) {
   try {
     // Check if user is authenticated and has required role
-    const user = await getCurrentUser();
-    if (!user) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!hasRequiredRole(user, ['ADMIN', 'OPERATOR'])) {
+    if (session.user.role !== 'ADMIN' && session.user.role !== 'OPERATOR') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -112,7 +112,7 @@ export async function PATCH(
       address: z.string().nullable().optional(),
       city: z.string().nullable().optional(),
       addressState: z.string().nullable().optional(),
-      scopeArea: z.enum(['NATIONAL', 'ZONE', 'STATE', 'OPEN']).optional(),
+      scopeArea: z.enum(['NATIONAL', 'ZONE', 'STATE', 'OPEN', 'DISTRICT', 'ONLINE_NATIONAL', 'ONLINE_ZONE', 'ONLINE_STATE', 'ONLINE_OPEN']).optional(),
       zoneId: z.number().nullable().optional(),
       stateId: z.number().nullable().optional(),
       latitude: z.number().or(z.string()).nullable().optional(),
@@ -132,6 +132,17 @@ export async function PATCH(
       );
     }
 
+    // Handle zone and state IDs based on scope area (same logic as frontend)
+    let processedZoneId = body.zoneId;
+    let processedStateId = body.stateId;
+    
+    // Special case: If 'Online State' selected and 'National' selected as 'State',
+    // then stateId shall save as NULL (open to all states)
+    // Check for both string "national" and numeric 0 (which represents "National" selection)
+    if (body.scopeArea === 'ONLINE_STATE' && (body.stateId === 'national' || body.stateId === 0)) {
+      processedStateId = null;
+    }
+
     // Update event
     const updatedEvent = await prisma.event.update({
       where: { id: parseInt(params.id) },
@@ -146,8 +157,8 @@ export async function PATCH(
         city: body.city,
         addressState: body.addressState,
         scopeArea: body.scopeArea,
-        zoneId: body.zoneId,
-        stateId: body.stateId,
+        zoneId: processedZoneId,
+        stateId: processedStateId,
         latitude: body.latitude,
         longitude: body.longitude,
         isActive: body.isActive,
@@ -174,12 +185,12 @@ export async function DELETE(
 ) {
   try {
     // Check if user is authenticated and has required role
-    const user = await getCurrentUser();
-    if (!user) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!hasRequiredRole(user, ['ADMIN'])) {
+    if (session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

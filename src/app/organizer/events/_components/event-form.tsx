@@ -52,7 +52,7 @@ const eventFormSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   addressState: z.string().optional(),
-  scopeArea: z.enum(['NATIONAL', 'ZONE', 'STATE', 'OPEN']).default('OPEN'),
+  scopeArea: z.enum(['NATIONAL', 'ZONE', 'STATE', 'OPEN', 'DISTRICT', 'ONLINE_NATIONAL', 'ONLINE_ZONE', 'ONLINE_STATE', 'ONLINE_OPEN']).default('OPEN'),
   zoneId: z.string().optional(),
   stateId: z.string().optional(),
   latitude: z.string().optional(),
@@ -191,12 +191,19 @@ export function EventForm({ initialData }: EventFormProps) {
       let zoneIdValue = null;
       let stateIdValue = null;
       
-      if (data.scopeArea === "ZONE" && data.zoneId) {
+      if ((data.scopeArea === "ZONE" || data.scopeArea === "ONLINE_ZONE") && data.zoneId) {
         zoneIdValue = parseInt(data.zoneId);
       }
       
-      if (data.scopeArea === "STATE" && data.stateId) {
-        stateIdValue = parseInt(data.stateId);
+      if ((data.scopeArea === "STATE" || data.scopeArea === "ONLINE_STATE") && data.stateId) {
+        // Special case: If 'Online State' selected and 'National' selected as 'State',
+        // then stateId shall save as NULL (open to all states)
+        // Check for both string "national" and numeric "0" (which represents "National" selection)
+        if (data.scopeArea === "ONLINE_STATE" && (data.stateId === "national" || data.stateId === "0")) {
+          stateIdValue = null;
+        } else {
+          stateIdValue = parseInt(data.stateId);
+        }
       }
       
       if (isEditMode) {
@@ -304,6 +311,10 @@ export function EventForm({ initialData }: EventFormProps) {
                         <SelectItem value="ZONE">Zone (requires zone selection)</SelectItem>
                         <SelectItem value="STATE">State (requires state selection)</SelectItem>
                         <SelectItem value="OPEN">Open</SelectItem>
+                        <SelectItem value="ONLINE_NATIONAL">Online National</SelectItem>
+                        <SelectItem value="ONLINE_ZONE">Online Zone (requires zone selection)</SelectItem>
+                        <SelectItem value="ONLINE_STATE">Online State (requires state selection)</SelectItem>
+                        <SelectItem value="ONLINE_OPEN">Online Open</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
@@ -314,8 +325,8 @@ export function EventForm({ initialData }: EventFormProps) {
                 )}
               />
 
-              {/* Zone - Only show when scope area is ZONE */}
-              {watchScopeArea === "ZONE" && (
+              {/* Zone - Only show when scope area is ZONE or ONLINE_ZONE */}
+              {(watchScopeArea === "ZONE" || watchScopeArea === "ONLINE_ZONE") && (
                 <FormField
                   control={form.control}
                   name="zoneId"
@@ -348,8 +359,8 @@ export function EventForm({ initialData }: EventFormProps) {
                 />
               )}
 
-              {/* State - Only show when scope area is STATE */}
-              {watchScopeArea === "STATE" && (
+              {/* State - Only show when scope area is STATE or ONLINE_STATE */}
+              {(watchScopeArea === "STATE" || watchScopeArea === "ONLINE_STATE") && (
                 <FormField
                   control={form.control}
                   name="stateId"
@@ -366,6 +377,9 @@ export function EventForm({ initialData }: EventFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          {watchScopeArea === "ONLINE_STATE" && (
+                            <SelectItem value="0">National</SelectItem>
+                          )}
                           {states.map((state) => (
                             <SelectItem key={state.id} value={state.id.toString()}>
                               {state.name}
