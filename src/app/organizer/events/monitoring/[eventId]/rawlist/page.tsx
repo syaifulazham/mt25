@@ -27,7 +27,8 @@ import {
   ChevronDown,
   Users,
   GraduationCap,
-  School
+  School,
+  FileSpreadsheet
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { PageHeader } from "@/components/page-header";
@@ -316,6 +317,29 @@ export default function RawlistPage() {
     }
   };
 
+  const handleGenerateXlsx = async () => {
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/rawlist/xlsx`);
+      if (!response.ok) {
+        throw new Error('Failed to generate XLSX');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `rawlist-event-${eventId}-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error generating XLSX:', error);
+      alert('Failed to generate XLSX file. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <DashboardShell>
@@ -366,6 +390,10 @@ export default function RawlistPage() {
             <Button onClick={handleGenerateDocx} className="flex items-center gap-2">
               <Download className="h-4 w-4" />
               Generate DOCX
+            </Button>
+            <Button onClick={handleGenerateXlsx} className="flex items-center gap-2" variant="outline">
+              <FileSpreadsheet className="h-4 w-4" />
+              XLSX
             </Button>
           </div>
         </div>
