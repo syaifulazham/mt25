@@ -13,6 +13,7 @@ import PendingRequestsAlert from "./pending-requests-alert";
 import ProfileCompletionAlert from "./profile-completion-alert";
 import UnassignedContestantsAlert from "./unassigned-contestants-alert";
 import ZoneRegistration from "./zone-registration";
+import OnlineRegistration from "./online-registration";
 
 interface DashboardClientProps {
   user: any;
@@ -101,6 +102,9 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
       
       {/* Zone Physical Event Registration */}
       <ZoneRegistration participantId={Number(user.id)} />
+      
+      {/* Online Event Registration */}
+      <OnlineRegistration participantId={Number(user.id)} />
       
       {/* Video Gallery - now more compact */}
       <div className="p-4 bg-muted/50 rounded-lg mb-6">

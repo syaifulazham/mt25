@@ -114,6 +114,7 @@ export async function GET(
           ev.scopeArea = 'OPEN'
           OR (ev.scopeArea = 'ZONE' AND ev.zoneId = ${zoneId || null})
           OR (ev.scopeArea = 'STATE' AND ev.stateId = ${stateId || null})
+          OR ev.scopeArea LIKE 'ONLINE_%'
         )
       ORDER BY 
         ev.name, c.name
