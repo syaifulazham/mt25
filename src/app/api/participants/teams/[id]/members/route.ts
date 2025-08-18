@@ -229,6 +229,38 @@ export async function POST(
         { status: 409 }
       );
     }
+
+    // Check if the contestant is already a member of any other team
+    const existingTeamMembership = await prisma.teamMember.findFirst({
+      where: {
+        contestantId: contestantId,
+        teamId: {
+          not: teamId
+        }
+      },
+      include: {
+        team: {
+          select: {
+            id: true,
+            name: true,
+            status: true
+          }
+        }
+      }
+    });
+    
+    if (existingTeamMembership && existingTeamMembership.team.status === 'ACTIVE') {
+      return NextResponse.json(
+        { 
+          error: `This contestant is already a member of another active team: ${existingTeamMembership.team.name}`,
+          existingTeam: {
+            id: existingTeamMembership.team.id,
+            name: existingTeamMembership.team.name
+          }
+        },
+        { status: 409 }
+      );
+    }
     
     // Add the contestant to the team
     await prisma.teamMember.create({

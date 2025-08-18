@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
 interface OnlineRegistrationProps {
   participantId: number;
@@ -175,6 +176,7 @@ export default function OnlineRegistrationSection({ participantId }: OnlineRegis
               <TableHead>{t('dashboard.team_name')}</TableHead>
               <TableHead className="text-center">{t('dashboard.number_of_members')}</TableHead>
               <TableHead>{t('dashboard.trainer')}</TableHead>
+              <TableHead className="text-right">{t('dashboard.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -216,6 +218,15 @@ export default function OnlineRegistrationSection({ participantId }: OnlineRegis
                       </div>
                     : '-'
                   }
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewMembers(team)}
+                  >
+                    {t('dashboard.view_members')}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

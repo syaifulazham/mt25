@@ -146,15 +146,23 @@ interface Team {
 interface Contestant {
   id: number;
   name: string;
-  icNumber: string;
+  ic?: string;
+  icNumber?: string;
   email?: string;
-  gender?: string;
+  phoneNumber?: string;
   age?: number;
+  gender?: string;
+  edu_level?: string;
   educationLevel?: string;
   class_grade?: string;
   class_name?: string;
   status: string;
   inTeam: boolean;
+  existingTeam?: {
+    id: number;
+    name: string;
+    status: string;
+  } | null;
 }
 
 export default function TeamMembersPage({ params }: { params: { id: string } }) {
@@ -295,10 +303,41 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
       
       console.log(`Loaded ${contestantsArray.length} contestants (page ${page}/${paginationInfo.totalPages}, total: ${paginationInfo.totalContestants})`);
       
+      // Check team membership for all contestants
+      const contestantIds = contestantsArray.map((c: any) => c.id);
+      let teamMemberships: any[] = [];
+      
+      if (contestantIds.length > 0) {
+        try {
+          const membershipResponse = await fetch(`/api/participants/contestants/memberships`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ contestantIds })
+          });
+          
+          if (membershipResponse.ok) {
+            teamMemberships = await membershipResponse.json();
+          }
+        } catch (error) {
+          console.error('Error fetching team memberships:', error);
+        }
+      }
+
+      // Create a map of contestant ID to their active team membership
+      const membershipMap = new Map();
+      teamMemberships.forEach((membership: any) => {
+        if (membership.team.status === 'ACTIVE') {
+          membershipMap.set(membership.contestantId, membership.team);
+        }
+      });
+
       // Mark contestants who are already in a team
       const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
         ...contestant,
-        inTeam: team?.members.some((member: TeamMember) => member.contestantId === contestant.id) || false,
+        inTeam: membershipMap.has(contestant.id),
+        existingTeam: membershipMap.get(contestant.id) || null,
       }));
       
       return { contestants: enhancedContestants, pagination: paginationInfo };
@@ -539,10 +578,41 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
           
           console.log('Total contestants loaded:', contestantsArray.length);
           
+          // Check team membership for all contestants
+          const contestantIds = contestantsArray.map((c: any) => c.id);
+          let teamMemberships: any[] = [];
+          
+          if (contestantIds.length > 0) {
+            try {
+              const membershipResponse = await fetch(`/api/participants/contestants/memberships`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ contestantIds })
+              });
+              
+              if (membershipResponse.ok) {
+                teamMemberships = await membershipResponse.json();
+              }
+            } catch (error) {
+              console.error('Error fetching team memberships:', error);
+            }
+          }
+
+          // Create a map of contestant ID to their active team membership
+          const membershipMap = new Map();
+          teamMemberships.forEach((membership: any) => {
+            if (membership.team.status === 'ACTIVE') {
+              membershipMap.set(membership.contestantId, membership.team);
+            }
+          });
+
           // Mark contestants who are already in a team
           const enhancedContestants = contestantsArray.map((contestant: Contestant) => ({
             ...contestant,
-            inTeam: teamData.members.some((member: TeamMember) => member.contestantId === contestant.id)
+            inTeam: membershipMap.has(contestant.id),
+            existingTeam: membershipMap.get(contestant.id) || null,
           }));
           
           setContestants(enhancedContestants);
@@ -1698,9 +1768,18 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                             <TableRow key={contestant.id}>
                               <TableCell className="text-center pr-2 w-[60px] sm:w-[80px]">
                                 {contestant.inTeam ? (
-                                  <Badge variant="outline" className="bg-green-50 text-xs p-1">
-                                    <CheckCircle className="h-3 w-3 text-green-500" />
-                                  </Badge>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 text-xs p-1 cursor-help">
+                                          <CheckCircle className="h-3 w-3 text-amber-600" />
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Already in team: {contestant.existingTeam?.name || 'Unknown Team'}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 ) : (
                                   <Button
                                     size="sm"
