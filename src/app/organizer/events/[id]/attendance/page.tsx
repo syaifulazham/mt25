@@ -1576,13 +1576,6 @@ export default function AttendancePage() {
           </CardContent>
           <CardFooter className="flex flex-col gap-2">
             <Button 
-              onClick={handleSync} 
-              disabled={syncing || resetting}
-              className="w-full"
-            >
-              {syncing ? 'Syncing...' : 'Synchronize Now'}
-            </Button>
-            <Button 
               onClick={handleOpenContingentSync}
               disabled={syncing || resetting}
               variant="outline"
