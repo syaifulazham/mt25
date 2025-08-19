@@ -1,20 +1,24 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 import { prisma } from '@/lib/prisma';
-import { getCurrentUser, isOrganizerOrAdmin } from '@/lib/session';
 
 // API to get contingents with attendance status for manual attendance entry
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { eventId: string } }
 ) {
   try {
     // Auth check
-    const currentUser = await getCurrentUser();
-    if (!currentUser || !(await isOrganizerOrAdmin(currentUser.id))) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check if user is an organizer admin or operator
+    if (session.user.role !== "ADMIN" && session.user.role !== "OPERATOR") {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
     const eventId = parseInt(params.eventId);
@@ -37,71 +41,42 @@ export async function GET(
       );
     }
 
-    // Get all contingents for this event with their team counts
-    const contingentsWithTeams = await prisma.contingent.findMany({
-      where: {
-        eventId,
-        status: 'ACCEPTED',
-      },
-      include: {
-        _count: {
-          select: {
-            teams: {
-              where: { status: 'ACCEPTED' }
-            }
-          }
-        },
-        teams: {
-          where: { status: 'ACCEPTED' },
-          select: {
-            _count: {
-              select: {
-                contestants: {
-                  where: { status: 'ACCEPTED' }
-                }
-              }
-            }
-          }
-        }
-      }
-    });
+    // Get contingents with attendance data and counts from attendance tables
+    const contingentsData = await prisma.$queryRaw`
+      SELECT DISTINCT
+        ac.id as attendanceId,
+        ac.contingentId,
+        c.name as contingentName,
+        ac.state,
+        ac.attendanceStatus,
+        ac.attendanceDate,
+        ac.attendanceTime,
+        (SELECT COUNT(*) FROM attendanceTeam WHERE eventId = ${eventId} AND contingentId = ac.contingentId) as teamCount,
+        (SELECT COUNT(*) FROM attendanceContestant WHERE eventId = ${eventId} AND contingentId = ac.contingentId) as contestantCount,
+        (SELECT COUNT(*) FROM attendanceManager WHERE eventId = ${eventId} AND contingentId = ac.contingentId) as managerCount
+      FROM attendanceContingent ac
+      JOIN contingent c ON ac.contingentId = c.id
+      WHERE ac.eventId = ${eventId}
+      ORDER BY c.name
+    ` as any[];
 
-    // Get attendance status for each contingent
-    const attendanceRecords = await prisma.attendanceContingent.findMany({
-      where: {
-        eventId,
-        contingentId: {
-          in: contingentsWithTeams.map(c => c.id)
-        }
-      }
-    });
+    console.log('Found contingents with attendance data:', contingentsData.length);
 
-    // Map attendance records to contingents
-    const contingents = contingentsWithTeams.map(contingent => {
-      // Find attendance record for this contingent
-      const attendanceRecord = attendanceRecords.find(
-        record => record.contingentId === contingent.id
-      );
-
-      // Calculate total contestants across all teams
-      const contestantCount = contingent.teams.reduce(
-        (sum, team) => sum + team._count.contestants, 
-        0
-      );
-
-      return {
-        id: contingent.id,
-        name: contingent.name,
-        state: contingent.state,
-        teamCount: contingent._count.teams,
-        contestantCount,
-        status: attendanceRecord?.attendanceStatus || 'Not Present',
-        attendanceDate: attendanceRecord?.attendanceDate ? 
-          attendanceRecord.attendanceDate.toISOString().split('T')[0] : undefined,
-        attendanceTime: attendanceRecord?.attendanceTime ? 
-          attendanceRecord.attendanceTime.toTimeString().split(' ')[0] : undefined,
-      };
-    });
+    // Transform the data to match the expected interface
+    const contingents = contingentsData.map((row: any) => ({
+      id: `${row.attendanceId}`,
+      contingentId: row.contingentId,
+      contingentName: row.contingentName,
+      state: row.state || 'Unknown',
+      teamCount: Number(row.teamCount || 0),
+      contestantCount: Number(row.contestantCount || 0),
+      managerCount: Number(row.managerCount || 0),
+      attendanceStatus: row.attendanceStatus || 'Not Checked In',
+      attendanceDate: row.attendanceDate ? 
+        new Date(row.attendanceDate).toISOString().split('T')[0] : undefined,
+      attendanceTime: row.attendanceTime ? 
+        row.attendanceTime.toString().split(' ')[0] : undefined,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -109,8 +84,12 @@ export async function GET(
     });
   } catch (error) {
     console.error('Error fetching contingents:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { error: 'Failed to fetch contingent data' },
+      { 
+        error: 'Failed to fetch contingent data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

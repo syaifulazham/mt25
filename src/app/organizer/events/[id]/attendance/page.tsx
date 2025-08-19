@@ -1646,10 +1646,18 @@ export default function AttendancePage() {
           <CardContent>
             <p>View and update attendance records manually from a list</p>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
             <Link href={`/organizer/events/${eventId}/attendance/log/bymanual`} className="w-full">
               <Button className="w-full">
                 Open Manual Entry
+              </Button>
+            </Link>
+            <Link href={`/organizer/events/${eventId}/attendance/log/bycontingent`} className="w-full">
+              <Button 
+                variant="outline"
+                className="w-full bg-green-50 text-green-700 hover:bg-green-100"
+              >
+                Contingent Check-in
               </Button>
             </Link>
           </CardFooter>
