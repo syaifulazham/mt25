@@ -93,10 +93,10 @@ export default function ContingentCheckInPage() {
 
   // Handle check-in action
   const handleCheckIn = async (contingentId: string) => {
+    setCheckingIn(contingentId);
+    
     try {
-      setCheckingIn(contingentId);
-      
-      const response = await fetch(`/api/organizer/events/${eventId}/attendance/contingents/${contingentId}/checkin`, {
+      const response = await fetch(`/api/organizer/events/${params.id}/attendance/contingents/${contingentId}/checkin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,16 +111,53 @@ export default function ContingentCheckInPage() {
       
       toast({
         title: "Success",
-        description: `Contingent checked in successfully. Updated ${result.updatedRecords} attendance records.`,
+        description: `${result.contingentName} has been checked in successfully. ${result.updatedRecords} records updated.`,
       });
 
-      // Refresh the contingents data
-      await fetchContingents();
+      // Refresh the contingents list
+      fetchContingents();
     } catch (error) {
       console.error('Error checking in contingent:', error);
       toast({
         title: "Error",
-        description: "Failed to check in contingent",
+        description: "Failed to check in contingent. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCheckingIn(null);
+    }
+  };
+
+  // Handle retract check-in action
+  const handleRetractCheckIn = async (contingentId: string) => {
+    setCheckingIn(contingentId);
+    
+    try {
+      const response = await fetch(`/api/organizer/events/${params.id}/attendance/contingents/${contingentId}/retract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to retract check-in');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Success",
+        description: `${result.contingentName} check-in has been retracted. ${result.updatedRecords} records updated.`,
+      });
+
+      // Refresh the contingents list
+      fetchContingents();
+    } catch (error) {
+      console.error('Error retracting check-in:', error);
+      toast({
+        title: "Error",
+        description: "Failed to retract check-in. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -248,29 +285,39 @@ export default function ContingentCheckInPage() {
                   filteredContingents.map((contingent) => (
                     <tr key={contingent.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <Button
-                          onClick={() => handleCheckIn(contingent.contingentId)}
-                          disabled={checkingIn === contingent.contingentId || contingent.attendanceStatus === 'Present'}
-                          size="sm"
-                          className={contingent.attendanceStatus === 'Present' 
-                            ? "bg-green-600 hover:bg-green-700" 
-                            : "bg-blue-600 hover:bg-blue-700"
-                          }
-                        >
-                          {checkingIn === contingent.contingentId ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Checking In...
-                            </>
-                          ) : contingent.attendanceStatus === 'Present' ? (
-                            <>
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              Checked In
-                            </>
-                          ) : (
-                            'Check In'
-                          )}
-                        </Button>
+                        {contingent.attendanceStatus === 'Present' ? (
+                          <Button
+                            onClick={() => handleRetractCheckIn(contingent.contingentId)}
+                            disabled={checkingIn === contingent.contingentId}
+                            size="sm"
+                            variant="outline"
+                            className="border-red-300 text-red-600 hover:bg-red-50"
+                          >
+                            {checkingIn === contingent.contingentId ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Retracting...
+                              </>
+                            ) : (
+                              'Retract Check-in'
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={() => handleCheckIn(contingent.contingentId)}
+                            disabled={checkingIn === contingent.contingentId}
+                            size="sm"
+                          >
+                            {checkingIn === contingent.contingentId ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Checking In...
+                              </>
+                            ) : (
+                              'Check In'
+                            )}
+                          </Button>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">

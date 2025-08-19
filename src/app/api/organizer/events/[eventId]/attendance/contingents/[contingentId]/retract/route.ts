@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from '@/lib/prisma';
 
-// API to check in all attendance records for a contingent
+// API to retract check-in for all attendance records of a contingent
 export async function POST(
   request: NextRequest,
   { params }: { params: { eventId: string; contingentId: string } }
@@ -70,12 +70,12 @@ export async function POST(
     const now = new Date();
     let updatedRecords = 0;
 
-    // Update all attendance records to 'Present' status
+    // Update all attendance records to 'Not Present' status
     await prisma.$transaction(async (tx) => {
       // 1. Update attendanceContingent record
       const contingentUpdateResult = await tx.$executeRaw`
         UPDATE attendanceContingent
-        SET attendanceStatus = 'Present',
+        SET attendanceStatus = 'Not Present',
             attendanceDate = ${now},
             attendanceTime = ${now},
             updatedAt = ${now}
@@ -86,7 +86,7 @@ export async function POST(
       // 2. Update all attendanceTeam records for this contingent
       const teamUpdateResult = await tx.$executeRaw`
         UPDATE attendanceTeam
-        SET attendanceStatus = 'Present',
+        SET attendanceStatus = 'Not Present',
             attendanceDate = ${now},
             attendanceTime = ${now},
             updatedAt = ${now}
@@ -97,7 +97,7 @@ export async function POST(
       // 3. Update all attendanceContestant records for this contingent
       const contestantUpdateResult = await tx.$executeRaw`
         UPDATE attendanceContestant
-        SET attendanceStatus = 'Present',
+        SET attendanceStatus = 'Not Present',
             attendanceDate = ${now},
             attendanceTime = ${now},
             updatedAt = ${now}
@@ -108,7 +108,7 @@ export async function POST(
       // 4. Update all attendanceManager records for this contingent
       const managerUpdateResult = await tx.$executeRaw`
         UPDATE attendanceManager
-        SET attendanceStatus = 'Present',
+        SET attendanceStatus = 'Not Present',
             attendanceDate = ${now},
             attendanceTime = ${now},
             updatedAt = ${now}
@@ -119,7 +119,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Contingent checked in successfully',
+      message: 'Contingent check-in retracted successfully',
       contingentId,
       contingentName: contingent[0].name,
       updatedRecords,
@@ -127,11 +127,11 @@ export async function POST(
     });
 
   } catch (error) {
-    console.error('Error checking in contingent:', error);
+    console.error('Error retracting contingent check-in:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     console.error('Event ID:', params.eventId, 'Contingent ID:', params.contingentId);
     return NextResponse.json(
-      { error: 'Failed to check in contingent', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to retract contingent check-in', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
