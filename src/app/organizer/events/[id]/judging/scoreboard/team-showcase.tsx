@@ -72,8 +72,9 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
             </div>
             
             {/* Logo and contest info */}
-            <div className="flex flex-col items-center justify-center pt-6 px-6 w-full">
-              <div className="relative w-40 h-40 mb-4">
+            <div className="flex flex-col items-center justify-center px-6 w-full">
+              {/* Techlympics logo */}
+              <div className="relative w-40 h-40">
                 <Image
                   src="/images/poster/mt-logo.png"
                   alt="Techlympics Logo"
@@ -82,21 +83,28 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
                   className="object-contain"
                 />
               </div>
-              {team.stateName && (
-                <div className="text-xl text-blue-200 font-medium mb-4">
-                  {team.stateName}
-                </div>
-              )}
               <h2 className="text-3xl font-bold mb-2">{team.contestName}</h2>
             </div>
             
             {/* Position indicator */}
             <motion.div 
-              className="py-4 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 text-center w-full"
+              className="py-4 bg-gradient-to-r from-blue-600/30 to-indigo-600/30 w-full flex justify-center items-center gap-4"
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.4 }}
             >
+              {/* State flag to the left of ranking name */}
+              {team.stateName && (
+                <div className="relative w-12 h-8 md:w-16 md:h-10 flex-shrink-0">
+                  <Image
+                    src={`/images/flags/${team.stateName?.toLowerCase()}.png`}
+                    alt={`${team.stateName} Flag`}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-contain"
+                  />
+                </div>
+              )}
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-wide">{positionText}</h1>
             </motion.div>
             
@@ -108,28 +116,23 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                <h3 className="text-sm uppercase tracking-wide text-blue-300 mb-1 text-center">Pasukan</h3>
-                
-                {/* Contingent Logo */}
-                <div className="flex justify-center mb-4">
-                  {team.contingentLogoUrl ? (
-                    <div className="relative w-24 h-24">
+                {/* Contingent logo above team name */}
+                <div className="flex items-center justify-center mb-4">
+                  {/* Contingent Logo */}
+                  {team.contingentLogoUrl && (
+                    <div className="relative w-16 h-16 md:w-20 md:h-20">
                       <Image 
                         src={team.contingentLogoUrl}
                         alt={`${team.contingentName} Logo`}
                         fill
-                        sizes="(max-width: 768px) 100vw, 50vw"
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         className="object-contain"
                       />
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center w-24 h-24 rounded-full bg-blue-600/20 text-blue-300">
-                      <Shield className="h-8 w-8" />
                     </div>
                   )}
                 </div>
                 
-                <h2 className="text-5xl md:text-6xl lg:text-7xl font-extrabold mb-3 text-center text-[#ffa400]">{team.teamName}</h2>
+                <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold mb-3 text-center text-[#ffa400]">{team.teamName}</h2>
                 <div className="flex flex-col items-center">
                   <h3 className="text-3xl md:text-4xl text-gray-200 mb-3 font-semibold">
                     {team.contingentName ? team.contingentName.replace(/\sContingent$|^Contingent\s/i, '') : ''}
@@ -152,7 +155,7 @@ export default function TeamShowcase({ team, position, onClose }: TeamShowcasePr
                   <div className="flex flex-col space-y-4 max-w-2xl mx-auto">
                     {team.members.map((member) => (
                       <div key={member.id} className="border-b border-white/10 pb-3 text-center">
-                        <p className="text-white text-lg md:text-xl font-bold">{member.name}</p>
+                        <p className="text-white text-lg md:text-xl font-bold">{member.name.toUpperCase()}</p>
                       </div>
                     ))}
                   </div>

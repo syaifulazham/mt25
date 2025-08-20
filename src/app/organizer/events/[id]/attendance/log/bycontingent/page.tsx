@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Search, Users, MapPin, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Search, Users, MapPin, CheckCircle, Loader2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import ContestantsModal from "@/components/custom/contestants-modal";
 
 interface ContingentAttendance {
   id: string;
@@ -25,6 +26,20 @@ interface ContingentAttendance {
   attendanceTime?: string;
 }
 
+interface Contestant {
+  attendanceContestantId: number;
+  contestantId: number;
+  attendanceState: string;
+  contestantName: string;
+  contestantIc: string;
+  contestantGender: string;
+  contestantAge: number;
+  teamId: number;
+  teamName: string;
+  contestId: number;
+  contestName: string;
+}
+
 export default function ContingentCheckInPage() {
   const params = useParams();
   const eventId = params.id as string;
@@ -36,6 +51,12 @@ export default function ContingentCheckInPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState('all');
   const [checkingIn, setCheckingIn] = useState<string | null>(null);
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedContingent, setSelectedContingent] = useState<ContingentAttendance | null>(null);
+  const [contestants, setContestants] = useState<Contestant[]>([]);
+  const [loadingContestants, setLoadingContestants] = useState(false);
 
   // Fetch contingents data
   const fetchContingents = async () => {
@@ -165,6 +186,34 @@ export default function ContingentCheckInPage() {
     }
   };
 
+  // Handle clicking on a contingent name to show contestants
+  const handleContingentClick = async (contingent: ContingentAttendance) => {
+    setSelectedContingent(contingent);
+    setLoadingContestants(true);
+    setContestants([]);
+    setIsModalOpen(true);
+    
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/contingents/${contingent.contingentId}/contestants`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch contestants');
+      }
+      
+      const data = await response.json();
+      setContestants(data.contestants || []);
+    } catch (error) {
+      console.error('Error fetching contestants:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load contestants data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingContestants(false);
+    }
+  };
+
   // Load data on component mount
   useEffect(() => {
     fetchContingents();
@@ -183,6 +232,17 @@ export default function ContingentCheckInPage() {
 
   return (
     <div className="container mx-auto p-6">
+      {/* Contestants Modal */}
+      {selectedContingent && (
+        <ContestantsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          contingentName={selectedContingent.contingentName}
+          contestants={contestants}
+          loading={loadingContestants}
+        />
+      )}
+      
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link href={`/organizer/events/${eventId}/attendance`}>
@@ -320,8 +380,12 @@ export default function ContingentCheckInPage() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div 
+                          className="text-sm font-medium text-primary hover:text-primary/80 cursor-pointer flex items-center gap-1"
+                          onClick={() => handleContingentClick(contingent)}
+                        >
                           {contingent.contingentName}
+                          <UserRound className="h-4 w-4 ml-1" />
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

@@ -218,7 +218,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       // Create team object for showcase
       const teamForShowcase = {
         attendanceTeamId: result.attendanceTeamId,
-        teamName: result.team?.name || 'Unknown Team',
+        teamName: (result.team?.name || 'Unknown Team').toUpperCase(),
         contingentName: trimContingentName(result.contingent?.name),
         contestName: selectedContest ? contests.find(c => c.id.toString() === selectedContest)?.name || 'Unknown Contest' : 'Unknown Contest',
         totalScore: result.averageScore,
@@ -236,7 +236,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       // Still show the team even if members couldn't be loaded
       const teamForShowcase = {
         attendanceTeamId: result.attendanceTeamId,
-        teamName: result.team?.name || 'Unknown Team',
+        teamName: (result.team?.name || 'Unknown Team').toUpperCase(),
         contingentName: trimContingentName(result.contingent?.name),
         contestName: selectedContest ? contests.find(c => c.id.toString() === selectedContest)?.name || 'Unknown Contest' : 'Unknown Contest',
         totalScore: result.averageScore,
@@ -820,7 +820,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                                     )}
                                   </div>
                                   <div>
-                                    <div className="text-lg font-bold text-white">{result.team?.name || 'Unknown Team'}</div>
+                                    <div className="text-lg font-bold text-white">{(result.team?.name || 'Unknown Team').toUpperCase()}</div>
                                     <div className="text-sm text-gray-400 mt-1">{trimContingentName(result.contingent?.name)}</div>
                                   </div>
                                 </div>

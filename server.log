@@ -1,0 +1,300 @@
+
+> mt25@0.1.0 dev
+> next dev --port 3001
+
+   ▲ Next.js 14.1.0
+   - Local:        http://localhost:3001
+   - Environments: .env
+
+ ✓ Ready in 1333ms
+ ✓ Compiled /src/middleware in 348ms (132 modules)
+ ○ Compiling /organizer/events/[id]/attendance/log/bycontingent ...
+ ✓ Compiled /organizer/events/[id]/attendance/log/bycontingent in 516ms (355 modules)
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ Compiled in 2.3s (429 modules)
+ ✓ Compiled in 514ms (420 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+NEXTAUTH ENV VARIABLES: {
+  NEXTAUTH_URL: 'http://localhost:3000',
+  NEXTAUTH_SECRET: 'set',
+  NODE_ENV: 'development'
+}
+Fetching user session for path: /organizer
+Looking up user with email: admin@techlympics.my
+Is participant flag from session: false
+User from database: {
+  id: 1,
+  name: 'System Administrator',
+  email: 'admin@techlympics.my',
+  username: 'admin',
+  role: 'ADMIN',
+  isActive: true,
+  lastLogin: 2025-08-19T10:22:53.922Z,
+  createdAt: 2025-05-04T17:07:38.600Z
+}
+Session check result: User found
+Authenticated user: {
+  "id": 1,
+  "name": "System Administrator",
+  "email": "admin@techlympics.my",
+  "username": "admin",
+  "role": "ADMIN",
+  "isActive": true,
+  "lastLogin": "2025-08-19T10:22:53.922Z",
+  "createdAt": "2025-05-04T17:07:38.600Z"
+}
+User role: ADMIN
+User role is ADMIN - menu restrictions will be applied in the component
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1444ms (1365 modules)
+NEXTAUTH ENV VARIABLES: {
+  NEXTAUTH_URL: 'http://localhost:3000',
+  NEXTAUTH_SECRET: 'set',
+  NODE_ENV: 'development'
+}
+Fetching user session for path: /organizer
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+[next-auth][error][JWT_SESSION_ERROR] 
+https://next-auth.js.org/errors#jwt_session_error Invalid Compact JWE {
+  message: 'Invalid Compact JWE',
+  stack: 'JWEInvalid: Invalid Compact JWE\n' +
+    '    at compactDecrypt (webpack-internal:///(rsc)/./node_modules/next-auth/node_modules/jose/dist/node/cjs/jwe/compact/decrypt.js:18:15)\n' +
+    '    at jwtDecrypt (webpack-internal:///(rsc)/./node_modules/next-auth/node_modules/jose/dist/node/cjs/jwt/decrypt.js:10:61)\n' +
+    '    at Object.decode (webpack-internal:///(rsc)/./node_modules/next-auth/jwt/index.js:44:52)\n' +
+    '    at async Object.session (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/session.js:25:34)\n' +
+    '    at async AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:145:37)\n' +
+    '    at async getServerSession (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:125:21)\n' +
+    '    at async getSessionUser (webpack-internal:///(rsc)/./src/lib/session.ts:145:25)\n' +
+    '    at async AuthenticatedContent (webpack-internal:///(rsc)/./src/app/organizer/layout.tsx:109:20)',
+  name: 'JWEInvalid'
+}
+No valid session or email found
+Session check result: No user
+No user from session, trying emergency auth...
+No user found via any method, redirecting to login
+ ✓ Compiled /api/auth/[...nextauth] in 64ms (829 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+[next-auth][error][JWT_SESSION_ERROR] 
+https://next-auth.js.org/errors#jwt_session_error Invalid Compact JWE {
+  message: 'Invalid Compact JWE',
+  stack: 'JWEInvalid: Invalid Compact JWE\n' +
+    '    at compactDecrypt (webpack-internal:///(rsc)/./node_modules/next-auth/node_modules/jose/dist/node/cjs/jwe/compact/decrypt.js:18:15)\n' +
+    '    at jwtDecrypt (webpack-internal:///(rsc)/./node_modules/next-auth/node_modules/jose/dist/node/cjs/jwt/decrypt.js:10:61)\n' +
+    '    at Object.decode (webpack-internal:///(rsc)/./node_modules/next-auth/jwt/index.js:44:52)\n' +
+    '    at async Object.session (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/session.js:25:34)\n' +
+    '    at async AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:145:37)\n' +
+    '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:50:30)\n' +
+    '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:85:24)\n' +
+    '    at async /Users/azham/a-job/repo/mt25/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:63809\n' +
+    '    at async eU.execute (/Users/azham/a-job/repo/mt25/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:53964)\n' +
+    '    at async eU.handle (/Users/azham/a-job/repo/mt25/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:65062)\n' +
+    '    at async doRender (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1333:42)\n' +
+    '    at async cacheEntry.responseCache.get.routeKind (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1543:40)\n' +
+    '    at async DevServer.renderToResponseWithComponentsImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1463:28)\n' +
+    '    at async DevServer.renderPageComponent (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1856:24)\n' +
+    '    at async DevServer.renderToResponseImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1894:32)\n' +
+    '    at async DevServer.pipeImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:911:25)\n' +
+    '    at async NextNodeServer.handleCatchallRenderRequest (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/next-server.js:271:17)\n' +
+    '    at async DevServer.handleRequestImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:807:17)\n' +
+    '    at async /Users/azham/a-job/repo/mt25/node_modules/next/dist/server/dev/next-dev-server.js:331:20\n' +
+    '    at async Span.traceAsyncFn (/Users/azham/a-job/repo/mt25/node_modules/next/dist/trace/trace.js:151:20)\n' +
+    '    at async DevServer.handleRequest (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/dev/next-dev-server.js:328:24)\n' +
+    '    at async invokeRender (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/router-server.js:163:21)\n' +
+    '    at async handleRequest (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/router-server.js:342:24)\n' +
+    '    at async requestHandlerImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/router-server.js:366:13)\n' +
+    '    at async Server.requestListener (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/start-server.js:140:13)',
+  name: 'JWEInvalid'
+}
+[next-auth][error][JWT_SESSION_ERROR] 
+https://next-auth.js.org/errors#jwt_session_error Invalid Compact JWE {
+  message: 'Invalid Compact JWE',
+  stack: 'JWEInvalid: Invalid Compact JWE\n' +
+    '    at compactDecrypt (webpack-internal:///(rsc)/./node_modules/next-auth/node_modules/jose/dist/node/cjs/jwe/compact/decrypt.js:18:15)\n' +
+    '    at jwtDecrypt (webpack-internal:///(rsc)/./node_modules/next-auth/node_modules/jose/dist/node/cjs/jwt/decrypt.js:10:61)\n' +
+    '    at Object.decode (webpack-internal:///(rsc)/./node_modules/next-auth/jwt/index.js:44:52)\n' +
+    '    at async Object.session (webpack-internal:///(rsc)/./node_modules/next-auth/core/routes/session.js:25:34)\n' +
+    '    at async AuthHandler (webpack-internal:///(rsc)/./node_modules/next-auth/core/index.js:145:37)\n' +
+    '    at async NextAuthRouteHandler (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:50:30)\n' +
+    '    at async NextAuth._args$ (webpack-internal:///(rsc)/./node_modules/next-auth/next/index.js:85:24)\n' +
+    '    at async /Users/azham/a-job/repo/mt25/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:63809\n' +
+    '    at async eU.execute (/Users/azham/a-job/repo/mt25/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:53964)\n' +
+    '    at async eU.handle (/Users/azham/a-job/repo/mt25/node_modules/next/dist/compiled/next-server/app-route.runtime.dev.js:6:65062)\n' +
+    '    at async doRender (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1333:42)\n' +
+    '    at async cacheEntry.responseCache.get.routeKind (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1543:40)\n' +
+    '    at async DevServer.renderToResponseWithComponentsImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1463:28)\n' +
+    '    at async DevServer.renderPageComponent (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1856:24)\n' +
+    '    at async DevServer.renderToResponseImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:1894:32)\n' +
+    '    at async DevServer.pipeImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:911:25)\n' +
+    '    at async NextNodeServer.handleCatchallRenderRequest (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/next-server.js:271:17)\n' +
+    '    at async DevServer.handleRequestImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/base-server.js:807:17)\n' +
+    '    at async /Users/azham/a-job/repo/mt25/node_modules/next/dist/server/dev/next-dev-server.js:331:20\n' +
+    '    at async Span.traceAsyncFn (/Users/azham/a-job/repo/mt25/node_modules/next/dist/trace/trace.js:151:20)\n' +
+    '    at async DevServer.handleRequest (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/dev/next-dev-server.js:328:24)\n' +
+    '    at async invokeRender (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/router-server.js:163:21)\n' +
+    '    at async handleRequest (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/router-server.js:342:24)\n' +
+    '    at async requestHandlerImpl (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/router-server.js:366:13)\n' +
+    '    at async Server.requestListener (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/lib/start-server.js:140:13)',
+  name: 'JWEInvalid'
+}
+ ✓ Compiled in 691ms (1381 modules)
+NEXTAUTH ENV VARIABLES: {
+  NEXTAUTH_URL: 'http://localhost:3000',
+  NEXTAUTH_SECRET: 'set',
+  NODE_ENV: 'development'
+}
+Fetching user session for path: /organizer
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+No valid session or email found
+Session check result: No user
+No user from session, trying emergency auth...
+No user found via any method, redirecting to login
+ ○ Compiling /auth/organizer/login ...
+ ✓ Compiled /auth/organizer/login in 672ms (1395 modules)
+Initial callback URL: /organizer/dashboard
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+ ○ Compiling /organizer/dashboard ...
+ ✓ Compiled /organizer/dashboard in 1445ms (2580 modules)
+NEXTAUTH ENV VARIABLES: {
+  NEXTAUTH_URL: 'http://localhost:3000',
+  NEXTAUTH_SECRET: 'set',
+  NODE_ENV: 'development'
+}
+Fetching user session for path: /organizer
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+Looking up user with email: admin@techlympics.my
+Is participant flag from session: false
+=== ContestParticipationByNameSection component called ===
+About to call fetchContestParticipationData...
+=== fetchContestParticipationData function called ===
+Inside prismaExecute callback...
+User from database: {
+  id: 1,
+  name: 'System Administrator',
+  email: 'admin@techlympics.my',
+  username: 'admin',
+  role: 'ADMIN',
+  isActive: true,
+  lastLogin: 2025-08-20T02:13:47.941Z,
+  createdAt: 2025-05-04T17:07:38.600Z
+}
+Session check result: User found
+Authenticated user: {
+  "id": 1,
+  "name": "System Administrator",
+  "email": "admin@techlympics.my",
+  "username": "admin",
+  "role": "ADMIN",
+  "isActive": true,
+  "lastLogin": "2025-08-20T02:13:47.941Z",
+  "createdAt": "2025-05-04T17:07:38.600Z"
+}
+User role: ADMIN
+User role is ADMIN - menu restrictions will be applied in the component
+Table exists check result: [ { count: 1n } ]
+Fetching contest participation data...
+Participation counts by contest: 33 contests
+Contests with targetgroups: 33
+Sample contestants for edu_level: 1000
+Using targetgroup for 1.1K-Cabaran Mencipta Robot (Keterangkuman): Primary (2 targetgroups)
+Using targetgroup for 1.2K-Program Jangkauan Techlympics: Primary (2 targetgroups)
+Using targetgroup for 4.4K-Techlympics Quiz-A-Thon: Primary (1 targetgroups)
+Using targetgroup for 6.2R-Cabaran Siasatan Jenayah: Secondary (1 targetgroups)
+Using targetgroup for 4.4R-Techlympics Quiz-A-Thon: Secondary (1 targetgroups)
+Processed countMap: 33 contests
+Final result: 33 entries
+participationData returned from prismaExecute: 33
+Transformed data: 33 contests
+Data received from fetchContestParticipationData: 33 entries
+Data found, proceeding with chart rendering...
+Education levels found: [
+  'PRIMARY_SCHOOL',
+  'SECONDARY_SCHOOL',
+  'UNIVERSITY',
+  'COLLEGE',
+  'OTHER'
+]
+ ⨯ Failed to generate static paths for /api/auth/[...nextauth]:
+TypeError: __webpack_require__.C is not a function
+    at /Users/azham/a-job/repo/mt25/.next/server/app/api/auth/[...nextauth]/route.js:221:21
+    at Object.<anonymous> (/Users/azham/a-job/repo/mt25/.next/server/app/api/auth/[...nextauth]/route.js:226:3)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1487:12)
+    at mod.require (/Users/azham/a-job/repo/mt25/node_modules/next/dist/server/require-hook.js:65:28) {
+  type: 'TypeError'
+}
+ ✓ Compiled /api/dashboard/participation-states-chunked in 124ms (1461 modules)
+ ✓ Compiled (1469 modules)
+[next-auth][warn][DEBUG_ENABLED] 
+https://next-auth.js.org/warnings#debug_enabled
+Fetching school categories by contest participation using raw query...
+Fetching education levels by contest participation using raw query...
+Total contest participations: 174345
+Fetching education levels by contest participation using raw query...
+Fetching school categories by contest participation using raw query...
+Gender distribution data from participations: [
+  { gender: 'MALE', count: 88806 },
+  { gender: 'FEMALE', count: 85539 }
+]
+Gender distribution data from participations: [
+  { gender: 'MALE', count: 88806 },
+  { gender: 'FEMALE', count: 85539 }
+]
+Found 9 school categories by participation
+School category data: [
+  { category: 'SMK', count: 99432 },
+  { category: 'SK', count: 59461 },
+  { category: 'SJKC', count: 15222 },
+  { category: 'SBP', count: 115 },
+  { category: 'SJKT', count: 28 },
+  { category: 'KV', count: 22 },
+  { category: 'SR SABK', count: 14 },
+  { category: 'SM SABK', count: 2 },
+  { category: 'MRSM', count: 1 }
+]
+Found 4 education levels by participation
+Education level data: [
+  { level: 'SEKOLAH MENENGAH', count: 93372 },
+  { level: 'SEKOLAH RENDAH', count: 80209 },
+  { level: 'SEKOLAH RENDAH (PPKI)', count: 647 },
+  { level: 'BELIA', count: 117 }
+]
+Found 9 school categories by participation
+School category data: [
+  { category: 'SMK', count: 99432 },
+  { category: 'SK', count: 59461 },
+  { category: 'SJKC', count: 15222 },
+  { category: 'SBP', count: 115 },
+  { category: 'SJKT', count: 28 },
+  { category: 'KV', count: 22 },
+  { category: 'SR SABK', count: 14 },
+  { category: 'SM SABK', count: 2 },
+  { category: 'MRSM', count: 1 }
+]
+Found 4 education levels by participation
+Education level data: [
+  { level: 'SEKOLAH MENENGAH', count: 93372 },
+  { level: 'SEKOLAH RENDAH', count: 80209 },
+  { level: 'SEKOLAH RENDAH (PPKI)', count: 647 },
+  { level: 'BELIA', count: 117 }
+]
+Total contest participations: 174345
+Processing chunk starting at offset 0 with chunk size 100000
+Processing chunk starting at offset 0 with chunk size 100000
+Retrieved 100000 contest participations for this chunk
+Processing chunk starting at offset 100000 with chunk size 100000
+Retrieved 100000 contest participations for this chunk
+Processing chunk starting at offset 100000 with chunk size 100000
+[?25h
