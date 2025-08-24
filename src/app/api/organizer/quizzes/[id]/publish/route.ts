@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 
 // POST /api/organizer/quizzes/[id]/publish
 // Publish a quiz
@@ -9,8 +9,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    const user = await getSessionUser({ redirectToLogin: false });
+    if (!user || (user as any).role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -32,9 +32,9 @@ export async function POST(
     }
 
     // Check if quiz can be published
-    if (quiz.status !== "created") {
+    if (quiz.status !== "created" && quiz.status !== "retracted") {
       return NextResponse.json(
-        { error: "Only quizzes in 'created' state can be published" },
+        { error: "Only quizzes in 'created' or 'retracted' state can be published" },
         { status: 400 }
       );
     }
@@ -70,8 +70,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getCurrentUser();
-    if (!user || user.role !== "ADMIN") {
+    const user = await getSessionUser({ redirectToLogin: false });
+    if (!user || (user as any).role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

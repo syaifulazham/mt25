@@ -187,19 +187,9 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
     setActionLoading(true);
 
     try {
-      // Send the request to retract the quiz by updating its status
-      const response = await fetch(`/api/organizer/quizzes/${quizId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          quiz_name: quiz!.quiz_name,
-          description: quiz!.description,
-          target_group: quiz!.target_group,
-          time_limit: quiz!.time_limit,
-          status: 'created'
-        }),
+      // Send the request to the dedicated retract endpoint
+      const response = await fetch(`/api/organizer/quizzes/${quizId}/retract`, {
+        method: 'POST'
       });
 
       if (!response.ok) {
@@ -341,7 +331,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                     <Dialog open={isPublishDialogOpen} onOpenChange={setIsPublishDialogOpen}>
                       <DialogTrigger asChild>
                         <Button 
-                          disabled={quiz.status !== 'created' || assignedQuestions.length === 0}
+                          disabled={(quiz.status !== 'created' && quiz.status !== 'retracted') || assignedQuestions.length === 0}
                         >
                           Publish Quiz
                         </Button>
@@ -652,18 +642,39 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                       </div>
                     </>
                   )}
+                  
+                  {quiz.status === 'retracted' && (
+                    <>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div>Quiz created successfully</div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div>Questions added ({assignedQuestions.length})</div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div>Was published on {quiz.publishedAt ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") : 'N/A'}</div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                        <div>Quiz was retracted and is no longer available to contestants</div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </CardContent>
             <CardFooter className="border-t pt-6 flex flex-col gap-2">
-              {quiz.status === 'created' && (
+              {(quiz.status === 'created' || quiz.status === 'retracted') && (
                 <>
                   <Button 
                     className="w-full" 
                     disabled={assignedQuestions.length === 0}
                     onClick={() => setIsPublishDialogOpen(true)}
                   >
-                    Publish Quiz
+                    {quiz.status === 'retracted' ? 'Republish Quiz' : 'Publish Quiz'}
                   </Button>
                   {assignedQuestions.length === 0 && (
                     <p className="text-xs text-amber-600 text-center">
