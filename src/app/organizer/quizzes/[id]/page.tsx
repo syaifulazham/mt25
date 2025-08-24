@@ -709,9 +709,11 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   Preview Quiz
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full justify-start" disabled={quiz.status !== 'published'}>
-                <Check className="w-4 h-4 mr-2" />
-                View Results
+              <Button variant="outline" className="w-full justify-start" disabled={quiz.status !== 'published'} asChild>
+                <Link href={`/organizer/quizzes/${quizId}/result`}>
+                  <Check className="w-4 h-4 mr-2" />
+                  View Results
+                </Link>
               </Button>
             </CardContent>
           </Card>
