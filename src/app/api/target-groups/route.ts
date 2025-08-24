@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-export const dynamic = 'force-dynamic';
 import { z } from "zod";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { hasRequiredRole } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
 
 // Schema for creating/updating target groups
 const targetGroupSchema = z.object({
@@ -13,6 +13,7 @@ const targetGroupSchema = z.object({
   minAge: z.number().int().min(0, "Minimum age must be 0 or greater"),
   maxAge: z.number().int().min(0, "Maximum age must be 0 or greater"),
   schoolLevel: z.string().min(1, "School level is required"),
+  contestant_class_grade: z.string().nullable().optional(),
 });
 
 // GET /api/target-groups - Get all target groups
@@ -71,6 +72,32 @@ export async function GET(request: NextRequest) {
         }
       }
     });
+    
+    // Get contestant_class_grade values for all target groups
+    if (targetGroups.length > 0) {
+      // Get all IDs
+      const ids = targetGroups.map(tg => tg.id);
+      
+      // Get all contestant_class_grade values in a single query
+      const gradeResults = await prisma.$queryRaw<Array<{id: number, contestant_class_grade: string|null}>>`
+        SELECT id, contestant_class_grade 
+        FROM targetgroup 
+        WHERE id IN (${Prisma.join(ids)})
+      `;
+      
+      // Add contestant_class_grade to each target group
+      if (gradeResults && gradeResults.length > 0) {
+        const gradeMap = new Map();
+        gradeResults.forEach(result => {
+          gradeMap.set(result.id, result.contestant_class_grade);
+        });
+        
+        targetGroups.forEach(tg => {
+          // @ts-ignore - TypeScript won't recognize this field
+          tg.contestant_class_grade = gradeMap.get(tg.id) || null;
+        });
+      }
+    }
 
     // Return paginated response
     return NextResponse.json({
@@ -131,21 +158,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create target group in database
-    const targetGroup = await prisma.targetgroup.create({
-      data: {
-        code: validationResult.data.code,
-        name: validationResult.data.name,
-        ageGroup: validationResult.data.ageGroup,
-        minAge: validationResult.data.minAge,
-        maxAge: validationResult.data.maxAge,
-        schoolLevel: validationResult.data.schoolLevel,
-      },
+    // Use a transaction to create the target group and set the contestant_class_grade field
+    const targetGroup = await prisma.$transaction(async (tx) => {
+      // Create target group with standard fields
+      const newTargetGroup = await tx.targetgroup.create({
+        data: {
+          code: validationResult.data.code,
+          name: validationResult.data.name,
+          ageGroup: validationResult.data.ageGroup,
+          minAge: validationResult.data.minAge,
+          maxAge: validationResult.data.maxAge,
+          schoolLevel: validationResult.data.schoolLevel,
+        },
+      });
+      
+      // Set the contestant_class_grade field using raw SQL
+      if (validationResult.data.contestant_class_grade) {
+        await tx.$executeRaw`
+          UPDATE targetgroup 
+          SET contestant_class_grade = ${validationResult.data.contestant_class_grade} 
+          WHERE id = ${newTargetGroup.id}
+        `;
+      }
+      
+      // Get the updated record with all fields
+      const updatedTargetGroup = await tx.targetgroup.findUnique({
+        where: { id: newTargetGroup.id }
+      });
+      
+      // Also get the contestant_class_grade directly using raw SQL to ensure we have it
+      const gradeResults = await tx.$queryRaw<Array<{contestant_class_grade: string|null}>>`
+        SELECT contestant_class_grade 
+        FROM targetgroup 
+        WHERE id = ${newTargetGroup.id}
+      `;
+      
+      // Combine the results
+      const result = updatedTargetGroup || newTargetGroup;
+      if (gradeResults && gradeResults.length > 0) {
+        // @ts-ignore - TypeScript won't recognize this field
+        result.contestant_class_grade = gradeResults[0].contestant_class_grade;
+      }
+      
+      return result;
     });
 
     return NextResponse.json(targetGroup, { status: 201 });
   } catch (error: any) {
     console.error("Error creating target group:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
     
     // Handle unique constraint violation
     if (error.code === 'P2002') {
@@ -156,7 +217,7 @@ export async function POST(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: "Failed to create target group" },
+      { error: "Failed to create target group", details: error.message },
       { status: 500 }
     );
   }

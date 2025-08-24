@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Download, Clock, BarChart, Medal, Users, X, UserCircle, Calendar, Timer } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   Table,
@@ -44,6 +45,7 @@ interface QuizResult {
   contestantHash: string;
   contingentName: string;
   institutionName: string;
+  contingentLogoUrl?: string | null;
   startTime: string;
   endTime: string;
   timeTaken: number;
@@ -391,9 +393,28 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                         {getRankBadge(result.rank)}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{result.contestantName}</div>
-                        <div className="text-xs text-gray-500">
-                          {result.contingentName.replace(' Contingent', '')} 
+                        <div className="flex items-center gap-3">
+                          {result.contingentLogoUrl ? (
+                            <div className="relative w-8 h-8 overflow-hidden rounded-full border border-gray-100">
+                              <Image 
+                                src={result.contingentLogoUrl} 
+                                alt={result.contingentName || 'Contingent logo'} 
+                                width={32} 
+                                height={32} 
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-500">
+                              <Users className="h-4 w-4" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-medium">{result.contestantName}</div>
+                            <div className="text-xs text-gray-500">
+                              {result.contingentName.replace(' Contingent', '')} 
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -462,9 +483,26 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div>
-                    <div className="font-medium">{selectedResult.contestantName}</div>
-                    <div className="text-sm text-gray-500">ID: {selectedResult.contestantHash}</div>
+                  <div className="flex items-start gap-4">
+                    {selectedResult.contingentLogoUrl ? (
+                      <div className="relative w-16 h-16 overflow-hidden rounded-full border border-gray-100">
+                        <Image 
+                          src={selectedResult.contingentLogoUrl} 
+                          alt={selectedResult.contingentName || 'Contingent logo'} 
+                          width={64} 
+                          height={64} 
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 text-gray-500">
+                        <Users className="h-8 w-8" />
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-medium text-lg">{selectedResult.contestantName}</div>
+                      <div className="text-sm text-gray-500">ID: {selectedResult.contestantHash}</div>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 mt-2">
                     <div>

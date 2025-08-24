@@ -17,6 +17,7 @@ const updateTargetGroupSchema = z.object({
   minAge: z.number().int().min(0, "Minimum age must be 0 or greater"),
   maxAge: z.number().int().min(0, "Maximum age must be 0 or greater"),
   schoolLevel: z.string().min(1, "School level is required"),
+  contestant_class_grade: z.string().nullable().optional(),
 });
 
 // GET /api/target-groups/[id] - Get a specific target group
@@ -40,7 +41,8 @@ export async function GET(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    // Get target group from database
+    // Get target group from database and make sure to include contestant_class_grade
+    // First, get the target group using Prisma's standard API
     const targetGroup = await prisma.targetgroup.findUnique({
       where: { id },
       include: {
@@ -50,6 +52,21 @@ export async function GET(
         }
       }
     });
+    
+    if (targetGroup) {
+      // Get the contestant_class_grade using raw SQL
+      const gradeResults = await prisma.$queryRaw<Array<{contestant_class_grade: string|null}>>`
+        SELECT contestant_class_grade 
+        FROM targetgroup 
+        WHERE id = ${id}
+      `;
+      
+      // Add the contestant_class_grade to the response
+      if (gradeResults && gradeResults.length > 0) {
+        // @ts-ignore - TypeScript won't recognize this field
+        targetGroup.contestant_class_grade = gradeResults[0].contestant_class_grade;
+      }
+    }
 
     if (!targetGroup) {
       return NextResponse.json({ error: "Target group not found" }, { status: 404 });
@@ -136,22 +153,56 @@ async function updateTargetGroup(
       );
     }
 
-    // Update target group in database
-    const updatedTargetGroup = await prisma.targetgroup.update({
-      where: { id },
-      data: {
-        code: validationResult.data.code,
-        name: validationResult.data.name,
-        ageGroup: validationResult.data.ageGroup,
-        minAge: validationResult.data.minAge,
-        maxAge: validationResult.data.maxAge,
-        schoolLevel: validationResult.data.schoolLevel,
-      },
+    // Use a transaction to update the target group and set the contestant_class_grade field
+    const updatedTargetGroup = await prisma.$transaction(async (tx) => {
+      // Update target group with standard fields
+      const updated = await tx.targetgroup.update({
+        where: { id },
+        data: {
+          code: validationResult.data.code,
+          name: validationResult.data.name,
+          ageGroup: validationResult.data.ageGroup,
+          minAge: validationResult.data.minAge,
+          maxAge: validationResult.data.maxAge,
+          schoolLevel: validationResult.data.schoolLevel,
+        },
+      });
+      
+      // Set the contestant_class_grade field using raw SQL
+      if (validationResult.data.contestant_class_grade !== undefined) {
+        await tx.$executeRaw`
+          UPDATE targetgroup 
+          SET contestant_class_grade = ${validationResult.data.contestant_class_grade} 
+          WHERE id = ${id}
+        `;
+      }
+      
+      // Get the updated record with all fields
+      const refreshedTargetGroup = await tx.targetgroup.findUnique({
+        where: { id }
+      });
+      
+      // Also get the contestant_class_grade directly using raw SQL to ensure we have it
+      const gradeResults = await tx.$queryRaw<Array<{contestant_class_grade: string|null}>>`
+        SELECT contestant_class_grade 
+        FROM targetgroup 
+        WHERE id = ${id}
+      `;
+      
+      // Combine the results
+      const result = refreshedTargetGroup || updated;
+      if (gradeResults && gradeResults.length > 0) {
+        // @ts-ignore - TypeScript won't recognize this field
+        result.contestant_class_grade = gradeResults[0].contestant_class_grade;
+      }
+      
+      return result;
     });
 
     return NextResponse.json(updatedTargetGroup);
   } catch (error: any) {
     console.error("Error updating target group:", error);
+    console.error("Error details:", JSON.stringify(error, null, 2));
     
     // Handle unique constraint violation
     if (error.code === 'P2002') {
@@ -162,7 +213,7 @@ async function updateTargetGroup(
     }
     
     return NextResponse.json(
-      { error: "Failed to update target group" },
+      { error: "Failed to update target group", details: error.message },
       { status: 500 }
     );
   }

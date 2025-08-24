@@ -560,14 +560,15 @@ model submission {
 }
 
 model targetgroup {
-  id          Int       @id @default(autoincrement())
-  code        String    @unique(map: "TargetGroup_code_key")
-  name        String
-  ageGroup    String
-  schoolLevel String
-  maxAge      Int       @default(0)
-  minAge      Int       @default(0)
-  contest     contest[] @relation("contesttotargetgroup")
+  id                   Int       @id @default(autoincrement())
+  code                 String    @unique(map: "TargetGroup_code_key")
+  name                 String
+  ageGroup             String
+  schoolLevel          String
+  maxAge               Int       @default(0)
+  minAge               Int       @default(0)
+  contestant_class_grade String?
+  contest              contest[] @relation("contesttotargetgroup")
 }
 
 model theme {

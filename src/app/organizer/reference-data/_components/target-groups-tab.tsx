@@ -45,6 +45,9 @@ import {
 // School levels for dropdown
 const schoolLevels = ["Primary", "Secondary", "Pre-University", "Higher Education"];
 
+// Class grade options
+const classGradeOptions = ["none", "1", "2", "3", "4", "5", "6", "PPKI"];
+
 // Target group type definition
 type TargetGroup = {
   id: number;
@@ -54,6 +57,7 @@ type TargetGroup = {
   minAge: number;
   maxAge: number;
   schoolLevel: string;
+  contestant_class_grade?: string | null;
   _count?: {
     contests: number;
   };
@@ -92,7 +96,8 @@ export function TargetGroupsTab() {
     ageGroup: "",
     minAge: 0,
     maxAge: 0,
-    schoolLevel: ""
+    schoolLevel: "",
+    contestant_class_grade: "none"
   });
   
   // State for edit target group form
@@ -169,6 +174,7 @@ export function TargetGroupsTab() {
         ...newTargetGroup,
         minAge: Number(newTargetGroup.minAge),
         maxAge: Number(newTargetGroup.maxAge),
+        contestant_class_grade: newTargetGroup.contestant_class_grade === "none" ? null : newTargetGroup.contestant_class_grade,
       });
       
       setNewTargetGroup({
@@ -177,7 +183,8 @@ export function TargetGroupsTab() {
         ageGroup: "",
         minAge: 0,
         maxAge: 0,
-        schoolLevel: ""
+        schoolLevel: "",
+        contestant_class_grade: "none"
       });
       
       setIsAddDialogOpen(false);
@@ -208,6 +215,7 @@ export function TargetGroupsTab() {
         ...editTargetGroup,
         minAge: Number(editTargetGroup.minAge),
         maxAge: Number(editTargetGroup.maxAge),
+        contestant_class_grade: editTargetGroup.contestant_class_grade || null,
       });
       
       setIsEditDialogOpen(false);
@@ -523,6 +531,26 @@ export function TargetGroupsTab() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="contestant_class_grade" className="text-right">
+                    Class Grade
+                  </Label>
+                  <Select 
+                    value={newTargetGroup.contestant_class_grade} 
+                    onValueChange={(value) => setNewTargetGroup({...newTargetGroup, contestant_class_grade: value})}
+                  >
+                    <SelectTrigger id="contestant_class_grade" className="col-span-3">
+                      <SelectValue placeholder="Select class grade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classGradeOptions.map((grade) => (
+                        <SelectItem key={grade} value={grade}>
+                          {grade === "none" ? "No specific grade" : grade}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
@@ -665,6 +693,26 @@ export function TargetGroupsTab() {
                                 {schoolLevels.map((level) => (
                                   <SelectItem key={level} value={level}>
                                     {level}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-contestant_class_grade" className="text-right">
+                              Class Grade
+                            </Label>
+                            <Select 
+                              value={editTargetGroup?.contestant_class_grade || "none"} 
+                              onValueChange={(value) => setEditTargetGroup(prev => prev ? { ...prev, contestant_class_grade: value === "none" ? null : value } : null)}
+                            >
+                              <SelectTrigger id="edit-contestant_class_grade" className="col-span-3">
+                                <SelectValue placeholder="Select class grade" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {classGradeOptions.map((grade) => (
+                                  <SelectItem key={grade} value={grade}>
+                                    {grade === "none" ? "No specific grade" : grade}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

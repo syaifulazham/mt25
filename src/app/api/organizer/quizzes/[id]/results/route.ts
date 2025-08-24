@@ -79,6 +79,7 @@ export async function GET(
               select: {
                 id: true,
                 name: true,
+                logoUrl: true,
                 school: {
                   select: {
                     name: true
@@ -141,6 +142,7 @@ export async function GET(
         contestantHash: attempt.contestant.hashcode,
         contingentName: attempt.contestant.contingent?.name || 'N/A',
         institutionName: getInstitutionName(attempt.contestant.contingent),
+        contingentLogoUrl: attempt.contestant.contingent?.logoUrl || null,
         startTime: attempt.start_time,
         endTime: attempt.end_time,
         timeTaken: attempt.time_taken,
