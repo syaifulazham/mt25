@@ -296,13 +296,26 @@ export default function ContestantArenaClient({ contestantHashcode }: Contestant
                   <School className="w-4 h-4" />
                   <span className="text-sm">{data.contingent.institutionName}</span>
                 </div>
-                {data.contestant.class_grade && (
-                  <div className="text-center">
-                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
-                      {data.contestant.class_grade} {data.contestant.class_name}
-                    </Badge>
-                  </div>
-                )}
+                <div className="text-center">
+                  <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white">
+                    {(() => {
+                      const eduLevel = data.contestant.edu_level?.toLowerCase() || '';
+                      const age = Number(data.contestant.age) || 0;
+                      
+                      if (eduLevel.includes('sekolah rendah (ppki)') || eduLevel.includes('SEKOLAH RENDAH (PPKI)')) {
+                        return 'PPKI';
+                      } else if (eduLevel.includes('sekolah rendah') || eduLevel === 'sekolah rendah') {
+                        return `DARJAH ${data.contestant.class_grade || ''}`;
+                      } else if (eduLevel.includes('sekolah menengah') || eduLevel === 'sekolah menengah') {
+                        return `TINGKATAN ${data.contestant.class_grade || ''}`;
+                      } else if (age >= 18) {
+                        return 'BELIA';
+                      } else {
+                        return data.contestant.class_grade ? `${data.contestant.class_grade} ${data.contestant.class_name || ''}` : '';
+                      }
+                    })()} 
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
 
