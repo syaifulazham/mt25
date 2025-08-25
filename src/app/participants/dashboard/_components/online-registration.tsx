@@ -51,6 +51,19 @@ interface ManagerTeam {
     email?: string;
     phoneNumber?: string;
   };
+  participant?: {
+    id: number;
+    name: string;
+    email?: string;
+    phoneNumber?: string;
+  };
+}
+
+interface IndependentManager {
+  id: number;
+  name: string;
+  email?: string;
+  phoneNumber?: string;
 }
 
 interface OnlineTeam {
@@ -60,12 +73,14 @@ interface OnlineTeam {
   contestName: string;
   contestCode: string;
   numberOfMembers: number;
+  status: string;
   hasMultipleTeamMembers?: boolean;
   hasMembersOutsideAgeRange?: boolean;
   ineligibleMembersCount?: number;
   members: TeamMember[];
   managers?: TeamManager[];
   managerTeams?: ManagerTeam[];
+  independentManagers?: IndependentManager[];
 }
 
 export default function OnlineRegistrationSection({ participantId }: OnlineRegistrationProps) {
@@ -176,6 +191,7 @@ export default function OnlineRegistrationSection({ participantId }: OnlineRegis
               <TableHead>{t('dashboard.team_name')}</TableHead>
               <TableHead className="text-center">{t('dashboard.number_of_members')}</TableHead>
               <TableHead>{t('dashboard.trainer')}</TableHead>
+              <TableHead className="text-center">{t('dashboard.status')}</TableHead>
               <TableHead className="text-right">{t('dashboard.actions')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -202,22 +218,54 @@ export default function OnlineRegistrationSection({ participantId }: OnlineRegis
                 </TableCell>
                 <TableCell className="text-center">{team.numberOfMembers}</TableCell>
                 <TableCell>
-                  {team.managerTeams && team.managerTeams.length > 0
+                  {/* Display both managerTeams and independentManagers */}
+                  {((team.managerTeams && team.managerTeams.length > 0) || (team.independentManagers && team.independentManagers.length > 0))
                     ? <div className="flex flex-col">
-                        {team.managerTeams.map((mt, index) => (
-                          <div key={index} className="mb-1">
+                        {/* Display team managers */}
+                        {team.managerTeams && team.managerTeams.map((mt, index) => (
+                          <div key={`team-manager-${mt.id}`} className="mb-1">
                             <div className="font-medium cursor-pointer hover:text-primary hover:underline" 
-                                 onClick={() => mt.manager?.id && router.push(`/participants/managers/${mt.manager.id}/edit`)}>
-                              {index + 1}. {mt.manager?.name}
+                                 onClick={() => mt.participant?.id && router.push(`/participants/managers/${mt.participant.id}/edit`)}>
+                              {index + 1}. {mt.participant?.name}
                             </div>
                             <div className="text-xs text-muted-foreground pl-3">
-                              {mt.manager?.email || '-'}
+                              {mt.participant?.email || '-'}
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Display independent managers */}
+                        {team.independentManagers && team.independentManagers.map((manager: IndependentManager, index: number) => (
+                          <div key={`independent-manager-${manager.id}`} className="mb-1">
+                            <div className="font-medium cursor-pointer hover:text-primary hover:underline"
+                                 onClick={() => manager.id && router.push(`/participants/managers/${manager.id}/edit`)}>
+                              {(team.managerTeams?.length || 0) + index + 1}. {manager.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground pl-3">
+                              {manager.email || '-'}
                             </div>
                           </div>
                         ))}
                       </div>
                     : '-'
                   }
+                </TableCell>
+                <TableCell className="text-center">
+                  <span
+                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      team.status === "ACCEPTED"
+                        ? "bg-green-100 text-green-800"
+                        : team.status === "APPROVED"
+                        ? "bg-blue-100 text-blue-800"
+                        : team.status === "CONDITIONAL"
+                        ? "bg-orange-100 text-orange-800"
+                        : team.status === "PENDING"
+                        ? "bg-gray-100 text-gray-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {team.status}
+                  </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

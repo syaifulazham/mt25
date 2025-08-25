@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,8 +29,19 @@ import {
   Users,
   GraduationCap,
   School,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileText,
+  X
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { PageHeader } from "@/components/page-header";
 
@@ -50,6 +62,7 @@ interface TeamMember {
 interface Team {
   id: number;
   teamName: string;
+  teamEmail?: string;
   contestName: string;
   status: string;
   registrationDate: string;
@@ -96,6 +109,10 @@ export default function RawlistPage() {
     teamName: string;
     newStatus: string;
   }>({ isOpen: false, teamId: null, teamName: '', newStatus: '' });
+  
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [downloadInProgress, setDownloadInProgress] = useState<string | null>(null);
+  const [pendingCount, setPendingCount] = useState<number>(0);
 
   // Helper function to format joinedAt date in Malaysia timezone (GMT+8)
   const formatJoinedAt = (joinedAt: string | null) => {
@@ -183,6 +200,47 @@ export default function RawlistPage() {
   useEffect(() => {
     fetchTeams();
   }, [fetchTeams]);
+
+  // Helper function to validate email format
+  const isValidEmail = (email: string | null | undefined): boolean => {
+    if (!email) return false;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Count pending teams that meet approval criteria
+  useEffect(() => {
+    // First log if teamEmail is available in the data
+    const pendingTeams = teams.filter(team => team.status === 'PENDING');
+    console.log('PENDING teams with emails:', pendingTeams.map(t => ({ 
+      name: t.teamName, 
+      id: t.id, 
+      email: t.teamEmail 
+    })));
+    
+    const eligiblePendingTeams = teams.filter(team => {
+      const eligible = 
+        team.status === 'PENDING' && 
+        team.members.length > 0 && 
+        !hasAgeMismatch(team) && 
+        !team.hasDuplicateMembers &&
+        isValidEmail(team.teamEmail);
+      
+      // Brief eligibility log for each PENDING team
+      if (team.status === 'PENDING') {
+        console.log(`Team ${team.teamName}: ${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'} | Email: ${team.teamEmail || 'missing'} | Valid email: ${isValidEmail(team.teamEmail)}`);
+      }
+      
+      return eligible;
+    });
+    
+    console.log(`Total eligible pending teams: ${eligiblePendingTeams.length}`);
+    if (eligiblePendingTeams.length > 0) {
+      console.log('Eligible teams:', eligiblePendingTeams.map(t => t.teamName).join(', '));
+    }
+    
+    setPendingCount(eligiblePendingTeams.length);
+  }, [teams]);
 
   // Filter teams based on search and filters
   useEffect(() => {
@@ -296,6 +354,7 @@ export default function RawlistPage() {
 
   const handleGenerateDocx = async () => {
     try {
+      setDownloadInProgress('docx');
       const response = await fetch(`/api/organizer/events/${eventId}/rawlist/docx`);
       if (!response.ok) {
         throw new Error('Failed to generate DOCX');
@@ -313,12 +372,15 @@ export default function RawlistPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error generating DOCX:', error);
-      alert('Failed to generate DOCX file. Please try again.');
+      toast.error('Failed to generate DOCX file. Please try again.');
+    } finally {
+      setDownloadInProgress(null);
     }
   };
 
   const handleGenerateXlsx = async () => {
     try {
+      setDownloadInProgress('xlsx');
       const response = await fetch(`/api/organizer/events/${eventId}/rawlist/xlsx`);
       if (!response.ok) {
         throw new Error('Failed to generate XLSX');
@@ -336,7 +398,47 @@ export default function RawlistPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error generating XLSX:', error);
-      alert('Failed to generate XLSX file. Please try again.');
+      toast.error('Failed to generate XLSX file. Please try again.');
+    } finally {
+      setDownloadInProgress(null);
+    }
+  };
+  
+  const handleApproveAndDownload = async () => {
+    try {
+      setDownloadInProgress('approve');
+      const response = await fetch(`/api/organizer/events/${eventId}/rawlist/approved-xlsx`);
+      
+      if (response.status === 404) {
+        toast.warning('No eligible PENDING teams found that meet the criteria for approval.');
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to approve and generate XLSX');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `approved-teams-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success('Teams successfully approved and downloaded!');
+      
+      // Refresh the teams data to show updated statuses
+      fetchTeams();
+      
+    } catch (error) {
+      console.error('Error approving and generating XLSX:', error);
+      toast.error('Failed to approve teams and generate XLSX file. Please try again.');
+    } finally {
+      setDownloadInProgress(null);
     }
   };
 
@@ -387,14 +489,108 @@ export default function RawlistPage() {
               <Users className="h-4 w-4" />
               View End List
             </Button>
-            <Button onClick={handleGenerateDocx} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Generate DOCX
-            </Button>
-            <Button onClick={handleGenerateXlsx} className="flex items-center gap-2" variant="outline">
-              <FileSpreadsheet className="h-4 w-4" />
-              XLSX
-            </Button>
+            <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Download className="h-4 w-4" />
+                  Download
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Download className="h-5 w-5" />
+                    Download Options
+                  </DialogTitle>
+                  <DialogDescription>
+                    Choose a format to download the raw team list data.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-1 gap-4 py-4">
+                  <Button 
+                    onClick={handleGenerateDocx} 
+                    className="flex items-center justify-center gap-2 h-16"
+                    disabled={downloadInProgress !== null}
+                  >
+                    {downloadInProgress === 'docx' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Generating DOCX...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <FileText className="h-5 w-5" />
+                        <div className="flex flex-col items-start">
+                          <span className="font-semibold">Word Document (DOCX)</span>
+                          <span className="text-xs text-muted-foreground">Complete report with team details</span>
+                        </div>
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleGenerateXlsx} 
+                    className="flex items-center justify-center gap-2 h-16" 
+                    variant="secondary"
+                    disabled={downloadInProgress !== null}
+                  >
+                    {downloadInProgress === 'xlsx' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span>Generating XLSX...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="h-5 w-5" />
+                        <div className="flex flex-col items-start">
+                          <span className="font-semibold">Excel Spreadsheet (XLSX)</span>
+                          <span className="text-xs text-muted-foreground">Tabular data for analysis</span>
+                        </div>
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleApproveAndDownload} 
+                    className="flex items-center justify-center gap-2 h-16"
+                    variant="default"
+                    disabled={downloadInProgress !== null || pendingCount === 0}
+                  >
+                    {downloadInProgress === 'approve' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Approving and downloading...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Download className="h-5 w-5" />
+                        <div className="flex flex-col items-start">
+                          <div className="flex items-center">
+                            <span className="font-semibold">Download & Approve</span>
+                            {pendingCount > 0 && (
+                              <Badge className="ml-2 bg-blue-500">{pendingCount}</Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {pendingCount > 0 
+                              ? `Approve and download ${pendingCount} eligible pending teams` 
+                              : "No eligible pending teams to approve"}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="flex justify-end">
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline" disabled={downloadInProgress !== null}>
+                      <X className="mr-2 h-4 w-4" />
+                      Close
+                    </Button>
+                  </DialogClose>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -520,6 +716,9 @@ export default function RawlistPage() {
                               <div className="flex flex-col">
                                 <span className="truncate font-medium">{team.teamName}</span>
                                 <span className="text-xs text-muted-foreground truncate">{team.contestName}</span>
+                                {team.teamEmail && (
+                                  <span className="text-xs text-blue-600 truncate">{team.teamEmail}</span>
+                                )}
                               </div>
                             </button>
                             {hasAgeMismatch(team) && (

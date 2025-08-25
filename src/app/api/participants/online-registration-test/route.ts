@@ -1,77 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/auth-options";
-import prisma from "@/lib/prisma";
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
 
-export const dynamic = 'force-dynamic';
-
-export async function GET(request: NextRequest) {
-  let participantId: string | null = null;
-  
+// Test route for online registration API that doesn't require authentication
+// This is for testing only and should not be exposed in production
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    participantId = searchParams.get("participantId");
-
-    if (!participantId) {
-      return NextResponse.json({ error: "Participant ID is required" }, { status: 400 });
-    }
-
-    console.log(`Fetching online teams for participant: ${participantId}`);
-
-    // First, let's check what teams exist for this participant
-    const allTeams = await prisma.$queryRaw`
-      SELECT 
-        t.id,
-        t.name as teamName,
-        c.name as contestName,
-        c.code as contestCode,
-        e.name as eventName,
-        e.scopeArea,
-        ect.status as registrationStatus,
-        t.status as teamStatus
-      FROM team t
-      JOIN contest c ON t.contestId = c.id
-      JOIN eventcontest ec ON c.id = ec.contestId
-      JOIN event e ON ec.eventId = e.id
-      JOIN eventcontestteam ect ON ec.id = ect.eventcontestId AND ect.teamId = t.id
-      JOIN contingent cont ON t.contingentId = cont.id
-      JOIN contingentManager cm ON cont.id = cm.contingentId
-      WHERE cm.participantId = ${parseInt(participantId)}
-      ORDER BY t.id
-    `;
-
-    console.log(`All teams for participant ${participantId}:`, allTeams);
-
-    // Now filter for online events - let's check each condition separately
-    console.log('Checking online events with individual conditions...');
+    console.log("Test online-registration API called");
     
-    // Check teams with ONLINE scopeArea (no status filters)
+    // Use a known participant ID for testing
+    const participantId = "304";
+    
+    console.log('Participant ID for testing:', participantId);
+    
+    // Get all online teams for this participant's contingents
     const onlineTeamsNoFilter = await prisma.$queryRaw`
-      SELECT 
-        t.id,
-        t.name as teamName,
-        c.name as contestName,
-        c.code as contestCode,
-        e.name as eventName,
-        e.scopeArea,
-        ect.status as registrationStatus,
-        t.status as teamStatus
+      SELECT COUNT(*) as count
       FROM team t
-      JOIN contest c ON t.contestId = c.id
-      JOIN eventcontest ec ON c.id = ec.contestId
-      JOIN event e ON ec.eventId = e.id
-      JOIN eventcontestteam ect ON ec.id = ect.eventcontestId AND ect.teamId = t.id
       JOIN contingent cont ON t.contingentId = cont.id
       JOIN contingentManager cm ON cont.id = cm.contingentId
+      JOIN event e ON e.scopeArea LIKE 'ONLINE_%'
       WHERE cm.participantId = ${parseInt(participantId)}
-        AND e.scopeArea LIKE 'ONLINE_%'
-      ORDER BY t.id
-    `;
+        AND t.status = 'ACTIVE'
+    ` as any[];
     
     console.log('Online teams (no status filter):', onlineTeamsNoFilter);
 
@@ -125,16 +76,18 @@ export async function GET(request: NextRequest) {
           )
       `;
 
-      // Check for age eligibility issues
+      // Initialize age eligibility check
       let ageEligibilityCheck: any[] = [];
+
+      // Check if age constraints exist and run the query if they do
       if (minAge !== null || maxAge !== null) {
         let ageQuery = `
-          SELECT tm.contestantId, c.age
+          SELECT c.id
           FROM teamMember tm
           JOIN contestant c ON tm.contestantId = c.id
           WHERE tm.teamId = ${teamId}
         `;
-        
+
         if (minAge !== null && maxAge !== null) {
           ageQuery += ` AND (c.age < ${minAge} OR c.age > ${maxAge})`;
         } else if (minAge !== null) {
@@ -146,13 +99,14 @@ export async function GET(request: NextRequest) {
         ageEligibilityCheck = await prisma.$queryRaw`${ageQuery}` as any[];
       }
 
-      // Get managers (trainers) from the manager_team junction table
-      const managerTeamRecords = await prisma.manager_team.findMany({
+      // Get manager teams for this team
+      // Using a more structured approach that matches zone-registration
+      const managerTeams = await prisma.teamManager.findMany({
         where: {
           teamId: teamId
         },
         include: {
-          manager: {
+          participant: {
             select: {
               id: true,
               name: true,
@@ -163,29 +117,18 @@ export async function GET(request: NextRequest) {
         }
       });
       
-      // Extract managers from the junction records
-      const managers = managerTeamRecords.map(record => record.manager);
-      
-      // For compatibility with the UI, create managerTeams structure 
-      // that includes both manager and participant fields
-      const managerTeams = managers.map(manager => ({
-        id: Number(manager.id),
-        manager: {
-          id: Number(manager.id),
-          name: manager.name,
-          email: manager.email,
-          phoneNumber: manager.phoneNumber
+      // Get independent managers directly associated with this team
+      const independentManagers = await prisma.manager.findMany({
+        where: {
+          teamId: teamId
         },
-        participant: {
-          id: Number(manager.id),
-          name: manager.name,
-          email: manager.email,
-          phoneNumber: manager.phoneNumber
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phoneNumber: true
         }
-      }));
-      
-      // Keep independent managers for backward compatibility
-      const independentManagers: Array<{id: number, name: string, email: string, phoneNumber: string | null}> = [];
+      });
 
       // Get the team status from eventcontestteam table
       const teamStatus = await prisma.$queryRaw`
@@ -207,22 +150,16 @@ export async function GET(request: NextRequest) {
         hasMultipleTeamMembers: (multipleTeamCheck as any[]).length > 0,
         hasMembersOutsideAgeRange: ageEligibilityCheck.length > 0,
         ineligibleMembersCount: ageEligibilityCheck.length,
-        managerTeams: managerTeams.map((mt) => ({
+        managerTeams: managerTeams.map((mt: any) => ({
           id: Number(mt.id),
           manager: {
             id: Number(mt.participant.id),
             name: mt.participant.name,
             email: mt.participant.email,
             phoneNumber: mt.participant.phoneNumber
-          },
-          participant: {
-            id: Number(mt.participant.id),
-            name: mt.participant.name,
-            email: mt.participant.email,
-            phoneNumber: mt.participant.phoneNumber
           }
         })),
-        independentManagers: independentManagers.map(manager => ({
+        independentManagers: independentManagers.map((manager: any) => ({
           id: Number(manager.id),
           name: manager.name,
           email: manager.email,
@@ -237,15 +174,14 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("Error fetching online registration data:", error);
+    console.error("Error fetching online registration test data:", error);
     console.error("Error details:", {
       message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace',
-      participantId: participantId || 'undefined'
+      stack: error instanceof Error ? error.stack : 'No stack trace'
     });
     return NextResponse.json(
       { 
-        error: "Failed to fetch online registration data",
+        error: "Failed to fetch online registration test data",
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
