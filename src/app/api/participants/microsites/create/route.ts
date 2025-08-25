@@ -36,13 +36,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user's contingent information from user_participant table
+    // Get user's contingent information - either as direct participant or as contingent manager
     const userContingents = await prismaExecute(async (prisma) => 
       prisma.$queryRaw`
-        SELECT c.id as contingentId
+        SELECT DISTINCT c.id as contingentId
         FROM contingent c
-        WHERE c.participantId = ${user.id}
-        LIMIT 1
+        LEFT JOIN contingentManager cm ON c.id = cm.contingentId
+        WHERE c.participantId = ${user.id} OR cm.participantId = ${user.id}
       `
     ) as any[];
 
@@ -53,9 +53,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contingentId = userContingents[0].contingentId;
+    // Extract all contingent IDs the user has access to
+    const userContingentIds = userContingents.map((c: any) => c.contingentId);
 
-    // Verify all contestants belong to the user's contingent and don't already have microsites
+    // Verify all contestants belong to one of the user's contingents and don't already have microsites
     const contestants = await prismaExecute(async (prisma) => {
       const placeholders = contestantIds.map(() => '?').join(',');
       return prisma.$queryRawUnsafe(`
@@ -70,8 +71,8 @@ export async function POST(request: NextRequest) {
       `, ...contestantIds);
     }) as any[];
 
-    // Check if all contestants belong to the user's contingent
-    const invalidContestants = contestants.filter((c: any) => c.contingentId !== contingentId);
+    // Check if all contestants belong to one of the user's contingents
+    const invalidContestants = contestants.filter((c: any) => !userContingentIds.includes(c.contingentId));
     if (invalidContestants.length > 0) {
       return NextResponse.json(
         { success: false, message: 'Some contestants do not belong to your contingent' },
