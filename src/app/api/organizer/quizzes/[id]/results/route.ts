@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/session';
+import { checkQuizAuthorization } from '../../../auth-utils';
 
 const prisma = new PrismaClient();
 
@@ -25,14 +25,16 @@ const getInstitutionName = (contingent: any): string => {
 };
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await getCurrentUser();
+    const authCheck = await checkQuizAuthorization(user);
+    
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);

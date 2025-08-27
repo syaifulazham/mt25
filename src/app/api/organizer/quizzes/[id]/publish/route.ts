@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getSessionUser } from "@/lib/session";
+import { getCurrentUser } from "@/lib/session";
+import { checkQuizAuthorization } from "../../auth-utils";
 
 // POST /api/organizer/quizzes/[id]/publish
 // Publish a quiz
@@ -9,9 +10,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getSessionUser({ redirectToLogin: false });
-    if (!user || (user as any).role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await getCurrentUser();
+    const authCheck = await checkQuizAuthorization(user);
+    
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);
@@ -70,9 +73,11 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getSessionUser({ redirectToLogin: false });
-    if (!user || (user as any).role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await getCurrentUser();
+    const authCheck = await checkQuizAuthorization(user);
+    
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);

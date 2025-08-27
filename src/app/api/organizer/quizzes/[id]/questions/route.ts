@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { checkQuizAuthorization } from "../../auth-utils";
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -15,13 +16,10 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuizAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);
@@ -80,13 +78,10 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuizAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);
@@ -157,13 +152,10 @@ export async function PUT(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuizAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);
@@ -225,13 +217,10 @@ export async function DELETE(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuizAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const quizId = parseInt(params.id);

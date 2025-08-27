@@ -11,8 +11,10 @@ import { getSessionUser } from "@/lib/session";
 import { getEmergencyAuthUser } from "@/lib/auth-debug";
 import { PrismaClient } from "@prisma/client";
 
-// Initialize Prisma client
-const prisma = new PrismaClient();
+// Initialize Prisma client with singleton pattern to prevent connection issues
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 /**
  * Checks if there are any users in the system and creates an initial admin user if none exist

@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { checkQuizAuthorization } from "./auth-utils";
 
 // GET /api/organizer/quizzes
 // Get all quizzes with optional filtering
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuizAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const { searchParams } = new URL(request.url);
@@ -82,13 +80,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuizAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can create quizzes" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const data = await request.json();

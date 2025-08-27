@@ -16,15 +16,25 @@ export const revalidate = 0;
  */
 export async function isOrganizerOrAdmin(userId: number): Promise<boolean> {
   try {
-    // Get user with role information
+    console.log('isOrganizerOrAdmin check for userId:', userId);
+    
+    // FIXED: The query was looking in the wrong table
+    // It was querying user_participant table instead of the user table for organizer users
     const result = await prismaExecute(prisma => prisma.$queryRaw`
-      SELECT up.id, up.userLevel as role 
-      FROM user_participant up 
-      WHERE up.id = ${userId}
+      SELECT u.id, u.role 
+      FROM user u 
+      WHERE u.id = ${userId}
     `);
     
+    console.log('isOrganizerOrAdmin query result:', JSON.stringify(result, null, 2));
+    
     const user = Array.isArray(result) && result.length > 0 ? result[0] : null;
-    return user?.role === 'ADMIN' || user?.role === 'OPERATOR';
+    const hasAccess = user?.role === 'ADMIN' || user?.role === 'OPERATOR';
+    
+    console.log('User from DB:', user);
+    console.log('Has access:', hasAccess, 'Role:', user?.role);
+    
+    return hasAccess;
   } catch (error) {
     console.error('Error checking if user is organizer or admin:', error);
     return false;

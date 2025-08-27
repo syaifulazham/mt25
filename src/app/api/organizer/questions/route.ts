@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
+import { checkQuestionAuthorization } from "./auth-utils";
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -8,25 +9,34 @@ export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
 // GET /api/organizer/questions
-// Get all questions with optional filtering
+// Get questions with pagination, sorting, and filtering
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuestionAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    // We need to use type assertion since the properties are added dynamically in session.ts
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     const { searchParams } = new URL(request.url);
+    
+    // Pagination parameters
+    const page = parseInt(searchParams.get("page") || '1');
+    const pageSize = parseInt(searchParams.get("pageSize") || '30');
+    
+    // Calculate skip value for pagination
+    const skip = (page - 1) * pageSize;
+    
+    // Search and filtering parameters
     const search = searchParams.get("search") || "";
     const targetGroup = searchParams.get("targetGroup") || undefined;
     const knowledgeField = searchParams.get("knowledgeField") || undefined;
     const answerType = searchParams.get("answerType") || undefined;
+    
+    // Sorting parameters
+    const sortField = searchParams.get("sortField") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
     
     // Build filter object
     const filters: any = {
@@ -48,6 +58,16 @@ export async function GET(request: NextRequest) {
       }
     });
     
+    // Dynamic orderBy object
+    const orderBy: any = {};
+    orderBy[sortField] = sortOrder;
+    
+    // Get total count for pagination
+    const totalCount = await prisma.question_bank.count({
+      where: Object.keys(filters).length > 0 ? filters : undefined
+    });
+    
+    // Get paginated and sorted questions
     const questions = await prisma.question_bank.findMany({
       where: Object.keys(filters).length > 0 ? filters : undefined,
       include: {
@@ -57,10 +77,15 @@ export async function GET(request: NextRequest) {
           }
         }
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy,
+      skip,
+      take: pageSize
     });
+    
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / pageSize);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
     
     // Transform the data to match the frontend expectations
     const formattedQuestions = questions.map(question => ({
@@ -77,8 +102,21 @@ export async function GET(request: NextRequest) {
       creatorName: question.createdBy || 'Unknown' // Use createdBy string directly now
     }));
 
-    console.log(`[API] Returning ${formattedQuestions.length} questions from the database`);
-    return NextResponse.json(formattedQuestions);
+    // Prepare response with pagination metadata
+    const response = {
+      questions: formattedQuestions,
+      pagination: {
+        page,
+        pageSize,
+        totalCount,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      }
+    };
+
+    console.log(`[API] Returning page ${page}/${totalPages} with ${formattedQuestions.length} questions`);
+    return NextResponse.json(response);
   } catch (error) {
     console.error("[API] Error getting questions:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -90,14 +128,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
-    }
+    const authCheck = await checkQuestionAuthorization(user);
     
-    // Check if user is an organizer (not a participant)
-    // We need to use type assertion since the properties are added dynamically in session.ts
-    if ((user as any).isParticipant === true) {
-      return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
+    if (!authCheck.authorized) {
+      return authCheck.response;
     }
 
     // Check content type to determine how to parse the request
@@ -109,7 +143,7 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       
       // Convert FormData to object
-      data = {};
+      data = {} as Record<string, any>;
       for (const [key, value] of formData.entries()) {
         // Special handling for answer_options as JSON string
         if (key === 'answer_options') {
@@ -178,13 +212,13 @@ export async function POST(request: NextRequest) {
     console.log('[API] Creating question with data:', {
       targetGroup: data.target_group,
       knowledgeField: data.knowledge_field,
-      userId: user.id,
-      userName: user.name || user.email,
-      isParticipant: (user as any).isParticipant
+      userId: user?.id,
+      userName: user?.name || user?.email || 'Unknown',
+      isParticipant: user ? (user as any).isParticipant : false
     });
     
     // Get creator info (name or email) to store as string
-    const creatorInfo = user.name || user.email || 'Admin user';
+    const creatorInfo = user?.name || user?.email || 'Admin user';
     
     // Create the question with creator info as string
     const question = await prisma.question_bank.create({
