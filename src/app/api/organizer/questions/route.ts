@@ -119,11 +119,12 @@ export async function POST(request: NextRequest) {
             console.error('Error parsing answer_options:', e);
             data[key] = value;
           }
-        } else if (key === 'image_file' && value instanceof File) {
+        } else if (key === 'image_file' && typeof value === 'object' && value !== null && 'arrayBuffer' in value && 'type' in value) {
           // Handle file upload - convert to base64
-          const buffer = await value.arrayBuffer();
+          // Using typeof and property checks instead of instanceof File which is not available in Node.js
+          const buffer = await (value as Blob).arrayBuffer();
           const base64 = Buffer.from(buffer).toString('base64');
-          const mimeType = value.type;
+          const mimeType = (value as Blob).type;
           data['question_image'] = `data:${mimeType};base64,${base64}`;
         } else {
           data[key] = value;
