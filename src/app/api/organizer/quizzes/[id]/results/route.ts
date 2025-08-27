@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getCurrentUser } from '@/lib/session';
-import { checkQuizAuthorization } from '../../../auth-utils';
+import { checkQuizAuthorization } from '../../auth-utils';
 
 const prisma = new PrismaClient();
 
