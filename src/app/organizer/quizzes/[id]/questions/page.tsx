@@ -131,7 +131,13 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         const questionBankData = await questionBankResponse.json();
         const targetGroupsData = await targetGroupsResponse.json();
         
-        setQuestionBank(questionBankData);
+        // Ensure questionBankData is an array
+        if (!Array.isArray(questionBankData)) {
+          console.error('API returned non-array questionBankData:', questionBankData);
+          setQuestionBank([]);
+        } else {
+          setQuestionBank(questionBankData);
+        }
         setTargetGroups(targetGroupsData.map((tg: any) => ({
           code: tg.value,
           name: tg.label,
@@ -167,16 +173,31 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
   };
 
   // Filter question bank questions, excluding ones already assigned
-  const filterQuestionBank = (questions: Question[]) => {
+  const filterQuestionBank = (questions: any) => {
+    // Ensure questions is an array before proceeding
+    if (!Array.isArray(questions)) {
+      console.error('Expected questions to be an array but got:', typeof questions);
+      return [];
+    }
+    
     const assignedIds = assignedQuestions.map(q => q.id);
     
-    return questions.filter(q => 
-      !assignedIds.includes(q.id) && // Not already assigned
-      quiz && ageRangesOverlap(quiz.target_group, q.target_group) && // Age ranges overlap
-      (searchTerm === '' || // No search term OR matches search
-       q.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
-       q.knowledge_field.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    return questions.filter(q => {
+      // Ensure the question is a valid object with required properties
+      if (!q || typeof q !== 'object' || !('id' in q)) return false;
+      
+      // First check if the question is already assigned
+      if (assignedIds.includes(q.id)) return false;
+      
+      // Then check if quiz exists and age ranges overlap
+      if (!quiz) return false;
+      if (!q.target_group || !ageRangesOverlap(quiz.target_group, q.target_group)) return false;
+      
+      // Finally check if it matches the search term
+      return searchTerm === '' || 
+        (q.question && typeof q.question === 'string' && q.question.toLowerCase().includes(searchTerm.toLowerCase())) || 
+        (q.knowledge_field && typeof q.knowledge_field === 'string' && q.knowledge_field.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
   };
 
   const availableQuestions = filterQuestionBank(questionBank);
