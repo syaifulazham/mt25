@@ -81,17 +81,10 @@ export default function QuizzesPage() {
   const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
   const [quizTab, setQuizTab] = useState("all");
   
-  // Question bank state
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]);
-  const [questionTab, setQuestionTab] = useState("all");
-  
-  // Shared state
+  // State for quizzes
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [questionsLoading, setQuestionsLoading] = useState(true);
-  const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchQuizzes = async () => {
@@ -118,34 +111,7 @@ export default function QuizzesPage() {
     fetchQuizzes();
   }, []);
   
-  // Fetch questions for Question Bank
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        setQuestionsLoading(true);
-        const response = await fetch("/api/organizer/questions");
-        
-        if (!response.ok) {
-          throw new Error(`Error fetching questions: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        setQuestions(data);
-        setFilteredQuestions(data);
-        setQuestionsError(null);
-      } catch (err) {
-        console.error("Failed to fetch questions:", err);
-        setQuestionsError("Failed to load questions. Please try again later.");
-      } finally {
-        setQuestionsLoading(false);
-      }
-    };
-
-    // Only fetch questions when the Question Bank tab is active
-    if (mainView === "questions") {
-      fetchQuestions();
-    }
-  }, [mainView]);
+  // Question Bank functionality removed - redirecting to dedicated page
 
   useEffect(() => {
     // Apply filtering based on active tab and search query for quizzes
@@ -174,28 +140,7 @@ export default function QuizzesPage() {
     setFilteredQuizzes(filtered);
   }, [quizTab, searchQuery, quizzes]);
   
-  // Filter questions based on tab and search query
-  useEffect(() => {
-    if (mainView !== "questions") return;
-    
-    let filtered = [...questions];
-    
-    // Filter by target group if not "all" tab
-    if (questionTab !== "all") {
-      filtered = filtered.filter(question => question.target_group === questionTab);
-    }
-    
-    // Apply search query filter if present
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(question => 
-        question.question.toLowerCase().includes(query) || 
-        question.knowledge_field.toLowerCase().includes(query)
-      );
-    }
-    
-    setFilteredQuestions(filtered);
-  }, [questionTab, searchQuery, questions, mainView]);
+  // Filter functionality for Question Bank removed - redirecting to dedicated page
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -205,10 +150,7 @@ export default function QuizzesPage() {
     setQuizTab(value);
   };
   
-  const handleQuestionTabChange = (value: string) => {
-    setQuestionTab(value);
-  };
-  
+  // Main view functionality simplified - using direct link for Question Bank tab
   const handleMainViewChange = (value: string) => {
     setMainView(value);
     setSearchQuery(""); // Reset search when switching views
@@ -248,9 +190,11 @@ export default function QuizzesPage() {
           <TabsTrigger value="quizzes" className="flex items-center">
             <BookOpen className="mr-2 h-4 w-4" /> Quizzes
           </TabsTrigger>
-          <TabsTrigger value="questions" className="flex items-center">
-            <BrainCircuit className="mr-2 h-4 w-4" /> Question Bank
-          </TabsTrigger>
+          <Link href="/organizer/quizzes/questions" className="w-full">
+            <button className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm h-10 w-full">
+              <BrainCircuit className="mr-2 h-4 w-4" /> Question Bank
+            </button>
+          </Link>
         </TabsList>
       
         {/* Quizzes Tab Content */}
@@ -330,164 +274,7 @@ export default function QuizzesPage() {
           </Tabs>
         </TabsContent>
         
-        {/* Question Bank Tab Content */}
-        <TabsContent value="questions" className="space-y-6">
-          <div className="flex mb-6">
-            <Input 
-              className="max-w-sm" 
-              placeholder="Search questions..." 
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
-          </div>
-
-          <Tabs defaultValue="all" value={questionTab} onValueChange={handleQuestionTabChange}>
-            <TabsList>
-              <TabsTrigger value="all">All Questions</TabsTrigger>
-              <TabsTrigger value="PRIMARY">Primary</TabsTrigger>
-              <TabsTrigger value="SECONDARY">Secondary</TabsTrigger>
-              <TabsTrigger value="HIGHER">Higher Education</TabsTrigger>
-            </TabsList>
-
-            {questionsLoading ? (
-              <div className="flex justify-center items-center h-60">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2">Loading questions...</span>
-              </div>
-            ) : questionsError ? (
-              <div className="mt-6 p-4 bg-red-50 text-red-800 rounded-md">
-                <p>{questionsError}</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-2"
-                  onClick={() => window.location.reload()}
-                >
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <TabsContent value={questionTab} className="mt-6">
-                {filteredQuestions.length === 0 ? (
-                  <div className="text-center py-12 border rounded-md bg-gray-50">
-                    <h3 className="text-lg font-medium mb-2">No questions found</h3>
-                    <p className="text-gray-500 mb-4">
-                      {searchQuery 
-                        ? "No questions match your search query. Try a different search term."
-                        : questionTab !== "all" 
-                          ? `You don't have any ${questionTab} level questions yet.` 
-                          : "You haven't created any questions yet."}
-                    </p>
-                    <div className="flex justify-center space-x-4">
-                      <Button asChild variant="outline">
-                        <Link href="/organizer/quizzes/questions/new">
-                          <Plus className="mr-2 h-4 w-4" /> Create Question Manually
-                        </Link>
-                      </Button>
-                      <Button asChild>
-                        <Link href="/organizer/quizzes/questions/generate">
-                          <Sparkles className="mr-2 h-4 w-4" /> Generate with AI
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-md border shadow-sm">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[300px]">Question</TableHead>
-                          <TableHead>Target Group</TableHead>
-                          <TableHead>Knowledge Field</TableHead>
-                          <TableHead>Answer Type</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredQuestions.map(question => (
-                          <TableRow key={question.id}>
-                            <TableCell className="font-medium truncate max-w-[300px]">
-                              {question.question}
-                              {question.question_image && (
-                                <Badge variant="outline" className="ml-2">
-                                  <ImageIcon className="h-3 w-3 mr-1" /> Has Image
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={question.target_group === 'PRIMARY' ? 'default' : 
-                                          question.target_group === 'SECONDARY' ? 'secondary' : 'outline'}>
-                                {question.target_group === 'PRIMARY' ? 'Primary' : 
-                                question.target_group === 'SECONDARY' ? 'Secondary' : 'Higher Education'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{question.knowledge_field}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">
-                                {question.answer_type === 'single_selection' ? 'Single Choice' :
-                                 question.answer_type === 'multiple_selection' ? 'Multiple Choice' :
-                                 question.answer_type === 'binary' ? 'Yes/No' : question.answer_type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {format(new Date(question.createdAt), 'MMM d, yyyy')}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="ghost" asChild>
-                                  <Link href={`/organizer/quizzes/questions/${question.id}`}>
-                                    <Eye className="h-4 w-4" />
-                                  </Link>
-                                </Button>
-                                <Button size="sm" variant="ghost" asChild>
-                                  <Link href={`/organizer/quizzes/questions/${question.id}/edit`}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Link>
-                                </Button>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/organizer/quizzes/questions/${question.id}`}>
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/organizer/quizzes/questions/${question.id}/edit`}>
-                                        <Pencil className="mr-2 h-4 w-4" />
-                                        Edit
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem>
-                                      <Copy className="mr-2 h-4 w-4" />
-                                      Duplicate
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-600">
-                                      <Trash className="mr-2 h-4 w-4" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </TabsContent>
-            )}
-          </Tabs>
-        </TabsContent>
+        {/* Removed Question Bank Tab Content - now redirecting to dedicated page */}
       </Tabs>
     </div>
   );

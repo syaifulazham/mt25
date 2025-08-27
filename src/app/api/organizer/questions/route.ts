@@ -100,7 +100,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized - Only organizers can access this endpoint" }, { status: 403 });
     }
 
-    const data = await request.json();
+    // Check content type to determine how to parse the request
+    const contentType = request.headers.get('content-type') || '';
+    let data;
+    
+    if (contentType.includes('multipart/form-data')) {
+      // Handle FormData submission
+      const formData = await request.formData();
+      
+      // Convert FormData to object
+      data = {};
+      for (const [key, value] of formData.entries()) {
+        // Special handling for answer_options as JSON string
+        if (key === 'answer_options') {
+          try {
+            data[key] = JSON.parse(value as string);
+          } catch (e) {
+            console.error('Error parsing answer_options:', e);
+            data[key] = value;
+          }
+        } else if (key === 'image_file' && value instanceof File) {
+          // Handle file upload - convert to base64
+          const buffer = await value.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString('base64');
+          const mimeType = value.type;
+          data['question_image'] = `data:${mimeType};base64,${base64}`;
+        } else {
+          data[key] = value;
+        }
+      }
+    } else {
+      // Handle JSON submission
+      data = await request.json();
+    }
 
     // Validate required fields
     if (!data.question || !data.target_group || !data.knowledge_field || !data.answer_type || !data.answer_options || !data.answer_correct) {

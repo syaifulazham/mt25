@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -79,6 +80,11 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetGroups, setTargetGroups] = useState<Array<{value: string, label: string}>>([]);
   const [loadingTargetGroups, setLoadingTargetGroups] = useState(false);
+  
+  // Image handling state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(question.question_image || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch target groups from API
   useEffect(() => {
@@ -239,13 +245,41 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
         }
       }
       
-      const response = await fetch(`/api/organizer/questions/${question.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
+      let response;
+      
+      // Use FormData if we have a new image file
+      if (imageFile) {
+        const formData = new FormData();
+        
+        // Append all form fields
+        Object.entries(values).forEach(([key, value]) => {
+          if (key === 'answer_options') {
+            formData.append(key, JSON.stringify(value));
+          } else if (key === 'question_image' && imageFile) {
+            // Skip since we'll append the file directly
+          } else {
+            formData.append(key, String(value));
+          }
+        });
+        
+        // Append the image file
+        formData.append('image_file', imageFile);
+        
+        // Send the FormData
+        response = await fetch(`/api/organizer/questions/${question.id}`, {
+          method: "PUT",
+          body: formData,
+        });
+      } else {
+        // Regular JSON request if no new image
+        response = await fetch(`/api/organizer/questions/${question.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        });
+      }
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -287,32 +321,89 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
           )}
         />
 
-        {/* Question Image URL */}
+        {/* Question Image */}
         <FormField
           control={form.control}
           name="question_image"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Question Image URL (Optional)</FormLabel>
+              <FormLabel>Question Image</FormLabel>
               <FormControl>
-                <div className="flex">
-                  <Input
-                    placeholder="Enter image URL (optional)"
-                    {...field}
-                    value={field.value || ""}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="ml-2"
-                    onClick={() => form.setValue("question_image", "")}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="space-y-4">
+                  {/* Image preview */}
+                  {imagePreview && (
+                    <div className="border rounded-md p-2 max-w-md">
+                      <div className="relative aspect-video w-full overflow-hidden rounded-md">
+                        <Image 
+                          src={imagePreview} 
+                          alt="Question image preview" 
+                          className="object-contain"
+                          fill
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => {
+                          setImagePreview(null);
+                          setImageFile(null);
+                          form.setValue("question_image", "");
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                      >
+                        <Trash className="h-4 w-4 mr-2" /> Remove Image
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Upload controls - only show if no image */}
+                  {!imagePreview && (
+                    <div className="flex flex-col gap-4">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        ref={fileInputRef}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setImageFile(file);
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              const result = reader.result as string;
+                              setImagePreview(result);
+                              // Keep the base64 string for preview but not in form state
+                              // We'll handle the upload separately
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center gap-2 w-fit"
+                      >
+                        <Upload className="h-4 w-4" />
+                        Upload Image
+                      </Button>
+
+                      {/* Hide the URL input as we now handle via file upload */}
+                      <Input
+                        type="hidden"
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </div>
+                  )}
                 </div>
               </FormControl>
               <FormDescription>
-                Enter a URL for an image to include with this question
+                Upload an image to include with this question (optional)
               </FormDescription>
               <FormMessage />
             </FormItem>

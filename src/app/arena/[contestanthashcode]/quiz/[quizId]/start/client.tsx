@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -439,6 +440,21 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
                   {currentQuestion.question}
                 </MathText>
               </div>
+
+              {/* Display question image if available */}
+              {currentQuestion.question_image && currentQuestion.question_image !== "null" && (
+                <div className="my-4 flex items-center justify-center">
+                  <div className="relative w-full max-w-md h-64">
+                    <Image 
+                      src={currentQuestion.question_image}
+                      alt="Question image"
+                      fill
+                      style={{ objectFit: 'contain' }}
+                      className="rounded-md"
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Answer Options - Dynamic based on answer_type */}
               {(() => {

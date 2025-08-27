@@ -285,36 +285,54 @@ export default function CreateQuestionPage() {
     }
 
     try {
-      // Here we would send the data to the server
-      const formData = new FormData();
+      // We need to properly handle the image upload
+      // Check if we're using the FormData API (for files) or JSON
+      let response;
       
-      // Append all form fields
-      Object.entries(formState).forEach(([key, value]) => {
-        if (key === 'answer_options') {
-          formData.append(key, JSON.stringify(value));
-        } else {
-          formData.append(key, String(value));
-        }
-      });
-      
-      // Append image file if exists
       if (imageFile) {
+        // Use FormData for file uploads
+        const formData = new FormData();
+        
+        // Append all text fields
+        Object.entries(formState).forEach(([key, value]) => {
+          if (key === 'answer_options') {
+            formData.append(key, JSON.stringify(value));
+          } else if (key === 'question_image') {
+            // Skip the base64 version since we'll upload the file directly
+          } else {
+            formData.append(key, String(value));
+          }
+        });
+        
+        // Append the image file
         formData.append('image_file', imageFile);
+        
+        // Send the FormData
+        response = await fetch('/api/organizer/questions', {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        // Regular JSON submission without files
+        response = await fetch('/api/organizer/questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formState)
+        });
       }
       
-      // For now, mock successful submission
-      // In a real implementation, use fetch API with FormData
-      // const response = await fetch('/api/organizer/questions', {
-      //   method: 'POST',
-      //   body: formData,
-      // });
+      // Process response (common for both paths)
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create question');
+      }
       
-      setTimeout(() => {
-        toast.success("Question created successfully!");
-        setIsSubmitting(false);
-        // Redirect to questions list after successful creation
-        window.location.href = "/organizer/quizzes/questions";
-      }, 1000);
+      toast.success("Question created successfully!");
+      setIsSubmitting(false);
+      // Redirect to questions list after successful creation
+      window.location.href = "/organizer/quizzes/questions";
       
     } catch (error) {
       console.error("Error creating question:", error);

@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ChevronLeft, Clock, CheckCircle, ArrowLeft, ArrowRight, Info } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -395,9 +396,15 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                     </h3>
                     
                     {currentQuestion?.question_image && (
-                      <div className="my-4 bg-gray-100 p-4 rounded-md flex items-center justify-center">
-                        <div className="text-sm text-gray-500">
-                          [Image would be displayed here]
+                      <div className="my-4 flex items-center justify-center">
+                        <div className="relative w-full max-w-md h-64">
+                          <Image 
+                            src={currentQuestion.question_image}
+                            alt="Question image"
+                            fill
+                            style={{ objectFit: 'contain' }}
+                            className="rounded-md"
+                          />
                         </div>
                       </div>
                     )}
@@ -553,6 +560,20 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                         </div>
                         
                         <p className="mt-2"><MathText text={question.question} /></p>
+                        
+                        {question.question_image && (
+                          <div className="mt-4 flex items-center justify-center">
+                            <div className="relative w-full max-w-md h-48">
+                              <Image 
+                                src={question.question_image}
+                                alt="Question image"
+                                fill
+                                style={{ objectFit: 'contain' }}
+                                className="rounded-md"
+                              />
+                            </div>
+                          </div>
+                        )}
                         
                         <div className="mt-4 space-y-2">
                           {question.answer_options.map((option) => {

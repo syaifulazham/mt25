@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import NextImage from "next/image";
 import { MathRenderer } from "@/components/math/math-renderer";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
-  Image,
+  Image as ImageIcon,
   AlertTriangle,
   ClipboardList
 } from "lucide-react";
@@ -387,11 +388,15 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
                       <MathRenderer content={question.question} />
                     </h3>
                     {question.question_image && (
-                      <div className="mt-4 p-4 border rounded flex items-center">
-                        <Image className="h-5 w-5 mr-2 text-blue-500" />
-                        <span className="text-sm text-muted-foreground">
-                          Image attached: {question.question_image}
-                        </span>
+                      <div className="mt-4 border rounded-md p-2">
+                        <div className="relative aspect-video w-full max-w-lg overflow-hidden rounded-md">
+                          <NextImage 
+                            src={question.question_image} 
+                            alt="Question image" 
+                            className="object-contain"
+                            fill
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
