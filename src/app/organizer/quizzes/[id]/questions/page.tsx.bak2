@@ -46,7 +46,6 @@ import { toast } from "sonner";
 
 type Question = {
   id: number;
-  questionId: number;
   target_group: string;
   knowledge_field: string;
   question: string;
@@ -375,7 +374,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
       // Send the assigned questions to the API
       console.log('Saving quiz questions:', JSON.stringify({
         questions: assignedQuestions.map(q => ({
-          questionId: q.questionId || q.id,
+          questionId: q.id,
           order: q.order,
           points: q.points
         }))
@@ -390,7 +389,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         cache: 'no-store',
         body: JSON.stringify({
           questions: assignedQuestions.map(q => ({
-            questionId: q.questionId || q.id, // Use questionId if available, otherwise fall back to id
+            questionId: q.id, // Use the question's ID
             order: q.order,
             points: q.points
           }))
@@ -580,16 +579,14 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                                 </TableCell>
                                 <TableCell>
                                   <div 
-                                    className="break-words max-w-[35ch]" 
-                                    title={question.question}
+                                    className="truncate max-w-[35ch]" 
+                                    title={isDisabled ? "This question is already in the quiz" : question.question}
                                   >
-                                    {question.question.length > 50 
-                                      ? `${question.question.substring(0, 50)}...` 
-                                      : question.question}
+                                    {question.question}
+                                    {isDisabled && (
+                                      <span className="ml-2 text-xs text-gray-500">(Already in quiz)</span>
+                                    )}
                                   </div>
-                                  {isDisabled && (
-                                    <div className="text-xs text-amber-600 mt-1 font-medium">Note: Already in quiz</div>
-                                  )}
                                   {question.question_image && (
                                     <div className="text-xs text-blue-600 mt-1">Has image</div>
                                   )}
@@ -662,12 +659,10 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                       <TableCell className="font-medium text-center">{question.order}</TableCell>
                       <TableCell>
                         <div 
-                          className="break-words max-w-[35ch]" 
+                          className="truncate max-w-[35ch]" 
                           title={question.question} // Add tooltip with full text
                         >
-                          {question.question.length > 50 
-                            ? `${question.question.substring(0, 50)}...` 
-                            : question.question}
+                          {question.question}
                         </div>
                         {question.question_image && (
                           <div className="text-xs text-blue-600 mt-1">Has image</div>
