@@ -38,18 +38,24 @@ export async function GET(request: NextRequest) {
     const sortField = searchParams.get("sortField") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
     
-    // Build filter object
-    const filters: any = {
-      target_group: targetGroup ?? undefined,
-      knowledge_field: knowledgeField ?? undefined,
-      answer_type: answerType ?? undefined,
-      ...(search ? {
-        OR: [
-          { question: { contains: search, mode: 'insensitive' } },
-          { knowledge_field: { contains: search, mode: 'insensitive' } },
-        ]
-      } : {})
-    };
+    // Build filter object - start with basic filters
+    let filters: any = {};
+    
+    // Add standard filters if they exist
+    if (targetGroup) filters.target_group = targetGroup;
+    if (knowledgeField) filters.knowledge_field = knowledgeField;
+    if (answerType) filters.answer_type = answerType;
+    
+    // Add search filter - simplified approach
+    if (search && search.trim() !== '') {
+      // Only search the question field for now to avoid issues
+      // Note: removed 'mode: insensitive' as it's not supported in this Prisma version
+      filters.question = {
+        contains: search.trim()
+      };
+      
+      console.log(`[API] Searching for questions containing: "${search.trim()}"`);  
+    }
     
     // Clean up undefined values
     Object.keys(filters).forEach(key => {
