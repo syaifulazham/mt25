@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Search, Filter, ChevronLeft, Plus, Save, X, ArrowUp, ArrowDown } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -308,15 +309,41 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
     setIsSaving(true);
     
     try {
+      // Check session first
+      const sessionCheck = await fetch('/api/auth/session', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      
+      const sessionData = await sessionCheck.json();
+      console.log('Current session data:', sessionData);
+      
+      if (!sessionData.user) {
+        toast.error("You're not authenticated. Please log in again.");
+        setIsSaving(false);
+        return;
+      }
+      
       // Send the assigned questions to the API
+      console.log('Saving quiz questions:', JSON.stringify({
+        questions: assignedQuestions.map(q => ({
+          questionId: q.questionId || q.id,
+          order: q.order,
+          points: q.points
+        }))
+      }, null, 2));
+      
       const response = await fetch(`/api/organizer/quizzes/${quizId}/questions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify({
           questions: assignedQuestions.map(q => ({
-            questionId: q.id,
+            questionId: q.questionId || q.id, // Handle both ID formats
             order: q.order,
             points: q.points
           }))
@@ -324,8 +351,19 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save quiz questions');
+        console.error(`Error response status: ${response.status}`);
+        const responseText = await response.text();
+        console.error('Response body:', responseText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse error response as JSON', e);
+          throw new Error(`HTTP Error ${response.status}: ${responseText}`);
+        }
+        
+        throw new Error(errorData.error || `Failed to save quiz questions: ${response.status}`);
       }
       
       toast.success(`Updated quiz questions successfully!`);
@@ -389,6 +427,16 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         </div>
       </div>
 
+      {quiz?.status === "published" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 flex items-center">
+          <AlertTriangle className="text-amber-500 h-5 w-5 mr-2" />
+          <div>
+            <h4 className="font-medium text-amber-800">Published Quiz</h4>
+            <p className="text-sm text-amber-700">This quiz is published and cannot be edited. You must retract it first to make changes.</p>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Quiz Questions</CardTitle>
@@ -399,9 +447,11 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         <CardContent>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <Dialog open={isAddDialogOpen} onOpenChange={quiz?.status !== "published" ? setIsAddDialogOpen : undefined}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button disabled={quiz?.status === "published"} 
+                    title={quiz?.status === "published" ? "Cannot edit questions for a published quiz" : "Add questions to this quiz"}
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Questions
                   </Button>
@@ -471,7 +521,12 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                                 />
                               </TableCell>
                               <TableCell className="font-medium">
-                                <div className="line-clamp-2">{question.question}</div>
+                                <div 
+                                  className="truncate max-w-[35ch]" 
+                                  title={question.question} // Add tooltip with full text
+                                >
+                                  {question.question}
+                                </div>
                                 {question.question_image && (
                                   <div className="text-xs text-blue-600 mt-1">Has image</div>
                                 )}
@@ -542,7 +597,12 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                     <TableRow key={question.id}>
                       <TableCell className="font-medium text-center">{question.order}</TableCell>
                       <TableCell>
-                        <div className="line-clamp-2">{question.question}</div>
+                        <div 
+                          className="truncate max-w-[35ch]" 
+                          title={question.question} // Add tooltip with full text
+                        >
+                          {question.question}
+                        </div>
                         {question.question_image && (
                           <div className="text-xs text-blue-600 mt-1">Has image</div>
                         )}
@@ -617,10 +677,16 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
           >
             Cancel
           </Button>
-          <Button onClick={saveQuizQuestions} disabled={assignedQuestions.length === 0 || isSaving}>
-            <Save className="w-4 h-4 mr-2" />
-            {isSaving ? "Saving..." : "Save Questions"}
-          </Button>
+          <div className="fixed bottom-8 right-8 z-10">
+            <Button 
+              onClick={saveQuizQuestions} 
+              disabled={isSaving || quiz?.status === "published"}
+              size="lg"
+              title={quiz?.status === "published" ? "Cannot edit questions for a published quiz" : "Save question changes"}
+            >
+              {isSaving ? 'Saving...' : 'Save Questions'}
+            </Button>
+          </div>
         </CardFooter>
       </Card>
     </div>
