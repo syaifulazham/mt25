@@ -117,8 +117,14 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         
         // Fetch question bank and target groups
         const [questionBankResponse, targetGroupsResponse] = await Promise.all([
-          fetch('/api/organizer/questions'),
-          fetch('/api/organizer/targetgroups')
+          fetch('/api/organizer/questions', {
+            credentials: 'include', // Include credentials for authenticated requests
+            cache: 'no-store' // Ensure fresh data
+          }),
+          fetch('/api/organizer/targetgroups', {
+            credentials: 'include', // Include credentials for authenticated requests
+            cache: 'no-store' // Ensure fresh data
+          })
         ]);
         
         if (!questionBankResponse.ok) {
@@ -131,8 +137,18 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         const questionBankData = await questionBankResponse.json();
         const targetGroupsData = await targetGroupsResponse.json();
         
+        // Check for error or unauthorized response
+        if (questionBankData.error) {
+          console.error('Question bank API returned error:', questionBankData.error);
+          setQuestionBank([]);
+        }
+        // Check for pagination structure - API returns { questions: [...], pagination: {...} }
+        else if (questionBankData.questions && Array.isArray(questionBankData.questions)) {
+          console.log('Retrieved', questionBankData.questions.length, 'questions from API');
+          setQuestionBank(questionBankData.questions);
+        }
         // Ensure questionBankData is an array
-        if (!Array.isArray(questionBankData)) {
+        else if (!Array.isArray(questionBankData)) {
           console.error('API returned non-array questionBankData:', questionBankData);
           setQuestionBank([]);
         } else {
