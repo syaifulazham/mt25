@@ -747,7 +747,13 @@ export default function QuestionsPage() {
   return (
     <div className="container py-10 mx-auto">
       <PageHeader title="Questions">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link href="/organizer/quizzes">
+            <Button variant="outline">
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Back to Quizzes
+            </Button>
+          </Link>
           <Link href="/organizer/quizzes/questions/create">
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />

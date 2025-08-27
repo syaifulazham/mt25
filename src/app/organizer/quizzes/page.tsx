@@ -73,8 +73,7 @@ interface Question {
 }
 
 export default function QuizzesPage() {
-  // Main tabs state - Quizzes or Questions
-  const [mainView, setMainView] = useState("quizzes");
+  // Removed tabs state - no longer needed
   
   // Quiz management state
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -150,11 +149,7 @@ export default function QuizzesPage() {
     setQuizTab(value);
   };
   
-  // Main view functionality simplified - using direct link for Question Bank tab
-  const handleMainViewChange = (value: string) => {
-    setMainView(value);
-    setSearchQuery(""); // Reset search when switching views
-  };
+  // Removed main view functionality - no longer needed with direct link for Question Bank
 
   return (
     <div className="container mx-auto py-6 space-y-8">
@@ -162,43 +157,22 @@ export default function QuizzesPage() {
         title="Quiz & Question Management" 
         description="Create and manage quizzes and questions for participants"
       >
-        {mainView === "quizzes" ? (
+        <div className="flex space-x-2">
           <Button asChild>
             <Link href="/organizer/quizzes/new">
               <Plus className="mr-2 h-4 w-4" /> New Quiz
             </Link>
           </Button>
-        ) : (
-          <div className="flex space-x-2">
-            <Button asChild variant="outline">
-              <Link href="/organizer/quizzes/questions/new">
-                <Plus className="mr-2 h-4 w-4" /> New Question
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link href="/organizer/quizzes/questions/generate">
-                <Sparkles className="mr-2 h-4 w-4" /> Generate with AI
-              </Link>
-            </Button>
-          </div>
-        )}
+          <Button asChild variant="outline">
+            <Link href="/organizer/quizzes/questions">
+              <BrainCircuit className="mr-2 h-4 w-4" /> Question Bank
+            </Link>
+          </Button>
+        </div>
       </PageHeader>
       
-      {/* Main Navigation Tabs */}
-      <Tabs defaultValue="quizzes" value={mainView} onValueChange={handleMainViewChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
-          <TabsTrigger value="quizzes" className="flex items-center">
-            <BookOpen className="mr-2 h-4 w-4" /> Quizzes
-          </TabsTrigger>
-          <Link href="/organizer/quizzes/questions" className="w-full">
-            <button className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm h-10 w-full">
-              <BrainCircuit className="mr-2 h-4 w-4" /> Question Bank
-            </button>
-          </Link>
-        </TabsList>
-      
-        {/* Quizzes Tab Content */}
-        <TabsContent value="quizzes" className="space-y-6">
+      {/* Quiz content section */}
+      <div className="space-y-6">
           <div className="flex mb-6">
             <Input 
               className="max-w-sm" 
@@ -272,10 +246,7 @@ export default function QuizzesPage() {
               </TabsContent>
             )}
           </Tabs>
-        </TabsContent>
-        
-        {/* Removed Question Bank Tab Content - now redirecting to dedicated page */}
-      </Tabs>
+        </div>
     </div>
   );
 }

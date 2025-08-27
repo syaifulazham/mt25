@@ -9,6 +9,7 @@ import { AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { QuestionDetailModal } from "../../questions/question-detail-modal";
 import {
   Table,
   TableBody,
@@ -98,6 +99,10 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [targetGroups, setTargetGroups] = useState<Array<{code: string, name: string, minAge: number, maxAge: number}>>([]);
+  
+  // Question detail modal state
+  const [selectedQuestionDetail, setSelectedQuestionDetail] = useState<Question | null>(null);
+  const [isQuestionDetailOpen, setIsQuestionDetailOpen] = useState(false);
 
   // Load quiz details and assigned questions
   useEffect(() => {
@@ -578,7 +583,13 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                                     className={isDisabled ? 'cursor-not-allowed' : ''}
                                   />
                                 </TableCell>
-                                <TableCell>
+                                <TableCell 
+                                  className="cursor-pointer hover:bg-gray-50"
+                                  onClick={() => {
+                                    setSelectedQuestionDetail(question);
+                                    setIsQuestionDetailOpen(true);
+                                  }}
+                                >
                                   <div 
                                     className="break-words max-w-[35ch]" 
                                     title={question.question}
@@ -660,7 +671,13 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                   {assignedQuestions.map((question) => (
                     <TableRow key={question.id}>
                       <TableCell className="font-medium text-center">{question.order}</TableCell>
-                      <TableCell>
+                      <TableCell 
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          setSelectedQuestionDetail(question);
+                          setIsQuestionDetailOpen(true);
+                        }}
+                      >
                         <div 
                           className="break-words max-w-[35ch]" 
                           title={question.question} // Add tooltip with full text
@@ -755,6 +772,13 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
           </div>
         </CardFooter>
       </Card>
+      
+      {/* Question Detail Modal */}
+      <QuestionDetailModal
+        question={selectedQuestionDetail}
+        open={isQuestionDetailOpen}
+        onOpenChange={setIsQuestionDetailOpen}
+      />
     </div>
   );
 }

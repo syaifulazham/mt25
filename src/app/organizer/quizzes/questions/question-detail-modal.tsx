@@ -72,7 +72,9 @@ export function QuestionDetailModal({
           </div>
           <DialogTitle className="text-xl">{question.question}</DialogTitle>
           <DialogDescription>
-            Created on {format(new Date(question.createdAt), "MMMM dd, yyyy")} 
+            {question.createdAt && typeof question.createdAt === 'string' && question.createdAt.trim() !== '' 
+              ? `Created on ${format(new Date(question.createdAt), "MMMM dd, yyyy")}` 
+              : 'Creation date not available'}
             {question.creatorName && ` by ${question.creatorName}`}
           </DialogDescription>
         </DialogHeader>
@@ -157,13 +159,13 @@ export function QuestionDetailModal({
               Close
             </Button>
             <Button asChild variant="outline">
-              <Link href={`/organizer/quizzes/questions/${question.id}`}>
+              <Link href={`/organizer/quizzes/questions/${question.questionId || question.id}`}>
                 <Eye className="mr-2 h-4 w-4" />
                 View Full Details
               </Link>
             </Button>
             <Button asChild>
-              <Link href={`/organizer/quizzes/questions/${question.id}/edit`}>
+              <Link href={`/organizer/quizzes/questions/${question.questionId || question.id}/edit`}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </Link>
