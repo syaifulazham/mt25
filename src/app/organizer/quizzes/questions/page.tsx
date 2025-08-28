@@ -760,6 +760,12 @@ export default function QuestionsPage() {
               Add Question
             </Button>
           </Link>
+          <Link href="/organizer/quizzes/questions/generate">
+            <Button variant="secondary">
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate with AI
+            </Button>
+          </Link>
         </div>
       </PageHeader>
 
