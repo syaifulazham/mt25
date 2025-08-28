@@ -547,6 +547,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                         <TableRow>
                           <TableHead className="w-[50px]"></TableHead>
                           <TableHead>Question</TableHead>
+                          <TableHead className="w-[150px]">Target Group</TableHead>
                           <TableHead className="w-[150px]">Type</TableHead>
                           <TableHead className="w-[150px]">Field</TableHead>
                         </TableRow>
@@ -554,7 +555,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                       <TableBody>
                         {availableQuestions.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                            <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                               {searchTerm ? (
                                 <>No matching questions found. Try a different search term.</>
                               ) : (
@@ -604,6 +605,12 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                                   {question.question_image && (
                                     <div className="text-xs text-blue-600 mt-1">Has image</div>
                                   )}
+                                </TableCell>
+                                <TableCell>
+                                  {(() => {
+                                    const targetGroup = targetGroups.find(tg => tg.code === question.target_group);
+                                    return targetGroup ? targetGroup.name : question.target_group;
+                                  })()}
                                 </TableCell>
                                 <TableCell>
                                   <Badge className={getTypeBadgeColor(question.answer_type)}>
