@@ -754,7 +754,7 @@ export default function QuestionsPage() {
               Back to Quizzes
             </Button>
           </Link>
-          <Link href="/organizer/quizzes/questions/create">
+          <Link href="/organizer/quizzes/questions/new">
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
               Add Question
