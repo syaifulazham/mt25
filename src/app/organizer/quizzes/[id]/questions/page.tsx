@@ -99,6 +99,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [targetGroups, setTargetGroups] = useState<Array<{code: string, name: string, minAge: number, maxAge: number}>>([]);
+  const [strictAgeFilter, setStrictAgeFilter] = useState(false);
   
   // Question detail modal state
   const [selectedQuestionDetail, setSelectedQuestionDetail] = useState<Question | null>(null);
@@ -129,7 +130,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         
         // Fetch question bank and target groups
         const [questionBankResponse, targetGroupsResponse] = await Promise.all([
-          fetch('/api/organizer/questions', {
+          fetch('/api/organizer/questions?pageSize=1000', {
             credentials: 'include', // Include credentials for authenticated requests
             cache: 'no-store' // Ensure fresh data
           }),
@@ -157,6 +158,11 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
         // Check for pagination structure - API returns { questions: [...], pagination: {...} }
         else if (questionBankData.questions && Array.isArray(questionBankData.questions)) {
           console.log('Retrieved', questionBankData.questions.length, 'questions from API');
+          console.log('Pagination info:', questionBankData.pagination);
+          // Log how many questions match the target group
+          const quizTargetGroup = quizData.target_group;
+          const matchingQuestions = questionBankData.questions.filter(q => q.target_group === quizTargetGroup);
+          console.log(`Questions matching quiz target group '${quizTargetGroup}':`, matchingQuestions.length);
           setQuestionBank(questionBankData.questions);
         }
         // Ensure questionBankData is an array
@@ -185,8 +191,14 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
     }
   }, [quizId]);
   
-  // Helper function to check if quiz age range engulfs the question age range
-  const ageRangesOverlap = (quizTargetGroup: string, questionTargetGroup: string) => {
+  // Helper function to check if quiz target group is compatible with question target group
+  const isTargetGroupCompatible = (quizTargetGroup: string, questionTargetGroup: string) => {
+    // If not using strict age filtering, just compare codes
+    if (!strictAgeFilter) {
+      return quizTargetGroup === questionTargetGroup;
+    }
+    
+    // With strict filtering, check if quiz age range engulfs the question age range
     const quizTG = targetGroups.find(tg => tg.code === quizTargetGroup);
     const questionTG = targetGroups.find(tg => tg.code === questionTargetGroup);
     
@@ -219,9 +231,9 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
       // Ensure the question is a valid object with required properties
       if (!q || typeof q !== 'object' || !('id' in q)) return false;
       
-      // Check if quiz exists and age ranges overlap
+      // Check if quiz exists and target group is compatible
       if (!quiz) return false;
-      if (!q.target_group || !ageRangesOverlap(quiz.target_group, q.target_group)) return false;
+      if (!q.target_group || !isTargetGroupCompatible(quiz.target_group, q.target_group)) return false;
       
       // Check if it matches the search term
       return searchTerm === '' || 
@@ -514,16 +526,41 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
                     <DialogDescription>
                       Select questions from the question bank to add to this quiz
                     </DialogDescription>
+                    {quiz && (
+                      <div className="mt-4 p-2 bg-blue-50 border border-blue-100 rounded-md text-xs text-blue-800">
+                        <p className="font-medium">Debug Information:</p>
+                        <p>Quiz Target Group: {quiz.target_group}</p>
+                        <p>Quiz Age Range: {targetGroups.find(tg => tg.code === quiz.target_group)?.minAge || '?'}-{targetGroups.find(tg => tg.code === quiz.target_group)?.maxAge || '?'} years</p>
+                        <p>Total Questions in Bank: {questionBank.length}</p>
+                        <p>Questions with Same Target Group: {questionBank.filter(q => q.target_group === quiz.target_group).length}</p>
+                        <p>Questions After Age Range Filter: {availableQuestions.length}</p>
+                      </div>
+                    )}
                   </DialogHeader>
                   
-                  <div className="flex items-center gap-2 my-4">
-                    <Search className="w-4 h-4 text-gray-500" />
-                    <Input
-                      placeholder="Search questions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="h-9"
-                    />
+                  <div className="flex justify-between items-center my-4">
+                    <div className="flex items-center gap-2">
+                      <Search className="w-4 h-4 text-gray-500" />
+                      <Input
+                        placeholder="Search questions..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="h-9 w-80"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Exact target group matching</span>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={!strictAgeFilter}
+                          onChange={() => setStrictAgeFilter(!strictAgeFilter)} 
+                          className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                      <span className="text-sm">Strict age range filtering</span>
+                    </div>
                   </div>
                   
                   <div className="flex justify-between items-center mb-2">
