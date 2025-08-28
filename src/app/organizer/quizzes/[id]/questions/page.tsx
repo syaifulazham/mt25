@@ -185,7 +185,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
     }
   }, [quizId]);
   
-  // Helper function to check if two age ranges overlap
+  // Helper function to check if quiz age range engulfs the question age range
   const ageRangesOverlap = (quizTargetGroup: string, questionTargetGroup: string) => {
     const quizTG = targetGroups.find(tg => tg.code === quizTargetGroup);
     const questionTG = targetGroups.find(tg => tg.code === questionTargetGroup);
@@ -195,9 +195,9 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
       return quizTargetGroup === questionTargetGroup;
     }
     
-    // Check if age ranges overlap
-    // Two ranges overlap if: max1 >= min2 && max2 >= min1
-    return quizTG.maxAge >= questionTG.minAge && questionTG.maxAge >= quizTG.minAge;
+    // Check if quiz age range engulfs the question age range
+    // Quiz min age must be <= question min age AND quiz max age must be >= question max age
+    return quizTG.minAge <= questionTG.minAge && quizTG.maxAge >= questionTG.maxAge;
   };
 
   // Filter question bank questions, showing all matching questions but marking already assigned ones
