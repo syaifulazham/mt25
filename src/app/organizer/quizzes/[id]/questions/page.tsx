@@ -161,7 +161,7 @@ export default function QuizQuestionsPage({ params }: { params: { id: string } }
           console.log('Pagination info:', questionBankData.pagination);
           // Log how many questions match the target group
           const quizTargetGroup = quizData.target_group;
-          const matchingQuestions = questionBankData.questions.filter(q => q.target_group === quizTargetGroup);
+          const matchingQuestions = questionBankData.questions.filter((q: Question) => q.target_group === quizTargetGroup);
           console.log(`Questions matching quiz target group '${quizTargetGroup}':`, matchingQuestions.length);
           setQuestionBank(questionBankData.questions);
         }
