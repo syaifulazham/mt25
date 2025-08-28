@@ -10,7 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -174,11 +176,26 @@ export default function CreateQuizPage() {
                     <SelectValue placeholder="Select target group" />
                   </SelectTrigger>
                   <SelectContent>
-                    {targetGroups.map((group) => (
-                      <SelectItem key={group.value} value={group.value}>
-                        {group.label}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      <SelectLabel>Quiz Group</SelectLabel>
+                      {targetGroups
+                        .filter((group) => group.label.startsWith('0'))
+                        .map((group) => (
+                          <SelectItem key={group.value} value={group.value}>
+                            {group.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel>Other</SelectLabel>
+                      {targetGroups
+                        .filter((group) => !group.label.startsWith('0'))
+                        .map((group) => (
+                          <SelectItem key={group.value} value={group.value}>
+                            {group.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
