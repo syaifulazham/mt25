@@ -20,11 +20,11 @@ import Link from "next/link";
 import { ChevronLeft, Clock, Save } from "lucide-react";
 import { toast } from "sonner";
 
-// Default target group options (used as fallback)
+// Default target group options (used as fallback) - sorted alphabetically by label
 const defaultTargetGroups = [
+  { value: "HIGHER", label: "Higher Education" },
   { value: "PRIMARY", label: "Primary School" },
   { value: "SECONDARY", label: "Secondary School" },
-  { value: "HIGHER", label: "Higher Education" },
 ];
 
 export default function CreateQuizPage() {
@@ -40,7 +40,9 @@ export default function CreateQuizPage() {
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data) && data.length > 0) {
-            setTargetGroups(data);
+            // Sort target groups alphabetically by label before setting state
+            const sortedData = [...data].sort((a, b) => a.label.localeCompare(b.label));
+            setTargetGroups(sortedData);
           }
         }
       } catch (error) {
