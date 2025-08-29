@@ -861,10 +861,15 @@ export default function RawlistPage() {
                                   </thead>
                                   <tbody>
                                     {team.members.map((member, memberIndex) => (
-                                      <tr key={member.id} className="border-b last:border-b-0 hover:bg-yellow-100">
+                                      <tr key={member.id} className={`border-b last:border-b-0 hover:bg-yellow-100 ${member.isDuplicate ? 'bg-orange-200 hover:bg-orange-300' : ''}`}>
                                         <td className="p-2">{memberIndex + 1}</td>
                                         <td className="p-2">
                                           <div className="font-medium">{member.participantName}</div>
+                                          {member.isDuplicate && (
+                                            <div className="text-xs text-orange-700 font-medium mt-1">
+                                              ⚠️ In multiple teams: {member.duplicateTeams?.join(', ')}
+                                            </div>
+                                          )}
                                           {formatJoinedAt(member.joinedAt) && (
                                             <div className="text-xs text-muted-foreground mt-1">
                                               Joined: {formatJoinedAt(member.joinedAt)}

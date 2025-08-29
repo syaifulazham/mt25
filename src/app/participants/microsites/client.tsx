@@ -33,7 +33,8 @@ import {
   Gamepad2,
   Key,
   Eye,
-  EyeOff
+  EyeOff,
+  Download
 } from 'lucide-react';
 import { useLanguage } from '@/lib/i18n/language-context';
 import { toast } from 'sonner';
@@ -223,14 +224,29 @@ export default function MicrositesClient() {
             }
           </p>
         </div>
-        <Button 
-          onClick={() => setShowPasscodes(!showPasscodes)}
-          variant="outline"
-          size="sm"
-        >
-          {showPasscodes ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
-          {showPasscodes ? 'Hide Passcodes' : 'Show Passcodes'}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowPasscodes(!showPasscodes)}
+            variant="outline"
+            size="sm"
+          >
+            {showPasscodes ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+            {showPasscodes ? 'Hide Passcodes' : 'Show Passcodes'}
+          </Button>
+          <Button 
+            variant="outline"
+            size="sm"
+            asChild
+          >
+            <a 
+              href="/api/participants/microsites/download"
+              download
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {language === 'my' ? 'Muat Turun' : 'Download'}
+            </a>
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
