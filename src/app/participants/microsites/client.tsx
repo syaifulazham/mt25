@@ -353,7 +353,7 @@ export default function MicrositesClient() {
                   <TableHead className="w-12"></TableHead>
                   <TableHead>{language === 'my' ? 'Status' : 'Status'}</TableHead>
                   <TableHead>{language === 'my' ? 'Nama' : 'Name'}</TableHead>
-                  <TableHead>{language === 'my' ? 'Pendidikan' : 'Education'}</TableHead>
+                  <TableHead>{language === 'my' ? 'Darjah/Tingkatan' : 'Darjah/Tingkatan'}</TableHead>
                   {showPasscodes && <TableHead>{language === 'my' ? 'Kod Laluan' : 'Passcode'}</TableHead>}
                   <TableHead>{language === 'my' ? 'Tindakan' : 'Actions'}</TableHead>
                 </TableRow>
@@ -394,10 +394,27 @@ export default function MicrositesClient() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        <div>{contestant.edu_level}</div>
-                        {contestant.class_grade && (
+                        {(() => {
+                          let formattedGrade = '';
+                          if (contestant.edu_level && contestant.class_grade) {
+                            const eduLevel = contestant.edu_level.toLowerCase();
+                            if (eduLevel === 'sekolah rendah') {
+                              formattedGrade = `Darjah ${contestant.class_grade}`;
+                            } else if (eduLevel === 'sekolah menengah') {
+                              formattedGrade = `Tingkatan ${contestant.class_grade}`;
+                            } else {
+                              formattedGrade = contestant.edu_level;
+                            }
+                          } else {
+                            formattedGrade = contestant.edu_level || 'Lain-lain';
+                          }
+                          return (
+                            <div className="font-medium">{formattedGrade}</div>
+                          );
+                        })()}
+                        {contestant.class_name && (
                           <div className="text-muted-foreground">
-                            {contestant.class_grade} {contestant.class_name}
+                            {contestant.class_name}
                           </div>
                         )}
                       </div>
