@@ -490,13 +490,7 @@ export async function GET(
                 })
               );
 
-              // Team info
-              children.push(
-                new Paragraph({
-                  children: [new TextRun({ text: `Registration Date: ${team.registrationDate}`, font: 'Calibri' })],
-                  spacing: { after: 100 }
-                })
-              );
+              // Registration Date removed as requested
 
               // Members table (without IC, phone, email)
               const memberTableRows = [
