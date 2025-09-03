@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         LEFT JOIN
           school s ON cont.schoolId = s.id
         LEFT JOIN
-          higherInstitution h ON cont.higherInstId = h.id
+          higherinstitution h ON cont.higherInstId = h.id
         LEFT JOIN
           independent i ON cont.independentId = i.id
         WHERE 
