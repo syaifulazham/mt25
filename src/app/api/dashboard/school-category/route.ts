@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         JOIN
           contingent c ON cnt.contingentId = c.id
         JOIN
-          School s ON c.schoolId = s.id
+          school s ON c.schoolId = s.id
         WHERE
           c.contingentType = 'SCHOOL'
           AND s.stateId = ${stateIdInt}
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
         JOIN
           contingent c ON cnt.contingentId = c.id
         JOIN
-          School s ON c.schoolId = s.id
+          school s ON c.schoolId = s.id
         WHERE
           c.contingentType = 'SCHOOL'
           AND s.category IS NOT NULL
