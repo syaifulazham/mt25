@@ -3,6 +3,7 @@ import { authenticateOrganizerApi, hasRequiredRole } from '@/lib/auth';
 import { user_role } from '@prisma/client';
 import * as docx from 'docx';
 import { getStateStatistics } from '@/app/organizer/events/stats/_utils/state-statistics';
+import { formatNumber } from '@/lib/utils/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,7 +121,7 @@ export async function GET(
                 verticalAlign: docx.VerticalAlign.CENTER,
               }),
               new docx.TableCell({
-                children: [new docx.Paragraph(`${summary.schoolCount}`)],
+                children: [new docx.Paragraph(formatNumber(summary.schoolCount))],
                 verticalAlign: docx.VerticalAlign.CENTER,
               }),
             ],
@@ -132,7 +133,7 @@ export async function GET(
                 verticalAlign: docx.VerticalAlign.CENTER,
               }),
               new docx.TableCell({
-                children: [new docx.Paragraph(`${summary.teamCount}`)],
+                children: [new docx.Paragraph(formatNumber(summary.teamCount))],
                 verticalAlign: docx.VerticalAlign.CENTER,
               }),
             ],
@@ -144,7 +145,7 @@ export async function GET(
                 verticalAlign: docx.VerticalAlign.CENTER,
               }),
               new docx.TableCell({
-                children: [new docx.Paragraph(`${summary.contestantCount}`)],
+                children: [new docx.Paragraph(formatNumber(summary.contestantCount))],
                 verticalAlign: docx.VerticalAlign.CENTER,
               }),
             ],
@@ -233,11 +234,11 @@ export async function GET(
                   verticalAlign: docx.VerticalAlign.CENTER,
                 }),
                 new docx.TableCell({
-                  children: [new docx.Paragraph(`${contingent.teamsCount}`)],
+                  children: [new docx.Paragraph(formatNumber(contingent.teamsCount))],
                   verticalAlign: docx.VerticalAlign.CENTER,
                 }),
                 new docx.TableCell({
-                  children: [new docx.Paragraph(`${contingent.contestantsCount}`)],
+                  children: [new docx.Paragraph(formatNumber(contingent.contestantsCount))],
                   verticalAlign: docx.VerticalAlign.CENTER,
                 }),
               ],

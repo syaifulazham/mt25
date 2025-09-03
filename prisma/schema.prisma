@@ -137,13 +137,13 @@ model contestant {
   is_ppki                Boolean                          @default(false)
   contests               contestParticipation[]
   contingent             contingent                       @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  microsites             microsite[]
   quizAttempts           quiz_attempt[]
   submissions            submission[]
   surveyAnswers          survey_answer[]
   surveyCompositions     survey_contestants_composition[]
   surveySubmissionStatus survey_submission_status[]
   teamMembers            teamMember[]
-  microsites             microsite[]
 
   @@index([contingentId], map: "contestant_contingentId_fkey")
 }
@@ -560,15 +560,15 @@ model submission {
 }
 
 model targetgroup {
-  id                   Int       @id @default(autoincrement())
-  code                 String    @unique(map: "TargetGroup_code_key")
-  name                 String
-  ageGroup             String
-  schoolLevel          String
-  maxAge               Int       @default(0)
-  minAge               Int       @default(0)
-  contestant_class_grade String?
-  contest              contest[] @relation("contesttotargetgroup")
+  id                     Int       @id @default(autoincrement())
+  code                   String    @unique(map: "TargetGroup_code_key")
+  name                   String
+  ageGroup               String
+  schoolLevel            String
+  maxAge                 Int       @default(0)
+  minAge                 Int       @default(0)
+  contestant_class_grade String?   @db.VarChar(255)
+  contest                contest[] @relation("contesttotargetgroup")
 }
 
 model theme {
@@ -644,7 +644,7 @@ model question_bank {
   target_group    String
   knowledge_field String
   question        String          @db.Text
-  question_image  String?
+  question_image  String?         @db.LongText
   answer_type     String
   answer_options  Json
   answer_correct  String

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, AlignmentType, TextRun, HeadingLevel } from 'docx';
+import { formatNumber } from '@/lib/utils/format';
 
 export async function GET(
   request: NextRequest,
@@ -219,7 +220,7 @@ export async function GET(
                     children: [new Paragraph({ children: [new TextRun("Total Competitions")] })],
                   }),
                   new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: String(generalSummary.totalContests), bold: true })] })],
+                    children: [new Paragraph({ children: [new TextRun({ text: formatNumber(generalSummary.totalContests), bold: true })] })],
                   }),
                 ],
               }),
@@ -229,7 +230,7 @@ export async function GET(
                     children: [new Paragraph({ children: [new TextRun("Total Contingents")] })],
                   }),
                   new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: String(generalSummary.totalContingents), bold: true })] })],
+                    children: [new Paragraph({ children: [new TextRun({ text: formatNumber(generalSummary.totalContingents), bold: true })] })],
                   }),
                 ],
               }),
@@ -239,7 +240,7 @@ export async function GET(
                     children: [new Paragraph({ children: [new TextRun("Total Teams")] })],
                   }),
                   new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: String(generalSummary.totalTeams), bold: true })] })],
+                    children: [new Paragraph({ children: [new TextRun({ text: formatNumber(generalSummary.totalTeams), bold: true })] })],
                   }),
                 ],
               }),
@@ -249,7 +250,7 @@ export async function GET(
                     children: [new Paragraph({ children: [new TextRun("Total Contestants")] })],
                   }),
                   new TableCell({
-                    children: [new Paragraph({ children: [new TextRun({ text: String(generalSummary.totalContestants), bold: true })] })],
+                    children: [new Paragraph({ children: [new TextRun({ text: formatNumber(generalSummary.totalContestants), bold: true })] })],
                   }),
                 ],
               }),
@@ -317,7 +318,7 @@ export async function GET(
                         children: [new Paragraph({ children: [new TextRun("Total Contingents")] })],
                       }),
                       new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text: String(state.stateSummary.totalContingents), bold: true })] })],
+                        children: [new Paragraph({ children: [new TextRun({ text: formatNumber(state.stateSummary.totalContingents), bold: true })] })],
                       }),
                     ],
                   }),
@@ -327,7 +328,7 @@ export async function GET(
                         children: [new Paragraph({ children: [new TextRun("Total Teams")] })],
                       }),
                       new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text: String(state.stateSummary.totalTeams), bold: true })] })],
+                        children: [new Paragraph({ children: [new TextRun({ text: formatNumber(state.stateSummary.totalTeams), bold: true })] })],
                       }),
                     ],
                   }),
@@ -337,7 +338,7 @@ export async function GET(
                         children: [new Paragraph({ children: [new TextRun("Total Contestants")] })],
                       }),
                       new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text: String(state.stateSummary.totalContestants), bold: true })] })],
+                        children: [new Paragraph({ children: [new TextRun({ text: formatNumber(state.stateSummary.totalContestants), bold: true })] })],
                       }),
                     ],
                   }),
@@ -389,7 +390,7 @@ export async function GET(
                         children: [new Paragraph({ children: [new TextRun("Total Contingents")] })],
                       }),
                       new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text: String(group.contestGroupSummary.totalContingents), bold: true })] })],
+                        children: [new Paragraph({ children: [new TextRun({ text: formatNumber(group.contestGroupSummary.totalContingents), bold: true })] })],
                       }),
                     ],
                   }),
@@ -399,7 +400,7 @@ export async function GET(
                         children: [new Paragraph({ children: [new TextRun("Total Teams")] })],
                       }),
                       new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text: String(group.contestGroupSummary.totalTeams), bold: true })] })],
+                        children: [new Paragraph({ children: [new TextRun({ text: formatNumber(group.contestGroupSummary.totalTeams), bold: true })] })],
                       }),
                     ],
                   }),
@@ -409,7 +410,7 @@ export async function GET(
                         children: [new Paragraph({ children: [new TextRun("Total Contestants")] })],
                       }),
                       new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text: String(group.contestGroupSummary.totalContestants), bold: true })] })],
+                        children: [new Paragraph({ children: [new TextRun({ text: formatNumber(group.contestGroupSummary.totalContestants), bold: true })] })],
                       }),
                     ],
                   }),
@@ -456,13 +457,13 @@ export async function GET(
                           children: [new Paragraph({ children: [new TextRun(contest.contestName)] })],
                         }),
                         new TableCell({
-                          children: [new Paragraph({ children: [new TextRun(String(contest.contingentCount))] })],
+                          children: [new Paragraph({ children: [new TextRun(formatNumber(contest.contingentCount))] })],
                         }),
                         new TableCell({
-                          children: [new Paragraph({ children: [new TextRun(String(contest.teamCount))] })],
+                          children: [new Paragraph({ children: [new TextRun(formatNumber(contest.teamCount))] })],
                         }),
                         new TableCell({
-                          children: [new Paragraph({ children: [new TextRun(String(contest.contestantCount))] })],
+                          children: [new Paragraph({ children: [new TextRun(formatNumber(contest.contestantCount))] })],
                         }),
                       ],
                     })

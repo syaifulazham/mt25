@@ -14,7 +14,7 @@ import {
 import Link from "next/link";
 import { formatNumber } from "@/lib/utils/format";
 
-// StatsCard component (moved from page.tsx)
+// StatsCard component
 const StatsCard = ({ title, value, icon: Icon, link, linkText }: { 
   title: string; 
   value: string | number; 
@@ -45,36 +45,56 @@ const StatsCard = ({ title, value, icon: Icon, link, linkText }: {
   </Card>
 );
 
-export default async function BasicStatsSection({ isAdmin = false }: { isAdmin?: boolean }) {
-  // Fetch basic dashboard data using prismaExecute for efficient connection management
-  const [userCount, participantCount, contestCount, schoolCount, highEduCount, contestParticipationCount] = await prismaExecute(async (prisma) => {
-    return Promise.all([
-      prisma.user.count(),
-      prisma.user_participant.count(),
-      prisma.contest.count(),
-      prisma.school.count(),
-      prisma.higherinstitution.count(),
-      prisma.contestParticipation.count(),
-    ]);
-  });
-
-  // Fetch contingent count separately to avoid blocking if it's slow
-  const contingentCount = await prismaExecute(prisma => prisma.contingent.count());
-  
-  // Fetch teams count
-  const teamsCount = await prismaExecute(prisma => prisma.team.count());
-
+export default async function BasicStatsSection({ isAdmin = false, stateId }: { isAdmin?: boolean, stateId: string }) {
   // Using centralized formatNumber utility for ###,##0 format
 
+  // Fetch contingent count filtered by state
+  const contingentCount = await prismaExecute(async (prisma) => {
+    return await prisma.contingent.count({
+      where: {
+        OR: [
+          { school: { stateId: parseInt(stateId) } },
+          { higherInstitution: { stateId: parseInt(stateId) } },
+          { independent: { stateId: parseInt(stateId) } }
+        ]
+      }
+    });
+  });
+  
+  // Fetch teams count filtered by state
+  const teamsCount = await prismaExecute(async (prisma) => {
+    return await prisma.team.count({
+      where: {
+        contingent: {
+          OR: [
+            { school: { stateId: parseInt(stateId) } },
+            { higherInstitution: { stateId: parseInt(stateId) } },
+            { independent: { stateId: parseInt(stateId) } }
+          ]
+        }
+      }
+    });
+  });
+
+  // Fetch contest participations count filtered by state
+  const contestParticipationCount = await prismaExecute(async (prisma) => {
+    return await prisma.contestParticipation.count({
+      where: {
+        contestant: {
+          contingent: {
+            OR: [
+              { school: { stateId: parseInt(stateId) } },
+              { higherInstitution: { stateId: parseInt(stateId) } },
+              { independent: { stateId: parseInt(stateId) } }
+            ]
+          }
+        }
+      }
+    });
+  });
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <StatsCard 
-        title="Managers" 
-        value={formatNumber(participantCount)} 
-        icon={Users} 
-        link="/organizer/participants"
-        linkText="View all"
-      />
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       <StatsCard 
         title="Contingents" 
         value={formatNumber(contingentCount)} 

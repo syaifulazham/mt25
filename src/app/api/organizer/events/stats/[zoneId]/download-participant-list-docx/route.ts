@@ -6,6 +6,7 @@ import { authenticateOrganizerApi } from "@/lib/auth";
 import { getZoneStatistics } from "@/app/organizer/events/stats/_utils/zone-statistics";
 import { user_role } from "@prisma/client";
 import { headers } from "next/headers";
+import { formatNumber } from "@/lib/utils/format";
 
 // Force dynamic rendering - required for routes that use cookies
 export const dynamic = 'force-dynamic';
@@ -348,13 +349,13 @@ function createSummaryTable(contingentCount: number, teamCount: number, contesta
       new TableRow({
         children: [
           new TableCell({
-            children: [new Paragraph({ text: contingentCount.toString(), alignment: AlignmentType.CENTER })],
+            children: [new Paragraph({ text: formatNumber(contingentCount), alignment: AlignmentType.CENTER })],
           }),
           new TableCell({
-            children: [new Paragraph({ text: teamCount.toString(), alignment: AlignmentType.CENTER })],
+            children: [new Paragraph({ text: formatNumber(teamCount), alignment: AlignmentType.CENTER })],
           }),
           new TableCell({
-            children: [new Paragraph({ text: contestantCount.toString(), alignment: AlignmentType.CENTER })],
+            children: [new Paragraph({ text: formatNumber(contestantCount), alignment: AlignmentType.CENTER })],
           }),
         ],
       }),

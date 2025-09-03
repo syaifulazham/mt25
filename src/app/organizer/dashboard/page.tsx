@@ -11,6 +11,7 @@ import ActivitySkeleton from "./_components/skeletons/activity-skeleton";
 
 // Import our section components
 import DashboardHeader from "./_components/dashboard-header";
+import StateSelector from "./_components/state-selector";
 import BasicStatsSection from "./_components/basic-stats-section";
 import ContingentStateSection from "./_components/contingent-state-section";
 import ParticipationStateSection from "./_components/participation-state-section";
@@ -53,7 +54,10 @@ export default async function DashboardPage() {
     <div className="container mx-auto p-4 flex flex-col gap-8">
       {/* Header section */}
       <section className="w-full">
-        <DashboardHeader userName={user.name || user.email || 'User'} />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <DashboardHeader userName={user.name || user.email || 'User'} />
+          <StateSelector />
+        </div>
         <DashboardDebug />
       </section>
       

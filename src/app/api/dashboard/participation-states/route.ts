@@ -12,7 +12,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     
     // Check if user is authenticated and has appropriate role
-    if (!session?.user || !['ADMIN', 'ORGANIZER', 'VIEWER'].includes(session.user.role)) {
+    if (!session?.user || !session.user.role || !['ADMIN', 'ORGANIZER', 'VIEWER'].includes(session.user.role)) {
       return new NextResponse(
         JSON.stringify({ error: 'Unauthorized to view dashboard data' }),
         { status: 401 }
@@ -20,7 +20,7 @@ export async function GET() {
     }
     
     // Define a helper function to format state names
-    const formatStateName = (stateName) => {
+    const formatStateName = (stateName: string): string => {
       if (!stateName) return stateName;
       
       const upperStateName = stateName.toUpperCase();
@@ -105,7 +105,7 @@ export async function GET() {
     console.log(`Database has ${allStateNames.length} states:`, allStateNames.map(state => state.name).join(', '));
     
     // Group the data by state and count by gender
-    const stateGenderMap = new Map<string, { MALE: number, FEMALE: number }>();
+    const stateGenderMap = new Map<string, { MALE: number, FEMALE: number, stateId: number | null }>();
 
     // Process each participation record
     for (const participation of participationData) {
@@ -118,15 +118,19 @@ export async function GET() {
       
       // Get the state based on contingent type
       let stateName = "Unknown";
+      let stateId = null;
       const contingent = contestant.contingent;
       const contingentType = contingent.contingentType;
       
       if (contingentType === 'SCHOOL' && contingent.school?.state?.name) {
         stateName = contingent.school.state.name;
+        stateId = contingent.school.state.id;
       } else if (contingentType === 'HIGHER_INSTITUTION' && contingent.higherInstitution?.state?.name) {
         stateName = contingent.higherInstitution.state.name;
+        stateId = contingent.higherInstitution.state.id;
       } else if (contingentType === 'INDEPENDENT' && contingent.independent?.state?.name) {
         stateName = contingent.independent.state.name;
+        stateId = contingent.independent.state.id;
       }
       
       // Skip Unknown states (optional - for debugging we include them)
@@ -148,7 +152,7 @@ export async function GET() {
       const formattedStateName = formatStateName(stateName);
       
       // Get current counts or initialize
-      const currentCounts = stateGenderMap.get(formattedStateName) || { MALE: 0, FEMALE: 0 };
+      const currentCounts = stateGenderMap.get(formattedStateName) || { MALE: 0, FEMALE: 0, stateId: stateId };
       
       // Increment the count for this gender
       // Each participation record counts as 1 participation
@@ -167,6 +171,7 @@ export async function GET() {
     const participationStateData = Array.from(stateGenderMap.entries())
       .map(([state, counts]) => ({
         state,
+        stateId: counts.stateId,
         MALE: counts.MALE,
         FEMALE: counts.FEMALE
       }))

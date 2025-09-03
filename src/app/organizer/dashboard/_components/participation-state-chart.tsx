@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 
 // Chart colors for gender representation
 const GENDER_COLORS = {
@@ -49,6 +50,7 @@ const formatNumber = (value: number): string => {
 
 type ParticipationStateData = {
   state: string;
+  stateId?: string | number;
   MALE: number;
   FEMALE: number;
   TOTAL?: number;
@@ -184,7 +186,17 @@ export default function ParticipationStateChart({ data: rawData }: { data: Parti
                       <div className="mr-2 p-1 rounded-full bg-muted">
                         <MapPin className="h-3 w-3" />
                       </div>
-                      <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
+                      {item.stateId ? (
+                        <Link 
+                          href={`/organizer/dashboard/${item.stateId}`} 
+                          className="text-xs font-medium truncate hover:text-primary hover:underline"
+                          title={`View dashboard for ${item.state}`}
+                        >
+                          {shortState}
+                        </Link>
+                      ) : (
+                        <span className="text-xs font-medium truncate" title={item.state}>{shortState}</span>
+                      )}
                     </div>
                     <div className="w-1/2 flex justify-end items-center space-x-2">
                       <span className="text-xs text-muted-foreground">

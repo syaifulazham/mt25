@@ -6,6 +6,7 @@ import {
   calculateAge,
   validateContestantRecord
 } from './contestant-validation';
+import { formatNumber } from './format';
 
 export {
   generateUniqueHash,
@@ -13,5 +14,6 @@ export {
   validateClassGrade,
   determineGender,
   calculateAge,
-  validateContestantRecord
+  validateContestantRecord,
+  formatNumber
 };

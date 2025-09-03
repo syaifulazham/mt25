@@ -5,6 +5,7 @@ import { Mars, Venus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Sector } from 'recharts';
 import { useState } from "react";
+import { formatNumber } from "@/lib/utils/format";
 
 // Gender colors matching the bar chart
 const GENDER_COLORS = {
@@ -12,13 +13,7 @@ const GENDER_COLORS = {
   FEMALE: '#ec4899', // Pink for female (bg-pink-500)
 };
 
-// Format numbers with commas
-const formatNumber = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    maximumFractionDigits: 0,
-    useGrouping: true
-  }).format(value);
-};
+// Using centralized formatNumber utility
 
 type GenderDistributionData = {
   MALE: number;
