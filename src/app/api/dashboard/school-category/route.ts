@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       // For state-specific queries, we'll count contest participations by school category
       
       // With state filter - get school categories with contest participation counts
-      schoolCategoryData = await prisma.$queryRaw`
+      schoolCategoryData = await prisma.$queryRaw<{ category: string; count: bigint }[]>`
         SELECT
           s.category AS category,
           COUNT(cp.id) AS count
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       `;
     } else {
       // Without state filter
-      schoolCategoryData = await prisma.$queryRaw`
+      schoolCategoryData = await prisma.$queryRaw<{ category: string; count: bigint }[]>`
         SELECT
           s.category AS category,
           COUNT(cp.id) AS count

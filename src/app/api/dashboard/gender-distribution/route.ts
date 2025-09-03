@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       console.log(`Getting gender distribution for state ID: ${stateIdInt}`);
       
       // Direct query combining all contingent types in one go
-      genderDistribution = await prisma.$queryRaw`
+      genderDistribution = await prisma.$queryRaw<{ gender: string; count: bigint }[]>`
         SELECT 
           c.gender, 
           COUNT(cp.id) as count
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       `;
     } else {
       // Without state filter - simpler query
-      genderDistribution = await prisma.$queryRaw`
+      genderDistribution = await prisma.$queryRaw<{ gender: string; count: bigint }[]>`
         SELECT 
           c.gender, 
           COUNT(cp.id) as count

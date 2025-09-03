@@ -40,9 +40,9 @@ export async function GET(request: Request) {
         JOIN 
           contestant as c ON cp.contestantId = c.id
         JOIN 
-          Contingent as contingent ON c.contingentId = contingent.id
+          contingent as contingent ON c.contingentId = contingent.id
         JOIN 
-          School as school ON contingent.schoolId = school.id
+          school as school ON contingent.schoolId = school.id
         WHERE 
           contingent.contingentType = 'SCHOOL'
           AND school.stateId = ${stateIdInt}
@@ -63,9 +63,9 @@ export async function GET(request: Request) {
         JOIN 
           contestant as c ON cp.contestantId = c.id
         JOIN 
-          Contingent as contingent ON c.contingentId = contingent.id
+          contingent as contingent ON c.contingentId = contingent.id
         JOIN 
-          School as school ON contingent.schoolId = school.id
+          school as school ON contingent.schoolId = school.id
         WHERE 
           contingent.contingentType = 'SCHOOL'
           AND school.ppd IS NOT NULL
