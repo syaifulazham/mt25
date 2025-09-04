@@ -41,6 +41,7 @@ import { ForcePrimaryManagerChanger } from "../_components/force-primary-manager
 import { EmergencyPrimaryManagerForm } from "../_components/emergency-primary-manager-form";
 import BulkAssignContestsButton from "../../participants/_components/bulk-assign-contests-button";
 import { IndependentStateChanger } from "../_components/independent-state-changer";
+import { SchoolChanger } from "../_components/school-changer";
 import { prismaExecute } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
@@ -491,6 +492,28 @@ export default async function ContingentDetailPage({ params }: PageProps) {
                 independent={contingentWithDetails.independent}
                 allStates={allStates}
               />
+            )}
+            
+            {/* School Change Card for school contingents (Admin only) */}
+            {isAdmin && contingentWithDetails.schoolId && contingentWithDetails.school && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <School className="h-4 w-4 text-amber-500" />
+                    Change School
+                  </CardTitle>
+                  <CardDescription>
+                    Change the school this contingent is associated with
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SchoolChanger
+                    contingentId={contingentWithDetails.id}
+                    schoolId={contingentWithDetails.schoolId}
+                    schoolName={contingentWithDetails.school.name}
+                  />
+                </CardContent>
+              </Card>
             )}
 
             {/* Contingent info card */}
