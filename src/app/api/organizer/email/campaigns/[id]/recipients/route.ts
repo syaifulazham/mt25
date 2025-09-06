@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateOrganizerApi } from '@/lib/auth';
 
+// Mark route as dynamic since it uses request headers
+export const dynamic = 'force-dynamic';
+
 // GET handler for listing recipients in a campaign
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   // @ts-ignore - Property 'error' access issue with authenticateOrganizerApi return type

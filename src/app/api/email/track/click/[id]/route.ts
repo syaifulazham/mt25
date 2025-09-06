@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Mark route as dynamic since it uses request headers
+export const dynamic = 'force-dynamic';
+
 // GET handler for tracking email link clicks
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
