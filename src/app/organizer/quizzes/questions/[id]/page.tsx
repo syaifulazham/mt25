@@ -49,6 +49,7 @@ import {
 interface Answer {
   option: string;
   answer: string;
+  alt_answer?: string;
 }
 
 interface Question {
@@ -57,6 +58,9 @@ interface Question {
   knowledge_field: string;
   question: string;
   question_image?: string;
+  main_lang?: string;
+  alt_lang?: string;
+  alt_question?: string;
   answer_type: "single_selection" | "multiple_selection" | "binary";
   answer_options: Answer[];
   answer_correct: string;
@@ -215,6 +219,22 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
     const knowledgeField = knowledgeFields.find(kf => kf.value === field);
     return knowledgeField ? knowledgeField.label : field;
   };
+  
+  // Language display options
+  const languageOptions = [
+    { value: "none", label: "None" },
+    { value: "en", label: "English" },
+    { value: "my", label: "Malay" },
+    { value: "zh", label: "Chinese" },
+    { value: "ta", label: "Tamil" },
+  ];
+  
+  // Function to get language display
+  const getLanguageDisplay = (code: string | undefined) => {
+    if (!code || code === 'none') return 'None';
+    const language = languageOptions.find(l => l.value === code);
+    return language ? language.label : code;
+  };
 
   // Function to render answers based on type
   const renderAnswers = (question: Question) => {
@@ -249,12 +269,33 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
                 }
               `}
             >
-              <div className="flex items-center">
-                {question.answer_type === "single_selection" 
-                  ? (opt.option === question.answer_correct && <CheckCircle className="h-5 w-5 text-green-500 mr-2" />)
-                  : (question.answer_correct.includes(opt.option) && <CheckCircle className="h-5 w-5 text-green-500 mr-2" />)
-                }
-                <MathRenderer content={opt.answer} />
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  {question.answer_type === "single_selection" 
+                    ? (opt.option === question.answer_correct && <CheckCircle className="h-5 w-5 text-green-500 mr-2" />)
+                    : (question.answer_correct.includes(opt.option) && <CheckCircle className="h-5 w-5 text-green-500 mr-2" />)
+                  }
+                  <div>
+                    <MathRenderer content={opt.answer} />
+                    {question.main_lang && question.main_lang !== 'none' && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {getLanguageDisplay(question.main_lang)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Alternate answer in second language */}
+                {question.alt_lang && question.alt_lang !== 'none' && opt.alt_answer && (
+                  <div className="pl-7 pt-1 pb-1 border-l-4 border-yellow-400 bg-yellow-50 mt-2 rounded">
+                    <div>
+                      <MathRenderer content={opt.alt_answer} />
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {getLanguageDisplay(question.alt_lang)}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -383,10 +424,30 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div>
-                    <h3 className="text-xl font-medium">
-                      <MathRenderer content={question.question} />
-                    </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-xl font-medium">
+                        <MathRenderer content={question.question} />
+                      </h3>
+                      
+                      {question.main_lang && question.main_lang !== 'none' && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Language: {getLanguageDisplay(question.main_lang)}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {question.alt_lang && question.alt_lang !== 'none' && question.alt_question && (
+                      <div className="border-l-4 border-yellow-400 pl-3 py-2 bg-yellow-50 rounded">
+                        <h3 className="text-lg font-medium">
+                          <MathRenderer content={question.alt_question} />
+                        </h3>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Language: {getLanguageDisplay(question.alt_lang)}
+                        </div>
+                      </div>
+                    )}
+                    
                     {question.question_image && (
                       <div className="mt-4 border rounded-md p-2">
                         <div className="relative aspect-video w-full max-w-lg overflow-hidden rounded-md">
@@ -495,6 +556,34 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
                       <p className="font-medium">{getAnswerTypeDisplay(question.answer_type)}</p>
                     </div>
                   </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 8l6 6" />
+                      <path d="M4 14l6-6 2 2 6-6" />
+                      <path d="M2 5h12" />
+                      <path d="M7 2h12v12" />
+                    </svg>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Main Language</p>
+                      <p className="font-medium">{getLanguageDisplay(question.main_lang)}</p>
+                    </div>
+                  </div>
+                  
+                  {question.alt_lang && question.alt_lang !== 'none' && (
+                    <div className="flex items-center gap-2">
+                      <svg className="h-4 w-4 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 5h12" />
+                        <path d="M7 2h12v12" />
+                        <path d="M22 19h-12" />
+                        <path d="M17 22h-12v-12" />
+                      </svg>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Alternate Language</p>
+                        <p className="font-medium">{getLanguageDisplay(question.alt_lang)}</p>
+                      </div>
+                    </div>
+                  )}
                   
                   <Separator />
                   

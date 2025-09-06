@@ -94,19 +94,26 @@ export async function GET(request: NextRequest) {
     const hasPrevPage = page > 1;
     
     // Transform the data to match the frontend expectations
-    const formattedQuestions = questions.map(question => ({
-      id: question.id,
-      question: question.question,
-      question_image: question.question_image,
-      target_group: question.target_group,
-      knowledge_field: question.knowledge_field,
-      answer_type: question.answer_type,
-      answer_options: question.answer_options,
-      answer_correct: question.answer_correct,
-      createdAt: question.createdAt.toISOString(),
-      createdBy: question.createdBy || 'Unknown',
-      creatorName: question.createdBy || 'Unknown' // Use createdBy string directly now
-    }));
+    const formattedQuestions = questions.map(question => {
+      // Get new fields with type assertion since they're recently added
+      const q = question as any;
+      return {
+        id: question.id,
+        question: question.question,
+        question_image: question.question_image,
+        target_group: question.target_group,
+        knowledge_field: question.knowledge_field,
+        main_lang: q.main_lang || 'en',
+        alt_lang: q.alt_lang || '',
+        alt_question: q.alt_question || '',
+        answer_type: question.answer_type,
+        answer_options: question.answer_options,
+        answer_correct: question.answer_correct,
+        createdAt: question.createdAt.toISOString(),
+        createdBy: question.createdBy || 'Unknown',
+        creatorName: question.createdBy || 'Unknown' // Use createdBy string directly now
+      };
+    });
 
     // Prepare response with pagination metadata
     const response = {
@@ -227,18 +234,41 @@ export async function POST(request: NextRequest) {
     const creatorInfo = user?.name || user?.email || 'Admin user';
     
     // Create the question with creator info as string
+    // Create a base object with standard fields
+    const baseData = {
+      question: data.question,
+      question_image: data.question_image,
+      target_group: data.target_group,
+      knowledge_field: data.knowledge_field,
+      answer_type: data.answer_type,
+      answer_options: data.answer_options, // This now includes alt_answer field when present
+      answer_correct: data.answer_correct,
+      createdBy: creatorInfo  // Use name/email as string instead of ID
+    };
+    
+    // Use Prisma's executeRaw to create the question with additional fields
+    // This bypasses Prisma's type checking and allows us to use the new columns directly
+    const mainLang = data.main_lang && data.main_lang !== 'none' ? data.main_lang : 'en';
+    const altLang = data.alt_lang && data.alt_lang !== 'none' ? data.alt_lang : null;
+    const altQuestion = data.alt_question ? data.alt_question : null;
+    
+    console.log('Creating question with language fields:', { mainLang, altLang, altQuestion });
+    
+    // Create the question with standard fields first
     const question = await prisma.question_bank.create({
-      data: {
-        question: data.question,
-        question_image: data.question_image,
-        target_group: data.target_group,
-        knowledge_field: data.knowledge_field,
-        answer_type: data.answer_type,
-        answer_options: data.answer_options,
-        answer_correct: data.answer_correct,
-        createdBy: creatorInfo  // Use name/email as string instead of ID
-      }
+      data: baseData
     });
+    
+    // Then update it with the new fields if they are provided
+    if (question.id) {
+      await prisma.$executeRaw`
+        UPDATE question_bank 
+        SET main_lang = ${mainLang}, 
+            alt_lang = ${altLang}, 
+            alt_question = ${altQuestion}
+        WHERE id = ${question.id}
+      `;
+    }
     
     console.log(`[API] Created question with ID ${question.id}, creator: ${creatorInfo}`);
     

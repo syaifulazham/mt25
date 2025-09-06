@@ -26,13 +26,22 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, Loader2, Plus, Trash, Upload, X, Calculator } from "lucide-react";
+import { Check, Loader2, Plus, Trash, Upload, X, Calculator, Languages } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // Target groups will be fetched from API
+
+// Language options
+const LANGUAGE_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "en", label: "English" },
+  { value: "my", label: "Malay" },
+  { value: "zh", label: "Chinese" },
+  { value: "ta", label: "Tamil" },
+];
 
 // Match knowledge fields with those in the new question page
 const KNOWLEDGE_FIELDS = [
@@ -54,8 +63,11 @@ interface QuestionEditFormProps {
     knowledge_field: string;
     question: string;
     question_image?: string;
+    main_lang?: string;
+    alt_lang?: string;
+    alt_question?: string;
     answer_type: string;
-    answer_options: Array<{ option: string; answer: string }>;
+    answer_options: Array<{ option: string; answer: string; alt_answer?: string }>;
     answer_correct: string;
   };
 }
@@ -63,13 +75,17 @@ interface QuestionEditFormProps {
 const formSchema = z.object({
   question: z.string().min(3, "Question must be at least 3 characters"),
   question_image: z.string().optional(),
+  main_lang: z.string().default("en"),
+  alt_lang: z.string().optional(),
+  alt_question: z.string().optional(),
   target_group: z.string().min(1, "Must select a target group"),
   knowledge_field: z.string().min(1, "Must select a knowledge field"),
   answer_type: z.string().min(1, "Must select an answer type"),
   answer_options: z.array(
     z.object({
       option: z.string(),
-      answer: z.string().min(1, "Answer text is required")
+      answer: z.string().min(1, "Answer text is required"),
+      alt_answer: z.string().optional()
     })
   ).min(1, "At least one answer option is required"),
   answer_correct: z.string().min(1, "Must select a correct answer")
@@ -80,6 +96,8 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetGroups, setTargetGroups] = useState<Array<{value: string, label: string}>>([]);
   const [loadingTargetGroups, setLoadingTargetGroups] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslatingOptions, setIsTranslatingOptions] = useState(false);
   
   // Image handling state
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -115,10 +133,16 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
     defaultValues: {
       question: question.question,
       question_image: question.question_image || "",
+      main_lang: question.main_lang || "en",
+      alt_lang: question.alt_lang || "none",
+      alt_question: question.alt_question || "",
       target_group: question.target_group,
       knowledge_field: question.knowledge_field,
       answer_type: question.answer_type,
-      answer_options: question.answer_options,
+      answer_options: question.answer_options.map(option => ({
+        ...option,
+        alt_answer: option.alt_answer || ""
+      })),
       answer_correct: question.answer_correct
     },
   });
@@ -205,6 +229,93 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
     }
   };
   
+  // Translation functions using OpenAI API
+  const translateText = async (text: string, targetLang: string) => {
+    if (!text.trim() || !targetLang || targetLang === "none") return "";
+    
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          targetLang,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Translation failed');
+      }
+      
+      const data = await response.json();
+      return data.translatedText;
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast.error('Failed to translate text');
+      return "";
+    }
+  };
+  
+  const handleTranslateQuestion = async () => {
+    const questionText = form.getValues("question");
+    const altLang = form.getValues("alt_lang") || "none";
+    
+    if (!questionText.trim() || !altLang || altLang === "none") {
+      toast.error('Please enter a question and select an alternate language');
+      return;
+    }
+    
+    setIsTranslating(true);
+    try {
+      const translatedText = await translateText(questionText, altLang);
+      if (translatedText) {
+        form.setValue("alt_question", translatedText);
+        toast.success('Question translated successfully');
+      }
+    } catch (error) {
+      console.error('Translation error:', error);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+  
+  const handleTranslateOptions = async () => {
+    const altLang = form.getValues("alt_lang") || "none";
+    
+    if (!altLang || altLang === "none") {
+      toast.error('Please select an alternate language');
+      return;
+    }
+    
+    // Check if there are options to translate
+    const hasEmptyAnswers = form.getValues("answer_options").some(opt => !opt.answer.trim());
+    if (hasEmptyAnswers) {
+      toast.error('Please fill in all answer options before translating');
+      return;
+    }
+    
+    setIsTranslatingOptions(true);
+    try {
+      // Translate each option
+      const currentOptions = form.getValues("answer_options");
+      const newOptions = [...currentOptions];
+      
+      for (let i = 0; i < newOptions.length; i++) {
+        const translatedAnswer = await translateText(newOptions[i].answer, altLang);
+        newOptions[i] = { ...newOptions[i], alt_answer: translatedAnswer };
+      }
+      
+      form.setValue("answer_options", newOptions);
+      toast.success('Answer options translated successfully');
+    } catch (error) {
+      console.error('Translation error:', error);
+    } finally {
+      setIsTranslatingOptions(false);
+    }
+  };
+  
   // Handle correct answer selection for multiple choice
   const handleMultipleCorrect = (option: string, checked: boolean) => {
     const currentCorrect = form.getValues("answer_correct").split(",").filter(Boolean);
@@ -246,6 +357,16 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
       }
       
       let response;
+      // Process language fields before submitting
+      const mainLang = values.main_lang || 'en';
+      const altLang = values.alt_lang === 'none' ? null : values.alt_lang;
+      const altQuestion = (!altLang || values.alt_lang === 'none') ? null : values.alt_question;
+      
+      // Process answer options to ensure alt_answer is properly handled
+      const processedAnswerOptions = values.answer_options.map(option => ({
+        ...option,
+        alt_answer: (!altLang || values.alt_lang === 'none') ? undefined : (option.alt_answer || '')
+      }));
       
       // Use FormData if we have a new image file
       if (imageFile) {
@@ -254,9 +375,15 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
         // Append all form fields
         Object.entries(values).forEach(([key, value]) => {
           if (key === 'answer_options') {
-            formData.append(key, JSON.stringify(value));
+            formData.append(key, JSON.stringify(processedAnswerOptions));
           } else if (key === 'question_image' && imageFile) {
             // Skip since we'll append the file directly
+          } else if (key === 'main_lang') {
+            formData.append(key, mainLang);
+          } else if (key === 'alt_lang') {
+            formData.append(key, altLang || '');
+          } else if (key === 'alt_question') {
+            formData.append(key, altQuestion || '');
           } else {
             formData.append(key, String(value));
           }
@@ -272,12 +399,22 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
         });
       } else {
         // Regular JSON request if no new image
+        const dataToSubmit = {
+          ...values,
+          main_lang: mainLang,
+          alt_lang: altLang,
+          alt_question: altQuestion,
+          answer_options: processedAnswerOptions
+        };
+        
+        console.log('Submitting question data:', dataToSubmit);
+        
         response = await fetch(`/api/organizer/questions/${question.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(values),
+          body: JSON.stringify(dataToSubmit),
         });
       }
 
@@ -298,6 +435,76 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        {/* Language Settings */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FormField
+            control={form.control}
+            name="main_lang"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-1">
+                  <Languages className="h-4 w-4" />
+                  Main Language
+                </FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  value={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {LANGUAGE_OPTIONS.filter(lang => lang.value !== "none").map((lang) => (
+                      <SelectItem key={lang.value} value={lang.value}>
+                        {lang.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Primary language of the question
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="alt_lang"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Alternate Language</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                  value={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {LANGUAGE_OPTIONS.map((lang) => (
+                      <SelectItem key={lang.value} value={lang.value}>
+                        {lang.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Optional secondary language for translation
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
         {/* Question Text */}
         <FormField
           control={form.control}
@@ -306,11 +513,37 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
             <FormItem>
               <FormLabel>Question Text</FormLabel>
               <FormControl>
-                <Textarea
-                  placeholder="Enter the question text"
-                  className="min-h-[120px]"
-                  {...field}
-                />
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Enter the question text"
+                    className="min-h-[120px]"
+                    {...field}
+                  />
+                  
+                  {form.watch("alt_lang") && form.watch("alt_lang") !== "none" && (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleTranslateQuestion}
+                        disabled={isTranslating || !form.watch("question").trim()}
+                      >
+                        {isTranslating ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Translating...
+                          </>
+                        ) : (
+                          <>
+                            <Languages className="mr-2 h-4 w-4" />
+                            Translate to {LANGUAGE_OPTIONS.find(l => l.value === form.watch("alt_lang"))?.label}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </FormControl>
               <FormDescription className="flex items-center gap-1 mt-1">
                 <Calculator className="h-4 w-4" />
@@ -320,6 +553,27 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
             </FormItem>
           )}
         />
+        
+        {/* Alternate Language Question */}
+        {form.watch("alt_lang") && form.watch("alt_lang") !== "none" && (
+          <FormField
+            control={form.control}
+            name="alt_question"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Question in {LANGUAGE_OPTIONS.find(l => l.value === form.watch("alt_lang"))?.label}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder={`Enter the question in ${LANGUAGE_OPTIONS.find(l => l.value === form.watch("alt_lang"))?.label}`}
+                    className="min-h-[120px] bg-yellow-50"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Question Image */}
         <FormField
@@ -516,46 +770,94 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Answer Options</h3>
             
-            {form.watch("answer_type") !== "binary" && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddOption}
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Option
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {form.watch("alt_lang") && form.watch("alt_lang") !== "none" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTranslateOptions}
+                  disabled={isTranslatingOptions || form.watch("answer_options").some(opt => !opt.answer.trim())}
+                >
+                  {isTranslatingOptions ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Translating...
+                    </>
+                  ) : (
+                    <>
+                      <Languages className="h-4 w-4 mr-2" />
+                      Translate Options
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              {form.watch("answer_type") !== "binary" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddOption}
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Add Option
+                </Button>
+              )}
+            </div>
           </div>
           
           <div className="space-y-3">
             {form.watch("answer_options").map((option, index) => (
               <div key={index} className="flex items-start gap-3">
                 <div className="w-[calc(100%-40px)]">
-                  <FormField
-                    control={form.control}
-                    name={`answer_options.${index}.answer`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                              {String.fromCharCode(65 + index)}
+                  <div className="space-y-2 w-full">
+                    <FormField
+                      control={form.control}
+                      name={`answer_options.${index}.answer`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+                                {String.fromCharCode(65 + index)}
+                              </div>
+                              <Input
+                                placeholder={`Answer option ${String.fromCharCode(65 + index)}`}
+                                {...field}
+                                disabled={form.watch("answer_type") === "binary"}
+                              />
                             </div>
-                            <Input
-                              placeholder={`Answer option ${String.fromCharCode(65 + index)}`}
-                              {...field}
-                              disabled={form.watch("answer_type") === "binary"}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormDescription className="ml-10 text-xs mt-1">
-                          You can use LaTeX for math formulas: e.g. $x^2$ or {`$$\sum_{n=1}^{10} n$$`}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                          </FormControl>
+                          <FormDescription className="ml-10 text-xs mt-1">
+                            You can use LaTeX for math formulas: e.g. $x^2$ or {`$$\sum_{n=1}^{10} n$$`}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    {form.watch("alt_lang") && form.watch("alt_lang") !== "none" && (
+                      <FormField
+                        control={form.control}
+                        name={`answer_options.${index}.alt_answer`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <div className="flex items-center gap-2 ml-10">
+                                <Input
+                                  placeholder={`${String.fromCharCode(65 + index)} in ${LANGUAGE_OPTIONS.find(l => l.value === form.watch("alt_lang"))?.label}`}
+                                  {...field}
+                                  className="bg-yellow-50"
+                                  disabled={form.watch("answer_type") === "binary"}
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
-                  />
+                  </div>
                 </div>
                 
                 {form.watch("answer_type") !== "binary" && (

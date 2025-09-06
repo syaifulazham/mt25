@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,15 @@ const answerTypes = [
   { value: "binary", label: "Binary (Yes/No)" },
 ];
 
+// Language options
+const languageOptions = [
+  { value: "none", label: "None" },
+  { value: "en", label: "English" },
+  { value: "my", label: "Malay" },
+  { value: "zh", label: "Chinese" },
+  { value: "ta", label: "Tamil" },
+];
+
 export default function CreateQuestionPage() {
   // State for target groups (fetched from API)
   const [targetGroups, setTargetGroups] = useState(defaultTargetGroups);
@@ -77,12 +87,15 @@ export default function CreateQuestionPage() {
     knowledge_field: "",
     question: "",
     question_image: "",
+    main_lang: "en", // Default to English
+    alt_lang: "", // Optional alternate language
+    alt_question: "", // Question in alternate language
     answer_type: "single_selection",
     answer_options: [
-      { option: "A", answer: "" },
-      { option: "B", answer: "" },
-      { option: "C", answer: "" },
-      { option: "D", answer: "" },
+      { option: "A", answer: "", alt_answer: "" },
+      { option: "B", answer: "", alt_answer: "" },
+      { option: "C", answer: "", alt_answer: "" },
+      { option: "D", answer: "", alt_answer: "" },
     ],
     answer_correct: "",
   });
@@ -90,6 +103,8 @@ export default function CreateQuestionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslatingOptions, setIsTranslatingOptions] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormState((prev) => ({
@@ -103,15 +118,15 @@ export default function CreateQuestionPage() {
     
     if (value === "binary") {
       defaultOptions = [
-        { option: "A", answer: "Yes" },
-        { option: "B", answer: "No" },
+        { option: "A", answer: "Yes", alt_answer: "" },
+        { option: "B", answer: "No", alt_answer: "" },
       ];
     } else {
       defaultOptions = [
-        { option: "A", answer: "" },
-        { option: "B", answer: "" },
-        { option: "C", answer: "" },
-        { option: "D", answer: "" },
+        { option: "A", answer: "", alt_answer: "" },
+        { option: "B", answer: "", alt_answer: "" },
+        { option: "C", answer: "", alt_answer: "" },
+        { option: "D", answer: "", alt_answer: "" },
       ];
     }
     
@@ -123,9 +138,9 @@ export default function CreateQuestionPage() {
     }));
   };
 
-  const handleOptionChange = (index: number, value: string) => {
+  const handleOptionChange = (index: number, value: string, field: 'answer' | 'alt_answer' = 'answer') => {
     const newOptions = [...formState.answer_options];
-    newOptions[index] = { ...newOptions[index], answer: value };
+    newOptions[index] = { ...newOptions[index], [field]: value };
     
     setFormState((prev) => ({
       ...prev,
@@ -160,7 +175,7 @@ export default function CreateQuestionPage() {
         ...prev,
         answer_options: [
           ...prev.answer_options,
-          { option: nextOptionLetter, answer: "" }
+          { option: nextOptionLetter, answer: "", alt_answer: "" }
         ]
       }));
     }
@@ -173,7 +188,8 @@ export default function CreateQuestionPage() {
       // Remap option letters after removal
       const remappedOptions = newOptions.map((option, i) => ({
         option: String.fromCharCode(65 + i),
-        answer: option.answer
+        answer: option.answer,
+        alt_answer: option.alt_answer || ""
       }));
 
       // Update correct answers if they reference removed options
@@ -246,6 +262,93 @@ export default function CreateQuestionPage() {
     setImagePreview(null);
     setFormState(prev => ({ ...prev, question_image: "" }));
   };
+  
+  // Translation functions using OpenAI API
+  const translateText = async (text: string, targetLang: string) => {
+    if (!text.trim() || !targetLang) return "";
+    
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text,
+          targetLang,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Translation failed');
+      }
+      
+      const data = await response.json();
+      return data.translatedText;
+    } catch (error) {
+      console.error('Translation error:', error);
+      toast.error('Failed to translate text');
+      return "";
+    }
+  };
+  
+  const handleTranslateQuestion = async () => {
+    if (!formState.question.trim() || !formState.alt_lang || formState.alt_lang === "none") {
+      toast.error('Please enter a question and select an alternate language');
+      return;
+    }
+    
+    setIsTranslating(true);
+    try {
+      const translatedText = await translateText(formState.question, formState.alt_lang);
+      if (translatedText) {
+        setFormState(prev => ({
+          ...prev,
+          alt_question: translatedText
+        }));
+        toast.success('Question translated successfully');
+      }
+    } catch (error) {
+      console.error('Translation error:', error);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+  
+  const handleTranslateOptions = async () => {
+    if (!formState.alt_lang || formState.alt_lang === "none") {
+      toast.error('Please select an alternate language');
+      return;
+    }
+    
+    // Check if there are options to translate
+    const hasEmptyAnswers = formState.answer_options.some(opt => !opt.answer.trim());
+    if (hasEmptyAnswers) {
+      toast.error('Please fill in all answer options before translating');
+      return;
+    }
+    
+    setIsTranslatingOptions(true);
+    try {
+      // Translate each option
+      const newOptions = [...formState.answer_options];
+      for (let i = 0; i < newOptions.length; i++) {
+        const translatedAnswer = await translateText(newOptions[i].answer, formState.alt_lang);
+        newOptions[i] = { ...newOptions[i], alt_answer: translatedAnswer };
+      }
+      
+      setFormState(prev => ({
+        ...prev,
+        answer_options: newOptions
+      }));
+      
+      toast.success('Answer options translated successfully');
+    } catch (error) {
+      console.error('Translation error:', error);
+    } finally {
+      setIsTranslatingOptions(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,6 +379,13 @@ export default function CreateQuestionPage() {
       return;
     }
     
+    // Check if alternate language is selected but no alternate question is provided
+    if (formState.alt_lang && formState.alt_lang !== "none" && !formState.alt_question.trim()) {
+      toast.error(`Please provide the question in ${languageOptions.find(l => l.value === formState.alt_lang)?.label || formState.alt_lang}`);
+      setIsSubmitting(false);
+      return;
+    }
+    
     // Check if all options have content
     const emptyOption = formState.answer_options.find(option => !option.answer.trim());
     if (emptyOption) {
@@ -293,12 +403,23 @@ export default function CreateQuestionPage() {
         // Use FormData for file uploads
         const formData = new FormData();
         
+        // Process language fields before adding to formData
+        const mainLang = formState.main_lang === 'none' ? 'en' : formState.main_lang;
+        const altLang = formState.alt_lang === 'none' ? '' : formState.alt_lang;
+        const altQuestion = formState.alt_lang === 'none' ? '' : formState.alt_question;
+        
         // Append all text fields
         Object.entries(formState).forEach(([key, value]) => {
           if (key === 'answer_options') {
             formData.append(key, JSON.stringify(value));
           } else if (key === 'question_image') {
             // Skip the base64 version since we'll upload the file directly
+          } else if (key === 'main_lang') {
+            formData.append(key, mainLang);
+          } else if (key === 'alt_lang') {
+            formData.append(key, altLang);
+          } else if (key === 'alt_question') {
+            formData.append(key, altQuestion);
           } else {
             formData.append(key, String(value));
           }
@@ -314,12 +435,23 @@ export default function CreateQuestionPage() {
         });
       } else {
         // Regular JSON submission without files
+        // Clean up language fields for submission
+        const dataToSubmit = {
+          ...formState,
+          // Handle language fields - ensure proper values are sent
+          main_lang: formState.main_lang === 'none' ? 'en' : formState.main_lang,
+          alt_lang: formState.alt_lang === 'none' ? null : formState.alt_lang,
+          alt_question: formState.alt_lang === 'none' ? null : formState.alt_question
+        };
+        
+        console.log('Submitting question data:', dataToSubmit);
+        
         response = await fetch('/api/organizer/questions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formState)
+          body: JSON.stringify(dataToSubmit)
         });
       }
       
@@ -408,16 +540,92 @@ export default function CreateQuestionPage() {
                 </Select>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:col-span-2">
+                <div className="space-y-2">
+                  <Label htmlFor="main_lang">Main Language</Label>
+                  <Select
+                    value={formState.main_lang}
+                    onValueChange={(value) => handleInputChange("main_lang", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languageOptions.filter(lang => lang.value).map((lang) => (
+                        <SelectItem key={lang.value} value={lang.value}>
+                          {lang.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="alt_lang">Alternate Language</Label>
+                  <Select
+                    value={formState.alt_lang}
+                    onValueChange={(value) => handleInputChange("alt_lang", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languageOptions.map((lang) => (
+                        <SelectItem key={lang.value} value={lang.value}>
+                          {lang.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="question">Question</Label>
-                <Textarea
-                  id="question"
-                  placeholder="Enter your question here"
-                  value={formState.question}
-                  onChange={(e) => handleInputChange("question", e.target.value)}
-                  className="min-h-[100px]"
-                />
+                <div className="flex flex-col space-y-2">
+                  <Textarea
+                    id="question"
+                    placeholder="Enter your question here"
+                    value={formState.question}
+                    onChange={(e) => handleInputChange("question", e.target.value)}
+                    className="min-h-[100px]"
+                  />
+                  {formState.alt_lang && formState.alt_lang !== "none" && (
+                    <div className="flex justify-end">
+                      <Button 
+                        type="button" 
+                        variant="secondary" 
+                        size="sm"
+                        onClick={handleTranslateQuestion}
+                        disabled={isTranslating || !formState.question.trim()}
+                        className="mt-2"
+                      >
+                        {isTranslating ? (
+                          <>
+                            <Spinner size="sm" className="mr-2" />
+                            Translating...
+                          </>
+                        ) : (
+                          <>Translate to {languageOptions.find(l => l.value === formState.alt_lang)?.label || formState.alt_lang}</>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
+              
+              {formState.alt_lang && formState.alt_lang !== "none" && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="alt_question">Question in {languageOptions.find(l => l.value === formState.alt_lang)?.label}</Label>
+                  <Textarea
+                    id="alt_question"
+                    placeholder={`Enter the question in ${languageOptions.find(l => l.value === formState.alt_lang)?.label || formState.alt_lang}`}
+                    value={formState.alt_question}
+                    onChange={(e) => handleInputChange("alt_question", e.target.value)}
+                    className="min-h-[100px] bg-yellow-50"
+                  />
+                </div>
+              )}
               
               <div className="space-y-2 md:col-span-2">
                 <Label>Question Image (Optional)</Label>
@@ -488,18 +696,38 @@ export default function CreateQuestionPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">Answer Options</h3>
-                {formState.answer_type !== "binary" && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={addOption}
-                    disabled={formState.answer_options.length >= 8}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Option
-                  </Button>
-                )}
+                <div className="flex gap-2">
+                  {formState.alt_lang && formState.alt_lang !== "none" && (
+                    <Button 
+                      type="button" 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={handleTranslateOptions}
+                      disabled={isTranslatingOptions || formState.answer_options.some(opt => !opt.answer.trim())}
+                    >
+                      {isTranslatingOptions ? (
+                        <>
+                          <Spinner size="sm" className="mr-2" />
+                          Translating...
+                        </>
+                      ) : (
+                        <>Translate Options</>
+                      )}
+                    </Button>
+                  )}
+                  {formState.answer_type !== "binary" && (
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={addOption}
+                      disabled={formState.answer_options.length >= 8}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Option
+                    </Button>
+                  )}
+                </div>
               </div>
               
               <div className="space-y-4">
@@ -508,13 +736,22 @@ export default function CreateQuestionPage() {
                     <div className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-md text-gray-600 font-medium">
                       {option.option}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 space-y-2">
                       <Input
                         value={option.answer}
                         onChange={(e) => handleOptionChange(index, e.target.value)}
                         placeholder={`Option ${option.option}`}
                         disabled={formState.answer_type === "binary"}
                       />
+                      {formState.alt_lang && formState.alt_lang !== "none" && (
+                        <Input
+                          value={option.alt_answer}
+                          onChange={(e) => handleOptionChange(index, e.target.value, 'alt_answer')}
+                          placeholder={`Option ${option.option} in ${languageOptions.find(l => l.value === formState.alt_lang)?.label || formState.alt_lang}`}
+                          disabled={formState.answer_type === "binary"}
+                          className="bg-yellow-50"
+                        />
+                      )}
                     </div>
                     <div className="flex-shrink-0">
                       {formState.answer_type === "multiple_selection" ? (

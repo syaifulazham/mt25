@@ -645,6 +645,9 @@ model question_bank {
   knowledge_field String
   question        String          @db.Text
   question_image  String?         @db.LongText
+  main_lang       String?         @db.VarChar(10)
+  alt_lang        String?         @db.VarChar(10)
+  alt_question    String?         @db.Text
   answer_type     String
   answer_options  Json
   answer_correct  String

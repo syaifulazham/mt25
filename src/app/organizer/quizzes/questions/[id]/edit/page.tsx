@@ -15,8 +15,11 @@ interface Question {
   knowledge_field: string;
   question: string;
   question_image?: string;
+  main_lang?: string;
+  alt_lang?: string;
+  alt_question?: string;
   answer_type: string;
-  answer_options: Array<{ option: string; answer: string }>;
+  answer_options: Array<{ option: string; answer: string; alt_answer?: string }>;
   answer_correct: string;
 }
 

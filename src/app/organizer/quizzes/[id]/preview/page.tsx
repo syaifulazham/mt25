@@ -72,10 +72,14 @@ type Question = {
   id: number;
   question: string;
   question_image?: string;
+  main_lang?: string;
+  alt_lang?: string;
+  alt_question?: string;
   answer_type: "single_selection" | "multiple_selection" | "binary";
   answer_options: Array<{
     option: string;
     answer: string;
+    alt_answer?: string;
   }>;
   answer_correct: string;
   points: number;
@@ -145,6 +149,28 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
           throw new Error('Failed to load quiz questions');
         }
         const questionsData = await questionsResponse.json();
+        
+        // Debug log to check multilingual fields
+        console.log('Quiz questions data received:', questionsData.length, 'questions');
+        if (questionsData.length > 0) {
+          // Log all fields of the first question to check structure
+          console.log('First question full data:', questionsData[0]);
+          
+          // Specifically check multilingual fields
+          console.log('Multilingual fields in first question:', { 
+            main_lang: questionsData[0].main_lang, 
+            alt_lang: questionsData[0].alt_lang,
+            alt_question: questionsData[0].alt_question,
+          });
+          
+          // Check if answer options have alt_answer field
+          if (questionsData[0].answer_options && questionsData[0].answer_options.length > 0) {
+            console.log('First answer option:', questionsData[0].answer_options[0]);
+            console.log('Has alt_answer in any options:', 
+              questionsData[0].answer_options.some(opt => opt.alt_answer !== undefined))
+          }
+        }
+        
         setQuestions(questionsData);
       } catch (error) {
         console.error('Error loading quiz data:', error);
@@ -395,6 +421,19 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                       <MathText text={currentQuestion?.question || ''} />
                     </h3>
                     
+                    {/* Display alternate question without Note label */}
+                    {currentQuestion?.alt_lang && currentQuestion?.alt_lang !== 'none' && (
+                      <div className="mt-3 p-3 bg-yellow-50 border-l-4 border-yellow-300 rounded-r-md">
+                        <div className="text-gray-800">
+                          {currentQuestion.alt_question ? (
+                            <MathText text={currentQuestion.alt_question} />
+                          ) : (
+                            <span className="italic text-gray-500">[Translation would appear here]</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
                     {currentQuestion?.question_image && (
                       <div className="my-4 flex items-center justify-center">
                         <div className="relative w-full max-w-md h-64">
@@ -436,7 +475,20 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                         `}>
                           {option.option}
                         </div>
-                        <div className="flex-1"><MathText text={option.answer} /></div>
+                        <div className="flex-1">
+                          <MathText text={option.answer} />
+                          
+                          {/* Display alternate answer without language label */}
+                          {currentQuestion?.alt_lang && currentQuestion?.alt_lang !== 'none' && (
+                            <div className="mt-2 pl-2 border-l-2 border-yellow-300 text-sm text-gray-600">
+                              {option.alt_answer ? (
+                                <MathText text={option.alt_answer} />
+                              ) : (
+                                <span className="italic text-gray-500">[Translation]</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -561,6 +613,19 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                         
                         <p className="mt-2"><MathText text={question.question} /></p>
                         
+                        {/* Display alternate question without language label */}
+                        {question.alt_lang && question.alt_lang !== 'none' && (
+                          <div className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-300 rounded-r-md">
+                            <div className="text-gray-800">
+                              {question.alt_question ? (
+                                <MathText text={question.alt_question} />
+                              ) : (
+                                <span className="italic text-gray-500">[Translation would appear here]</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
                         {question.question_image && (
                           <div className="mt-4 flex items-center justify-center">
                             <div className="relative w-full max-w-md h-48">
@@ -599,7 +664,20 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
                                 `}>
                                   {option.option}
                                 </div>
-                                <div className="flex-1"><MathText text={option.answer} /></div>
+                                <div className="flex-1">
+                                  <MathText text={option.answer} />
+                                  
+                                  {/* Display alternate answer without language label */}
+                                  {question.alt_lang && question.alt_lang !== 'none' && (
+                                    <div className="mt-1 pl-2 border-l-2 border-yellow-300 text-sm text-gray-600">
+                                      {option.alt_answer ? (
+                                        <MathText text={option.alt_answer} />
+                                      ) : (
+                                        <span className="italic text-gray-500">[Translation]</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             );
                           })}

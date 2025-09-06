@@ -50,9 +50,23 @@ export async function GET(
       return NextResponse.json({ error: "Question not found" }, { status: 404 });
     }
 
-    // Transform the response to include formatted data
+    // Get the language fields using raw SQL to include the new columns even if Prisma's schema doesn't have them yet
+    const languageFields = await prisma.$queryRaw`
+      SELECT main_lang, alt_lang, alt_question 
+      FROM question_bank 
+      WHERE id = ${questionId}
+    ` as any[];
+    
+    const mainLang = languageFields.length > 0 ? languageFields[0].main_lang || 'en' : 'en';
+    const altLang = languageFields.length > 0 ? languageFields[0].alt_lang : null;
+    const altQuestion = languageFields.length > 0 ? languageFields[0].alt_question : null;
+
+    // Transform the response to include formatted data and language fields
     const transformedQuestion = {
       ...question,
+      main_lang: mainLang,
+      alt_lang: altLang,
+      alt_question: altQuestion,
       creatorName: question.createdBy || 'Unknown', // Use createdBy field instead of creator relation
       usedInQuizzes: question.quiz_questions.map((qq) => ({
         quizId: qq.quiz.id,
@@ -185,19 +199,32 @@ export async function PUT(
       }
     }
 
-    // Update the question
+    // Create an update object for standard fields
+    const updateData: any = {
+      question: data.question,
+      question_image: data.question_image,
+      target_group: data.target_group,
+      knowledge_field: data.knowledge_field,
+      answer_type: data.answer_type,
+      answer_options: data.answer_options,
+      answer_correct: data.answer_correct
+    };
+    
+    // Add language fields using raw SQL to avoid schema type errors
+    // Update the question with standard fields
     const question = await prisma.question_bank.update({
       where: { id: questionId },
-      data: {
-        question: data.question,
-        question_image: data.question_image,
-        target_group: data.target_group,
-        knowledge_field: data.knowledge_field,
-        answer_type: data.answer_type,
-        answer_options: data.answer_options,
-        answer_correct: data.answer_correct,
-      },
+      data: updateData,
     });
+    
+    // Then update language fields separately using executeRaw to bypass Prisma type checking
+    await prisma.$executeRaw`
+      UPDATE question_bank
+      SET main_lang = ${data.main_lang || 'en'},
+          alt_lang = ${data.alt_lang || null},
+          alt_question = ${data.alt_question || null}
+      WHERE id = ${questionId}
+    `;
 
     return NextResponse.json(question);
   } catch (error) {
