@@ -65,12 +65,13 @@ export async function GET(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    // Fetch ALL teams without any status filtering (show everything) - same as rawlist
-    const teams = await prisma.$queryRaw`
-      SELECT 
+    // First fetch the unique team records to avoid duplication
+    const uniqueTeams = await prisma.$queryRaw`
+      SELECT DISTINCT
         t.id,
         t.name as teamName,
         ct.name as contestName,
+        ct.id as contestId,
         ect.status,
         ect.createdAt as registrationDate,
         CASE 
@@ -80,28 +81,17 @@ export async function GET(
           ELSE 'Unknown'
         END as contingentName,
         c.contingentType as contingentType,
-        tg.schoolLevel,
-        CASE 
-          WHEN tg.schoolLevel = 'Primary' THEN 'Kids'
-          WHEN tg.schoolLevel = 'Secondary' THEN 'Teens'
-          WHEN tg.schoolLevel = 'Higher Education' THEN 'Youth'
-          ELSE tg.schoolLevel
-        END as targetGroupLabel,
         CASE 
           WHEN c.contingentType = 'SCHOOL' THEN st_s.name
           WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN st_hi.name
           WHEN c.contingentType = 'INDEPENDENT' THEN st_i.name
           ELSE 'Unknown State'
-        END as stateName,
-        tg.minAge,
-        tg.maxAge
+        END as stateName
       FROM eventcontestteam ect
       JOIN eventcontest ec ON ect.eventcontestId = ec.id
       JOIN team t ON ect.teamId = t.id
       JOIN contingent c ON t.contingentId = c.id
       JOIN contest ct ON ec.contestId = ct.id
-      JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
-      JOIN targetgroup tg ON tg.id = ctg.B
       LEFT JOIN school s ON c.schoolId = s.id
       LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
@@ -109,8 +99,53 @@ export async function GET(
       LEFT JOIN state st_hi ON hi.stateId = st_hi.id
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
-      ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
+      ORDER BY ct.name, t.name ASC
     ` as any[];
+    
+    // Now fetch target group info for each unique team/contest combination
+    const teams = await Promise.all(
+      uniqueTeams.map(async (team) => {
+        const targetGroups = await prisma.$queryRaw`
+          SELECT 
+            tg.schoolLevel,
+            CASE 
+              WHEN tg.schoolLevel = 'Primary' THEN 'Kids'
+              WHEN tg.schoolLevel = 'Secondary' THEN 'Teens'
+              WHEN tg.schoolLevel = 'Higher Education' THEN 'Youth'
+              ELSE tg.schoolLevel
+            END as targetGroupLabel,
+            tg.minAge,
+            tg.maxAge
+          FROM _contesttotargetgroup ctg 
+          JOIN targetgroup tg ON tg.id = ctg.B
+          WHERE ctg.A = ${team.contestId}
+          ORDER BY tg.minAge ASC
+        ` as any[];
+        
+        // Get the combined age range across all target groups
+        let minAge = Number.MAX_SAFE_INTEGER;
+        let maxAge = 0;
+        let schoolLevel = '';
+        let targetGroupLabel = '';
+        
+        if (targetGroups.length > 0) {
+          targetGroups.forEach(tg => {
+            if (tg.minAge < minAge) minAge = tg.minAge;
+            if (tg.maxAge > maxAge) maxAge = tg.maxAge;
+            schoolLevel = tg.schoolLevel; // Use the last one
+            targetGroupLabel = tg.targetGroupLabel; // Use the last one
+          });
+        }
+        
+        return {
+          ...team,
+          schoolLevel,
+          targetGroupLabel,
+          minAge,
+          maxAge
+        };
+      })
+    );
 
     // Fetch team members for each team
     const teamsWithMembers = await Promise.all(
@@ -437,7 +472,7 @@ export async function GET(
                       },
                     }),
                     new TableCell({
-                      children: team.members.length > 0 ? team.members.map((member, memberIndex) => 
+                      children: team.members.length > 0 ? team.members.map((member: TeamMember, memberIndex: number) => 
                         new Paragraph({
                           children: [
                             new TextRun({ 

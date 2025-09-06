@@ -37,14 +37,15 @@ export async function GET(
 
     console.log(`Fetching rawlist data for event ID: ${eventId}`);
     
-    // Fetch teams with required fields: target group, contest code, contest name, contingent, team, team email
-    const teams = await prisma.$queryRaw`
+    // First fetch the unique team records to avoid duplication
+    const uniqueTeams = await prisma.$queryRaw`
       SELECT DISTINCT
         t.id,
         t.name as teamName,
         t.team_email as teamEmail,
         ct.name as contestName,
         ct.code as contestCode,
+        ct.id as contestId,
         ect.status,
         ect.createdAt as registrationDate,
         CASE 
@@ -54,13 +55,6 @@ export async function GET(
           ELSE 'Unknown'
         END as contingentName,
         c.contingentType as contingentType,
-        tg.schoolLevel,
-        CASE 
-          WHEN tg.schoolLevel = 'Primary' THEN 'Kids'
-          WHEN tg.schoolLevel = 'Secondary' THEN 'Teens'
-          WHEN tg.schoolLevel = 'Higher Education' THEN 'Youth'
-          ELSE tg.schoolLevel
-        END as targetGroupLabel,
         CASE 
           WHEN c.contingentType = 'SCHOOL' THEN st_s.name
           WHEN c.contingentType = 'HIGHER_INSTITUTION' THEN st_hi.name
@@ -76,8 +70,6 @@ export async function GET(
       JOIN team t ON ect.teamId = t.id
       JOIN contingent c ON t.contingentId = c.id
       JOIN contest ct ON ec.contestId = ct.id
-      JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
-      JOIN targetgroup tg ON tg.id = ctg.B
       LEFT JOIN school s ON c.schoolId = s.id
       LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
@@ -85,10 +77,55 @@ export async function GET(
       LEFT JOIN state st_hi ON hi.stateId = st_hi.id
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
-      ORDER BY tg.schoolLevel, schoolStateName, hiStateName, indStateName, contingentNameRaw, t.name ASC
+      ORDER BY ct.name, t.name ASC
     ` as any[];
     
-    console.log(`Found ${teams.length} teams for rawlist XLSX`);
+    // Now fetch target group info for each unique team/contest combination
+    const teams = await Promise.all(
+      uniqueTeams.map(async (team) => {
+        const targetGroups = await prisma.$queryRaw`
+          SELECT 
+            tg.schoolLevel,
+            CASE 
+              WHEN tg.schoolLevel = 'Primary' THEN 'Kids'
+              WHEN tg.schoolLevel = 'Secondary' THEN 'Teens'
+              WHEN tg.schoolLevel = 'Higher Education' THEN 'Youth'
+              ELSE tg.schoolLevel
+            END as targetGroupLabel,
+            tg.minAge,
+            tg.maxAge
+          FROM _contesttotargetgroup ctg 
+          JOIN targetgroup tg ON tg.id = ctg.B
+          WHERE ctg.A = ${team.contestId}
+          ORDER BY tg.minAge ASC
+        ` as any[];
+        
+        // Get the combined age range across all target groups
+        let minAge = Number.MAX_SAFE_INTEGER;
+        let maxAge = 0;
+        let schoolLevel = '';
+        let targetGroupLabel = '';
+        
+        if (targetGroups.length > 0) {
+          targetGroups.forEach(tg => {
+            if (tg.minAge < minAge) minAge = tg.minAge;
+            if (tg.maxAge > maxAge) maxAge = tg.maxAge;
+            schoolLevel = tg.schoolLevel; // Use the last one
+            targetGroupLabel = tg.targetGroupLabel; // Use the last one
+          });
+        }
+        
+        return {
+          ...team,
+          schoolLevel,
+          targetGroupLabel,
+          minAge,
+          maxAge
+        };
+      })
+    );
+    
+    console.log(`Found ${teams.length} unique teams for rawlist XLSX`);
 
     // Convert BigInt values to numbers to avoid serialization issues
     const processedTeams = teams.map(team => ({
