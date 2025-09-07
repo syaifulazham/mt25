@@ -487,7 +487,7 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
                   // Multiple selection (checkboxes)
                   <div className="space-y-3">
                     {options.map((option, index) => (
-                      <div key={option.option} className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                      <div key={option.option} className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${answers[currentQuestion.id]?.split(',').includes(option.option) ? 'bg-cyan-500/30 border border-cyan-400' : 'bg-white/5 hover:bg-white/10'}`}>
                         <input
                           type="checkbox"
                           id={`option-${option.option}`}
@@ -523,7 +523,7 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
                     className="space-y-3"
                   >
                     {options.map((option, index) => (
-                      <div key={option.option} className="flex items-center space-x-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                      <div key={option.option} className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${answers[currentQuestion.id] === option.option ? 'bg-cyan-500/30 border border-cyan-400' : 'bg-white/5 hover:bg-white/10'}`}>
                         <RadioGroupItem value={option.option} id={`option-${option.option}`} className="text-cyan-400" />
                         <Label 
                           htmlFor={`option-${option.option}`} 
@@ -599,23 +599,34 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
 
           {/* Submit Button */}
           <div className="text-center">
-            <Button 
-              onClick={handleSubmitQuiz}
-              disabled={isSubmitting}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-3 text-lg font-semibold"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  {language === 'my' ? 'Menghantar...' : 'Submitting...'}
-                </>
-              ) : (
-                <>
-                  <Flag className="w-5 h-5 mr-2" />
-                  {language === 'my' ? 'Selesai Kuiz' : 'Finish Quiz'}
-                </>
-              )}
-            </Button>
+            {getAnsweredCount() === randomizedQuestions.length ? (
+              <Button 
+                onClick={handleSubmitQuiz}
+                disabled={isSubmitting}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-8 py-3 text-lg font-semibold"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    {language === 'my' ? 'Menghantar...' : 'Submitting...'}
+                  </>
+                ) : (
+                  <>
+                    <Flag className="w-5 h-5 mr-2" />
+                    {language === 'my' ? 'Selesai Kuiz' : 'Finish Quiz'}
+                  </>
+                )}
+              </Button>
+            ) : (
+              <div className="bg-amber-100/20 border border-amber-400/30 rounded-lg p-4 flex items-center justify-center space-x-3">
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+                <p className="text-amber-200">
+                  {language === 'my' 
+                    ? `${randomizedQuestions.length - getAnsweredCount()} soalan belum dijawab` 
+                    : `${randomizedQuestions.length - getAnsweredCount()} question${randomizedQuestions.length - getAnsweredCount() !== 1 ? 's' : ''} left unanswered`}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
