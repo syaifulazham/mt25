@@ -167,7 +167,7 @@ export default function QuizPreviewPage({ params }: { params: { id: string } }) 
           if (questionsData[0].answer_options && questionsData[0].answer_options.length > 0) {
             console.log('First answer option:', questionsData[0].answer_options[0]);
             console.log('Has alt_answer in any options:', 
-              questionsData[0].answer_options.some(opt => opt.alt_answer !== undefined))
+              questionsData[0].answer_options.some((opt: {option: string; answer: string; alt_answer?: string}) => opt.alt_answer !== undefined))
           }
         }
         
