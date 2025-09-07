@@ -15,7 +15,28 @@ import Link from "next/link";
 import Image from "next/image";
 
 interface QuestionDetailModalProps {
-  question: any | null;
+  question: {
+    id: number;
+    questionId?: number;
+    target_group: string;
+    knowledge_field: string;
+    question: string;
+    question_image?: string;
+    main_lang?: string | null;
+    alt_lang?: string | null;
+    alt_question?: string | null;
+    answer_type: "single_selection" | "multiple_selection" | "binary";
+    answer_options: Array<{
+      option: string;
+      answer: string;
+      alt_answer?: string | null;
+    }>;
+    answer_correct: string | string[];
+    createdAt: string;
+    createdBy: string;
+    creatorName: string;
+    updatedAt?: string;
+  } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -71,6 +92,14 @@ export function QuestionDetailModal({
             <Badge variant="outline">{question.knowledge_field}</Badge>
           </div>
           <DialogTitle className="text-xl">{question.question}</DialogTitle>
+          
+          {/* Display alternate language question if available */}
+          {question.alt_lang && question.alt_lang !== 'none' && question.alt_question && (
+            <div className="mt-2 text-muted-foreground">
+              <p className="italic">{question.alt_question}</p>
+            </div>
+          )}
+          
           <DialogDescription>
             {question.createdAt && typeof question.createdAt === 'string' && question.createdAt.trim() !== '' 
               ? `Created on ${format(new Date(question.createdAt), "MMMM dd, yyyy")}` 
@@ -147,6 +176,13 @@ export function QuestionDetailModal({
                     )}
                   </div>
                   <p className="text-sm mt-1">{option.answer}</p>
+                  
+                  {/* Display alternate language answer if available */}
+                  {question.alt_lang && question.alt_lang !== 'none' && option.alt_answer && (
+                    <p className="text-sm mt-1 text-muted-foreground italic">
+                      {option.alt_answer}
+                    </p>
+                  )}
                 </div>
               );
             })}
