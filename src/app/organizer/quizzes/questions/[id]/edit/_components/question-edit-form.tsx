@@ -75,7 +75,7 @@ interface QuestionEditFormProps {
 const formSchema = z.object({
   question: z.string().min(3, "Question must be at least 3 characters"),
   question_image: z.string().optional(),
-  main_lang: z.string().default("en"),
+  main_lang: z.string().default("none"),
   alt_lang: z.string().optional(),
   alt_question: z.string().optional(),
   target_group: z.string().min(1, "Must select a target group"),
@@ -133,7 +133,7 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
     defaultValues: {
       question: question.question,
       question_image: question.question_image || "",
-      main_lang: question.main_lang || "en",
+      main_lang: question.main_lang || "none",
       alt_lang: question.alt_lang || "none",
       alt_question: question.alt_question || "",
       target_group: question.target_group,
@@ -358,7 +358,7 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
       
       let response;
       // Process language fields before submitting
-      const mainLang = values.main_lang || 'en';
+      const mainLang = values.main_lang === 'none' ? null : values.main_lang;
       const altLang = values.alt_lang === 'none' ? null : values.alt_lang;
       const altQuestion = (!altLang || values.alt_lang === 'none') ? null : values.alt_question;
       
@@ -379,7 +379,7 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
           } else if (key === 'question_image' && imageFile) {
             // Skip since we'll append the file directly
           } else if (key === 'main_lang') {
-            formData.append(key, mainLang);
+            formData.append(key, mainLang || ''); // Handle null value
           } else if (key === 'alt_lang') {
             formData.append(key, altLang || '');
           } else if (key === 'alt_question') {
@@ -457,7 +457,7 @@ export function QuestionEditForm({ question }: QuestionEditFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {LANGUAGE_OPTIONS.filter(lang => lang.value !== "none").map((lang) => (
+                    {LANGUAGE_OPTIONS.map((lang) => (
                       <SelectItem key={lang.value} value={lang.value}>
                         {lang.label}
                       </SelectItem>

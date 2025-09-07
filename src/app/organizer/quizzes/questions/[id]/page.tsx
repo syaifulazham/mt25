@@ -149,6 +149,9 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
         }
         
         const data = await res.json();
+        // Debug main language value
+        console.log('Question data received:', data);
+        console.log('Main language value:', data.main_lang, 'type:', typeof data.main_lang);
         setQuestion(data);
       } catch (err: any) {
         setError(err.message || "An error occurred");
@@ -230,8 +233,8 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
   ];
   
   // Function to get language display
-  const getLanguageDisplay = (code: string | undefined) => {
-    if (!code || code === 'none') return 'None';
+  const getLanguageDisplay = (code: string | undefined | null) => {
+    if (!code || code === 'none' || code === null) return 'None';
     const language = languageOptions.find(l => l.value === code);
     return language ? language.label : code;
   };
@@ -430,11 +433,9 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
                         <MathRenderer content={question.question} />
                       </h3>
                       
-                      {question.main_lang && question.main_lang !== 'none' && (
-                        <div className="text-sm text-muted-foreground mt-1">
-                          Language: {getLanguageDisplay(question.main_lang)}
-                        </div>
-                      )}
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Language: {getLanguageDisplay(question.main_lang)}
+                      </div>
                     </div>
                     
                     {question.alt_lang && question.alt_lang !== 'none' && question.alt_question && (

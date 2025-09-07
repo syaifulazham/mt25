@@ -57,9 +57,15 @@ export async function GET(
       WHERE id = ${questionId}
     ` as any[];
     
-    const mainLang = languageFields.length > 0 ? languageFields[0].main_lang || 'en' : 'en';
+    // Log raw language fields from database
+    console.log('Raw language fields from DB:', languageFields);
+    
+    const mainLang = languageFields.length > 0 ? languageFields[0].main_lang : null;
     const altLang = languageFields.length > 0 ? languageFields[0].alt_lang : null;
     const altQuestion = languageFields.length > 0 ? languageFields[0].alt_question : null;
+    
+    // Log processed language values
+    console.log('Processed language values:', { mainLang, altLang, altQuestion });
 
     // Transform the response to include formatted data and language fields
     const transformedQuestion = {
@@ -217,11 +223,21 @@ export async function PUT(
       data: updateData,
     });
     
+    // Log language field values before update
+    console.log('Language fields for update:', {
+      main_lang: data.main_lang,
+      main_lang_type: typeof data.main_lang,
+      is_none: data.main_lang === 'none',
+      value_to_set: data.main_lang === 'none' ? null : data.main_lang,
+      alt_lang: data.alt_lang,
+      alt_question: data.alt_question
+    });
+    
     // Then update language fields separately using executeRaw to bypass Prisma type checking
     await prisma.$executeRaw`
       UPDATE question_bank
-      SET main_lang = ${data.main_lang || 'en'},
-          alt_lang = ${data.alt_lang || null},
+      SET main_lang = ${data.main_lang === 'none' ? null : data.main_lang},
+          alt_lang = ${data.alt_lang === 'none' ? null : data.alt_lang},
           alt_question = ${data.alt_question || null}
       WHERE id = ${questionId}
     `;
