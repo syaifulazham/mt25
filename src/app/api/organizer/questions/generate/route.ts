@@ -11,10 +11,13 @@ export const revalidate = 0;
 // Define types for the generated questions
 interface GeneratedQuestion {
   question: string;
+  alt_question?: string;
   question_image: string;
   answer_type: string;
-  answer_options: { option: string; answer: string }[];
+  answer_options: { option: string; answer: string; alt_answer?: string }[];
   answer_correct: string;
+  main_lang?: string;
+  alt_lang?: string;
 }
 
 // POST /api/organizer/questions/generate
@@ -54,8 +57,9 @@ export async function POST(request: NextRequest) {
     const withImages = data.with_images === true;
     const withMathEquations = data.with_math_equations === true;
     
-    // Set default language to English if not specified
-    const language = data.language || 'english';
+    // Set default languages
+    const mainLang = data.main_lang || 'english';
+    const altLang = data.alt_lang || 'none'; // 'none' means no alternate language
 
     // Initialize OpenAI client
     const openai = new OpenAI({
@@ -75,12 +79,25 @@ export async function POST(request: NextRequest) {
     let includeMathEquations = withMathEquations ? 
       "Where appropriate, include mathematical equations using LaTeX notation. For inline equations use single dollar signs like $E=mc^2$ and for block equations use double dollar signs like $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$. Make sure the LaTeX syntax is correct and properly escaped in the JSON response." : '';
     
-    // Add language instruction
+    // Add language instruction for multilingual support - using ISO language codes
     let languageInstruction = '';
-    if (language === 'malay') {
-      languageInstruction = "Generate all questions and answers in Bahasa Melayu. Pastikan semua soalan dan jawapan ditulis dalam Bahasa Melayu yang standard dan gramatis.";
+    
+    if (mainLang === 'my') {
+      languageInstruction = "Generate all questions and answers primarily in Bahasa Melayu. Pastikan semua soalan dan jawapan ditulis dalam Bahasa Melayu yang standard dan gramatis.";
+    } else if (mainLang === 'en') {
+      languageInstruction = "Generate all questions and answers primarily in English.";
     } else {
-      languageInstruction = "Generate all questions and answers in English.";
+      // Default to English if code is not recognized
+      languageInstruction = "Generate all questions and answers primarily in English.";
+    }
+    
+    // Add alternate language instruction if needed
+    if (altLang !== 'none') {
+      if (altLang === 'en' && mainLang === 'my') {
+        languageInstruction += " Additionally, provide an English translation for each question in the 'alt_question' field and for each answer in an 'alt_answer' field within each answer option.";
+      } else if (altLang === 'my' && mainLang === 'en') {
+        languageInstruction += " Additionally, provide a Malay (Bahasa Melayu) translation for each question in the 'alt_question' field and for each answer in an 'alt_answer' field within each answer option.";
+      }
     }
     
     // Create a structured prompt that will help OpenAI format the response correctly
@@ -95,10 +112,19 @@ export async function POST(request: NextRequest) {
     {
       "questions": [
         {
-          "question": "The full question text",
+          "question": "The full question text in the primary language",
+          "alt_question": "The translated question text in the alternate language, if requested",
           "question_image": "Brief description of an appropriate image if relevant, or empty string",
           "answer_type": "${data.answer_type}",
-          "answer_options": [{"option": "A", "answer": "First option"}, {"option": "B", "answer": "Second option"}, ...],
+          "answer_options": [
+            {
+              "option": "A", 
+              "answer": "First option in primary language",
+              "alt_answer": "First option in alternate language, if requested"
+            },
+            {"option": "B", "answer": "Second option", "alt_answer": "Translation if needed"}, 
+            ...
+          ],
           "answer_correct": "The correct option letter(s) - comma separated for multiple selection"
         },
         ...
@@ -120,7 +146,7 @@ export async function POST(request: NextRequest) {
       model: "gpt-3.5-turbo-16k", // More widely available model with good context length
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Generate ${data.count} ${data.difficulty} ${data.answer_type} questions about ${data.knowledge_field} for ${data.target_group} education level in ${language === 'malay' ? 'Bahasa Melayu' : 'English'}. Respond with ONLY a valid JSON object following the format in my instructions.` }
+        { role: "user", content: `Generate ${data.count} ${data.difficulty} ${data.answer_type} questions about ${data.knowledge_field} for ${data.target_group} education level in ${mainLang === 'my' ? 'Bahasa Melayu' : 'English'}${altLang !== 'none' ? ' with translations in ' + (altLang === 'en' ? 'English' : 'Bahasa Melayu') : ''}. Respond with ONLY a valid JSON object following the format in my instructions.` }
       ],
       temperature: 0.7,
       max_tokens: 3000
@@ -150,10 +176,11 @@ export async function POST(request: NextRequest) {
     console.log(`[API] Generated ${generatedQuestions.length} questions using OpenAI`);
 
     // Process and validate the generated questions
-    const validatedQuestions = generatedQuestions.map((q: any): GeneratedQuestion => {
+    const validatedQuestions = generatedQuestions.map((q: any) => {
       // Ensure all fields exist
       return {
         question: q.question,
+        alt_question: q.alt_question || null,
         question_image: q.question_image || "",
         answer_type: q.answer_type || data.answer_type,
         answer_options: q.answer_options || [],
@@ -191,9 +218,9 @@ export async function POST(request: NextRequest) {
     
     for (const q of validatedQuestions) {
       try {
-        // Create the question in the question_bank table
-        const saved = await prisma.question_bank.create({
-          data: {
+        // Create the question in the question_bank table with multilingual support
+        // Using type assertion to handle Prisma type issues
+        const questionData: any = {
             question: q.question,
             question_image: q.question_image,
             target_group: data.target_group, // Use the target group name directly as a string
@@ -201,8 +228,21 @@ export async function POST(request: NextRequest) {
             answer_type: q.answer_type,
             answer_options: q.answer_options,
             answer_correct: q.answer_correct,
+            main_lang: mainLang,
             createdBy: creatorInfo // Use the name/email as string instead of ID
-          }
+        };
+        
+        // Add alternate language fields if available
+        if (q.alt_question) {
+            questionData.alt_question = q.alt_question;
+        }
+        
+        if (altLang !== 'none') {
+            questionData.alt_lang = altLang;
+        }
+        
+        const saved = await prisma.question_bank.create({
+          data: questionData
         });
         
         savedQuestions.push(saved);

@@ -56,10 +56,10 @@ const difficultyLevels = [
   { value: "hard", label: "Hard" },
 ];
 
-// Language options
+// Language options - using ISO language codes
 const languageOptions = [
-  { value: "english", label: "English" },
-  { value: "malay", label: "Bahasa Melayu" },
+  { value: "en", label: "English" },
+  { value: "my", label: "Bahasa Melayu" },
 ];
 
 // Mock generated questions for demo
@@ -142,7 +142,9 @@ export default function GenerateQuestionsPage() {
     answer_type: "single_selection",
     number_of_questions: 3,
     difficulty: "medium",
-    language: "english", // Default to English
+    language: "my", // Default to Malay (ISO code)
+    alt_language: "en", // Alternative language (English ISO code)
+    include_alt_language: true, // Include alternative language by default
     with_images: false,
     with_math_equations: false,
     specific_topics: "",
@@ -176,7 +178,8 @@ export default function GenerateQuestionsPage() {
           answer_type: formState.answer_type,
           count: formState.number_of_questions,
           difficulty: formState.difficulty,
-          language: formState.language,
+          main_lang: formState.language,
+          alt_lang: formState.include_alt_language ? formState.alt_language : 'none',
           with_images: formState.with_images,
           with_math_equations: formState.with_math_equations,
           specific_topics: formState.specific_topics,
@@ -344,13 +347,13 @@ export default function GenerateQuestionsPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="language">Language</Label>
+              <Label htmlFor="language">Main Language</Label>
               <Select
                 value={formState.language}
                 onValueChange={(value) => handleInputChange("language", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select language" />
+                  <SelectValue placeholder="Select main language" />
                 </SelectTrigger>
                 <SelectContent>
                   {languageOptions.map((lang) => (
@@ -361,6 +364,48 @@ export default function GenerateQuestionsPage() {
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="flex items-start space-x-2 pt-2">
+              <Checkbox
+                id="include_alt_language"
+                checked={formState.include_alt_language}
+                onCheckedChange={(checked) => handleInputChange("include_alt_language", checked)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label
+                  htmlFor="include_alt_language"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Include alternate language
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Questions and answers will be provided in both languages
+                </p>
+              </div>
+            </div>
+            
+            {formState.include_alt_language && (
+              <div className="space-y-2">
+                <Label htmlFor="alt_language">Alternate Language</Label>
+                <Select
+                  value={formState.alt_language}
+                  onValueChange={(value) => handleInputChange("alt_language", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select alternate language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languageOptions
+                      .filter(lang => lang.value !== formState.language)
+                      .map((lang) => (
+                        <SelectItem key={lang.value} value={lang.value}>
+                          {lang.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="difficulty">Difficulty Level</Label>
@@ -518,14 +563,35 @@ export default function GenerateQuestionsPage() {
                               <Badge>{question.knowledge_field.replace('_', ' ')}</Badge>
                               <Badge variant="outline">{question.target_group}</Badge>
                               <Badge variant="outline">{question.answer_type.replace('_', ' ')}</Badge>
+                              {question.main_lang && (
+                                <Badge variant="secondary">
+                                  {question.main_lang.charAt(0).toUpperCase() + question.main_lang.slice(1)}
+                                </Badge>
+                              )}
+                              {question.alt_lang && question.alt_lang !== 'none' && (
+                                <Badge variant="outline" className="border-amber-300 text-amber-600">
+                                  + {question.alt_lang.charAt(0).toUpperCase() + question.alt_lang.slice(1)}
+                                </Badge>
+                              )}
                             </div>
-                            <p className="font-medium">
-                              <MathRenderer content={question.question} />
-                            </p>
+                            <div className="space-y-3">
+                              <p className="font-medium">
+                                <MathRenderer content={question.question} />
+                              </p>
+                              
+                              {/* Show alternate language question if available */}
+                              {question.alt_question && question.alt_lang && question.alt_lang !== 'none' && (
+                                <div className="bg-amber-50/40 border-l-4 border-amber-300 pl-3 py-2 rounded-r-md">
+                                  <p className="text-amber-800">
+                                    <MathRenderer content={question.alt_question} />
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {question.answer_options.map((option: { option: string, answer: string }, index: number) => (
+                            {question.answer_options.map((option: { option: string, answer: string, alt_answer?: string }, index: number) => (
                               <div 
                                 key={index} 
                                 className={`flex items-center gap-2 p-2 rounded-md ${
@@ -537,8 +603,15 @@ export default function GenerateQuestionsPage() {
                                 <div className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full flex-shrink-0">
                                   {option.option}
                                 </div>
-                                <div className="flex-1 line-clamp-1">
-                                  <MathRenderer content={option.answer} />
+                                <div className="flex-1">
+                                  <div className="line-clamp-2">
+                                    <MathRenderer content={option.answer} />
+                                  </div>
+                                  {option.alt_answer && (
+                                    <div className="text-sm text-amber-700 mt-1 line-clamp-2 border-l-2 border-amber-300 pl-2">
+                                      <MathRenderer content={option.alt_answer} />
+                                    </div>
+                                  )}
                                 </div>
                                 {question.answer_correct.includes(option.option) && (
                                   <Badge className="bg-green-100 text-green-800 flex-shrink-0">Correct</Badge>
