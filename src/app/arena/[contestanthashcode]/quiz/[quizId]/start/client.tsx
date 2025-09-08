@@ -79,12 +79,15 @@ const MathText = ({ children, className = '' }: { children: string, className?: 
 interface Question {
   id: number;
   question: string;
+  alt_question?: string;
   question_image?: string;
   answer_type: string;
-  answer_options: Array<{option: string, answer: string}>;
+  answer_options: Array<{option: string, answer: string, alt_answer?: string}>;
   answer_correct: string;
   knowledge_field: string;
   target_group: string;
+  main_lang?: string;
+  alt_lang?: string;
 }
 
 interface QuizData {
@@ -216,6 +219,9 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
           console.log('First question data:', shuffledQuestions[0]);
           console.log('Answer options:', shuffledQuestions[0].answer_options);
           console.log('Answer type:', shuffledQuestions[0].answer_type);
+          console.log('Alt question available:', !!shuffledQuestions[0].alt_question);
+          console.log('Alt lang available:', shuffledQuestions[0].alt_lang);
+          console.log('Main lang available:', shuffledQuestions[0].main_lang);
         }
 
         setQuiz({
@@ -435,11 +441,21 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Main language question */}
               <div className="text-white text-lg leading-relaxed">
                 <MathText className="text-white text-lg leading-relaxed">
                   {currentQuestion.question}
                 </MathText>
               </div>
+              
+              {/* Alternate language question */}
+              {currentQuestion.alt_question && (
+                <div className="bg-white/5 border-l-4 border-amber-400/50 pl-4 py-3 rounded-r mt-2">
+                  <MathText className="text-white/80 text-base leading-relaxed">
+                    {currentQuestion.alt_question}
+                  </MathText>
+                </div>
+              )}
 
               {/* Display question image if available */}
               {currentQuestion.question_image && currentQuestion.question_image !== "null" && (
@@ -483,6 +499,22 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
                 
                 console.log('Processed options for question', currentQuestion.id, ':', options);
                 
+                // Helper function to render answer text with alternate language if available
+                const renderAnswerWithAltLanguage = (option: {option: string, answer: string, alt_answer?: string}) => (
+                  <div className="flex flex-col w-full">
+                    <MathText className="text-white">
+                      {option.answer || 'No answer text available'}
+                    </MathText>
+                    {option.alt_answer && (
+                      <div className="mt-1.5 border-l-2 border-amber-400/30 pl-2">
+                        <MathText className="text-amber-200/80 text-sm">
+                          {option.alt_answer}
+                        </MathText>
+                      </div>
+                    )}
+                  </div>
+                );
+                
                 return currentQuestion.answer_type === 'multiple_selection' ? (
                   // Multiple selection (checkboxes)
                   <div className="space-y-3">
@@ -508,9 +540,7 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
                           className="text-white cursor-pointer flex-1 text-base"
                         >
                           <span className="font-semibold text-cyan-400 mr-2">{option.option}.</span>
-                          <MathText className="text-white">
-                            {option.answer || 'No answer text available'}
-                          </MathText>
+                          {renderAnswerWithAltLanguage(option)}
                         </Label>
                       </div>
                     ))}
@@ -530,9 +560,7 @@ export default function QuizTakingClient({ contestantHashcode, quizId }: QuizTak
                           className="text-white cursor-pointer flex-1 text-base"
                         >
                           <span className="font-semibold text-cyan-400 mr-2">{option.option}.</span>
-                          <MathText className="text-white">
-                            {option.answer || 'No answer text available'}
-                          </MathText>
+                          {renderAnswerWithAltLanguage(option)}
                         </Label>
                       </div>
                     ))}

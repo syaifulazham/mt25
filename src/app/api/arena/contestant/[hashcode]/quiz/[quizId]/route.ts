@@ -126,6 +126,9 @@ export async function GET(
         SELECT 
           qb.id,
           qb.question,
+          qb.alt_question,
+          qb.main_lang,
+          qb.alt_lang,
           qb.question_image,
           qb.answer_type,
           qb.answer_options,
@@ -156,6 +159,9 @@ export async function GET(
       questions: questions.map((q: any) => ({
         id: Number(q.id),
         question: q.question || '',
+        alt_question: q.alt_question || null,
+        main_lang: q.main_lang || null,
+        alt_lang: q.alt_lang || null,
         question_image: q.question_image || null,
         answer_type: q.answer_type || 'single_selection',
         answer_options: q.answer_options || [],
