@@ -490,17 +490,38 @@ export default function RawlistPage() {
   const handleRunDiagnostic = async () => {
     try {
       toast.info('Running eligibility diagnostic check...');
+      setDiagnosticData(null); // Clear previous data
+      setShowDiagnosticDialog(true); // Show dialog immediately with loading state
       
       const response = await fetch(`/api/organizer/events/${eventId}/rawlist/diagnostic`);
+      let data;
       
-      if (!response.ok) {
-        toast.error(`Diagnostic check failed: ${response.status} ${response.statusText}`);
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing diagnostic response:', parseError);
+        setDiagnosticData({
+          error: 'Failed to parse server response',
+          summary: { totalPendingCount: 0, eligibleCount: -1 }
+        });
+        toast.error('Error parsing diagnostic results');
         return;
       }
       
-      const data = await response.json();
+      // Check if we got a partial or error response
+      if (!response.ok || data.error) {
+        console.error('Diagnostic API returned error:', data.error || response.statusText);
+        setDiagnosticData({
+          error: data.error || `API Error: ${response.status} ${response.statusText}`,
+          summary: data.summary || { totalPendingCount: 0, eligibleCount: -1 },
+          errorDetails: data.details || 'No additional details available'
+        });
+        toast.warning(`Diagnostic returned partial results: ${data.error || response.statusText}`);
+        return;
+      }
+      
+      // Success path
       setDiagnosticData(data);
-      setShowDiagnosticDialog(true);
       
       // Log detailed diagnostic information
       console.log('==== DIAGNOSTIC RESULTS ====', data);
@@ -522,6 +543,13 @@ export default function RawlistPage() {
     } catch (error) {
       console.error('Error running diagnostic:', error);
       toast.error('Failed to run eligibility diagnostic');
+      
+      // Still show dialog with error state
+      setDiagnosticData({
+        error: 'Failed to run diagnostic',
+        summary: { totalPendingCount: 0, eligibleCount: -1 },
+        errorDetails: error instanceof Error ? error.message : String(error)
+      });
     }
   };
 
@@ -623,6 +651,29 @@ export default function RawlistPage() {
           
           {diagnosticData ? (
             <div className="space-y-4">
+              {/* Error state */}
+              {diagnosticData.error && (
+                <div className="bg-red-50 p-4 rounded-md border border-red-200">
+                  <h3 className="font-medium text-red-800 mb-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    {diagnosticData.error}
+                  </h3>
+                  {diagnosticData.errorDetails && (
+                    <div className="text-sm text-red-700 mt-2 bg-red-100 p-2 rounded overflow-auto max-h-40">
+                      {diagnosticData.errorDetails}
+                    </div>
+                  )}
+                  <p className="text-sm text-red-700 mt-2">
+                    Some information may be incomplete. Results shown below are partial or might be unavailable.
+                  </p>
+                </div>
+              )}
+              
+              {/* Summary section always shows, even with partial data */}
               <div className="bg-blue-50 p-4 rounded-md">
                 <h3 className="font-medium text-blue-800 mb-2">Summary</h3>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -632,34 +683,44 @@ export default function RawlistPage() {
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-xs text-gray-500">Eligible</div>
-                    <div className="text-lg font-bold text-green-600">{diagnosticData.summary?.eligibleCount || 0}</div>
+                    <div className={`text-lg font-bold ${diagnosticData.summary?.eligibleCount === -1 ? 'text-gray-400' : 'text-green-600'}`}>
+                      {diagnosticData.summary?.eligibleCount === -1 ? 'N/A' : diagnosticData.summary?.eligibleCount || 0}
+                    </div>
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-xs text-gray-500">Invalid Email</div>
-                    <div className="text-lg font-bold text-amber-600">{diagnosticData.summary?.teamsWithInvalidEmailsCount || 0}</div>
+                    <div className="text-lg font-bold text-amber-600">
+                      {diagnosticData.summary?.teamsWithInvalidEmailsCount === undefined ? 'N/A' : diagnosticData.summary?.teamsWithInvalidEmailsCount}
+                    </div>
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-xs text-gray-500">Duplicate Members</div>
-                    <div className="text-lg font-bold text-red-600">{diagnosticData.summary?.teamsWithDuplicateMembersCount || 0}</div>
+                    <div className="text-lg font-bold text-red-600">
+                      {diagnosticData.summary?.teamsWithDuplicateMembersCount === undefined ? 'N/A' : diagnosticData.summary?.teamsWithDuplicateMembersCount}
+                    </div>
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-xs text-gray-500">Age Mismatches</div>
-                    <div className="text-lg font-bold text-purple-600">{diagnosticData.summary?.teamsWithAgeMismatchesCount || 0}</div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {diagnosticData.summary?.teamsWithAgeMismatchesCount === undefined ? 'N/A' : diagnosticData.summary?.teamsWithAgeMismatchesCount}
+                    </div>
                   </div>
                 </div>
               </div>
               
-              {/* Filter information */}
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h3 className="font-medium mb-2">Filter Criteria</h3>
-                <div className="text-sm space-y-1">
-                  <div><strong>Email Validation:</strong> {diagnosticData.filters?.emailRegex}</div>
-                  <div><strong>Member Check:</strong> {diagnosticData.filters?.hasMemberCheck}</div>
-                  <div><strong>Duplicate Logic:</strong> {diagnosticData.filters?.duplicateLogic}</div>
+              {/* Filter information - only show if available */}
+              {diagnosticData.filters && (
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h3 className="font-medium mb-2">Filter Criteria</h3>
+                  <div className="text-sm space-y-1">
+                    <div><strong>Email Validation:</strong> {diagnosticData.filters?.emailRegex}</div>
+                    <div><strong>Member Check:</strong> {diagnosticData.filters?.hasMemberCheck}</div>
+                    <div><strong>Duplicate Logic:</strong> {diagnosticData.filters?.duplicateLogic}</div>
+                  </div>
                 </div>
-              </div>
+              )}
               
-              {/* Sample teams table */}
+              {/* Sample teams table - only show if available */}
               {diagnosticData.sampleTeams && diagnosticData.sampleTeams.length > 0 && (
                 <div className="border rounded-md overflow-hidden">
                   <h3 className="font-medium p-4 bg-gray-50 border-b">Sample PENDING Teams</h3>
@@ -698,6 +759,19 @@ export default function RawlistPage() {
                 </div>
               )}
               
+              {/* No data available state */}
+              {!diagnosticData.filters && !diagnosticData.sampleTeams && !diagnosticData.error && (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">No detailed data available</h3>
+                  <p className="mt-2 text-sm text-gray-500">
+                    We couldn't retrieve detailed diagnostic information. Only basic counts are available.
+                  </p>
+                </div>
+              )}
+              
               <div className="flex justify-between">
                 <div>
                   {diagnosticData.summary?.eligibleCount === 0 && (
@@ -705,7 +779,7 @@ export default function RawlistPage() {
                       No teams are currently eligible for approval. Please check the criteria above.
                     </div>
                   )}
-                  {pendingCount !== diagnosticData.summary?.eligibleCount && (
+                  {pendingCount !== diagnosticData.summary?.eligibleCount && diagnosticData.summary?.eligibleCount !== -1 && (
                     <div className="text-amber-600 text-sm">
                       Warning: Frontend count ({pendingCount}) doesn't match backend count ({diagnosticData.summary?.eligibleCount || 0}).
                     </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -44,16 +44,19 @@ export async function GET(
       WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
     ` as any[];
 
-    // Teams with no members
+    // Teams with no members - simplified to avoid group by issue
     const teamsWithNoMembers = await prisma.$queryRaw`
       SELECT COUNT(*) as count
-      FROM eventcontestteam ect
-      JOIN eventcontest ec ON ect.eventcontestId = ec.id
-      JOIN team t ON ect.teamId = t.id
-      LEFT JOIN teamMember tm ON t.id = tm.teamId
-      WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
-      GROUP BY t.id
-      HAVING COUNT(tm.contestantId) = 0
+      FROM (
+        SELECT t.id
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        LEFT JOIN teamMember tm ON t.id = tm.teamId
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+        GROUP BY t.id
+        HAVING COUNT(tm.contestantId) = 0
+      ) AS empty_teams
     ` as any[];
 
     // Teams with invalid emails
@@ -335,12 +338,36 @@ export async function GET(
     console.error("Error running diagnostic:", error);
     console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
     console.error("Error message:", error instanceof Error ? error.message : String(error));
-    return NextResponse.json(
-      { 
-        error: "Failed to run diagnostic",
-        details: error instanceof Error ? error.message : String(error)
-      },
-      { status: 500 }
-    );
+    
+    // Create a simplified response with just basic information
+    try {
+      // Access to eventId is maintained in the outer scope
+      // Attempt to get only the total count of pending teams as a fallback
+      const pendingCount = await prisma.$queryRaw`
+        SELECT COUNT(*) as count 
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${params.eventId} AND ect.status = 'PENDING'
+      ` as any[];
+      
+      return NextResponse.json({
+        error: "Partial diagnostic only - some queries failed",
+        summary: {
+          totalPendingCount: Number(pendingCount[0]?.count || 0),
+          eligibleCount: -1, // Unable to determine
+          errorDetails: error instanceof Error ? error.message : String(error)
+        }
+      });
+    } catch (fallbackError) {
+      // If even the fallback fails, return a clear error
+      return NextResponse.json(
+        { 
+          error: "Failed to run diagnostic",
+          details: error instanceof Error ? error.message : String(error),
+          suggestion: "Please check server logs for detailed error information"
+        },
+        { status: 500 }
+      );
+    }
   }
 }
