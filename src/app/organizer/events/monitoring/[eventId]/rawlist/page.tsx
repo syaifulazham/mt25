@@ -676,6 +676,11 @@ export default function RawlistPage() {
               {/* Summary section always shows, even with partial data */}
               <div className="bg-blue-50 p-4 rounded-md">
                 <h3 className="font-medium text-blue-800 mb-2">Summary</h3>
+                {diagnosticData.summary?.note && (
+                  <p className="text-sm text-blue-700 mb-3 bg-blue-100 p-2 rounded-md">
+                    Note: {diagnosticData.summary.note}
+                  </p>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-xs text-gray-500">Pending Teams</div>
@@ -683,8 +688,8 @@ export default function RawlistPage() {
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
                     <div className="text-xs text-gray-500">Eligible</div>
-                    <div className={`text-lg font-bold ${diagnosticData.summary?.eligibleCount === -1 ? 'text-gray-400' : 'text-green-600'}`}>
-                      {diagnosticData.summary?.eligibleCount === -1 ? 'N/A' : diagnosticData.summary?.eligibleCount || 0}
+                    <div className={`text-lg font-bold ${diagnosticData.summary?.eligibleCount === -1 || diagnosticData.summary?.eligibleCount === undefined ? 'text-gray-400' : 'text-green-600'}`}>
+                      {diagnosticData.summary?.eligibleCount === -1 || diagnosticData.summary?.eligibleCount === undefined ? 'N/A' : diagnosticData.summary?.eligibleCount}
                     </div>
                   </div>
                   <div className="bg-white p-3 rounded shadow-sm">
