@@ -39,8 +39,11 @@ export async function GET(
     
     // Get teams with status PENDING that meet criteria:
     // 1. No age mismatches with target group
-    // 2. No members in multiple teams
+    // 2. No members in multiple teams WITHIN THE SAME CONTEST
     // 3. At least one member in the team
+    // 4. Email follows proper format
+    console.log('Building query with improved filtering criteria...');
+    
     const eligibleTeams = await prisma.$queryRaw`
       WITH team_member_counts AS (
         SELECT 
@@ -56,19 +59,30 @@ export async function GET(
         FROM team t
         WHERE 
           t.team_email IS NULL 
-          OR t.team_email = ''
-          OR t.team_email NOT LIKE '%@%.%'
+          OR TRIM(t.team_email) = ''
+          OR t.team_email NOT REGEXP '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
       ),
       duplicate_members AS (
+        -- Find contestants who are in multiple teams across ALL contests
         SELECT 
           DISTINCT tm.contestantId
         FROM teamMember tm
-        JOIN team t ON tm.teamId = t.id
-        JOIN eventcontestteam ect ON t.id = ect.teamId
-        JOIN eventcontest ec ON ect.eventcontestId = ec.id
-        WHERE ec.eventId = ${eventId}
-        GROUP BY tm.contestantId
-        HAVING COUNT(DISTINCT tm.teamId) > 1
+        JOIN team t1 ON tm.teamId = t1.id
+        JOIN eventcontestteam ect1 ON t1.id = ect1.teamId
+        JOIN eventcontest ec1 ON ect1.eventcontestId = ec1.id
+        WHERE 
+          ec1.eventId = ${eventId}
+          AND EXISTS (
+            SELECT 1
+            FROM teamMember tm2
+            JOIN team t2 ON tm2.teamId = t2.id
+            JOIN eventcontestteam ect2 ON t2.id = ect2.teamId
+            JOIN eventcontest ec2 ON ect2.eventcontestId = ec2.id
+            WHERE 
+              ec2.eventId = ${eventId}
+              AND tm2.contestantId = tm.contestantId
+              AND t2.id != t1.id  -- Different team
+          )
       ),
       teams_with_duplicates AS (
         SELECT 
@@ -92,7 +106,10 @@ export async function GET(
           ec.eventId = ${eventId}
           AND ect.status = 'PENDING'
           AND ect.status != 'APPROVED_SPECIAL'
-          AND (c.age < tg.minAge OR c.age > tg.maxAge)
+          AND (
+            (c.age IS NOT NULL AND tg.minAge IS NOT NULL AND c.age < tg.minAge) OR
+            (c.age IS NOT NULL AND tg.maxAge IS NOT NULL AND c.age > tg.maxAge)
+          )
       )
       
       SELECT DISTINCT
@@ -153,6 +170,106 @@ export async function GET(
     ` as any[];
     
     console.log(`Found ${eligibleTeams.length} eligible PENDING teams for approval`);
+    
+    // If no eligible teams found, let's log detailed diagnostics to help identify why
+    if (eligibleTeams.length === 0) {
+      console.log('Running diagnostics to identify filtering issues...');
+      
+      // Check how many PENDING teams exist total
+      const pendingTeamsCount = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+      ` as any[];
+      
+      console.log(`Total PENDING teams: ${pendingTeamsCount[0]?.count || 0}`);
+      
+      // Check how many teams fail each criteria
+      const teamsWithNoMembers = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        LEFT JOIN teamMember tm ON t.id = tm.teamId
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+        GROUP BY t.id
+        HAVING COUNT(tm.contestantId) = 0
+      ` as any[];
+      
+      console.log(`Teams with no members: ${teamsWithNoMembers.length || 0}`);
+      
+      const teamsWithInvalidEmails = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        WHERE 
+          ec.eventId = ${eventId} 
+          AND ect.status = 'PENDING'
+          AND (
+            t.team_email IS NULL 
+            OR TRIM(t.team_email) = ''
+            OR t.team_email NOT REGEXP '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
+          )
+      ` as any[];
+      
+      console.log(`Teams with invalid emails: ${teamsWithInvalidEmails[0]?.count || 0}`);
+      
+      const teamsWithDuplicateMembers = await prisma.$queryRaw`
+        WITH duplicate_members AS (
+          SELECT DISTINCT tm.contestantId
+          FROM teamMember tm
+          JOIN team t1 ON tm.teamId = t1.id
+          JOIN eventcontestteam ect1 ON t1.id = ect1.teamId
+          JOIN eventcontest ec1 ON ect1.eventcontestId = ec1.id
+          WHERE 
+            ec1.eventId = ${eventId}
+            AND EXISTS (
+              SELECT 1
+              FROM teamMember tm2
+              JOIN team t2 ON tm2.teamId = t2.id
+              JOIN eventcontestteam ect2 ON t2.id = ect2.teamId
+              JOIN eventcontest ec2 ON ect2.eventcontestId = ec2.id
+              WHERE 
+                ec2.eventId = ${eventId}
+                AND tm2.contestantId = tm.contestantId
+                AND t2.id != t1.id
+            )
+        )
+        SELECT COUNT(DISTINCT t.id) as count
+        FROM team t
+        JOIN teamMember tm ON t.id = tm.teamId
+        JOIN duplicate_members dm ON tm.contestantId = dm.contestantId
+        JOIN eventcontestteam ect ON t.id = ect.teamId
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+      ` as any[];
+      
+      console.log(`Teams with duplicate members across all contests: ${teamsWithDuplicateMembers[0]?.count || 0}`);
+      
+      const teamsWithAgeMismatches = await prisma.$queryRaw`
+        SELECT COUNT(DISTINCT t.id) as count
+        FROM team t
+        JOIN teamMember tm ON t.id = tm.teamId
+        JOIN contestant c ON tm.contestantId = c.id
+        JOIN eventcontestteam ect ON t.id = ect.teamId
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN contest ct ON ec.contestId = ct.id
+        JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
+        JOIN targetgroup tg ON tg.id = ctg.B
+        WHERE 
+          ec.eventId = ${eventId}
+          AND ect.status = 'PENDING'
+          AND ect.status != 'APPROVED_SPECIAL'
+          AND (
+            (c.age IS NOT NULL AND tg.minAge IS NOT NULL AND c.age < tg.minAge) OR
+            (c.age IS NOT NULL AND tg.maxAge IS NOT NULL AND c.age > tg.maxAge)
+          )
+      ` as any[];
+      
+      console.log(`Teams with age mismatches: ${teamsWithAgeMismatches[0]?.count || 0}`);
+    }
 
     if (eligibleTeams.length === 0) {
       return NextResponse.json({ error: "No eligible PENDING teams found" }, { status: 404 });
@@ -177,6 +294,11 @@ export async function GET(
     }
     
     console.log(`Updated ${updatedCount} teams to APPROVED status`);
+    
+    // Log any discrepancies between eligible teams and updated count
+    if (updatedCount !== teamIds.length) {
+      console.log(`WARNING: Discrepancy detected. ${teamIds.length} teams were eligible, but only ${updatedCount} were updated.`);
+    }
 
     // Convert BigInt values to numbers to avoid serialization issues
     const processedTeams = eligibleTeams.map(team => ({

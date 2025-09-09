@@ -201,10 +201,11 @@ export default function RawlistPage() {
     fetchTeams();
   }, [fetchTeams]);
 
-  // Helper function to validate email format
+  // Helper function to validate email format using the exact same regex as the backend
   const isValidEmail = (email: string | null | undefined): boolean => {
-    if (!email) return false;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || email.trim() === '') return false;
+    // This must match exactly the backend regex in approved-xlsx/route.ts
+    const emailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
   };
 
@@ -219,16 +220,34 @@ export default function RawlistPage() {
     })));
     
     const eligiblePendingTeams = teams.filter(team => {
+      // Criteria must match exactly what the backend API checks:
+      // 1. Must be PENDING status
+      // 2. Must have at least one member
+      // 3. No age mismatches with target group
+      // 4. No duplicate members across ANY teams (not just same contest)
+      // 5. Email must be valid and follow regex pattern
+      
+      // Check email strictly using same regex as backend
+      const validEmailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      const validEmail = team.teamEmail && 
+                        team.teamEmail.trim() !== '' && 
+                        validEmailRegex.test(team.teamEmail);
+      
       const eligible = 
         team.status === 'PENDING' && 
         team.members.length > 0 && 
         !hasAgeMismatch(team) && 
         !team.hasDuplicateMembers &&
-        isValidEmail(team.teamEmail);
+        validEmail;
       
-      // Brief eligibility log for each PENDING team
+      // Detailed eligibility logging
       if (team.status === 'PENDING') {
-        console.log(`Team ${team.teamName}: ${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'} | Email: ${team.teamEmail || 'missing'} | Valid email: ${isValidEmail(team.teamEmail)}`);
+        console.log(`Team ${team.teamName} (${team.id}): ${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'} | ` +
+          `Members: ${team.members.length > 0 ? 'Yes' : 'No'} | ` +
+          `Age Mismatch: ${hasAgeMismatch(team) ? 'Yes' : 'No'} | ` +
+          `Duplicates: ${team.hasDuplicateMembers ? 'Yes' : 'No'} | ` +
+          `Email: '${team.teamEmail || 'missing'}' | ` +
+          `Valid email: ${validEmail ? 'Yes' : 'No'}`);
       }
       
       return eligible;
