@@ -89,6 +89,10 @@ export default function RawlistPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [targetGroupFilter, setTargetGroupFilter] = useState("all");
   const [stateFilter, setStateFilter] = useState("all");
+  const [emailFilter, setEmailFilter] = useState("all"); // all, with_email, without_email, invalid_email
+  const [memberFilter, setMemberFilter] = useState("all"); // all, with_members, without_members
+  const [duplicateFilter, setDuplicateFilter] = useState("all"); // all, with_duplicates, without_duplicates
+  const [ageMismatchFilter, setAgeMismatchFilter] = useState("all"); // all, with_age_mismatch, without_age_mismatch
 
   // Column width management
   const [columnWidths, setColumnWidths] = useState<{[key: string]: number}>({
@@ -355,9 +359,59 @@ export default function RawlistPage() {
     if (stateFilter !== "all") {
       filtered = filtered.filter(team => team.stateName === stateFilter);
     }
+    
+    // Email filter
+    if (emailFilter !== "all") {
+      filtered = filtered.filter(team => {
+        // Check if the team has an email
+        const hasEmail = team.teamEmail && team.teamEmail.trim() !== '';
+        
+        // Check if the email is valid using the same regex as the backend
+        const emailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        const isValidEmailFormat = hasEmail && emailRegex.test(team.teamEmail!);
+        
+        switch(emailFilter) {
+          case "with_email":
+            return hasEmail && isValidEmailFormat;
+          case "without_email":
+            return !hasEmail;
+          case "invalid_email":
+            return hasEmail && !isValidEmailFormat;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Member filter
+    if (memberFilter !== "all") {
+      filtered = filtered.filter(team => {
+        const hasMember = team.members.length > 0;
+        return memberFilter === "with_members" ? hasMember : !hasMember;
+      });
+    }
+    
+    // Duplicate members filter
+    if (duplicateFilter !== "all") {
+      filtered = filtered.filter(team => {
+        return duplicateFilter === "with_duplicates" ? 
+          team.hasDuplicateMembers : 
+          !team.hasDuplicateMembers;
+      });
+    }
+    
+    // Age mismatch filter
+    if (ageMismatchFilter !== "all") {
+      filtered = filtered.filter(team => {
+        const hasAgeMismatchIssue = hasAgeMismatch(team);
+        return ageMismatchFilter === "with_age_mismatch" ? 
+          hasAgeMismatchIssue : 
+          !hasAgeMismatchIssue;
+      });
+    }
 
     setFilteredTeams(filtered);
-  }, [teams, searchTerm, statusFilter, targetGroupFilter, stateFilter]);
+  }, [teams, searchTerm, statusFilter, targetGroupFilter, stateFilter, emailFilter, memberFilter, duplicateFilter, ageMismatchFilter]);
 
   // Get unique values for filters
   const uniqueStatuses = [...new Set(teams.map(team => team.status))];
@@ -953,59 +1007,136 @@ export default function RawlistPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Search and Filters */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              <div className="relative flex-1">
+            <div className="flex flex-col gap-4">
+              {/* Search box - Now in its own row */}
+              <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
                   placeholder="Search teams, contingents, states, or members..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 w-full"
                 />
               </div>
               
-              <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    {uniqueStatuses.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* First row of filter dropdowns - Status, Target Group, State */}
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium text-muted-foreground">Basic Filters</div>
+                <div className="flex gap-2 flex-wrap md:flex-nowrap overflow-x-auto pb-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">Status:</label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        {uniqueStatuses.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Select value={targetGroupFilter} onValueChange={setTargetGroupFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by target group" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Target Groups</SelectItem>
-                    {uniqueTargetGroups.map((group) => (
-                      <SelectItem key={group} value={group}>
-                        {group}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">Target Group:</label>
+                    <Select value={targetGroupFilter} onValueChange={setTargetGroupFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by target group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Target Groups</SelectItem>
+                        {uniqueTargetGroups.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <Select value={stateFilter} onValueChange={setStateFilter}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by state" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All States</SelectItem>
-                    {uniqueStates.map((state) => (
-                      <SelectItem key={state} value={state}>
-                        {state}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">State:</label>
+                    <Select value={stateFilter} onValueChange={setStateFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All States</SelectItem>
+                        {uniqueStates.map((state) => (
+                          <SelectItem key={state} value={state}>
+                            {state}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Second row of filter dropdowns - Eligibility filters */}
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-medium text-muted-foreground">Eligibility Filters</div>
+                <div className="flex gap-2 flex-wrap md:flex-nowrap overflow-x-auto pb-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">Email Status:</label>
+                    <Select value={emailFilter} onValueChange={setEmailFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by email" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Emails</SelectItem>
+                        <SelectItem value="with_email">With Valid Email</SelectItem>
+                        <SelectItem value="without_email">Without Email</SelectItem>
+                        <SelectItem value="invalid_email">Invalid Email Format</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">Team Members:</label>
+                    <Select value={memberFilter} onValueChange={setMemberFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by members" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Teams</SelectItem>
+                        <SelectItem value="with_members">With Members</SelectItem>
+                        <SelectItem value="without_members">Without Members</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">Duplicate Members:</label>
+                    <Select value={duplicateFilter} onValueChange={setDuplicateFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by duplicates" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Teams</SelectItem>
+                        <SelectItem value="with_duplicates">With Duplicate Members</SelectItem>
+                        <SelectItem value="without_duplicates">Without Duplicate Members</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground pl-1">Age Validation:</label>
+                    <Select value={ageMismatchFilter} onValueChange={setAgeMismatchFilter}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Filter by age" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Teams</SelectItem>
+                        <SelectItem value="with_age_mismatch">With Age Mismatch</SelectItem>
+                        <SelectItem value="without_age_mismatch">Without Age Mismatch</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </div>
 
