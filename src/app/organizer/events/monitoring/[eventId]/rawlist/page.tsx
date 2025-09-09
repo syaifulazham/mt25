@@ -215,7 +215,7 @@ export default function RawlistPage() {
     return emailRegex.test(email);
   };
 
-  // Count pending teams that meet approval criteria
+  // Count pending teams that meet approval criteria - MUST EXACTLY MATCH BACKEND LOGIC
   useEffect(() => {
     console.log('==== DEBUGGING TEAM ELIGIBILITY ====');
     console.log(`Total teams: ${teams.length}`);
@@ -231,6 +231,9 @@ export default function RawlistPage() {
     let ineligibleDuplicatesCount = 0;
     let ineligibleAgeMismatchCount = 0;
     
+    // IMPORTANT: This function should EXACTLY match backend logic in approved-xlsx/route.ts
+    // The backend uses SQL queries with CTE (Common Table Expressions) to filter eligible teams
+    // Here we replicate the same logic but in JavaScript
     const eligiblePendingTeams = teams.filter(team => {
       if (team.status !== 'PENDING') return false;
       
@@ -247,6 +250,7 @@ export default function RawlistPage() {
       } else {
         ineligibleReasons.push('No members');
         ineligibleEmptyTeamCount++;
+        return false; // Early return if a critical criterion fails
       }
       
       // 3. No age mismatches with target group
@@ -256,9 +260,11 @@ export default function RawlistPage() {
       } else {
         ineligibleReasons.push(`Age mismatch: ${getAgeMismatchDetails(team)}`);
         ineligibleAgeMismatchCount++;
+        return false; // Early return if a critical criterion fails
       }
       
       // 4. No duplicate members across ANY teams
+      // This is the critical check that must match backend exactly
       if (!team.hasDuplicateMembers) {
         eligibleReasons.push('No duplicate members');
       } else {
@@ -267,6 +273,7 @@ export default function RawlistPage() {
         const duplicateMemberNames = duplicateMembers.map(m => m.participantName).join(', ');
         ineligibleReasons.push(`Has duplicate members: ${duplicateMemberNames}`);
         ineligibleDuplicatesCount++;
+        return false; // Early return if a critical criterion fails
       }
       
       // 5. Email must be valid and follow regex pattern
@@ -281,38 +288,72 @@ export default function RawlistPage() {
       } else {
         ineligibleReasons.push(`Invalid email: '${team.teamEmail || 'missing'}'`);
         ineligibleEmailCount++;
+        return false; // Early return if a critical criterion fails
       }
       
-      // Final eligibility determination
-      const eligible = 
-        team.status === 'PENDING' && 
-        team.members.length > 0 && 
-        !hasAgeMismatch(team) && 
-        !team.hasDuplicateMembers &&
-        validEmail;
+      // All criteria passed, mark as eligible
+      eligibleCount++;
       
       // Detailed console logging with color formatting
       console.log(
-        `%cTeam %c${team.teamName}%c (ID: ${team.id}): %c${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`,
+        `%cTeam %c${team.teamName}%c (ID: ${team.id}): %c${true ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`,
         'color: black;',
         'color: blue; font-weight: bold;',
         'color: black;',
-        `color: ${eligible ? 'green' : 'red'}; font-weight: bold;`
+        'color: green; font-weight: bold;'
       );
       
       if (eligibleReasons.length > 0) {
         console.log('  %c✓ PASS:%c ' + eligibleReasons.join(', '), 'color: green; font-weight: bold;', 'color: green;');
       }
       
+      return true; // Team is eligible
+    });
+    
+    // Log teams with issues separately for clarity
+    pendingTeams.forEach(team => {
+      // Skip eligible teams since we already logged them
+      if (eligiblePendingTeams.includes(team)) return;
+      
+      // Log ineligible teams
+      let ineligibleReasons = [];
+      
+      // Check each criterion
+      if (team.members.length === 0) {
+        ineligibleReasons.push('No members');
+      }
+      
+      if (hasAgeMismatch(team)) {
+        ineligibleReasons.push(`Age mismatch: ${getAgeMismatchDetails(team)}`);
+      }
+      
+      if (team.hasDuplicateMembers) {
+        const duplicateMembers = team.members.filter(m => m.isDuplicate);
+        const duplicateMemberNames = duplicateMembers.map(m => m.participantName).join(', ');
+        ineligibleReasons.push(`Has duplicate members: ${duplicateMemberNames}`);
+      }
+      
+      const validEmailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      const validEmail = team.teamEmail && 
+                        team.teamEmail.trim() !== '' && 
+                        validEmailRegex.test(team.teamEmail);
+      
+      if (!validEmail) {
+        ineligibleReasons.push(`Invalid email: '${team.teamEmail || 'missing'}'`);
+      }
+      
+      // Log ineligible team with reasons
+      console.log(
+        `%cTeam %c${team.teamName}%c (ID: ${team.id}): %c${false ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`,
+        'color: black;',
+        'color: blue; font-weight: bold;',
+        'color: black;',
+        'color: red; font-weight: bold;'
+      );
+      
       if (ineligibleReasons.length > 0) {
         console.log('  %c✗ FAIL:%c ' + ineligibleReasons.join(', '), 'color: red; font-weight: bold;', 'color: red;');
       }
-      
-      if (eligible) {
-        eligibleCount++;
-      }
-      
-      return eligible;
     });
     
     // Summary report
@@ -326,6 +367,7 @@ export default function RawlistPage() {
     console.log(`  - Teams with duplicate members: ${ineligibleDuplicatesCount}`);
     console.log(`  - Teams with age mismatches: ${ineligibleAgeMismatchCount}`);
     
+    // Set the pendingCount for the UI
     setPendingCount(eligibleCount);
   }, [teams]);
 
@@ -514,7 +556,7 @@ export default function RawlistPage() {
       setDownloadInProgress(null);
     }
   };
-
+  
   const handleGenerateXlsx = async () => {
     try {
       setDownloadInProgress('xlsx');
@@ -535,12 +577,11 @@ export default function RawlistPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error generating XLSX:', error);
-      toast.error('Failed to generate XLSX file. Please try again.');
+      toast.error('Failed to generate Excel file. Please try again.');
     } finally {
       setDownloadInProgress(null);
     }
   };
-  
   const handleRunDiagnostic = async () => {
     try {
       toast.info('Running eligibility diagnostic check...');
@@ -608,69 +649,91 @@ export default function RawlistPage() {
   };
 
   const handleApproveAndDownload = async () => {
+    if (pendingCount === 0) return;
+    
+    setDownloadInProgress('approve');
+    setDownloadModalOpen(false);
+    
     try {
-      setDownloadInProgress('approve');
       console.log('==== STARTING APPROVE AND DOWNLOAD ====');
-      console.log(`Sending request to approve ${pendingCount} eligible teams`);
+      toast.loading(`Approving ${pendingCount} eligible teams...`);
       
-      // First, log the criteria we're using on the frontend for eligibility
-      console.log('Frontend eligibility criteria:');
-      console.log('1. Status must be PENDING');
-      console.log('2. Team must have at least one member');
-      console.log('3. No age mismatches with target group');
-      console.log('4. No duplicate members across ANY teams');
-      console.log('5. Valid email format: /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/');
-      
-      // Run diagnostic first to see eligibility count
-      await handleRunDiagnostic();
-      
-      const response = await fetch(`/api/organizer/events/${eventId}/rawlist/approved-xlsx`);
-      console.log(`Response status: ${response.status}`);
-      
-      // Log response headers if available
-      console.log('Response headers:');
-      response.headers.forEach((value, name) => {
-        console.log(`${name}: ${value}`);
+      // Get IDs of eligible teams based on frontend filtering
+      const eligibleTeams = filteredTeams.filter(team => {
+        // Only consider PENDING teams
+        if (team.status !== 'PENDING') return false;
+        
+        // Must have at least one member
+        if (team.members.length === 0) return false;
+        
+        // No age mismatches
+        if (hasAgeMismatch(team)) return false;
+        
+        // Email must be valid
+        const validEmailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        const validEmail = team.teamEmail && 
+                          team.teamEmail.trim() !== '' && 
+                          validEmailRegex.test(team.teamEmail);
+        if (!validEmail) return false;
+        
+        // Check duplicates based on current filter
+        if (duplicateFilter === "with_duplicates") {
+          // If specifically looking for teams with duplicates
+          if (!team.hasDuplicateMembers) return false;
+        } else if (duplicateFilter === "without_duplicates" || duplicateFilter === "all") {
+          // Default behavior for 'all' and explicit 'without_duplicates': only include teams without duplicates 
+          if (team.hasDuplicateMembers) return false;
+        }
+        
+        // All checks passed
+        return true;
       });
       
-      if (response.status === 404) {
-        // Try to extract more details from the response
-        const errorText = await response.text();
-        try {
-          const errorJson = JSON.parse(errorText);
-          console.error('API error details:', errorJson);
-          toast.warning(`No eligible teams found: ${errorJson.error || 'Unknown error'}`);
-        } catch (e) {
-          console.error('Raw API error:', errorText);
-          toast.warning('No eligible PENDING teams found that meet the criteria for approval.');
-        }
-        return;
-      }
+      const eligibleTeamIds = eligibleTeams.map(team => team.id);
+      console.log(`Sending ${eligibleTeamIds.length} team IDs for approval`);
       
+      // Use our new endpoint that processes exactly the teams selected by frontend filters
+      const response = await fetch(`/api/organizer/events/${eventId}/rawlist/approved-teams`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ teamIds: eligibleTeamIds })
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to approve and generate XLSX');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to approve teams and generate Excel');
       }
-      
+
+      // Get filename from content disposition header
+      const contentDisposition = response.headers.get('content-disposition');
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/i);
+      const filename = filenameMatch ? filenameMatch[1] : `approved-teams-${Date.now()}.xlsx`;
+
+      // Process blob response for download
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = `approved-teams-${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
+
+      // Clean up
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+
+      toast.dismiss();
+      toast.success(`Successfully approved ${eligibleTeamIds.length} teams`);
       
-      toast.success('Teams successfully approved and downloaded!');
-      
-      // Refresh the teams data to show updated statuses
-      console.log('Refreshing team data after successful approval');
-      await fetchTeams();
-      
-    } catch (error) {
-      console.error('Error approving and generating XLSX:', error);
-      toast.error('Failed to approve teams and generate XLSX file. Please try again.');
+      // Refresh the team list
+      fetchTeams();
+    } catch (error: any) {
+      console.error('Error approving teams:', error);
+      toast.dismiss();
+      toast.error(error.message || 'Failed to approve teams');
     } finally {
       setDownloadInProgress(null);
     }

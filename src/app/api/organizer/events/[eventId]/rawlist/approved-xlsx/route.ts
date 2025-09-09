@@ -39,10 +39,10 @@ export async function GET(
     
     // Get teams with status PENDING that meet criteria:
     // 1. No age mismatches with target group
-    // 2. No members in multiple teams WITHIN THE SAME CONTEST
-    // 3. At least one member in the team
-    // 4. Email follows proper format
-    console.log('Building query with improved filtering criteria...');
+    // 2. Team has at least one member
+    // 3. Email follows proper format
+    // 4. IMPORTANT: Now using frontend filter logic for duplicates - accepting all teams that are shown as eligible in the UI
+    console.log('Building query using frontend-compatible filtering criteria...');
     
     const eligibleTeams = await prisma.$queryRaw`
       WITH team_member_counts AS (
@@ -62,34 +62,25 @@ export async function GET(
           OR TRIM(t.team_email) = ''
           OR t.team_email NOT REGEXP '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
       ),
-      duplicate_members AS (
-        -- Find contestants who are in multiple teams across ALL contests
-        SELECT 
-          DISTINCT tm.contestantId
-        FROM teamMember tm
-        JOIN team t1 ON tm.teamId = t1.id
-        JOIN eventcontestteam ect1 ON t1.id = ect1.teamId
-        JOIN eventcontest ec1 ON ect1.eventcontestId = ec1.id
-        WHERE 
-          ec1.eventId = ${eventId}
-          AND EXISTS (
-            SELECT 1
-            FROM teamMember tm2
-            JOIN team t2 ON tm2.teamId = t2.id
-            JOIN eventcontestteam ect2 ON t2.id = ect2.teamId
-            JOIN eventcontest ec2 ON ect2.eventcontestId = ec2.id
-            WHERE 
-              ec2.eventId = ${eventId}
-              AND tm2.contestantId = tm.contestantId
-              AND t2.id != t1.id  -- Different team
-          )
-      ),
+      -- Get teams with duplicate flags directly from rawlist API
+      -- This ensures consistency between what's shown in the UI and what's processed
       teams_with_duplicates AS (
         SELECT 
           DISTINCT t.id
         FROM team t
         JOIN teamMember tm ON t.id = tm.teamId
-        JOIN duplicate_members dm ON tm.contestantId = dm.contestantId
+        JOIN eventcontestteam ect ON t.id = ect.teamId
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE 
+          ec.eventId = ${eventId}
+          AND ect.status = 'PENDING'
+          AND EXISTS (
+            -- Get the hasDuplicateMembers flag that matches what's shown in the UI
+            SELECT 1
+            FROM team t_dup
+            WHERE t_dup.id = t.id
+            AND t_dup.has_duplicate_members = true
+          )
       ),
       age_mismatches AS (
         SELECT 
