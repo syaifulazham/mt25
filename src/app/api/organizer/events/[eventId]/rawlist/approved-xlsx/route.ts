@@ -272,7 +272,112 @@ export async function GET(
     }
 
     if (eligibleTeams.length === 0) {
-      return NextResponse.json({ error: "No eligible PENDING teams found" }, { status: 404 });
+      // Create a more detailed error message including counts for each filter reason
+      const pendingCount = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+      ` as any[];
+      
+      // Get counts for each filter reason
+      // Teams with no members
+      const noMembersQuery = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        LEFT JOIN teamMember tm ON t.id = tm.teamId
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+        GROUP BY t.id
+        HAVING COUNT(tm.contestantId) = 0
+      ` as any[];
+      
+      // Teams with invalid emails
+      const invalidEmailsQuery = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM eventcontestteam ect
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN team t ON ect.teamId = t.id
+        WHERE 
+          ec.eventId = ${eventId} 
+          AND ect.status = 'PENDING'
+          AND (
+            t.team_email IS NULL 
+            OR TRIM(t.team_email) = ''
+            OR t.team_email NOT REGEXP '^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'
+          )
+      ` as any[];
+      
+      // Teams with duplicate members
+      const duplicateMembersQuery = await prisma.$queryRaw`
+        WITH duplicate_members AS (
+          SELECT DISTINCT tm.contestantId
+          FROM teamMember tm
+          JOIN team t1 ON tm.teamId = t1.id
+          JOIN eventcontestteam ect1 ON t1.id = ect1.teamId
+          JOIN eventcontest ec1 ON ect1.eventcontestId = ec1.id
+          WHERE 
+            ec1.eventId = ${eventId}
+            AND EXISTS (
+              SELECT 1
+              FROM teamMember tm2
+              JOIN team t2 ON tm2.teamId = t2.id
+              JOIN eventcontestteam ect2 ON t2.id = ect2.teamId
+              JOIN eventcontest ec2 ON ect2.eventcontestId = ec2.id
+              WHERE 
+                ec2.eventId = ${eventId}
+                AND tm2.contestantId = tm.contestantId
+                AND t2.id != t1.id
+            )
+        )
+        SELECT COUNT(DISTINCT t.id) as count
+        FROM team t
+        JOIN teamMember tm ON t.id = tm.teamId
+        JOIN duplicate_members dm ON tm.contestantId = dm.contestantId
+        JOIN eventcontestteam ect ON t.id = ect.teamId
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        WHERE ec.eventId = ${eventId} AND ect.status = 'PENDING'
+      ` as any[];
+      
+      // Teams with age mismatches
+      const ageMismatchesQuery = await prisma.$queryRaw`
+        SELECT COUNT(DISTINCT t.id) as count
+        FROM team t
+        JOIN teamMember tm ON t.id = tm.teamId
+        JOIN contestant c ON tm.contestantId = c.id
+        JOIN eventcontestteam ect ON t.id = ect.teamId
+        JOIN eventcontest ec ON ect.eventcontestId = ec.id
+        JOIN contest ct ON ec.contestId = ct.id
+        JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
+        JOIN targetgroup tg ON tg.id = ctg.B
+        WHERE 
+          ec.eventId = ${eventId}
+          AND ect.status = 'PENDING'
+          AND ect.status != 'APPROVED_SPECIAL'
+          AND (
+            (c.age IS NOT NULL AND tg.minAge IS NOT NULL AND c.age < tg.minAge) OR
+            (c.age IS NOT NULL AND tg.maxAge IS NOT NULL AND c.age > tg.maxAge)
+          )
+      ` as any[];
+      
+      const noMembersCount = Array.isArray(noMembersQuery) ? noMembersQuery.length : 0;
+      const invalidEmailsCount = Number(invalidEmailsQuery[0]?.count || 0);
+      const duplicateMembersCount = Number(duplicateMembersQuery[0]?.count || 0);
+      const ageMismatchesCount = Number(ageMismatchesQuery[0]?.count || 0);
+      
+      // Return detailed error information
+      return NextResponse.json({ 
+        error: "No eligible PENDING teams found", 
+        details: {
+          totalPendingTeams: Number(pendingCount[0]?.count || 0),
+          noMembersCount,
+          invalidEmailsCount,
+          duplicateMembersCount,
+          ageMismatchesCount
+        },
+        message: "Teams must have members, valid email, no duplicate contestants, and ages matching target group requirements."
+      }, { status: 404 });
     }
 
     // Collect team IDs for status update

@@ -157,35 +157,64 @@ export async function GET(
       })
     );
 
-    // Detect duplicate members across teams
-    const memberTeamMap = new Map<string, string[]>(); // ic -> team names
-    const duplicateMembers = new Set<string>(); // ic of duplicate members
+    // Detect duplicate members across teams - STRICT enforcement (no duplicates across ANY contests)
+    // This must exactly match the logic in /api/organizer/events/[eventId]/rawlist/approved-xlsx/route.ts
+    console.log('Applying strict duplicate member detection - no duplicates across ANY contests');
     
+    const memberTeamMap = new Map<string, Array<{teamId: number, teamName: string}>>(); // contestantId -> team info
+    const duplicateMembers = new Set<string>(); // contestantId of duplicate members
+    const teamWithDuplicatesMap = new Map<number, boolean>(); // teamId -> has duplicates flag
+    
+    // First pass: build the contestant -> teams mapping
     teamsWithMembers.forEach(team => {
       team.members.forEach((member: any) => {
-        if (member.ic) {
-          if (!memberTeamMap.has(member.ic)) {
-            memberTeamMap.set(member.ic, []);
-          }
-          memberTeamMap.get(member.ic)!.push(team.teamName);
+        const contestantId = String(member.id); // Use contestant ID not IC for proper matching
+        
+        if (!memberTeamMap.has(contestantId)) {
+          memberTeamMap.set(contestantId, []);
+        }
+        
+        memberTeamMap.get(contestantId)!.push({
+          teamId: team.id,
+          teamName: team.teamName
+        });
+        
+        // If this contestant belongs to more than one team (across ANY contest), mark as duplicate
+        if (memberTeamMap.get(contestantId)!.length > 1) {
+          duplicateMembers.add(contestantId);
           
-          // If this member belongs to more than one team, mark as duplicate
-          if (memberTeamMap.get(member.ic)!.length > 1) {
-            duplicateMembers.add(member.ic);
-          }
+          // Mark ALL teams with this contestant as having duplicates
+          memberTeamMap.get(contestantId)!.forEach(teamInfo => {
+            teamWithDuplicatesMap.set(teamInfo.teamId, true);
+          });
         }
       });
     });
+    
+    console.log(`Found ${duplicateMembers.size} duplicate contestants across ${teamWithDuplicatesMap.size} teams`);
+    if (duplicateMembers.size > 0) {
+      console.log('Teams with duplicates:', Array.from(teamWithDuplicatesMap.keys()));
+    }
 
     // Add duplicate information to teams and members
     const teamsWithDuplicateInfo = teamsWithMembers.map(team => {
-      const membersWithDuplicateInfo = team.members.map((member: any) => ({
-        ...member,
-        isDuplicate: member.ic ? duplicateMembers.has(member.ic) : false,
-        duplicateTeams: member.ic ? memberTeamMap.get(member.ic) || [] : []
-      }));
+      const membersWithDuplicateInfo = team.members.map((member: any) => {
+        const contestantId = String(member.id);
+        const isInDuplicateList = duplicateMembers.has(contestantId);
+        const teamsInfo = memberTeamMap.get(contestantId) || [];
+        const duplicateTeamNames = teamsInfo
+          .filter(t => t.teamId !== team.id) // Exclude current team
+          .map(t => t.teamName);
+        
+        return {
+          ...member,
+          isDuplicate: isInDuplicateList,
+          duplicateTeams: duplicateTeamNames
+        };
+      });
       
-      const hasDuplicateMembers = membersWithDuplicateInfo.some((member: any) => member.isDuplicate);
+      // A team has duplicate members if it's in our map of teams with duplicates
+      const hasDuplicateMembers = teamWithDuplicatesMap.has(team.id);
       
       return {
         ...team,

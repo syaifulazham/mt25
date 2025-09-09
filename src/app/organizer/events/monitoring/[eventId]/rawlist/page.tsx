@@ -113,6 +113,8 @@ export default function RawlistPage() {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [downloadInProgress, setDownloadInProgress] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const [diagnosticData, setDiagnosticData] = useState<any>(null);
+  const [showDiagnosticDialog, setShowDiagnosticDialog] = useState(false);
 
   // Helper function to format joinedAt date in Malaysia timezone (GMT+8)
   const formatJoinedAt = (joinedAt: string | null) => {
@@ -211,28 +213,73 @@ export default function RawlistPage() {
 
   // Count pending teams that meet approval criteria
   useEffect(() => {
-    // First log if teamEmail is available in the data
+    console.log('==== DEBUGGING TEAM ELIGIBILITY ====');
+    console.log(`Total teams: ${teams.length}`);
+    
+    // First log all PENDING teams with their details
     const pendingTeams = teams.filter(team => team.status === 'PENDING');
-    console.log('PENDING teams with emails:', pendingTeams.map(t => ({ 
-      name: t.teamName, 
-      id: t.id, 
-      email: t.teamEmail 
-    })));
+    console.log(`PENDING teams count: ${pendingTeams.length}`);
+    
+    // Create an exhaustive debug report for each team
+    let eligibleCount = 0;
+    let ineligibleEmailCount = 0;
+    let ineligibleEmptyTeamCount = 0;
+    let ineligibleDuplicatesCount = 0;
+    let ineligibleAgeMismatchCount = 0;
     
     const eligiblePendingTeams = teams.filter(team => {
-      // Criteria must match exactly what the backend API checks:
-      // 1. Must be PENDING status
-      // 2. Must have at least one member
-      // 3. No age mismatches with target group
-      // 4. No duplicate members across ANY teams (not just same contest)
-      // 5. Email must be valid and follow regex pattern
+      if (team.status !== 'PENDING') return false;
       
+      // Analyze why a team might be ineligible
+      let eligibleReasons = [];
+      let ineligibleReasons = [];
+      
+      // 1. PENDING status
+      eligibleReasons.push('Status is PENDING');
+      
+      // 2. Must have at least one member
+      if (team.members.length > 0) {
+        eligibleReasons.push(`Has ${team.members.length} members`);
+      } else {
+        ineligibleReasons.push('No members');
+        ineligibleEmptyTeamCount++;
+      }
+      
+      // 3. No age mismatches with target group
+      const ageIssue = hasAgeMismatch(team);
+      if (!ageIssue) {
+        eligibleReasons.push('Ages match target group');
+      } else {
+        ineligibleReasons.push(`Age mismatch: ${getAgeMismatchDetails(team)}`);
+        ineligibleAgeMismatchCount++;
+      }
+      
+      // 4. No duplicate members across ANY teams
+      if (!team.hasDuplicateMembers) {
+        eligibleReasons.push('No duplicate members');
+      } else {
+        // Find which members are duplicates
+        const duplicateMembers = team.members.filter(m => m.isDuplicate);
+        const duplicateMemberNames = duplicateMembers.map(m => m.participantName).join(', ');
+        ineligibleReasons.push(`Has duplicate members: ${duplicateMemberNames}`);
+        ineligibleDuplicatesCount++;
+      }
+      
+      // 5. Email must be valid and follow regex pattern
       // Check email strictly using same regex as backend
       const validEmailRegex = /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       const validEmail = team.teamEmail && 
                         team.teamEmail.trim() !== '' && 
                         validEmailRegex.test(team.teamEmail);
       
+      if (validEmail) {
+        eligibleReasons.push(`Valid email: ${team.teamEmail}`);
+      } else {
+        ineligibleReasons.push(`Invalid email: '${team.teamEmail || 'missing'}'`);
+        ineligibleEmailCount++;
+      }
+      
+      // Final eligibility determination
       const eligible = 
         team.status === 'PENDING' && 
         team.members.length > 0 && 
@@ -240,25 +287,42 @@ export default function RawlistPage() {
         !team.hasDuplicateMembers &&
         validEmail;
       
-      // Detailed eligibility logging
-      if (team.status === 'PENDING') {
-        console.log(`Team ${team.teamName} (${team.id}): ${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'} | ` +
-          `Members: ${team.members.length > 0 ? 'Yes' : 'No'} | ` +
-          `Age Mismatch: ${hasAgeMismatch(team) ? 'Yes' : 'No'} | ` +
-          `Duplicates: ${team.hasDuplicateMembers ? 'Yes' : 'No'} | ` +
-          `Email: '${team.teamEmail || 'missing'}' | ` +
-          `Valid email: ${validEmail ? 'Yes' : 'No'}`);
+      // Detailed console logging with color formatting
+      console.log(
+        `%cTeam %c${team.teamName}%c (ID: ${team.id}): %c${eligible ? 'ELIGIBLE' : 'NOT ELIGIBLE'}`,
+        'color: black;',
+        'color: blue; font-weight: bold;',
+        'color: black;',
+        `color: ${eligible ? 'green' : 'red'}; font-weight: bold;`
+      );
+      
+      if (eligibleReasons.length > 0) {
+        console.log('  %c✓ PASS:%c ' + eligibleReasons.join(', '), 'color: green; font-weight: bold;', 'color: green;');
+      }
+      
+      if (ineligibleReasons.length > 0) {
+        console.log('  %c✗ FAIL:%c ' + ineligibleReasons.join(', '), 'color: red; font-weight: bold;', 'color: red;');
+      }
+      
+      if (eligible) {
+        eligibleCount++;
       }
       
       return eligible;
     });
     
-    console.log(`Total eligible pending teams: ${eligiblePendingTeams.length}`);
-    if (eligiblePendingTeams.length > 0) {
-      console.log('Eligible teams:', eligiblePendingTeams.map(t => t.teamName).join(', '));
-    }
+    // Summary report
+    console.log('==== ELIGIBILITY SUMMARY ====');
+    console.log(`Total teams: ${teams.length}`);
+    console.log(`Total PENDING teams: ${pendingTeams.length}`);
+    console.log(`Total ELIGIBLE teams: ${eligibleCount}`);
+    console.log('Ineligible teams breakdown:');
+    console.log(`  - Teams with invalid emails: ${ineligibleEmailCount}`);
+    console.log(`  - Teams with no members: ${ineligibleEmptyTeamCount}`);
+    console.log(`  - Teams with duplicate members: ${ineligibleDuplicatesCount}`);
+    console.log(`  - Teams with age mismatches: ${ineligibleAgeMismatchCount}`);
     
-    setPendingCount(eligiblePendingTeams.length);
+    setPendingCount(eligibleCount);
   }, [teams]);
 
   // Filter teams based on search and filters
@@ -423,13 +487,81 @@ export default function RawlistPage() {
     }
   };
   
+  const handleRunDiagnostic = async () => {
+    try {
+      toast.info('Running eligibility diagnostic check...');
+      
+      const response = await fetch(`/api/organizer/events/${eventId}/rawlist/diagnostic`);
+      
+      if (!response.ok) {
+        toast.error(`Diagnostic check failed: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
+      const data = await response.json();
+      setDiagnosticData(data);
+      setShowDiagnosticDialog(true);
+      
+      // Log detailed diagnostic information
+      console.log('==== DIAGNOSTIC RESULTS ====', data);
+      
+      // Compare with frontend eligibility count
+      console.log(`Frontend eligible count: ${pendingCount}`);
+      console.log(`Backend eligible count: ${data.summary?.eligibleCount || 0}`);
+      
+      if (data.summary?.eligibleCount === 0) {
+        console.log('==== ELIGIBILITY BLOCKERS ====');
+        console.log(`Teams with no members: ${data.summary?.teamsWithNoMembersCount || 0}`);
+        console.log(`Teams with invalid emails: ${data.summary?.teamsWithInvalidEmailsCount || 0}`);
+        console.log(`Teams with duplicate members: ${data.summary?.teamsWithDuplicateMembersCount || 0}`);
+        console.log(`Teams with age mismatches: ${data.summary?.teamsWithAgeMismatchesCount || 0}`);
+      }
+      
+      toast.success('Diagnostic completed!');
+      
+    } catch (error) {
+      console.error('Error running diagnostic:', error);
+      toast.error('Failed to run eligibility diagnostic');
+    }
+  };
+
   const handleApproveAndDownload = async () => {
     try {
       setDownloadInProgress('approve');
+      console.log('==== STARTING APPROVE AND DOWNLOAD ====');
+      console.log(`Sending request to approve ${pendingCount} eligible teams`);
+      
+      // First, log the criteria we're using on the frontend for eligibility
+      console.log('Frontend eligibility criteria:');
+      console.log('1. Status must be PENDING');
+      console.log('2. Team must have at least one member');
+      console.log('3. No age mismatches with target group');
+      console.log('4. No duplicate members across ANY teams');
+      console.log('5. Valid email format: /^[a-zA-Z0-9][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/');
+      
+      // Run diagnostic first to see eligibility count
+      await handleRunDiagnostic();
+      
       const response = await fetch(`/api/organizer/events/${eventId}/rawlist/approved-xlsx`);
+      console.log(`Response status: ${response.status}`);
+      
+      // Log response headers if available
+      console.log('Response headers:');
+      response.headers.forEach((value, name) => {
+        console.log(`${name}: ${value}`);
+      });
       
       if (response.status === 404) {
-        toast.warning('No eligible PENDING teams found that meet the criteria for approval.');
+        // Try to extract more details from the response
+        const errorText = await response.text();
+        try {
+          const errorJson = JSON.parse(errorText);
+          console.error('API error details:', errorJson);
+          toast.warning(`No eligible teams found: ${errorJson.error || 'Unknown error'}`);
+        } catch (e) {
+          console.error('Raw API error:', errorText);
+          toast.warning('No eligible PENDING teams found that meet the criteria for approval.');
+        }
         return;
       }
       
@@ -451,7 +583,8 @@ export default function RawlistPage() {
       toast.success('Teams successfully approved and downloaded!');
       
       // Refresh the teams data to show updated statuses
-      fetchTeams();
+      console.log('Refreshing team data after successful approval');
+      await fetchTeams();
       
     } catch (error) {
       console.error('Error approving and generating XLSX:', error);
@@ -480,6 +613,116 @@ export default function RawlistPage() {
 
   return (
     <DashboardShell>
+      {/* Diagnostic Results Dialog */}
+      <Dialog open={showDiagnosticDialog} onOpenChange={setShowDiagnosticDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Eligibility Diagnostic Results</DialogTitle>
+            <DialogDescription>Detailed analysis of team eligibility status</DialogDescription>
+          </DialogHeader>
+          
+          {diagnosticData ? (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-md">
+                <h3 className="font-medium text-blue-800 mb-2">Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="text-xs text-gray-500">Pending Teams</div>
+                    <div className="text-lg font-bold">{diagnosticData.summary?.totalPendingCount || 0}</div>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="text-xs text-gray-500">Eligible</div>
+                    <div className="text-lg font-bold text-green-600">{diagnosticData.summary?.eligibleCount || 0}</div>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="text-xs text-gray-500">Invalid Email</div>
+                    <div className="text-lg font-bold text-amber-600">{diagnosticData.summary?.teamsWithInvalidEmailsCount || 0}</div>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="text-xs text-gray-500">Duplicate Members</div>
+                    <div className="text-lg font-bold text-red-600">{diagnosticData.summary?.teamsWithDuplicateMembersCount || 0}</div>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow-sm">
+                    <div className="text-xs text-gray-500">Age Mismatches</div>
+                    <div className="text-lg font-bold text-purple-600">{diagnosticData.summary?.teamsWithAgeMismatchesCount || 0}</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Filter information */}
+              <div className="bg-gray-50 p-4 rounded-md">
+                <h3 className="font-medium mb-2">Filter Criteria</h3>
+                <div className="text-sm space-y-1">
+                  <div><strong>Email Validation:</strong> {diagnosticData.filters?.emailRegex}</div>
+                  <div><strong>Member Check:</strong> {diagnosticData.filters?.hasMemberCheck}</div>
+                  <div><strong>Duplicate Logic:</strong> {diagnosticData.filters?.duplicateLogic}</div>
+                </div>
+              </div>
+              
+              {/* Sample teams table */}
+              {diagnosticData.sampleTeams && diagnosticData.sampleTeams.length > 0 && (
+                <div className="border rounded-md overflow-hidden">
+                  <h3 className="font-medium p-4 bg-gray-50 border-b">Sample PENDING Teams</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 text-xs">
+                        <tr>
+                          <th className="p-2 text-left">Team Name</th>
+                          <th className="p-2 text-left">Email</th>
+                          <th className="p-2 text-left">Members</th>
+                          <th className="p-2 text-left">Age Mismatch</th>
+                          <th className="p-2 text-left">Duplicates</th>
+                          <th className="p-2 text-left">Status</th>
+                          <th className="p-2 text-left">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {diagnosticData.sampleTeams.map((team: any, index: number) => (
+                          <tr key={team.id} className={team.eligibilityStatus === 'eligible' ? 'bg-green-50' : 'bg-red-50'}>
+                            <td className="p-2 text-sm">{team.teamName}</td>
+                            <td className="p-2 text-sm">
+                              <span className={`inline-block px-2 py-1 text-xs rounded ${team.emailStatus === 'valid' ? 'bg-green-100' : 'bg-red-100'}`}>
+                                {team.emailStatus}
+                              </span>
+                            </td>
+                            <td className="p-2 text-sm">{team.memberCount}</td>
+                            <td className="p-2 text-sm">{team.hasAgeMismatch}</td>
+                            <td className="p-2 text-sm">{team.hasDuplicateMembers}</td>
+                            <td className="p-2 text-sm font-medium">{team.eligibilityStatus}</td>
+                            <td className="p-2 text-sm">{team.failureReason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-between">
+                <div>
+                  {diagnosticData.summary?.eligibleCount === 0 && (
+                    <div className="text-red-600 text-sm">
+                      No teams are currently eligible for approval. Please check the criteria above.
+                    </div>
+                  )}
+                  {pendingCount !== diagnosticData.summary?.eligibleCount && (
+                    <div className="text-amber-600 text-sm">
+                      Warning: Frontend count ({pendingCount}) doesn't match backend count ({diagnosticData.summary?.eligibleCount || 0}).
+                    </div>
+                  )}
+                </div>
+                <Button onClick={() => setShowDiagnosticDialog(false)}>Close</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2">Loading diagnostic data...</span>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -507,6 +750,13 @@ export default function RawlistPage() {
             >
               <Users className="h-4 w-4" />
               View End List
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleRunDiagnostic}
+              className="flex items-center gap-2"
+            >
+              Check Eligibility
             </Button>
             <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
               <DialogTrigger asChild>
