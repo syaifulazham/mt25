@@ -192,6 +192,10 @@ export async function GET(req: NextRequest) {
               participantId: parseInt(participantId)
             }
           },
+          // Only include teams with PHYSICAL contests (not ONLINE)
+          contest: {
+            method: 'PHYSICAL'
+          },
           // Only include teams that exist in eventcontestteam
           eventcontestteam: {
             some: {}
@@ -254,6 +258,10 @@ export async function GET(req: NextRequest) {
       where: {
         contingentId: {
           in: contingentIds
+        },
+        // Only include teams with PHYSICAL contests (not ONLINE)
+        contest: {
+          method: 'PHYSICAL'
         },
         // Only include teams that exist in eventcontestteam
         eventcontestteam: {
