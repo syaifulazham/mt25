@@ -582,6 +582,65 @@ export default function RawlistPage() {
       setDownloadInProgress(null);
     }
   };
+
+  const handleGenerateFilteredXlsx = async () => {
+    if (filteredTeams.length === 0) return;
+    
+    setDownloadInProgress('filtered-xlsx');
+    setDownloadModalOpen(false);
+    
+    try {
+      console.log('==== STARTING FILTERED XLSX DOWNLOAD ====');
+      toast.loading(`Generating Excel for ${filteredTeams.length} filtered teams...`);
+      
+      // Get IDs of all filtered teams
+      const filteredTeamIds = filteredTeams.map(team => team.id);
+      console.log(`Sending ${filteredTeamIds.length} team IDs for filtered export`);
+      
+      // Use our filtered-xlsx endpoint
+      const response = await fetch(`/api/organizer/events/${eventId}/rawlist/filtered-xlsx`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ teamIds: filteredTeamIds })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate filtered Excel');
+      }
+
+      // Get filename from content disposition header
+      const contentDisposition = response.headers.get('content-disposition');
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/i);
+      const filename = filenameMatch ? filenameMatch[1] : `filtered-teams-${Date.now()}.xlsx`;
+
+      // Process blob response for download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.dismiss();
+      toast.success(`Successfully generated Excel for ${filteredTeamIds.length} filtered teams`);
+      
+    } catch (error: any) {
+      console.error('Error generating filtered Excel:', error);
+      toast.dismiss();
+      toast.error(error.message || 'Failed to generate filtered Excel');
+    } finally {
+      setDownloadInProgress(null);
+    }
+  };
   const handleRunDiagnostic = async () => {
     try {
       toast.info('Running eligibility diagnostic check...');
@@ -1010,6 +1069,30 @@ export default function RawlistPage() {
                         <div className="flex flex-col items-start">
                           <span className="font-semibold">Excel Spreadsheet (XLSX)</span>
                           <span className="text-xs text-muted-foreground">Tabular data for analysis</span>
+                        </div>
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleGenerateFilteredXlsx} 
+                    className="flex items-center justify-center gap-2 h-16" 
+                    variant="default"
+                    disabled={downloadInProgress !== null || filteredTeams.length === 0}
+                  >
+                    {downloadInProgress === 'filtered-xlsx' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Generating filtered XLSX...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="h-5 w-5" />
+                        <div className="flex flex-col items-start">
+                          <span className="font-semibold">Download as filtered</span>
+                          <span className="text-xs text-muted-foreground">
+                            Export {filteredTeams.length} filtered teams
+                          </span>
                         </div>
                       </>
                     )}
