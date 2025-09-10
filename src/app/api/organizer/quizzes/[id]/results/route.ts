@@ -103,9 +103,7 @@ export async function GET(
           }
         },
       },
-      orderBy: {
-        score: 'desc', // Order by score descending (highest first)
-      }
+      // No sorting here - we'll sort after getting answers
     });
     
     // Get quiz answers separately
@@ -129,7 +127,7 @@ export async function GET(
     );
 
     // Calculate summary for each attempt
-    const resultsWithSummary = attemptsWithAnswers.map((attempt, index) => {
+    const attemptsWithSummary = attemptsWithAnswers.map((attempt) => {
       const totalQuestions = attempt.quiz_answer.length;
       const correctAnswers = attempt.quiz_answer.filter(answer => answer.is_correct).length;
       const percentage = totalQuestions > 0 
@@ -137,7 +135,6 @@ export async function GET(
         : 0;
       
       return {
-        rank: index + 1, // Add ranking based on ordered results
         attemptId: attempt.id,
         contestantId: attempt.contestantId,
         contestantName: attempt.contestant.name,
@@ -156,6 +153,33 @@ export async function GET(
         }
       };
     });
+    
+    // Sort by correct answers (highest first) and then by time taken (fastest first) for non-zero times
+    const sortedResults = [...attemptsWithSummary].sort((a, b) => {
+      // First sort by number of correct answers (highest first)
+      if (b.summary.correctAnswers !== a.summary.correctAnswers) {
+        return b.summary.correctAnswers - a.summary.correctAnswers;
+      }
+      
+      // Then sort by time taken (fastest first), but only consider non-zero times
+      // If either value is null/undefined, treat as zero
+      const aTime = a.timeTaken || 0;
+      const bTime = b.timeTaken || 0;
+      
+      // If both have zero time, they're equal
+      // If one has zero time, the non-zero time comes first
+      // Otherwise, sort by fastest time
+      if (aTime === 0 && bTime === 0) return 0;
+      if (aTime === 0) return 1;
+      if (bTime === 0) return -1;
+      return aTime - bTime;
+    });
+    
+    // Add ranking after sorting
+    const resultsWithSummary = sortedResults.map((result, index) => ({
+      ...result,
+      rank: index + 1
+    }));
 
     return NextResponse.json({ 
       quiz,

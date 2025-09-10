@@ -346,7 +346,7 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
           <div>
             <CardTitle>Quiz Results</CardTitle>
             <CardDescription>
-              Ranked by score from highest to lowest
+              Ranked by number of correct answers and fastest time taken
             </CardDescription>
           </div>
           <div className="flex gap-2">
