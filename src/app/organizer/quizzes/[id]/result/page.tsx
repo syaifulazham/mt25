@@ -159,11 +159,11 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
       "Contestant Name", 
       "Contestant ID",
       "Institution", 
-      "Score", 
-      "Correct Answers", 
+      "Correct Answers", // Moved up to emphasize ranking priority
       "Total Questions", 
       "Percentage", 
-      "Time Taken"
+      "Time Taken", // Moved up to emphasize ranking priority
+      "Score" // Moved to the end since it's not the primary ranking factor
     ];
     
     const csvData = results.map(result => [
@@ -171,11 +171,11 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
       result.contestantName,
       result.contestantHash,
       `${result.contingentName.replace(' Contingent', '')} - ${result.institutionName}`,
-      result.score,
       result.summary.correctAnswers,
       result.summary.totalQuestions,
       `${result.summary.percentage}%`,
-      formatTimeTaken(result.timeTaken)
+      formatTimeTaken(result.timeTaken),
+      result.score
     ]);
     
     const csvContent = [
@@ -372,9 +372,9 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                 <TableRow>
                   <TableHead className="w-[60px]">Rank</TableHead>
                   <TableHead>Contestant</TableHead>
+                  <TableHead className="font-semibold text-primary">Correct / Total</TableHead>
+                  <TableHead className="font-semibold text-primary">Time Taken</TableHead>
                   <TableHead>Score</TableHead>
-                  <TableHead>Correct / Total</TableHead>
-                  <TableHead>Time Taken</TableHead>
                   <TableHead>Completed</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -417,19 +417,22 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="font-semibold text-primary">
-                          {result.summary.percentage}%
-                        </div>
+                      <TableCell className="font-semibold text-primary">
+                        {result.summary.correctAnswers} / {result.summary.totalQuestions}
                         <div className="text-xs text-gray-500">
+                          {result.summary.percentage}% correct
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-semibold text-primary">
+                        {formatTimeTaken(result.timeTaken)}
+                        {result.timeTaken === 0 && (
+                          <div className="text-xs text-gray-500">Not completed</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div>
                           {result.score} points
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {result.summary.correctAnswers} / {result.summary.totalQuestions}
-                      </TableCell>
-                      <TableCell>
-                        {formatTimeTaken(result.timeTaken)}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -591,6 +594,9 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                         {selectedResult.rank === 3 && "🥉"}
                       </span>
                     )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Ranking based on correct answers and time taken
                   </div>
                 </div>
                 <div>

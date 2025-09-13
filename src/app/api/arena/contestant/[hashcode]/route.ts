@@ -78,7 +78,7 @@ export async function GET(
         return 'Primary';
       } else if (eduLevel.includes('menengah') || eduLevel.includes('secondary')) {
         return 'Secondary';
-      } else if (eduLevel.includes('universiti') || eduLevel.includes('university') || eduLevel.includes('college')) {
+      } else if (eduLevel.includes('universiti') || eduLevel.includes('university') || eduLevel.includes('college') || eduLevel.includes('belia')) {
         return 'Higher Education';
       } else {
         return 'Primary'; // Default fallback
@@ -92,6 +92,7 @@ export async function GET(
       prisma.$queryRaw`
         SELECT 
           code, 
+          name,
           contestant_class_grade,
           minAge,
           maxAge,
@@ -105,31 +106,42 @@ export async function GET(
         )
       `
     ) as any[];
+    
+    console.log(`Found ${eligibleTargetGroups.length} potentially eligible target groups for contestant:`, {
+      contestantAge,
+      eduLevel,
+      schoolLevel: schoolLevel,
+      eligibleTargetGroups: eligibleTargetGroups.map(tg => ({ code: tg.code, name: tg.name, schoolLevel: tg.schoolLevel }))
+    });
 
-    // Filter target groups that match contestant's class grade and education level
+    // Filter target groups that match contestant's class grade only if specified
+    // We're ignoring school level condition as requested
     const filteredTargetGroups = eligibleTargetGroups.filter(tg => {
-      // School level matching check
-      const schoolLevelMatches = 
-        (tg.schoolLevel === 'Primary' && ['sekolah rendah', 'SEKOLAH RENDAH'].includes(contestant.edu_level)) ||
-        (tg.schoolLevel === 'Secondary' && ['sekolah menengah', 'SEKOLAH MENENGAH'].includes(contestant.edu_level)) ||
-        (tg.schoolLevel === schoolLevel && !['Primary', 'Secondary'].includes(tg.schoolLevel));
-      
-      // If not matching school level, exclude
-      if (!schoolLevelMatches) {
-        return false;
-      }
+      console.log(`Checking target group ${tg.code} (${tg.name}) - minAge: ${tg.minAge}, maxAge: ${tg.maxAge}, contestant age: ${contestantAge}`);
       
       // If target group has a specific class grade requirement
       if (tg.contestant_class_grade && tg.contestant_class_grade !== 'none') {
         // Only include if it matches contestant's class grade
-        return tg.contestant_class_grade === contestantClassGrade;
+        const matches = tg.contestant_class_grade === contestantClassGrade;
+        if (!matches) {
+          console.log(`Filtering out target group ${tg.code} - Class grade ${tg.contestant_class_grade} doesn't match contestant class grade ${contestantClassGrade}`);
+        }
+        return matches;
       }
       
-      // Include target groups with no specific class grade requirement
+      // Include all target groups with no specific class grade requirement
+      // This will use only the age range check from the SQL query
       return true;
     });
     
     const targetGroupCodes = filteredTargetGroups.map(tg => tg.code);
+    
+    console.log(`After filtering, ${filteredTargetGroups.length} target groups match for contestant:`, {
+      contestantAge,
+      eduLevel,
+      schoolLevel: schoolLevel,
+      filteredTargetGroups: filteredTargetGroups.map(tg => ({ code: tg.code, name: tg.name, schoolLevel: tg.schoolLevel }))
+    });
 
     // Get published quizzes matching contestant's eligible target groups
     let quizzes: any[] = [];
