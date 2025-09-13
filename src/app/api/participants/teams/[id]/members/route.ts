@@ -230,7 +230,7 @@ export async function POST(
       );
     }
 
-    // Check if the contestant is already a member of any other team
+    // Check if the contestant is already a member of any other team (for informational purposes only)
     const existingTeamMembership = await prisma.teamMember.findFirst({
       where: {
         contestantId: contestantId,
@@ -249,17 +249,10 @@ export async function POST(
       }
     });
     
+    // We're allowing contestants to be in multiple teams now, so we don't return an error
+    // Just log the information for debugging purposes
     if (existingTeamMembership && existingTeamMembership.team.status === 'ACTIVE') {
-      return NextResponse.json(
-        { 
-          error: `This contestant is already a member of another active team: ${existingTeamMembership.team.name}`,
-          existingTeam: {
-            id: existingTeamMembership.team.id,
-            name: existingTeamMembership.team.name
-          }
-        },
-        { status: 409 }
-      );
+      console.log(`Note: Contestant ${contestantId} is already a member of another active team: ${existingTeamMembership.team.name} (ID: ${existingTeamMembership.team.id}), but will be allowed to join this team as well.`);
     }
     
     // Add the contestant to the team

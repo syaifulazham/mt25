@@ -1765,22 +1765,12 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                         </TableHeader>
                         <TableBody>
                           {filteredContestants.map((contestant) => (
-                            <TableRow key={contestant.id}>
+                            <TableRow 
+                              key={contestant.id} 
+                              className={contestant.inTeam ? "bg-amber-50" : ""}
+                            >
                               <TableCell className="text-center pr-2 w-[60px] sm:w-[80px]">
-                                {contestant.inTeam ? (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 text-xs p-1 cursor-help">
-                                          <CheckCircle className="h-3 w-3 text-amber-600" />
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Already in team: {contestant.existingTeam?.name || 'Unknown Team'}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                ) : (
+                                <div className="flex items-center justify-center">
                                   <Button
                                     size="sm"
                                     onClick={() => handleAddMember(contestant.id)}
@@ -1796,7 +1786,7 @@ export default function TeamMembersPage({ params }: { params: { id: string } }) 
                                       </>
                                     )}
                                   </Button>
-                                )}
+                                </div>
                               </TableCell>
                               <TableCell className="pl-2">
                                 <div className="font-medium">{contestant.name || "—"}</div>
