@@ -93,7 +93,7 @@ export async function GET(
         return 'Primary';
       } else if (eduLevel.includes('menengah') || eduLevel.includes('secondary')) {
         return 'Secondary';
-      } else if (eduLevel.includes('universiti') || eduLevel.includes('university') || eduLevel.includes('college')) {
+      } else if (eduLevel.includes('universiti') || eduLevel.includes('university') || eduLevel.includes('college') || eduLevel.includes('belia')) {
         return 'Higher Education';
       } else {
         return 'Primary'; // Default fallback
@@ -105,15 +105,44 @@ export async function GET(
     // Check if contestant is eligible for this quiz's target group
     const eligibleTargetGroups = await prismaExecute(async (prisma) => 
       prisma.$queryRaw`
-        SELECT code FROM targetgroup 
+        SELECT 
+          code, 
+          contestant_class_grade
+        FROM targetgroup 
         WHERE code = ${quiz.target_group}
-        AND minAge <= ${contestantAge} 
-        AND maxAge >= ${contestantAge}
-        AND (schoolLevel = ${schoolLevel} OR code = 'OA')
+        AND (
+          -- If contestant_class_grade is specified, ignore age restrictions
+          (contestant_class_grade IS NOT NULL AND contestant_class_grade != '' AND contestant_class_grade != 'none') OR
+          -- Otherwise apply age restrictions
+          (minAge <= ${contestantAge} AND maxAge >= ${contestantAge})
+        )
       `
     ) as any[];
 
-    if (eligibleTargetGroups.length === 0) {
+    // Get contestant's class grade
+    const contestantClassGrade = await prismaExecute(async (prisma) => 
+      prisma.$queryRaw`
+        SELECT class_grade FROM contestant 
+        WHERE id = ${contestant.id}
+        LIMIT 1
+      `
+    ) as any[];
+    
+    const contestantGrade = contestantClassGrade.length > 0 ? contestantClassGrade[0].class_grade : null;
+    
+    // Filter target groups that match contestant's class grade only if specified
+    const filteredTargetGroups = eligibleTargetGroups.filter(tg => {
+      // If target group has a specific class grade requirement
+      if (tg.contestant_class_grade && tg.contestant_class_grade !== 'none') {
+        // Only include if it matches contestant's class grade
+        return tg.contestant_class_grade === contestantGrade;
+      }
+      
+      // Include all target groups with no specific class grade requirement
+      return true;
+    });
+    
+    if (filteredTargetGroups.length === 0) {
       return NextResponse.json(
         { success: false, message: 'You are not eligible for this quiz' },
         { status: 403 }
