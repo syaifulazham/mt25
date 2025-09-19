@@ -87,9 +87,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Define limits for file size in config
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}
+// Route segment config
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+// This route needs to handle file uploads, which means we can't use the default body parsing
