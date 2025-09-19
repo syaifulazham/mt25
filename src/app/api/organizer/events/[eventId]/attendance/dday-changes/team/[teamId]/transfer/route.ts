@@ -79,7 +79,7 @@ export async function GET(
 
     const currentEventData = currentEvent[0];
 
-    // Find eligible events based on scope area rules
+    // Find eligible events based on contest matching only (ignoring scope area)
     let eligibleEventsQuery = `
       SELECT DISTINCT
         e.id,
@@ -99,25 +99,8 @@ export async function GET(
         AND c.code = '${team.contestCode}'
     `;
 
-    // Apply scope area filtering rules
-    if (currentEventData.scopeArea === 'ZONE') {
-      // For ZONE events, target events must be in same zone or be OPEN/NATIONAL
-      eligibleEventsQuery += `
-        AND (
-          (e.scopeArea = 'ZONE' AND e.zoneId = ${team.stateZoneId})
-          OR e.scopeArea IN ('OPEN', 'NATIONAL')
-        )
-      `;
-    } else if (currentEventData.scopeArea === 'STATE') {
-      // For STATE events, target events must be in same state or be OPEN/NATIONAL
-      eligibleEventsQuery += `
-        AND (
-          (e.scopeArea = 'STATE' AND e.stateId = ${team.stateId})
-          OR e.scopeArea IN ('OPEN', 'NATIONAL')
-        )
-      `;
-    }
-    // For OPEN/NATIONAL events, any event offering the same contest is eligible
+    // Scope area filtering rules are now ignored as per requirement
+    // All events offering the same contest are eligible regardless of scope area
 
     eligibleEventsQuery += `
       GROUP BY e.id, e.name, e.scopeArea, e.startDate, e.endDate, e.status, e.zoneId, e.stateId

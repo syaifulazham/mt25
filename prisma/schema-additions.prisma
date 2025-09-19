@@ -87,3 +87,62 @@ model email_template {
   campaigns            email_campaign[]
   outgoing_emails      email_outgoing[]
 }
+
+// Certificate Template System
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+model CertTemplate {
+  id              Int       @id @default(autoincrement())
+  templateName    String    @db.VarChar(255)
+  basePdfPath     String?   @db.VarChar(1000)
+  configuration   Json      // Stores canvas config, elements, and other template data
+  status          Status    @default(ACTIVE)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       Int       // User ID who created the template
+  updatedBy       Int?      // User ID who last updated the template
+  
+  // Relations to user table
+  creator         user      @relation("CreatedTemplates", fields: [createdBy], references: [id])
+  updater         user?     @relation("UpdatedTemplates", fields: [updatedBy], references: [id])
+  
+  // Generated certificates using this template
+  certificates    Certificate[]
+  
+  @@index([templateName])
+  @@index([status])
+  @@index([createdAt])
+  @@map("cert_template")
+}
+
+model Certificate {
+  id              Int       @id @default(autoincrement())
+  templateId      Int       // Reference to the template used
+  recipientName   String    @db.VarChar(255)
+  recipientEmail  String?   @db.VarChar(255)
+  recipientType   String    @db.VarChar(50) // PARTICIPANT, CONTESTANT, JUDGE, ORGANIZER
+  contestName     String?   @db.VarChar(255)
+  awardTitle      String?   @db.VarChar(255)
+  uniqueCode      String    @unique @db.VarChar(50)
+  filePath        String?   @db.VarChar(1000)
+  status          String    @default("DRAFT") @db.VarChar(20) // DRAFT, GENERATED, SENT, DOWNLOADED
+  issuedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       Int       // User ID who created the certificate
+  
+  // Relations
+  template        CertTemplate @relation(fields: [templateId], references: [id])
+  creator         user        @relation("CreatedCertificates", fields: [createdBy], references: [id])
+  
+  @@index([templateId])
+  @@index([recipientName])
+  @@index([recipientEmail])
+  @@index([status])
+  @@index([createdAt])
+  @@map("certificate")
+}

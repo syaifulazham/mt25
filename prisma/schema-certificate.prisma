@@ -1,0 +1,74 @@
+// Certificate Management Models for MySQL
+
+// Status enum for templates - Mapped to certificate_status_enum table
+enum CertificateStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// Certificate Template model
+model CertTemplate {
+  id              Int              @id @default(autoincrement())
+  templateName    String           @db.VarChar(255)
+  basePdfPath     String?          @db.VarChar(1000)
+  configuration   Json
+  status          CertificateStatus @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdBy       Int
+  updatedBy       Int?
+
+  // Relations to user table
+  creator         user             @relation("CreatedTemplates", fields: [createdBy], references: [id])
+  updater         user?            @relation("UpdatedTemplates", fields: [updatedBy], references: [id])
+  
+  // Generated certificates using this template
+  certificates    Certificate[]
+
+  @@index([templateName], name: "idx_cert_template_name")
+  @@index([status], name: "idx_cert_template_status")
+  @@index([createdAt], name: "idx_cert_template_createdAt")
+  @@map("cert_template")
+}
+
+// Certificate model
+model Certificate {
+  id              Int       @id @default(autoincrement())
+  templateId      Int
+  recipientName   String    @db.VarChar(255)
+  recipientEmail  String?   @db.VarChar(255)
+  recipientType   String    @db.VarChar(50) // PARTICIPANT, CONTESTANT, JUDGE, ORGANIZER
+  contestName     String?   @db.VarChar(255)
+  awardTitle      String?   @db.VarChar(255)
+  uniqueCode      String    @unique @db.VarChar(50)
+  filePath        String?   @db.VarChar(1000)
+  status          String    @default("DRAFT") @db.VarChar(20) // DRAFT, GENERATED, SENT, DOWNLOADED
+  issuedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdBy       Int
+  
+  // Relations
+  template        CertTemplate @relation(fields: [templateId], references: [id])
+  creator         user        @relation("CreatedCertificates", fields: [createdBy], references: [id])
+  
+  @@index([templateId], name: "idx_certificate_templateId")
+  @@index([recipientName], name: "idx_certificate_recipientName")
+  @@index([recipientEmail], name: "idx_certificate_recipientEmail")
+  @@index([status], name: "idx_certificate_status")
+  @@index([createdAt], name: "idx_certificate_createdAt")
+  @@map("certificate")
+}
+
+// Add these relations to the user model
+model user {
+  id                Int            @id @default(autoincrement())
+  // Existing fields...
+  
+  // Certificate relations
+  createdTemplates  CertTemplate[] @relation("CreatedTemplates")
+  updatedTemplates  CertTemplate[] @relation("UpdatedTemplates") 
+  createdCertificates Certificate[] @relation("CreatedCertificates")
+  
+  // ... other existing relations
+}

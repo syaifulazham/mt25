@@ -171,7 +171,7 @@ export default function TeamTransferModal({
             Transfer Team to Another Event
           </DialogTitle>
           <DialogDescription>
-            Move "{teamName}" to another event that offers the same contest and meets scope requirements
+            Move "{teamName}" to another event that offers the same contest
           </DialogDescription>
         </DialogHeader>
 
@@ -244,6 +244,19 @@ export default function TeamTransferModal({
             {/* Eligible Events */}
             <div>
               <h3 className="text-lg font-semibold mb-4">Select Target Event</h3>
+              <div className="mb-4 p-3 rounded-md bg-blue-50 border border-blue-200">
+                <div className="flex items-start gap-2">
+                  <div className="mt-0.5">
+                    <AlertTriangle className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-800 font-medium">Scope Area Requirements Ignored</p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      All events offering the same contest are shown, regardless of scope area (ZONE/STATE/NATIONAL).
+                    </p>
+                  </div>
+                </div>
+              </div>
               {transferData.eligibleEvents.length === 0 ? (
                 <Card>
                   <CardContent className="flex items-center justify-center py-8">
@@ -251,7 +264,7 @@ export default function TeamTransferModal({
                       <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
                       <h4 className="text-lg font-medium mb-2">No Eligible Events Found</h4>
                       <p className="text-muted-foreground">
-                        There are no other events that offer the same contest and meet the scope area requirements.
+                        There are no other events that offer the same contest.
                       </p>
                     </div>
                   </CardContent>
