@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Award, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert } from "lucide-react";
+import { Award, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert, User } from "lucide-react";
 import Link from "next/link";
 import AssignContestsModal from "./assign-contests-modal";
 
@@ -136,7 +136,13 @@ export function PaginatedContestantsList({ contestants, contingentId, refreshDat
                     </div>
                   </div>
                 </CardHeader>
-                <CardFooter className="bg-slate-50 py-2 px-6 flex justify-end">
+                <CardFooter className="bg-slate-50 py-2 px-6 flex justify-between">
+                  <Link href={`/organizer/participants/contestants/${contestant.id}`} passHref>
+                    <Button variant="ghost" size="sm" className="gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50">
+                      <User className="h-4 w-4" />
+                      View Details
+                    </Button>
+                  </Link>
                   <AssignContestsModal
                     contestantId={contestant.id}
                     contestantName={contestant.name}
