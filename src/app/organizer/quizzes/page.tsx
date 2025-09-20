@@ -45,6 +45,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 
+interface QuizStatistics {
+  totalEligible: number;
+  totalAnswered: number;
+  percentAnswered: number;
+  ageRange: string; // Age range from targetgroup
+  matched?: boolean; // Whether a matching targetgroup was found
+  targetGroup?: string; // Target group code or name
+}
+
 interface Quiz {
   id: number;
   quiz_name: string;
@@ -58,6 +67,7 @@ interface Quiz {
   creatorName: string;
   totalQuestions: number;
   totalPoints: number;
+  statistics?: QuizStatistics;
 }
 
 interface Question {
@@ -79,11 +89,46 @@ export default function QuizzesPage() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
   const [quizTab, setQuizTab] = useState("all");
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
   
   // State for quizzes
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quizStatistics, setQuizStatistics] = useState<Record<number, QuizStatistics>>({});
+
+  // Function to fetch real statistics for quizzes
+  const fetchQuizStatistics = async (): Promise<Record<number, QuizStatistics>> => {
+    try {
+      const response = await fetch("/api/organizer/quizzes/statistics");
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching quiz statistics: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const stats: Record<number, QuizStatistics> = {};
+      
+      // Convert array of statistics to a record indexed by quizId
+      data.forEach((stat: any) => {
+        console.log(`Processing statistics for quiz ID ${stat.quizId}:`, stat);
+        stats[stat.quizId] = {
+          totalEligible: stat.totalEligible,
+          totalAnswered: stat.totalAnswered,
+          percentAnswered: stat.percentAnswered,
+          ageRange: stat.ageRange || '0-100', // Always provide a string value
+          matched: stat.matched // Include the matched flag
+        };
+      });
+      
+      console.log("Processed statistics for all quizzes:", stats);
+      return stats;
+    } catch (error) {
+      console.error("Failed to fetch quiz statistics:", error);
+      // Return empty stats object in case of error
+      return {};
+    }
+  };
 
   useEffect(() => {
     const fetchQuizzes = async () => {
@@ -96,8 +141,19 @@ export default function QuizzesPage() {
         }
         
         const data = await response.json();
-        setQuizzes(data);
-        setFilteredQuizzes(data);
+        
+        // Fetch real statistics from the API
+        const statistics = await fetchQuizStatistics();
+        setQuizStatistics(statistics);
+        
+        // Attach statistics to each quiz
+        const quizzesWithStats = data.map((quiz: Quiz) => ({
+          ...quiz,
+          statistics: statistics[quiz.id] || { totalEligible: 0, totalAnswered: 0, percentAnswered: 0 }
+        }));
+        
+        setQuizzes(quizzesWithStats);
+        setFilteredQuizzes(quizzesWithStats);
         setError(null);
       } catch (err) {
         console.error("Failed to fetch quizzes:", err);
@@ -173,13 +229,42 @@ export default function QuizzesPage() {
       
       {/* Quiz content section */}
       <div className="space-y-6">
-          <div className="flex mb-6">
-            <Input 
-              className="max-w-sm" 
-              placeholder="Search quizzes..." 
-              value={searchQuery}
-              onChange={handleSearchChange}
-            />
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center">
+              <Input 
+                className="max-w-sm" 
+                placeholder="Search quizzes..." 
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">View:</span>
+              <div className="border rounded-md overflow-hidden flex">
+                <Button 
+                  variant={viewMode === "cards" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => setViewMode("cards")}
+                >
+                  <div className="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect></svg>
+                    Cards
+                  </div>
+                </Button>
+                <Button 
+                  variant={viewMode === "table" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => setViewMode("table")}
+                >
+                  <div className="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M3 9h18"></path><path d="M3 15h18"></path><path d="M9 3v18"></path><path d="M15 3v18"></path></svg>
+                    Table
+                  </div>
+                </Button>
+              </div>
+            </div>
           </div>
 
           <Tabs defaultValue="all" value={quizTab} onValueChange={handleQuizTabChange}>
@@ -189,6 +274,27 @@ export default function QuizzesPage() {
               <TabsTrigger value="published">Published</TabsTrigger>
               <TabsTrigger value="ended">Ended</TabsTrigger>
             </TabsList>
+            
+            {/* Legend for quiz status styling */}
+            <div className="flex items-center gap-4 mt-4 text-sm">
+              <div className="font-semibold">Legend:</div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-green-50 border border-green-300 mr-2"></div>
+                <span>Published Quiz</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-4 h-4 bg-white border text-gray-500 flex items-center justify-center text-xs mr-2">A</div>
+                <span className="text-gray-500">Draft Quiz</span>
+              </div>
+              <div className="flex items-center">
+                <div className="relative w-4 h-4 bg-white border mr-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <span>Target Group Not Linked</span>
+              </div>
+            </div>
 
             {isLoading ? (
               <div className="flex justify-center items-center h-60">
@@ -225,7 +331,7 @@ export default function QuizzesPage() {
                       </Link>
                     </Button>
                   </div>
-                ) : (
+                ) : viewMode === "cards" ? (
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {filteredQuizzes.map(quiz => (
                       <QuizCard 
@@ -241,6 +347,86 @@ export default function QuizzesPage() {
                         createdBy={quiz.creatorName}
                       />
                     ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Quiz Name</TableHead>
+                          <TableHead>Target Group</TableHead>
+                          <TableHead>Age Range</TableHead>
+                          <TableHead className="text-right">Eligible Contestants</TableHead>
+                          <TableHead className="text-right">Answered</TableHead>
+                          <TableHead className="w-[200px]">Completion</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredQuizzes.map(quiz => {
+                          // Define default statistics with all required fields
+                          const stats = quiz.statistics || { 
+                            totalEligible: 0, 
+                            totalAnswered: 0, 
+                            percentAnswered: 0,
+                            ageRange: '0-100',
+                            matched: false
+                          };
+                          return (
+                            <TableRow 
+                              key={quiz.id}
+                              className={`${
+                                quiz.status === 'published' ? 'bg-green-50 hover:bg-green-100' : 
+                                quiz.status === 'created' ? 'text-gray-500' : ''
+                              }`}
+                            >
+                              <TableCell className="font-medium">{quiz.quiz_name}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {quiz.target_group === 'PRIMARY' ? 'Primary School' : 
+                                   quiz.target_group === 'SECONDARY' ? 'Secondary School' : 
+                                   quiz.target_group === 'UNIVERSITY' ? 'University' : 
+                                   quiz.target_group === 'PROFESSIONAL' ? 'Professional' : 
+                                   quiz.target_group === 'ALL' ? 'All Groups' : quiz.target_group}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {stats.matched ? (
+                                  <span className="text-sm font-medium">{stats.ageRange} years</span>
+                                ) : (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    Target group not linked
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">{stats.totalEligible.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{stats.totalAnswered.toLocaleString()}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                    <div 
+                                      className="bg-blue-600 h-2.5 rounded-full" 
+                                      style={{ width: `${stats.percentAnswered}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-sm font-medium whitespace-nowrap">{stats.percentAnswered}%</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button asChild variant="ghost" size="sm">
+                                  <Link href={`/organizer/quizzes/${quiz.id}`}>
+                                    <Eye className="h-4 w-4 mr-2" /> View
+                                  </Link>
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </TabsContent>
@@ -361,8 +547,15 @@ function QuizCard({ id, title, description, status, targetGroup, totalQuestions,
     }
   };
 
+  // Determine card styling based on status
+  const cardStyles = status === 'published' 
+    ? 'border-green-300 bg-green-50' 
+    : status === 'created' 
+    ? 'text-gray-500' 
+    : '';
+
   return (
-    <Card>
+    <Card className={cardStyles}>
       <CardHeader>
         <div className="flex justify-between">
           <CardTitle className="line-clamp-1">{title}</CardTitle>
