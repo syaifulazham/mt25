@@ -95,7 +95,7 @@ export async function GET(
       JOIN eventcontest ec ON e.id = ec.eventId
       JOIN contest c ON ec.contestId = c.id
       WHERE e.id != ${eventIdNum}
-        AND e.status = 'OPEN'
+        -- Status check removed as per requirement
         AND c.code = '${team.contestCode}'
     `;
 

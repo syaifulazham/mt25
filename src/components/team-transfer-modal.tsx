@@ -250,9 +250,9 @@ export default function TeamTransferModal({
                     <AlertTriangle className="h-4 w-4 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-blue-800 font-medium">Scope Area Requirements Ignored</p>
+                    <p className="text-sm text-blue-800 font-medium">All Available Events Shown</p>
                     <p className="text-xs text-blue-600 mt-1">
-                      All events offering the same contest are shown, regardless of scope area (ZONE/STATE/NATIONAL).
+                      All events offering the same contest are shown, regardless of scope area (ZONE/STATE/NATIONAL) or event status.
                     </p>
                   </div>
                 </div>
