@@ -55,16 +55,17 @@ export function SurveyResultsView({ survey, onBack }: SurveyResultsViewProps) {
     answers: {}
   });
 
-  // Helper function to determine age group from age
-  const getAgeGroupFromValue = (age: number): string => {
-    if (age < 13) return 'Under 13';
-    if (age < 18) return '13-17';
-    if (age < 25) return '18-24';
-    if (age < 35) return '25-34';
-    if (age < 45) return '35-44';
-    if (age < 55) return '45-54';
-    if (age < 65) return '55-64';
-    return '65+';
+    // Define a monotone color palette for age bars
+  const MONOTONE_COLORS = [
+    '#0d47a1', '#1565c0', '#1976d2', '#1e88e5', '#2196f3', '#42a5f5', '#64b5f6', '#90caf9', '#bbdefb', '#e3f2fd'
+  ];
+  
+  // Generate a color from the monotone palette based on age
+  const getAgeColor = (age: number): string => {
+    // Use a normalized age range to pick a color (assuming ages from 6 to 80)
+    const normalizedIndex = Math.min(Math.floor((age - 5) / 8), MONOTONE_COLORS.length - 1);
+    const safeIndex = Math.max(0, normalizedIndex);
+    return MONOTONE_COLORS[safeIndex];
   };
   
   // Fetch survey results
@@ -138,10 +139,10 @@ export function SurveyResultsView({ survey, onBack }: SurveyResultsViewProps) {
         return false;
       }
       
-      // Age filtering - convert numeric age to age group
+      // Age filtering using exact ages instead of groups
       if (filters.age.length > 0) {
-        const ageGroup = getAgeGroupFromValue(Number(respondent.age));
-        if (!filters.age.includes(ageGroup)) {
+        const age = respondent.age ? respondent.age.toString() : '0';
+        if (!filters.age.includes(age)) {
           return false;
         }
       }
@@ -188,9 +189,10 @@ export function SurveyResultsView({ survey, onBack }: SurveyResultsViewProps) {
       const gender = r.gender || 'Unknown';
       counts.gender[gender] = (counts.gender[gender] || 0) + 1;
       
-      // Track age groups
-      const ageGroup = getAgeGroupFromValue(Number(r.age));
-      counts.age[ageGroup] = (counts.age[ageGroup] || 0) + 1;
+      // Track individual ages instead of age groups
+      const age = Number(r.age) || 0;
+      const ageKey = age.toString();
+      counts.age[ageKey] = (counts.age[ageKey] || 0) + 1;
       
       // Track education
       const eduLevel = r.edu_level || 'Unknown';
@@ -216,18 +218,16 @@ export function SurveyResultsView({ survey, onBack }: SurveyResultsViewProps) {
     fill: COLORS[index % COLORS.length]
   }));
   
-  const ageData = Object.entries(filteredDemographics.age).map(([name, value], index) => ({
-    name,
-    value: value as number,
-    fill: COLORS[index % COLORS.length]
-  })).sort((a, b) => {
-    // Sort age groups logically
-    const ageOrder: Record<string, number> = {
-      'Under 13': 0, '13-17': 1, '18-24': 2, '25-34': 3,
-      '35-44': 4, '45-54': 5, '55-64': 6, '65+': 7
-    };
-    return (ageOrder[a.name] || 999) - (ageOrder[b.name] || 999);
-  });
+  const ageData = filteredDemographics.age
+    ? Object.entries(filteredDemographics.age).map(([name, value]) => ({
+        name,
+        value: value as number,
+        fill: getAgeColor(Number(name)) // Use monotone color based on age
+      })).sort((a, b) => {
+        // Sort by age numerically
+        return Number(a.name) - Number(b.name);
+      })
+    : [];
   
   const educationData = Object.entries(filteredDemographics.education).map(([name, value], index) => ({
     name,
@@ -510,10 +510,16 @@ export function SurveyResultsView({ survey, onBack }: SurveyResultsViewProps) {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={ageData}
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: 11 }}
+                        interval={0} 
+                        angle={-45} 
+                        textAnchor="end"
+                      />
                       <YAxis />
                       <RechartsTooltip formatter={(value) => [`${value} respondents`, 'Count']} />
                       <Legend />

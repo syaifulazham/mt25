@@ -209,7 +209,7 @@ export async function GET(
     
     // Count responses by gender
     const genderCounts: Record<string, number> = {};
-    const ageGroups: Record<string, number> = {};
+    const ageDistribution: Record<string, number> = {}; // Changed from ageGroups to ageDistribution
     const eduLevels: Record<string, number> = {};
     const stateCounts: Record<string, number> = {};
     
@@ -223,7 +223,7 @@ export async function GET(
           email: respondent?.contestantEmail,
           gender: respondent?.gender || 'Unknown',
           age: respondent?.age || 0,
-          edu_level: respondent?.edu_level || 'Unknown',
+          edu_level: respondent?.edu_level ? respondent.edu_level.toLowerCase() : 'unknown',
           state: respondent?.state || 'Unknown',
           contingentName: respondent?.contingentName || 'Unknown',
           contingentType: respondent?.contingentType || 'Unknown'
@@ -236,12 +236,13 @@ export async function GET(
       // Gender distribution
       genderCounts[respondent.gender] = (genderCounts[respondent.gender] || 0) + 1;
       
-      // Age group distribution
-      const ageGroup = getAgeGroup(respondent.age);
-      ageGroups[ageGroup] = (ageGroups[ageGroup] || 0) + 1;
+      // Age distribution - use individual ages
+      const age = respondent.age ? respondent.age.toString() : 'Unknown';
+      ageDistribution[age] = (ageDistribution[age] || 0) + 1;
       
-      // Education level distribution
-      eduLevels[respondent.edu_level] = (eduLevels[respondent.edu_level] || 0) + 1;
+      // Education level distribution - normalize to lowercase
+      const normalizedEduLevel = respondent.edu_level ? respondent.edu_level.toLowerCase() : 'unknown';
+      eduLevels[normalizedEduLevel] = (eduLevels[normalizedEduLevel] || 0) + 1;
       
       // State distribution
       stateCounts[respondent.state] = (stateCounts[respondent.state] || 0) + 1;
@@ -312,7 +313,7 @@ export async function GET(
       totalRespondents,
       demographics: {
         genderDistribution: genderCounts,
-        ageDistribution: ageGroups,
+        ageDistribution: ageDistribution,
         educationDistribution: eduLevels,
         stateDistribution: stateCounts
       },
@@ -334,7 +335,7 @@ export async function GET(
   }
 }
 
-// Helper function to categorize ages into groups
+// Helper function to categorize ages into groups - kept for backward compatibility but no longer used
 function getAgeGroup(age: number): string {
   if (age < 13) return 'Under 13';
   if (age < 18) return '13-17';
@@ -358,7 +359,7 @@ function processRespondentAnswers(
       contestantId: respondent.contestantId,
       gender: respondent.gender,
       age: respondent.age,
-      edu_level: respondent.edu_level,
+      edu_level: respondent.edu_level ? respondent.edu_level.toLowerCase() : 'unknown',
       state: respondent.state || 'Unknown',
       contingentName: respondent.contingentName || 'Unknown',
       contingentType: respondent.contingentType || 'Unknown'
@@ -565,7 +566,7 @@ export async function POST(
         contestantId: r.contestantId,
         gender: r.gender,
         age: r.age,
-        edu_level: r.edu_level,
+        edu_level: r.edu_level ? r.edu_level.toLowerCase() : 'unknown',
         state: r.state || 'Unknown',
         contingentName: r.contingentName || 'Unknown',
         contingentType: r.contingentType || 'Unknown'
