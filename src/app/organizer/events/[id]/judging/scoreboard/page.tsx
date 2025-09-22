@@ -354,38 +354,61 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     }
   }, [eventId, event]);
   
-  // Use all Malaysian states for OPEN events
+  // Fetch participating states for events
   useEffect(() => {
-    // When event is OPEN and splitByState is enabled, show all Malaysian states
+    // When event is OPEN and splitByState is enabled, fetch participating states
     if (event?.scopeArea === 'OPEN' && splitByState) {
-      // Hard-code all 16 Malaysian states to ensure all are available
-      const malaysianStates = [
-        { id: 1, name: "Johor" },
-        { id: 2, name: "Kedah" },
-        { id: 3, name: "Kelantan" },
-        { id: 4, name: "Melaka" },
-        { id: 5, name: "Negeri Sembilan" },
-        { id: 6, name: "Pahang" },
-        { id: 7, name: "Perak" },
-        { id: 8, name: "Perlis" },
-        { id: 9, name: "Pulau Pinang" },
-        { id: 10, name: "Sabah" },
-        { id: 11, name: "Sarawak" },
-        { id: 12, name: "Selangor" },
-        { id: 13, name: "Terengganu" },
-        { id: 14, name: "Wilayah Persekutuan Kuala Lumpur" },
-        { id: 15, name: "Wilayah Persekutuan Labuan" },
-        { id: 16, name: "Wilayah Persekutuan Putrajaya" }
-      ];
+      const fetchParticipatingStates = async () => {
+        try {
+          // Use SQL to fetch distinct states participating in this event
+          const url = `/api/organizer/events/${eventId}/participating-states`;
+          
+          console.log('Fetching participating states for event:', eventId);
+          const response = await fetch(url, {
+            credentials: "include",
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Fetched participating states:', data);
+            
+            if (data && data.length > 0) {
+              setAvailableStates(data);
+              
+              // Set default state value if not already set
+              const savedFilters = loadFiltersFromCookies();
+              if (!selectedFilterState && !savedFilters.state) {
+                setSelectedFilterState(data[0].id.toString());
+              }
+            } else {
+              console.warn('No participating states found');
+              // Fallback to empty array if no states found
+              setAvailableStates([]);
+            }
+          } else {
+            // If endpoint doesn't exist, fetch all states
+            console.warn('Failed to fetch participating states, fetching all states');
+            const allStatesResponse = await fetch('/api/states', {
+              credentials: "include",
+            });
+            
+            if (allStatesResponse.ok) {
+              const allStates = await allStatesResponse.json();
+              setAvailableStates(allStates);
+              
+              // Set default state value if not already set
+              const savedFilters = loadFiltersFromCookies();
+              if (!selectedFilterState && !savedFilters.state) {
+                setSelectedFilterState(allStates[0].id.toString());
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching participating states:", error);
+        }
+      };
       
-      console.log('Using all Malaysian states:', malaysianStates);
-      setAvailableStates(malaysianStates);
-      
-      // Set default state value if not already set
-      const savedFilters = loadFiltersFromCookies();
-      if (!selectedFilterState && !savedFilters.state) {
-        setSelectedFilterState(malaysianStates[0].id.toString());
-      }
+      fetchParticipatingStates();
     }
     // For ZONE events, fetch states by zoneId
     else if (event?.scopeArea === 'ZONE' && event?.zoneId) {
