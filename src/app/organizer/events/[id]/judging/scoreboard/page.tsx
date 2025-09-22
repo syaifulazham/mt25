@@ -497,15 +497,10 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   }, [eventId, selectedContest, selectedState, selectedFilterState, selectedSchoolLevels, contests, event?.scopeArea]);
   
   // Filter results based on search term and school level
-  const filteredResults = results.filter((result) => {
+  let filteredResults = results.filter((result) => {
     const matchesSearch = 
       result.team?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       result.contingent?.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // If no school levels are selected, show all results
-    if (selectedSchoolLevels.length === 0) {
-      return matchesSearch;
-    }
     
     // Check if the selected contest has target groups that match selected school levels
     const selectedContestData = contests.find(c => c.id.toString() === selectedContest);
@@ -523,6 +518,19 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     
     return matchesSearch && matchesSchoolLevel;
   });
+  
+  // Re-rank results when not splitting by state to ensure proper ranking
+  // This ensures ranks are always calculated correctly regardless of filter state
+  if (event?.scopeArea === 'OPEN' && !splitByState) {
+    // Sort by score descending
+    filteredResults = [...filteredResults].sort((a, b) => b.averageScore - a.averageScore);
+    
+    // Apply ranks
+    filteredResults = filteredResults.map((result, index) => ({
+      ...result,
+      rank: index + 1 // 1-based ranking
+    }));
+  }
   
   // Handle refreshing the results
   const refreshResults = async () => {
