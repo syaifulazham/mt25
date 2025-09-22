@@ -348,10 +348,12 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     }
   }, [eventId, event]);
   
-  // Fetch available states when event changes
+  // Fetch all available states initially for reference
+  const [allStates, setAllStates] = useState<State[]>([]);
+  
   useEffect(() => {
     if (event) {
-      const fetchAvailableStates = async () => {
+      const fetchAllStates = async () => {
         try {
           // For ZONE events, fetch states in that zone
           // For other events, fetch all states
@@ -364,19 +366,13 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           });
           if (response.ok) {
             const data = await response.json();
-            setAvailableStates(data);
-            
-            // Set default state value when states are loaded (only if no saved value exists)
-            const savedFilters = loadFiltersFromCookies();
-            if (data.length > 0 && !selectedFilterState && !savedFilters.state) {
-              setSelectedFilterState(data[0].id.toString());
-            }
+            setAllStates(data);
           }
         } catch (error) {
           console.error("Error fetching available states:", error);
         }
       };
-      fetchAvailableStates();
+      fetchAllStates();
     }
   }, [event]);
 
@@ -417,6 +413,33 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           totalInProgress: data.totalInProgress,
           totalCompleted: data.totalCompleted
         });
+        
+        // Extract participating states from results
+        const participatingStatesMap = new Map<number, State>();
+        
+        data.results.forEach((result: TeamResult) => {
+          if (result.state && result.state.id) {
+            participatingStatesMap.set(result.state.id, result.state);
+          }
+        });
+        
+        const participatingStatesArray = Array.from(participatingStatesMap.values()).sort((a, b) => 
+          a.name.localeCompare(b.name)
+        );
+        
+        setAvailableStates(participatingStatesArray);
+        
+        // If current selected state isn't in the participating states, reset it
+        if (selectedFilterState && !participatingStatesArray.some(state => state.id.toString() === selectedFilterState)) {
+          setSelectedFilterState("");
+        }
+        
+        // Set default state value if none is selected (only if no saved value exists)
+        const savedFilters = loadFiltersFromCookies();
+        if (participatingStatesArray.length > 0 && !selectedFilterState && !savedFilters.state) {
+          setSelectedFilterState(participatingStatesArray[0].id.toString());
+        }
+        
         setLoading(false);
       } catch (error) {
         console.error('Error fetching results:', error);
