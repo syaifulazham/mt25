@@ -350,10 +350,16 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   
   // Fetch available states when event changes
   useEffect(() => {
-    if (event?.scopeArea === 'ZONE' && event?.zoneId) {
+    if (event) {
       const fetchAvailableStates = async () => {
         try {
-          const response = await fetch(`/api/states?zoneId=${event.zoneId}`, {
+          // For ZONE events, fetch states in that zone
+          // For other events, fetch all states
+          const endpoint = event.scopeArea === 'ZONE' && event.zoneId
+            ? `/api/states?zoneId=${event.zoneId}`
+            : '/api/states';
+          
+          const response = await fetch(endpoint, {
             credentials: "include",
           });
           if (response.ok) {
@@ -372,7 +378,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       };
       fetchAvailableStates();
     }
-  }, [event?.zoneId, event?.scopeArea]);
+  }, [event]);
 
   // Fetch scoreboard results
   useEffect(() => {
@@ -391,8 +397,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           contestId: selectedContest
         });
         
-        // Add stateId for ZONE events if selected
-        if (event?.scopeArea === 'ZONE' && selectedFilterState) {
+        // Add stateId if selected (for any event type)
+        if (selectedFilterState) {
           queryParams.append('stateId', selectedFilterState);
         }
         
@@ -461,8 +467,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         contestId: selectedContest
       });
       
-      // Add stateId for ZONE events if selected
-      if (event?.scopeArea === 'ZONE' && selectedFilterState) {
+      // Add stateId if selected (for any event type)
+      if (selectedFilterState) {
         queryParams.append('stateId', selectedFilterState);
       }
       
@@ -502,8 +508,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         contestId: selectedContest
       });
       
-      // Add stateId for ZONE events if selected
-      if (event?.scopeArea === 'ZONE' && selectedFilterState) {
+      // Add stateId if selected (for any event type)
+      if (selectedFilterState) {
         queryParams.append('stateId', selectedFilterState);
       }
       
@@ -605,8 +611,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                 <CardTitle>Filters</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* State Filter (only for ZONE events) */}
-                {event.scopeArea === 'ZONE' && availableStates.length > 0 && (
+                {/* State Filter (available for all event types) */}
+                {availableStates.length > 0 && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">
                       State
