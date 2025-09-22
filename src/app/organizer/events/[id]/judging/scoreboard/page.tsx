@@ -354,39 +354,68 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     }
   }, [eventId, event]);
   
+  // Filter results to get participating states
+  useEffect(() => {
+    if (results.length > 0) {
+      // Extract unique states from results
+      const uniqueStates = new Map();
+      results.forEach(result => {
+        if (result.state) {
+          uniqueStates.set(result.state.id, result.state);
+        }
+      });
+      
+      const participatingStates = Array.from(uniqueStates.values());
+      
+      // Only update if we have participating states
+      if (participatingStates.length > 0) {
+        setAvailableStates(participatingStates);
+        
+        // Set default state value if not already set
+        const savedFilters = loadFiltersFromCookies();
+        if (!selectedFilterState && !savedFilters.state) {
+          setSelectedFilterState(participatingStates[0].id.toString());
+        }
+      }
+    }
+  }, [results]);
+  
   // Fetch available states when event changes or splitByState changes for OPEN events
   useEffect(() => {
     // For ZONE events or OPEN events with splitByState enabled
     if ((event?.scopeArea === 'ZONE' && event?.zoneId) || (event?.scopeArea === 'OPEN' && splitByState)) {
-      const fetchAvailableStates = async () => {
-        try {
-          // For ZONE events, we fetch states by zoneId
-          // For OPEN events, we fetch all states
-          const url = event?.scopeArea === 'ZONE' && event?.zoneId
-            ? `/api/states?zoneId=${event.zoneId}`
-            : '/api/states';
+      // Only fetch all states if we have no results yet (initial load)
+      if (results.length === 0) {
+        const fetchAvailableStates = async () => {
+          try {
+            // For ZONE events, we fetch states by zoneId
+            // For OPEN events, we fetch all states
+            const url = event?.scopeArea === 'ZONE' && event?.zoneId
+              ? `/api/states?zoneId=${event.zoneId}`
+              : '/api/states';
+              
+            const response = await fetch(url, {
+              credentials: "include",
+            });
             
-          const response = await fetch(url, {
-            credentials: "include",
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            setAvailableStates(data);
-            
-            // Set default state value when states are loaded (only if no saved value exists)
-            const savedFilters = loadFiltersFromCookies();
-            if (data.length > 0 && !selectedFilterState && !savedFilters.state) {
-              setSelectedFilterState(data[0].id.toString());
+            if (response.ok) {
+              const data = await response.json();
+              setAvailableStates(data);
+              
+              // Set default state value when states are loaded (only if no saved value exists)
+              const savedFilters = loadFiltersFromCookies();
+              if (data.length > 0 && !selectedFilterState && !savedFilters.state) {
+                setSelectedFilterState(data[0].id.toString());
+              }
             }
+          } catch (error) {
+            console.error("Error fetching available states:", error);
           }
-        } catch (error) {
-          console.error("Error fetching available states:", error);
-        }
-      };
-      fetchAvailableStates();
+        };
+        fetchAvailableStates();
+      }
     }
-  }, [event?.zoneId, event?.scopeArea, splitByState]);
+  }, [event?.zoneId, event?.scopeArea, splitByState, results.length]);
 
   // Fetch scoreboard results
   useEffect(() => {
