@@ -354,68 +354,76 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     }
   }, [eventId, event]);
   
-  // Filter results to get participating states
+  // Use all Malaysian states for OPEN events
   useEffect(() => {
-    if (results.length > 0) {
-      // Extract unique states from results
-      const uniqueStates = new Map();
-      results.forEach(result => {
-        if (result.state) {
-          uniqueStates.set(result.state.id, result.state);
-        }
-      });
+    // When event is OPEN and splitByState is enabled, show all Malaysian states
+    if (event?.scopeArea === 'OPEN' && splitByState) {
+      // Hard-code all 16 Malaysian states to ensure all are available
+      const malaysianStates = [
+        { id: 1, name: "Johor" },
+        { id: 2, name: "Kedah" },
+        { id: 3, name: "Kelantan" },
+        { id: 4, name: "Melaka" },
+        { id: 5, name: "Negeri Sembilan" },
+        { id: 6, name: "Pahang" },
+        { id: 7, name: "Perak" },
+        { id: 8, name: "Perlis" },
+        { id: 9, name: "Pulau Pinang" },
+        { id: 10, name: "Sabah" },
+        { id: 11, name: "Sarawak" },
+        { id: 12, name: "Selangor" },
+        { id: 13, name: "Terengganu" },
+        { id: 14, name: "Wilayah Persekutuan Kuala Lumpur" },
+        { id: 15, name: "Wilayah Persekutuan Labuan" },
+        { id: 16, name: "Wilayah Persekutuan Putrajaya" }
+      ];
       
-      const participatingStates = Array.from(uniqueStates.values());
+      console.log('Using all Malaysian states:', malaysianStates);
+      setAvailableStates(malaysianStates);
       
-      // Only update if we have participating states
-      if (participatingStates.length > 0) {
-        setAvailableStates(participatingStates);
-        
-        // Set default state value if not already set
-        const savedFilters = loadFiltersFromCookies();
-        if (!selectedFilterState && !savedFilters.state) {
-          setSelectedFilterState(participatingStates[0].id.toString());
-        }
+      // Set default state value if not already set
+      const savedFilters = loadFiltersFromCookies();
+      if (!selectedFilterState && !savedFilters.state) {
+        setSelectedFilterState(malaysianStates[0].id.toString());
       }
     }
-  }, [results]);
-  
-  // Fetch available states when event changes or splitByState changes for OPEN events
-  useEffect(() => {
-    // For ZONE events or OPEN events with splitByState enabled
-    if ((event?.scopeArea === 'ZONE' && event?.zoneId) || (event?.scopeArea === 'OPEN' && splitByState)) {
-      // Only fetch all states if we have no results yet (initial load)
-      if (results.length === 0) {
-        const fetchAvailableStates = async () => {
-          try {
-            // For ZONE events, we fetch states by zoneId
-            // For OPEN events, we fetch all states
-            const url = event?.scopeArea === 'ZONE' && event?.zoneId
-              ? `/api/states?zoneId=${event.zoneId}`
-              : '/api/states';
-              
-            const response = await fetch(url, {
-              credentials: "include",
-            });
+    // For ZONE events, fetch states by zoneId
+    else if (event?.scopeArea === 'ZONE' && event?.zoneId) {
+      const fetchZoneStates = async () => {
+        try {
+          const url = `/api/states?zoneId=${event.zoneId}`;
+          
+          console.log('Fetching zone states from:', url);
+          const response = await fetch(url, {
+            credentials: "include",
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Fetched zone states:', data);
             
-            if (response.ok) {
-              const data = await response.json();
+            if (data && data.length > 0) {
               setAvailableStates(data);
               
               // Set default state value when states are loaded (only if no saved value exists)
               const savedFilters = loadFiltersFromCookies();
-              if (data.length > 0 && !selectedFilterState && !savedFilters.state) {
+              if (!selectedFilterState && !savedFilters.state) {
                 setSelectedFilterState(data[0].id.toString());
               }
+            } else {
+              console.warn('No states found in this zone');
             }
-          } catch (error) {
-            console.error("Error fetching available states:", error);
+          } else {
+            console.error('Failed to fetch zone states, status:', response.status);
           }
-        };
-        fetchAvailableStates();
-      }
+        } catch (error) {
+          console.error("Error fetching zone states:", error);
+        }
+      };
+      
+      fetchZoneStates();
     }
-  }, [event?.zoneId, event?.scopeArea, splitByState, results.length]);
+  }, [event?.scopeArea, event?.zoneId, splitByState]);
 
   // Fetch scoreboard results
   useEffect(() => {
@@ -609,6 +617,36 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           </DialogHeader>
           
           <div className="space-y-6">
+            {/* State Filter Alert - Always visible for OPEN events when split toggle is on */}
+            {event.scopeArea === 'OPEN' && splitByState && availableStates.length > 0 && (
+              <div className="bg-blue-900/40 border border-blue-500/50 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-blue-300">State Filter Active</h3>
+                  <p className="text-sm text-blue-200">Results are currently grouped by state. Select a state to filter further:</p>
+                </div>
+                <div className="w-full md:w-1/3">
+                  <Select
+                    value={selectedFilterState || "all"}
+                    onValueChange={(value) => setSelectedFilterState(value === "all" ? "" : value)}
+                  >
+                    <SelectTrigger className="w-full bg-blue-950/50 border-blue-500/50">
+                      <SelectValue placeholder="All States" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States</SelectItem>
+                      {[...availableStates]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((state) => (
+                          <SelectItem key={state.id} value={state.id.toString()}>
+                            {state.name}
+                          </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
@@ -663,10 +701,13 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All States</SelectItem>
-                        {availableStates.map((state) => (
-                          <SelectItem key={state.id} value={state.id.toString()}>
-                            {state.name}
-                          </SelectItem>
+                        {/* Sort states alphabetically for better UX */}
+                        {[...availableStates]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((state) => (
+                            <SelectItem key={state.id} value={state.id.toString()}>
+                              {state.name}
+                            </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
