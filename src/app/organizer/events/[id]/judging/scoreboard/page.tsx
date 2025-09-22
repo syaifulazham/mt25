@@ -100,7 +100,7 @@ interface Event {
   startDate: string;
   endDate: string;
   status?: string;
-  scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE';
+  scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN';
   zoneId?: number;
   zoneName?: string;
   stateId?: number | null;
@@ -139,7 +139,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     contest: `scoreboard_contest_${eventId}`,
     state: `scoreboard_state_${eventId}`,
     schoolLevels: `scoreboard_schoolLevels_${eventId}`,
-    search: `scoreboard_search_${eventId}`
+    search: `scoreboard_search_${eventId}`,
+    splitByState: `scoreboard_splitByState_${eventId}`
   };
   
   // Functions to save/load filter state from cookies
@@ -148,6 +149,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     setCookie(cookieKeys.state, selectedFilterState);
     setCookie(cookieKeys.schoolLevels, JSON.stringify(selectedSchoolLevels));
     setCookie(cookieKeys.search, searchTerm);
+    setCookie(cookieKeys.splitByState, splitByState.toString());
   };
   
   const loadFiltersFromCookies = () => {
@@ -155,12 +157,14 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     const savedState = getCookie(cookieKeys.state);
     const savedSchoolLevels = getCookie(cookieKeys.schoolLevels);
     const savedSearch = getCookie(cookieKeys.search);
+    const savedSplitByState = getCookie(cookieKeys.splitByState);
     
     return {
       contest: savedContest,
       state: savedState,
       schoolLevels: savedSchoolLevels ? JSON.parse(savedSchoolLevels) : [],
-      search: savedSearch || ""
+      search: savedSearch || "",
+      splitByState: savedSplitByState === 'true'
     };
   };
   
@@ -188,6 +192,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   const [selectedTeam, setSelectedTeam] = useState<any | null>(null);
   const [selectedTeamPosition, setSelectedTeamPosition] = useState<number>(0);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [splitByState, setSplitByState] = useState(false);
   
   // Initialize filters from cookies on component mount
   useEffect(() => {
@@ -196,12 +201,13 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     if (savedFilters.state) setSelectedFilterState(savedFilters.state);
     if (savedFilters.schoolLevels.length > 0) setSelectedSchoolLevels(savedFilters.schoolLevels);
     if (savedFilters.search) setSearchTerm(savedFilters.search);
+    setSplitByState(savedFilters.splitByState || false);
   }, []);
   
   // Save filters to cookies whenever they change
   useEffect(() => {
     saveFiltersToCookies();
-  }, [selectedContest, selectedFilterState, selectedSchoolLevels, searchTerm]);
+  }, [selectedContest, selectedFilterState, selectedSchoolLevels, searchTerm, splitByState]);
   
   // Fetch team members when a team is selected
   const fetchTeamMembers = async (result: TeamResult, position: number) => {
@@ -348,14 +354,22 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     }
   }, [eventId, event]);
   
-  // Fetch available states when event changes
+  // Fetch available states when event changes or splitByState changes for OPEN events
   useEffect(() => {
-    if (event?.scopeArea === 'ZONE' && event?.zoneId) {
+    // For ZONE events or OPEN events with splitByState enabled
+    if ((event?.scopeArea === 'ZONE' && event?.zoneId) || (event?.scopeArea === 'OPEN' && splitByState)) {
       const fetchAvailableStates = async () => {
         try {
-          const response = await fetch(`/api/states?zoneId=${event.zoneId}`, {
+          // For ZONE events, we fetch states by zoneId
+          // For OPEN events, we fetch all states
+          const url = event?.scopeArea === 'ZONE' && event?.zoneId
+            ? `/api/states?zoneId=${event.zoneId}`
+            : '/api/states';
+            
+          const response = await fetch(url, {
             credentials: "include",
           });
+          
           if (response.ok) {
             const data = await response.json();
             setAvailableStates(data);
@@ -372,7 +386,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       };
       fetchAvailableStates();
     }
-  }, [event?.zoneId, event?.scopeArea]);
+  }, [event?.zoneId, event?.scopeArea, splitByState]);
 
   // Fetch scoreboard results
   useEffect(() => {
@@ -391,8 +405,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           contestId: selectedContest
         });
         
-        // Add stateId for ZONE events if selected
-        if (event?.scopeArea === 'ZONE' && selectedFilterState) {
+        // Add stateId for ZONE events or OPEN events with splitByState if selected
+        if ((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && selectedFilterState) {
           queryParams.append('stateId', selectedFilterState);
         }
         
@@ -461,8 +475,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         contestId: selectedContest
       });
       
-      // Add stateId for ZONE events if selected
-      if (event?.scopeArea === 'ZONE' && selectedFilterState) {
+      // Add stateId for ZONE events or OPEN events with splitByState if selected
+      if ((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && selectedFilterState) {
         queryParams.append('stateId', selectedFilterState);
       }
       
@@ -502,8 +516,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         contestId: selectedContest
       });
       
-      // Add stateId for ZONE events if selected
-      if (event?.scopeArea === 'ZONE' && selectedFilterState) {
+      // Add stateId for ZONE events or OPEN events with splitByState if selected
+      if ((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && selectedFilterState) {
         queryParams.append('stateId', selectedFilterState);
       }
       
@@ -605,8 +619,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                 <CardTitle>Filters</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* State Filter (only for ZONE events) */}
-                {event.scopeArea === 'ZONE' && availableStates.length > 0 && (
+                {/* State Filter (for ZONE events or OPEN events with splitByState) */}
+                {((event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) && availableStates.length > 0) && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">
                       State
@@ -743,13 +757,30 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       
 
       
+      {/* OPEN Event State Toggle */}
+      {event.scopeArea === 'OPEN' && (
+        <div className="mb-4 flex justify-end">
+          <div className="flex items-center space-x-2 bg-black/20 backdrop-blur-sm p-2 rounded-md border border-white/10">
+            <span className="text-sm font-medium">Split results by state</span>
+            <Button
+              size="sm"
+              variant={splitByState ? "default" : "outline"}
+              onClick={() => setSplitByState(!splitByState)}
+              className="h-8"
+            >
+              {splitByState ? "On" : "Off"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Results Table */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
         </div>
       ) : selectedContest && filteredResults.length > 0 ? (
-        event.scopeArea === 'ZONE' ? (
+        (event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) ? (
           // Group by state for ZONE events
           <div className="space-y-8">
             {/* Group results by state */}
