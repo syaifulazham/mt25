@@ -348,33 +348,35 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     }
   }, [eventId, event]);
   
-  // Fetch all available states initially for reference
-  const [allStates, setAllStates] = useState<State[]>([]);
-  
+  // Fetch available states that are participating in this event
   useEffect(() => {
     if (event) {
-      const fetchAllStates = async () => {
+      const fetchParticipatingStates = async () => {
         try {
-          // For ZONE events, fetch states in that zone
-          // For other events, fetch all states
-          const endpoint = event.scopeArea === 'ZONE' && event.zoneId
-            ? `/api/states?zoneId=${event.zoneId}`
-            : '/api/states';
+          // Use the new API endpoint to get only states with participating teams
+          const endpoint = `/api/judging/event-participating-states?eventId=${eventId}`;
           
           const response = await fetch(endpoint, {
             credentials: "include",
           });
           if (response.ok) {
             const data = await response.json();
-            setAllStates(data);
+            setAvailableStates(data);
+            
+            // Set default state value when states are loaded (only if no saved value exists)
+            const savedFilters = loadFiltersFromCookies();
+            if (data.length > 0 && !selectedFilterState && !savedFilters.state) {
+              setSelectedFilterState(data[0].id.toString());
+            }
           }
         } catch (error) {
-          console.error("Error fetching available states:", error);
+          console.error("Error fetching participating states:", error);
+          toast.error("Failed to load state filter data");
         }
       };
-      fetchAllStates();
+      fetchParticipatingStates();
     }
-  }, [event]);
+  }, [eventId, event]);
 
   // Fetch scoreboard results
   useEffect(() => {
@@ -413,33 +415,6 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           totalInProgress: data.totalInProgress,
           totalCompleted: data.totalCompleted
         });
-        
-        // Extract participating states from results
-        const participatingStatesMap = new Map<number, State>();
-        
-        data.results.forEach((result: TeamResult) => {
-          if (result.state && result.state.id) {
-            participatingStatesMap.set(result.state.id, result.state);
-          }
-        });
-        
-        const participatingStatesArray = Array.from(participatingStatesMap.values()).sort((a, b) => 
-          a.name.localeCompare(b.name)
-        );
-        
-        setAvailableStates(participatingStatesArray);
-        
-        // If current selected state isn't in the participating states, reset it
-        if (selectedFilterState && !participatingStatesArray.some(state => state.id.toString() === selectedFilterState)) {
-          setSelectedFilterState("");
-        }
-        
-        // Set default state value if none is selected (only if no saved value exists)
-        const savedFilters = loadFiltersFromCookies();
-        if (participatingStatesArray.length > 0 && !selectedFilterState && !savedFilters.state) {
-          setSelectedFilterState(participatingStatesArray[0].id.toString());
-        }
-        
         setLoading(false);
       } catch (error) {
         console.error('Error fetching results:', error);
