@@ -204,6 +204,14 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
     setSplitByState(savedFilters.splitByState || false);
   }, []);
   
+  // Clear state filter when splitByState is turned off
+  useEffect(() => {
+    if (event?.scopeArea === 'OPEN' && !splitByState && selectedFilterState) {
+      // Clear state filter when split by state is turned off
+      setSelectedFilterState("");
+    }
+  }, [splitByState, event?.scopeArea, selectedFilterState]);
+  
   // Save filters to cookies whenever they change
   useEffect(() => {
     saveFiltersToCookies();
@@ -873,7 +881,16 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
             <Button
               size="sm"
               variant={splitByState ? "default" : "outline"}
-              onClick={() => setSplitByState(!splitByState)}
+              onClick={() => {
+                const newSplitState = !splitByState;
+                setSplitByState(newSplitState);
+                
+                // Clear state filter when turning off split by state
+                if (!newSplitState && selectedFilterState) {
+                  setSelectedFilterState("");
+                  // The cookie will be updated automatically via useEffect
+                }
+              }}
               className="h-8 ml-2"
               title={splitByState ? "Click to show unified global ranking" : "Click to split results by state"}
             >
