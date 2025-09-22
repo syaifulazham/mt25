@@ -221,12 +221,6 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       
       const data = await res.json();
       
-      // For OPEN events with splitByState on, or ZONE events, use the provided state-specific position
-      // For other cases (OPEN with splitByState off, NATIONAL, STATE), use the global rank
-      const displayPosition = (event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) 
-        ? position 
-        : result.rank;
-      
       // Create team object for showcase
       const teamForShowcase = {
         attendanceTeamId: result.attendanceTeamId,
@@ -240,16 +234,10 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       };
       
       setSelectedTeam(teamForShowcase);
-      setSelectedTeamPosition(displayPosition);
+      setSelectedTeamPosition(position);
     } catch (error) {
       console.error("Error fetching team members:", error);
       toast.error("Failed to load team members");
-      
-      // For OPEN events with splitByState on, or ZONE events, use the provided state-specific position
-      // For other cases (OPEN with splitByState off, NATIONAL, STATE), use the global rank
-      const displayPosition = (event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) 
-        ? position 
-        : result.rank;
       
       // Still show the team even if members couldn't be loaded
       const teamForShowcase = {
@@ -264,7 +252,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       };
       
       setSelectedTeam(teamForShowcase);
-      setSelectedTeamPosition(displayPosition);
+      setSelectedTeamPosition(position);
     } finally {
       setLoadingMembers(false);
     }
@@ -632,7 +620,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
               </CardHeader>
               <CardContent>
                 {/* State Filter (for ZONE events or OPEN events with splitByState) */}
-                {((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && availableStates.length > 0) && (
+                {((event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) && availableStates.length > 0) && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">
                       State
@@ -770,7 +758,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
 
       
       {/* OPEN Event State Toggle */}
-      {event?.scopeArea === 'OPEN' && (
+      {event.scopeArea === 'OPEN' && (
         <div className="mb-4 flex justify-end">
           <div className="flex items-center space-x-2 bg-black/20 backdrop-blur-sm p-2 rounded-md border border-white/10">
             <span className="text-sm font-medium">Split results by state</span>
@@ -792,7 +780,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
         </div>
       ) : selectedContest && filteredResults.length > 0 ? (
-        (event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) ? (
+        (event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) ? (
           // Group by state for ZONE events
           <div className="space-y-8">
             {/* Group results by state */}
@@ -848,18 +836,6 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-3">
-                                  {/* State flag */}
-                                  {result.state?.name && (
-                                    <div className="relative w-8 h-6 flex-shrink-0 rounded-md overflow-hidden bg-gray-800/50">
-                                      <Image 
-                                        src={`/images/flags/${result.state.name.toLowerCase()}.png`}
-                                        alt={`${result.state.name} flag`}
-                                        fill
-                                        className="object-cover"
-                                      />
-                                    </div>
-                                  )}
-                                  {/* Contingent logo */}
                                   <div className="relative w-10 h-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-800/50">
                                     {result.contingent?.logoUrl ? (
                                       <Image 
@@ -930,18 +906,6 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            {/* State flag */}
-                            {result.state?.name && (
-                              <div className="relative w-8 h-6 flex-shrink-0 rounded-md overflow-hidden bg-gray-800/50">
-                                <Image 
-                                  src={`/images/flags/${result.state.name.toLowerCase()}.png`}
-                                  alt={`${result.state.name} flag`}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            )}
-                            {/* Contingent logo */}
                             <div className="relative w-10 h-10 flex-shrink-0 rounded-md overflow-hidden bg-gray-800/50">
                               {result.contingent?.logoUrl ? (
                                 <Image 
