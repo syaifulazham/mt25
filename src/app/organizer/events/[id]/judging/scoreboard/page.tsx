@@ -853,13 +853,21 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       {/* OPEN Event State Toggle */}
       {event.scopeArea === 'OPEN' && (
         <div className="mb-4 flex justify-end">
-          <div className="flex items-center space-x-2 bg-black/20 backdrop-blur-sm p-2 rounded-md border border-white/10">
-            <span className="text-sm font-medium">Split results by state</span>
+          <div className="flex items-center space-x-2 bg-black/20 backdrop-blur-sm p-3 rounded-md border border-white/10">
+            <div>
+              <span className="text-sm font-medium">Split results by state</span>
+              <p className="text-xs text-gray-400 max-w-[240px] mt-1">
+                {splitByState 
+                  ? "Showing results grouped by state with state-specific rankings"
+                  : "Showing unified list with global rankings across all states"}
+              </p>
+            </div>
             <Button
               size="sm"
               variant={splitByState ? "default" : "outline"}
               onClick={() => setSplitByState(!splitByState)}
-              className="h-8"
+              className="h-8 ml-2"
+              title={splitByState ? "Click to show unified global ranking" : "Click to split results by state"}
             >
               {splitByState ? "On" : "Off"}
             </Button>
@@ -873,6 +881,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
         </div>
       ) : selectedContest && filteredResults.length > 0 ? (
+        // For ZONE events or OPEN events with splitByState enabled, group by state
         (event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) ? (
           // Group by state for ZONE events
           <div className="space-y-8">
