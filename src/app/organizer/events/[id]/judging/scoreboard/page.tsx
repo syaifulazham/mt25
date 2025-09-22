@@ -709,8 +709,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                 <CardTitle>Filters</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* State Filter (for ZONE events or OPEN events with splitByState) */}
-                {((event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) && availableStates.length > 0) && (
+                {/* State Filter (for ZONE events only - OPEN events with splitByState use the alert box above) */}
+                {(event.scopeArea === 'ZONE' && availableStates.length > 0) && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">
                       State

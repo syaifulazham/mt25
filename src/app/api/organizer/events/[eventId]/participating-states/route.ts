@@ -21,19 +21,38 @@ export async function GET(
     }
 
     // Execute SQL query to get distinct states with teams in this event
-    // Using the sql suggested: 'select distinct stateId, state from attetndanceTeam where eventId = 15'
-    // Note: Fixed typo in table name from "attetndanceTeam" to "attendanceTeam"
+    // Using the exact query format suggested: 'select distinct stateId, state from attendanceTeam where eventId = 15'
     const participatingStates = await prisma.$queryRaw`
       SELECT DISTINCT 
-        s.id, 
+        at.stateId as id, 
         s.name 
       FROM attendanceTeam at
-      JOIN team t ON at.teamId = t.id
-      JOIN contingent c ON t.contingentId = c.id
-      JOIN state s ON c.stateId = s.id
+      JOIN state s ON at.stateId = s.id
       WHERE at.eventId = ${eventId}
       ORDER BY s.name ASC
     `;
+    
+    // If the above query doesn't work, try this alternative fallback
+    if ((participatingStates as any[]).length === 0) {
+      console.log('Trying fallback query to find participating states');
+      // Alternative query that goes through the contingent relationship
+      const fallbackStates = await prisma.$queryRaw`
+        SELECT DISTINCT 
+          s.id, 
+          s.name 
+        FROM attendanceTeam at
+        JOIN team t ON at.teamId = t.id
+        JOIN contingent c ON t.contingentId = c.id
+        JOIN state s ON c.stateId = s.id
+        WHERE at.eventId = ${eventId}
+        ORDER BY s.name ASC
+      `;
+      
+      if ((fallbackStates as any[]).length > 0) {
+        console.log(`Found ${(fallbackStates as any[]).length} states using fallback query`);
+        return NextResponse.json(fallbackStates);
+      }
+    }
 
     // Log the results
     console.log(`Found ${(participatingStates as any[]).length} participating states for event ${eventId}`);
