@@ -3,6 +3,11 @@ import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/auth-options";
 
+// Mark this route as dynamic to prevent static rendering
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 // GET /api/organizer/quizzes/statistics
 // Get real statistics for quizzes based on actual database data
 export async function GET(request: NextRequest) {
