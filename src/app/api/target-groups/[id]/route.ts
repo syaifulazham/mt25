@@ -18,6 +18,7 @@ const updateTargetGroupSchema = z.object({
   maxAge: z.number().int().min(0, "Maximum age must be 0 or greater"),
   schoolLevel: z.string().min(1, "School level is required"),
   contestant_class_grade: z.string().nullable().optional(),
+  class_grade_array: z.array(z.string()).nullable().optional(),
 });
 
 // GET /api/target-groups/[id] - Get a specific target group
@@ -54,17 +55,18 @@ export async function GET(
     });
     
     if (targetGroup) {
-      // Get the contestant_class_grade using raw SQL
-      const gradeResults = await prisma.$queryRaw<Array<{contestant_class_grade: string|null}>>`
-        SELECT contestant_class_grade 
+      // Get the contestant_class_grade and class_grade_array using raw SQL
+      const gradeResults = await prisma.$queryRaw<Array<{contestant_class_grade: string|null, class_grade_array: any}>>`
+        SELECT contestant_class_grade, class_grade_array 
         FROM targetgroup 
         WHERE id = ${id}
       `;
       
-      // Add the contestant_class_grade to the response
+      // Add the contestant_class_grade and class_grade_array to the response
       if (gradeResults && gradeResults.length > 0) {
-        // @ts-ignore - TypeScript won't recognize this field
+        // @ts-ignore - TypeScript won't recognize these fields
         targetGroup.contestant_class_grade = gradeResults[0].contestant_class_grade;
+        targetGroup.class_grade_array = gradeResults[0].class_grade_array;
       }
     }
 
@@ -168,6 +170,16 @@ async function updateTargetGroup(
         },
       });
       
+      // Handle class_grade_array separately using raw SQL since Prisma types may not be updated
+      if (validationResult.data.class_grade_array !== undefined) {
+        const jsonValue = JSON.stringify(validationResult.data.class_grade_array);
+        await tx.$executeRaw`
+          UPDATE targetgroup 
+          SET class_grade_array = ${jsonValue}
+          WHERE id = ${id}
+        `;
+      }
+      
       // Set the contestant_class_grade field using raw SQL
       if (validationResult.data.contestant_class_grade !== undefined) {
         await tx.$executeRaw`
@@ -182,9 +194,9 @@ async function updateTargetGroup(
         where: { id }
       });
       
-      // Also get the contestant_class_grade directly using raw SQL to ensure we have it
-      const gradeResults = await tx.$queryRaw<Array<{contestant_class_grade: string|null}>>`
-        SELECT contestant_class_grade 
+      // Also get the contestant_class_grade and class_grade_array directly using raw SQL to ensure we have them
+      const gradeResults = await tx.$queryRaw<Array<{contestant_class_grade: string|null, class_grade_array: any}>>`
+        SELECT contestant_class_grade, class_grade_array 
         FROM targetgroup 
         WHERE id = ${id}
       `;
@@ -192,8 +204,9 @@ async function updateTargetGroup(
       // Combine the results
       const result = refreshedTargetGroup || updated;
       if (gradeResults && gradeResults.length > 0) {
-        // @ts-ignore - TypeScript won't recognize this field
+        // @ts-ignore - TypeScript won't recognize these fields
         result.contestant_class_grade = gradeResults[0].contestant_class_grade;
+        result.class_grade_array = gradeResults[0].class_grade_array;
       }
       
       return result;

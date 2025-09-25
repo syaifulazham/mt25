@@ -568,6 +568,7 @@ model targetgroup {
   maxAge                 Int       @default(0)
   minAge                 Int       @default(0)
   contestant_class_grade String?   @db.VarChar(255)
+  class_grade_array      Json?
   contest                contest[] @relation("contesttotargetgroup")
 }
 

@@ -46,7 +46,7 @@ import {
 const schoolLevels = ["Primary", "Secondary", "Pre-University", "Higher Education"];
 
 // Class grade options
-const classGradeOptions = ["none", "1", "2", "3", "4", "5", "6", "PPKI"];
+const classGradeOptions = ["1", "2", "3", "4", "5", "6", "PPKI"];
 
 // Target group type definition
 type TargetGroup = {
@@ -58,6 +58,7 @@ type TargetGroup = {
   maxAge: number;
   schoolLevel: string;
   contestant_class_grade?: string | null;
+  class_grade_array?: string[] | null;
   _count?: {
     contests: number;
   };
@@ -97,7 +98,8 @@ export function TargetGroupsTab() {
     minAge: 0,
     maxAge: 0,
     schoolLevel: "",
-    contestant_class_grade: "none"
+    contestant_class_grade: null,
+    class_grade_array: [] as string[]
   });
   
   // State for edit target group form
@@ -174,7 +176,7 @@ export function TargetGroupsTab() {
         ...newTargetGroup,
         minAge: Number(newTargetGroup.minAge),
         maxAge: Number(newTargetGroup.maxAge),
-        contestant_class_grade: newTargetGroup.contestant_class_grade === "none" ? null : newTargetGroup.contestant_class_grade,
+        class_grade_array: newTargetGroup.class_grade_array.length > 0 ? newTargetGroup.class_grade_array : null,
       });
       
       setNewTargetGroup({
@@ -184,7 +186,8 @@ export function TargetGroupsTab() {
         minAge: 0,
         maxAge: 0,
         schoolLevel: "",
-        contestant_class_grade: "none"
+        contestant_class_grade: null,
+        class_grade_array: []
       });
       
       setIsAddDialogOpen(false);
@@ -215,7 +218,9 @@ export function TargetGroupsTab() {
         ...editTargetGroup,
         minAge: Number(editTargetGroup.minAge),
         maxAge: Number(editTargetGroup.maxAge),
-        contestant_class_grade: editTargetGroup.contestant_class_grade || null,
+        class_grade_array: editTargetGroup.class_grade_array && editTargetGroup.class_grade_array.length > 0 
+          ? editTargetGroup.class_grade_array 
+          : null,
       });
       
       setIsEditDialogOpen(false);
@@ -531,25 +536,36 @@ export function TargetGroupsTab() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="contestant_class_grade" className="text-right">
-                    Class Grade
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="class_grade_array" className="text-right mt-2">
+                    Class Grades
                   </Label>
-                  <Select 
-                    value={newTargetGroup.contestant_class_grade} 
-                    onValueChange={(value) => setNewTargetGroup({...newTargetGroup, contestant_class_grade: value})}
-                  >
-                    <SelectTrigger id="contestant_class_grade" className="col-span-3">
-                      <SelectValue placeholder="Select class grade" />
-                    </SelectTrigger>
-                    <SelectContent>
+                  <div className="col-span-3 space-y-2">
+                    <div className="flex flex-wrap gap-2">
                       {classGradeOptions.map((grade) => (
-                        <SelectItem key={grade} value={grade}>
-                          {grade === "none" ? "No specific grade" : grade}
-                        </SelectItem>
+                        <div key={grade} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`grade-${grade}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={newTargetGroup.class_grade_array.includes(grade)}
+                            onChange={(e) => {
+                              const updatedGrades = e.target.checked
+                                ? [...newTargetGroup.class_grade_array, grade]
+                                : newTargetGroup.class_grade_array.filter(g => g !== grade);
+                              setNewTargetGroup({...newTargetGroup, class_grade_array: updatedGrades});
+                            }}
+                          />
+                          <label htmlFor={`grade-${grade}`} className="text-sm font-medium">
+                            {grade}
+                          </label>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Select multiple class grades that apply to this target group
+                    </p>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -698,25 +714,38 @@ export function TargetGroupsTab() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-contestant_class_grade" className="text-right">
-                              Class Grade
+                          <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="edit-class_grade_array" className="text-right mt-2">
+                              Class Grades
                             </Label>
-                            <Select 
-                              value={editTargetGroup?.contestant_class_grade || "none"} 
-                              onValueChange={(value) => setEditTargetGroup(prev => prev ? { ...prev, contestant_class_grade: value === "none" ? null : value } : null)}
-                            >
-                              <SelectTrigger id="edit-contestant_class_grade" className="col-span-3">
-                                <SelectValue placeholder="Select class grade" />
-                              </SelectTrigger>
-                              <SelectContent>
+                            <div className="col-span-3 space-y-2">
+                              <div className="flex flex-wrap gap-2">
                                 {classGradeOptions.map((grade) => (
-                                  <SelectItem key={grade} value={grade}>
-                                    {grade === "none" ? "No specific grade" : grade}
-                                  </SelectItem>
+                                  <div key={grade} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id={`edit-grade-${grade}`}
+                                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                      checked={editTargetGroup?.class_grade_array?.includes(grade) || false}
+                                      onChange={(e) => {
+                                        if (!editTargetGroup) return;
+                                        const currentGrades = editTargetGroup.class_grade_array || [];
+                                        const updatedGrades = e.target.checked
+                                          ? [...currentGrades, grade]
+                                          : currentGrades.filter(g => g !== grade);
+                                        setEditTargetGroup({ ...editTargetGroup, class_grade_array: updatedGrades });
+                                      }}
+                                    />
+                                    <label htmlFor={`edit-grade-${grade}`} className="text-sm font-medium">
+                                      {grade}
+                                    </label>
+                                  </div>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Select multiple class grades that apply to this target group
+                              </p>
+                            </div>
                           </div>
                         </div>
                         <DialogFooter>

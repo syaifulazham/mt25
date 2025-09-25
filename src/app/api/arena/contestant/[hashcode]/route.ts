@@ -96,11 +96,14 @@ export async function GET(
           contestant_class_grade,
           minAge,
           maxAge,
-          schoolLevel
+          schoolLevel,
+          class_grade_array
         FROM targetgroup 
         WHERE (
           -- If contestant_class_grade is specified, ignore age restrictions
           (contestant_class_grade IS NOT NULL AND contestant_class_grade != '' AND contestant_class_grade != 'none') OR
+          -- Include all target groups with class_grade_array for further filtering
+          (class_grade_array IS NOT NULL) OR
           -- Otherwise apply age restrictions
           (minAge <= ${contestantAge} AND maxAge >= ${contestantAge})
         )
@@ -114,24 +117,74 @@ export async function GET(
       eligibleTargetGroups: eligibleTargetGroups.map(tg => ({ code: tg.code, name: tg.name, schoolLevel: tg.schoolLevel }))
     });
 
-    // Filter target groups that match contestant's class grade only if specified
-    // We're ignoring school level condition as requested
+    // Filter target groups with the new condition
     const filteredTargetGroups = eligibleTargetGroups.filter(tg => {
-      console.log(`Checking target group ${tg.code} (${tg.name}) - minAge: ${tg.minAge}, maxAge: ${tg.maxAge}, contestant age: ${contestantAge}`);
+      console.log(`Checking target group ${tg.code} (${tg.name}) - minAge: ${tg.minAge}, maxAge: ${tg.maxAge}, contestant age: ${contestantAge}, contestant ID: ${contestant.id}`);
+      console.log(`  Target group details: schoolLevel=${tg.schoolLevel}, contestant_class_grade=${tg.contestant_class_grade}, class_grade_array=${JSON.stringify(tg.class_grade_array)}`);
       
-      // If target group has a specific class grade requirement
-      if (tg.contestant_class_grade && tg.contestant_class_grade !== 'none') {
-        // Only include if it matches contestant's class grade
-        const matches = tg.contestant_class_grade === contestantClassGrade;
-        if (!matches) {
-          console.log(`Filtering out target group ${tg.code} - Class grade ${tg.contestant_class_grade} doesn't match contestant class grade ${contestantClassGrade}`);
-        }
-        return matches;
+      // Current condition: target group has a specific class grade requirement that matches
+      const currentCondition = tg.contestant_class_grade && 
+                              tg.contestant_class_grade !== 'none' && 
+                              tg.contestant_class_grade === contestantClassGrade;
+      
+      if (currentCondition) {
+        console.log(`  ✅ Matched current condition: contestant_class_grade ${contestantClassGrade} matches exactly`);
       }
       
-      // Include all target groups with no specific class grade requirement
-      // This will use only the age range check from the SQL query
-      return true;
+      // New condition: class_grade_array contains contestant's class grade based on education level
+      let classGradeArrayCondition = false;
+      
+      if (contestantClassGrade && tg.class_grade_array) {
+        let classGradeArray = [];
+        try {
+          // Parse JSON array if it's a string, or use it directly if it's already an array
+          classGradeArray = typeof tg.class_grade_array === 'string' 
+            ? JSON.parse(tg.class_grade_array)
+            : tg.class_grade_array;
+
+          console.log(`  Parsed class_grade_array: ${JSON.stringify(classGradeArray)}`);
+        } catch (error) {
+          console.error(`  ⚠️ Error parsing class_grade_array for target group ${tg.code}:`, error);
+        }
+        
+        // Check if class_grade_array includes contestant's class grade
+        const classGradeInArray = Array.isArray(classGradeArray) && 
+                                 classGradeArray.includes(contestantClassGrade);
+        
+        console.log(`  Class grade in array check: ${contestantClassGrade} in ${JSON.stringify(classGradeArray)} = ${classGradeInArray}`);
+        
+        // Only apply this condition if the education level and school level match
+        if (eduLevel.toLowerCase().includes('sekolah menengah') && tg.schoolLevel === 'Secondary' && classGradeInArray) {
+          console.log(`  ✅ Target group ${tg.code} matches secondary school class grade array condition`);
+          classGradeArrayCondition = true;
+
+          // Special debug for contestant 16874 and target group T1.2
+          if (contestant.id === 16874 && tg.code === 'T1.2') {
+            console.log(`  🔍 SPECIAL CASE - Contestant 16874 matched T1.2 with class_grade=${contestantClassGrade} in ${JSON.stringify(classGradeArray)}`);
+          }
+        } else if (eduLevel.toLowerCase().includes('sekolah rendah') && tg.schoolLevel === 'Primary' && classGradeInArray) {
+          console.log(`  ✅ Target group ${tg.code} matches primary school class grade array condition`);
+          classGradeArrayCondition = true;
+        } else {
+          console.log(`  ❌ Education level (${eduLevel}) and school level (${tg.schoolLevel}) don't match or class grade not in array`);
+        }
+      }
+      
+      // Apply the original condition OR the new condition
+      const shouldInclude = currentCondition || classGradeArrayCondition;
+      
+      // If neither condition is met but it passed the age criteria from SQL, still include it
+      const defaultInclude = !tg.contestant_class_grade || tg.contestant_class_grade === 'none';
+      
+      if (shouldInclude) {
+        console.log(`  ✅ Target group ${tg.code} included based on class grade match`);
+      } else if (defaultInclude) {
+        console.log(`  ✅ Target group ${tg.code} included based on default criteria (no specific class grade requirement)`);
+      } else {
+        console.log(`  ❌ Target group ${tg.code} filtered out`);
+      }
+      
+      return shouldInclude || defaultInclude;
     });
     
     const targetGroupCodes = filteredTargetGroups.map(tg => tg.code);
