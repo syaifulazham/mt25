@@ -173,8 +173,16 @@ export async function GET(
       // Apply the original condition OR the new condition
       const shouldInclude = currentCondition || classGradeArrayCondition;
       
-      // If neither condition is met but it passed the age criteria from SQL, still include it
-      const defaultInclude = !tg.contestant_class_grade || tg.contestant_class_grade === 'none';
+      // If neither condition is met but it passed the age criteria from SQL and doesn't have class_grade_array, include it
+      // Important: We only want to use the defaultInclude path for target groups without class_grade_array
+      const defaultInclude = (!tg.contestant_class_grade || tg.contestant_class_grade === 'none') && 
+                           !tg.class_grade_array;
+      
+      // Special case: If it has class_grade_array but doesn't match our conditions, exclude it
+      if (tg.class_grade_array && !classGradeArrayCondition) {
+        console.log(`  ❌ Target group ${tg.code} filtered out: has class_grade_array but contestant's grade or education level doesn't match`);
+        return false;
+      }
       
       if (shouldInclude) {
         console.log(`  ✅ Target group ${tg.code} included based on class grade match`);
