@@ -105,12 +105,18 @@ export async function POST(
       prisma.$queryRaw`
         SELECT 
           code, 
-          contestant_class_grade
+          contestant_class_grade,
+          schoolLevel,
+          class_grade_array,
+          minAge,
+          maxAge
         FROM targetgroup 
         WHERE code = ${quiz.target_group}
         AND (
           -- If contestant_class_grade is specified, ignore age restrictions
           (contestant_class_grade IS NOT NULL AND contestant_class_grade != '' AND contestant_class_grade != 'none') OR
+          -- Include target groups with class_grade_array for further filtering
+          (class_grade_array IS NOT NULL) OR
           -- Otherwise apply age restrictions
           (minAge <= ${contestantAge} AND maxAge >= ${contestantAge})
         )
@@ -128,16 +134,64 @@ export async function POST(
     
     const contestantGrade = contestantClassGrade.length > 0 ? contestantClassGrade[0].class_grade : null;
     
-    // Filter target groups that match contestant's class grade only if specified
+    // Filter target groups with the enhanced rules
     const filteredTargetGroups = eligibleTargetGroups.filter(tg => {
-      // If target group has a specific class grade requirement
-      if (tg.contestant_class_grade && tg.contestant_class_grade !== 'none') {
-        // Only include if it matches contestant's class grade
-        return tg.contestant_class_grade === contestantGrade;
+      console.log(`Start API: Checking eligibility for target group ${tg.code} with contestant grade ${contestantGrade}`);
+      
+      // Original condition: exact match on contestant_class_grade
+      const originalCondition = tg.contestant_class_grade && 
+                              tg.contestant_class_grade !== 'none' && 
+                              tg.contestant_class_grade === contestantGrade;
+      
+      // New condition: class_grade_array contains contestant's class grade based on education level
+      let classGradeArrayCondition = false;
+      
+      if (contestantGrade && tg.class_grade_array) {
+        let classGradeArray = [];
+        try {
+          // Parse JSON array if it's a string, or use it directly if it's already an array
+          classGradeArray = typeof tg.class_grade_array === 'string' 
+            ? JSON.parse(tg.class_grade_array)
+            : tg.class_grade_array;
+          
+          console.log(`Start API: Target group ${tg.code} class_grade_array:`, classGradeArray);
+        } catch (error) {
+          console.error(`Start API: Error parsing class_grade_array for target group ${tg.code}:`, error);
+        }
+        
+        // Check if class_grade_array includes contestant's class grade
+        const classGradeInArray = Array.isArray(classGradeArray) && 
+                                 classGradeArray.includes(contestantGrade);
+        
+        console.log(`Start API: Class grade ${contestantGrade} in array: ${classGradeInArray}`);
+        
+        // Only apply this condition if the education level and school level match
+        if (eduLevel.toLowerCase().includes('sekolah menengah') && tg.schoolLevel === 'Secondary' && classGradeInArray) {
+          console.log(`Start API: Match found: Secondary school with class grade ${contestantGrade} in array`);
+          classGradeArrayCondition = true;
+        } else if (eduLevel.toLowerCase().includes('sekolah rendah') && tg.schoolLevel === 'Primary' && classGradeInArray) {
+          console.log(`Start API: Match found: Primary school with class grade ${contestantGrade} in array`);
+          classGradeArrayCondition = true;
+        }
       }
       
-      // Include all target groups with no specific class grade requirement
-      return true;
+      // Special case: If it has class_grade_array but doesn't match conditions, exclude it
+      if (tg.class_grade_array && !classGradeArrayCondition) {
+        console.log(`Start API: Excluding target group ${tg.code}: has class_grade_array but contestant doesn't match`);
+        return false;
+      }
+      
+      // Apply the original condition OR the new condition
+      const shouldInclude = originalCondition || classGradeArrayCondition;
+      
+      // If neither condition is met but it passed the age criteria, include it
+      // Only for target groups without class_grade_array
+      const defaultInclude = (!tg.contestant_class_grade || tg.contestant_class_grade === 'none') && 
+                           !tg.class_grade_array;
+      
+      const result = shouldInclude || defaultInclude;
+      console.log(`Start API: Target group ${tg.code} eligible: ${result}`);
+      return result;
     });
     
     if (filteredTargetGroups.length === 0) {
