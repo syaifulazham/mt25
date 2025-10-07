@@ -78,7 +78,18 @@ export default function MonitoringPage() {
         throw new Error("Failed to fetch events");
       }
       const data = await response.json();
-      setEvents(data);
+      console.log('API response data:', data);
+      
+      // Handle both array response and {events: array} response formats
+      if (Array.isArray(data)) {
+        setEvents(data);
+      } else if (data.events && Array.isArray(data.events)) {
+        setEvents(data.events);
+      } else {
+        // Fallback to empty array if unexpected format
+        console.error('Unexpected API response format:', data);
+        setEvents([]);
+      }
     } catch (error) {
       console.error("Error fetching events:", error);
       toast({

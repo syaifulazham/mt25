@@ -61,7 +61,7 @@ export async function GET() {
       stateName: event.state?.name || null,
     }));
 
-    return NextResponse.json({ events: formattedEvents });
+    return NextResponse.json(formattedEvents);
   } catch (error) {
     console.error("Error fetching all events:", error);
     return NextResponse.json(
