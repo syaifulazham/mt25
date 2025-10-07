@@ -1,0 +1,70 @@
+{
+  "canvas": {
+    "scale": 1,
+    "width": 842,
+    "height": 595
+  },
+  "elements": [
+    {
+      "id": "element_1758147932535",
+      "type": "dynamic_text",
+      "layer": 1,
+      "style": {
+        "align": "center",
+        "color": "#000000",
+        "font_size": 34.5,
+        "font_family": "Arial",
+        "font_weight": "normal"
+      },
+      "position": {
+        "x": 386.7,
+        "y": 404.8
+      },
+      "placeholder": "{{recipient_name}}",
+      "text_anchor": "middle",
+      "prefix": ""
+    },
+    {
+      "id": "element_1758147985488",
+      "type": "dynamic_text",
+      "layer": 2,
+      "style": {
+        "align": "center",
+        "color": "#000000",
+        "font_size": 27,
+        "font_family": "Georgia",
+        "font_weight": "bold"
+      },
+      "position": {
+        "x": 386.4,
+        "y": 531.3
+      },
+      "placeholder": "{{contest_name}}",
+      "text_anchor": "middle",
+      "prefix": ""
+    },
+    {
+      "id": "element_1759361989648",
+      "type": "dynamic_text",
+      "layer": 3,
+      "style": {
+        "align": "center",
+        "color": "#000000",
+        "font_size": 16,
+        "font_family": "Arial",
+        "font_weight": "normal"
+      },
+      "position": {
+        "x": 738,
+        "y": 98
+      },
+      "placeholder": "{{unique_code}}",
+      "text_anchor": "middle",
+      "prefix": ""
+    }
+  ],
+  "background": {
+    "page": 1,
+    "pdf_path": "/uploads/templates/c364faa6-0519-47ae-a784-8d189e68fabe-SIJIL_PENYERTAAN_v2.pdf"
+  }
+}

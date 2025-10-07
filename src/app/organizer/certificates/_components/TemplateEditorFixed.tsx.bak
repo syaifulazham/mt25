@@ -5,12 +5,6 @@ import { PreviewModal } from './PreviewModal'
 import { Session } from 'next-auth'
 import { useRouter } from 'next/navigation'
 import { DebugPanel } from './DebugPanel'
-import PaperSizeSelector, { PAPER_SIZES, PaperSize } from './PaperSizeSelector'
-import CalibrationControls, { CalibrationSettings } from './CalibrationControls'
-import CollapsibleSection from './CollapsibleSection'
-
-// Define TextAnchor type for better type safety
-type TextAnchor = 'start' | 'middle' | 'end';
 
 interface TemplateEditorProps {
   template?: any // Template data from database
@@ -26,83 +20,13 @@ interface Element {
   prefix?: string  // Added prefix field for dynamic text
   placeholder?: string
   style?: any
-  text_anchor?: TextAnchor  // Controls text alignment relative to position
+  text_anchor?: 'start' | 'middle' | 'end'  // Controls text alignment relative to position
   layer: number
   isSelected?: boolean
 }
 // Component for the certificate template editor
 
-// Debug function to inspect element properties when rendering
-function debugElementProps(element: Element, location: string): string | undefined {
-  console.log(`Rendering element ${element.id} at ${location} with text_anchor: "${element.text_anchor}" (${typeof element.text_anchor})`)
-  return element.text_anchor
-}export function TemplateEditor({ template, session, isNew = false }: TemplateEditorProps) {
-  // Function to fix text anchor properties in the elements
-  const fixElementProperties = () => {
-    const updatedElements = elements.map(element => {
-      const updatedElement = {...element};
-      
-      // Fix text elements
-      if (element.type === 'dynamic_text' || element.type === 'static_text') {
-        // Update text_anchor based on style.align
-        if (element.style?.align === 'center') {
-          updatedElement.text_anchor = 'middle';
-        } else if (element.style?.align === 'right') {
-          updatedElement.text_anchor = 'end';
-        } else {
-          updatedElement.text_anchor = 'start';
-        }
-        
-        // Ensure prefix exists for dynamic text
-        if (element.type === 'dynamic_text' && updatedElement.prefix === undefined) {
-          updatedElement.prefix = '';
-        }
-      }
-      
-      return updatedElement;
-    });
-    
-    // Update state with fixed elements
-    setElements(updatedElements);
-    console.log('Fixed elements with proper text_anchor and prefix values');
-    setSuccess('Text properties fixed!');
-  };
-
-  // Function to fix text anchor properties in the elements
-  const ensureElementProperties = (elements: Element[]): Element[] => {
-    return elements.map(element => {
-      // Deep clone the element
-      const updatedElement = JSON.parse(JSON.stringify(element));
-      
-      // For text elements, ensure properties are properly set
-      if (element.type === 'dynamic_text' || element.type === 'static_text') {
-        // Set text_anchor based on style.align
-        if (element.style?.align === 'center') {
-          updatedElement.text_anchor = 'middle';
-        } else if (element.style?.align === 'right') {
-          updatedElement.text_anchor = 'end';
-        } else {
-          updatedElement.text_anchor = 'start';
-        }
-        
-        // Ensure prefix exists for dynamic text
-        if (element.type === 'dynamic_text' && updatedElement.prefix === undefined) {
-          updatedElement.prefix = '';
-        }
-      }
-      
-      return updatedElement;
-    });
-  };
-  // IMMEDIATE DEBUG: Log template configuration as received from server
-  console.log("TEMPLATE RAW DATA FROM SERVER:", JSON.stringify(template?.configuration?.elements?.map(el => ({
-    id: el.id,
-    type: el.type,
-    text_anchor: el.text_anchor,
-    style: el.style,
-    prefix: el.prefix
-  })), null, 2));
-
+export function TemplateEditor({ template, session, isNew = false }: TemplateEditorProps) {
   // IMMEDIATE DEBUG: Log template configuration as received from server
   console.log('TEMPLATE RAW DATA:', template?.configuration?.elements?.map(el => ({
     id: el.id,
@@ -114,50 +38,6 @@ function debugElementProps(element: Element, location: string): string | undefin
   const router = useRouter()
   const canvasRef = useRef<HTMLDivElement>(null)
   const [pdfUrl, setPdfUrl] = useState<string | null>(template?.basePdfPath || null)
-  
-  // Initialize paper size from template or default to A4 Landscape
-  const initialPaperSize = (): PaperSize => {
-    if (template?.configuration?.canvas) {
-      const { width, height, paperSize } = template.configuration.canvas;
-      
-      // If paperSize is specified, use that
-      if (paperSize && PAPER_SIZES[paperSize]) {
-        return PAPER_SIZES[paperSize];
-      }
-      
-      // Otherwise try to determine from width/height
-      for (const [key, size] of Object.entries(PAPER_SIZES)) {
-        if (size.width === width && size.height === height) {
-          return size;
-        }
-      }
-    }
-    
-    // Default to A4 Landscape if no match
-    return PAPER_SIZES['A4-Landscape'];
-  };
-  
-  const [paperSize, setPaperSize] = useState<PaperSize>(initialPaperSize())
-  
-  // Initialize calibration settings from template or use defaults
-  const initialCalibration = (): CalibrationSettings => {
-    if (template?.configuration?.calibration) {
-      return {
-        scaleX: template.configuration.calibration.scaleX || 1,
-        scaleY: template.configuration.calibration.scaleY || 1,
-        offsetY: template.configuration.calibration.offsetY || 0,
-        baselineRatio: template.configuration.calibration.baselineRatio || 0.35
-      };
-    }
-    return {
-      scaleX: 1,
-      scaleY: 1,
-      offsetY: 0,
-      baselineRatio: 0.35
-    };
-  };
-  
-  const [calibration, setCalibration] = useState<CalibrationSettings>(initialCalibration())
   
   // Process elements when loading to ensure all required properties exist
   const processLoadedElements = (loadedElements: Element[] = []): Element[] => {
@@ -410,40 +290,6 @@ function debugElementProps(element: Element, location: string): string | undefin
   }
   
   // Handle clicking on the canvas (deselect elements)
-  // Function to fix text anchor properties in the elements
-  const fixTextAnchorProperties = () => {
-    const updatedElements = elements.map(element => {
-      const updatedElement = {...element};
-      
-      // Ensure text_anchor is set based on style.align
-      if (element.type === 'dynamic_text' || element.type === 'static_text') {
-        // Update text_anchor based on style.align
-        if (element.style?.align === 'center') {
-          updatedElement.text_anchor = 'middle';
-        } else if (element.style?.align === 'right') {
-          updatedElement.text_anchor = 'end';
-        } else {
-          updatedElement.text_anchor = 'start';
-        }
-        
-        // Ensure prefix exists for dynamic text
-        if (element.type === 'dynamic_text' && updatedElement.prefix === undefined) {
-          updatedElement.prefix = '';
-        }
-      }
-      
-      return updatedElement;
-    });
-    
-    // Update state with fixed elements
-    setElements(updatedElements);
-    
-    // Set success message
-    setSuccess('Text anchor properties fixed! Try selecting an element now.');
-    
-    // Print debug info
-    console.log('Fixed elements:', updatedElements);
-  };
   const handleCanvasClick = () => {
     setSelectedElement(null)
   }
@@ -546,8 +392,8 @@ function debugElementProps(element: Element, location: string): string | undefin
   const centerElementHorizontally = () => {
     if (!selectedElement || !canvasRef.current) return
     
-    // Canvas dimensions from selected paper size
-    const canvasWidth = paperSize.width; // Use the selected paper size width
+    // Canvas dimensions (A4 paper)
+    const canvasWidth = 794; // A4 width in pixels
     
     // Estimate element width based on content and type
     let elementWidth = 100; // Default width estimate
@@ -592,8 +438,8 @@ function debugElementProps(element: Element, location: string): string | undefin
   const centerElementVertically = () => {
     if (!selectedElement || !canvasRef.current) return
     
-    // Canvas dimensions from selected paper size
-    const canvasHeight = paperSize.height; // Use the selected paper size height
+    // Canvas dimensions (A4 paper)
+    const canvasHeight = 1123; // A4 height in pixels
     
     // Estimate element height based on type
     let elementHeight = 24; // Default height estimate
@@ -626,9 +472,9 @@ function debugElementProps(element: Element, location: string): string | undefin
   const centerElementBoth = () => {
     if (!selectedElement || !canvasRef.current) return
     
-    // Canvas dimensions from selected paper size
-    const canvasWidth = paperSize.width; // Use the selected paper size width
-    const canvasHeight = paperSize.height; // Use the selected paper size height
+    // Canvas dimensions (A4 paper)
+    const canvasWidth = 794; // A4 width in pixels
+    const canvasHeight = 1123; // A4 height in pixels
     
     // Estimate element dimensions based on content and type
     let elementWidth = 100; // Default width estimate
@@ -761,20 +607,9 @@ function debugElementProps(element: Element, location: string): string | undefin
         winnerRangeEnd: targetType === 'EVENT_WINNER' ? winnerRangeEnd : null,
         configuration: {
           canvas: {
-            width: paperSize.width,
-            height: paperSize.height,
-            scale: 1.0,
-            paperSize: Object.keys(PAPER_SIZES).find(key => 
-              PAPER_SIZES[key].width === paperSize.width && 
-              PAPER_SIZES[key].height === paperSize.height
-            ) || 'A4-Landscape',
-            orientation: paperSize.orientation
-          },
-          calibration: {
-            scaleX: calibration.scaleX,
-            scaleY: calibration.scaleY,
-            offsetY: calibration.offsetY,
-            baselineRatio: calibration.baselineRatio
+            width: 842, // A4 width in points
+            height: 595, // A4 height in points
+            scale: 1.0
           },
           background: {
             pdf_path: pdfUrl,
@@ -917,41 +752,10 @@ function debugElementProps(element: Element, location: string): string | undefin
           />
         </div>
         
-        {/* Paper Size Selector - Collapsible */}
-        <div className="mb-4">
-          <CollapsibleSection title="Certificate Size">
-            <PaperSizeSelector 
-              currentSize={{ width: paperSize.width, height: paperSize.height }} 
-              onSizeChange={(newSize) => {
-                setPaperSize(newSize);
-                setSuccess(`Paper size changed to ${newSize.name} (${newSize.width}×${newSize.height})`);
-                setTimeout(() => setSuccess(null), 1500);
-              }} 
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Choose the appropriate size for your certificate. This affects canvas dimensions and element positioning.
-            </p>
-          </CollapsibleSection>
-        </div>
-        
-        {/* PDF Calibration Settings - Collapsible */}
-        <div className="mb-4">
-          <CollapsibleSection title="PDF Calibration Settings">
-            <CalibrationControls
-              calibration={calibration}
-              onCalibrationChange={(newCalibration) => {
-                setCalibration(newCalibration);
-                setSuccess('Calibration settings updated');
-                setTimeout(() => setSuccess(null), 1500);
-              }}
-            />
-          </CollapsibleSection>
-        </div>
-        
-        {/* Target Audience Configuration - Collapsible */}
-        <div className="mb-4">
-          <CollapsibleSection title="Target Audience">
-            <div className="space-y-3">
+        {/* Target Audience Configuration */}
+        <div className="pt-3 border-t border-gray-200">
+          <h3 className="text-md font-medium mb-3">Target Audience</h3>
+          <div className="space-y-3">
             {/* Target Type Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1064,7 +868,6 @@ function debugElementProps(element: Element, location: string): string | undefin
               </p>
             </div>
           </div>
-          </CollapsibleSection>
         </div>
       </div>
       
@@ -1118,7 +921,7 @@ function debugElementProps(element: Element, location: string): string | undefin
           <div className="bg-gray-100 p-2 border-b flex justify-between items-center">
             <h3 className="font-medium px-1">Template Designer</h3>
             <div className="flex space-x-2 items-center">
-{/* Preview button */}
+              {/* Preview button */}
               <button
                 type="button"
                 onClick={() => setShowPreview(true)}
@@ -1145,7 +948,8 @@ function debugElementProps(element: Element, location: string): string | undefin
                 </svg>
                 <span>Debug {debugMode ? 'ON' : 'OFF'}</span>
               </button>
-{/* Element buttons */}
+              
+              {/* Element buttons */}
               <div className="flex items-center border border-gray-200 rounded-md bg-white divide-x divide-gray-200">
                 <button
                   type="button"
@@ -1188,17 +992,13 @@ function debugElementProps(element: Element, location: string): string | undefin
             {/* Canvas Area with PDF Background */}
             <div className="flex-1 overflow-auto border-r" style={{ height: '700px' }}>
               <div className="p-4 min-h-full flex justify-center">
-                <div className="relative mb-20" style={{ width: `${paperSize.width}px`, minHeight: `${paperSize.height}px` }}>
-                  {/* Paper size indicator */}
-                  <div className="absolute top-2 right-2 bg-white bg-opacity-80 px-2 py-1 text-xs text-gray-600 rounded shadow-sm">
-                    {paperSize.name}: {paperSize.width} × {paperSize.height} pts
-                  </div>
+                <div className="relative mb-20" style={{ width: '794px', minHeight: '1123px' }}>
                   {/* PDF Frame */}
                   <div className="mb-4 border border-gray-300 shadow-sm">
                     <iframe
                       src={pdfUrl.startsWith('/') ? `/uploads/templates/${pdfUrl.split('/').pop()}` : pdfUrl}
                       className="w-full"
-                      style={{ height: `${paperSize.height}px` }}
+                      style={{ height: '1123px' }}
                       title="PDF Template"
                     />
                   </div>
@@ -1208,7 +1008,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                     ref={canvasRef}
                     className="absolute top-0 left-0 right-0 bottom-0"
                     onClick={handleCanvasClick}
-                    style={{ height: `${paperSize.height}px` }}
+                    style={{ height: '1123px' }}
                   >
                     {elements.map(element => (
                       <div
@@ -1233,10 +1033,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                               position: 'relative',
                               transform: element.text_anchor === 'middle' ? 'translateX(-50%)' : 
                                         element.text_anchor === 'end' ? 'translateX(-100%)' : 'none',
-                              textAnchor: (() => {
-                                const anchor = debugElementProps(element, "render") || "start";
-                                return anchor;
-                              })(),
+                              textAnchor: element.text_anchor || 'start',
                               whiteSpace: 'nowrap'
                             }}
                           >
@@ -1255,10 +1052,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                               position: 'relative',
                               transform: element.text_anchor === 'middle' ? 'translateX(-50%)' : 
                                         element.text_anchor === 'end' ? 'translateX(-100%)' : 'none',
-                              textAnchor: (() => {
-                                const anchor = debugElementProps(element, "render") || "start";
-                                return anchor;
-                              })(),
+                              textAnchor: element.text_anchor || 'start',
                               whiteSpace: 'nowrap'
                             }}
                           >
@@ -1440,7 +1234,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         <button
                           type="button"
                           onClick={() => updateElementProperty('text_anchor', 'start')}
-                          className={`p-2 flex-1 flex items-center justify-center tooltip-container ${(() => { console.log("Left alignment button, selectedElement.text_anchor:", selectedElement?.text_anchor); return selectedElement.text_anchor === "start" ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"; })()}`}
+                          className={`p-2 flex-1 flex items-center justify-center tooltip-container ${selectedElement.text_anchor === 'start' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
                           title="Align Left"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1451,7 +1245,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         <button
                           type="button"
                           onClick={() => updateElementProperty('text_anchor', 'middle')}
-                          className={`p-2 flex-1 flex items-center justify-center tooltip-container ${(() => { console.log("Center alignment button, selectedElement.text_anchor:", selectedElement?.text_anchor); return selectedElement.text_anchor === "middle" ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"; })()}`}
+                          className={`p-2 flex-1 flex items-center justify-center tooltip-container ${selectedElement.text_anchor === 'middle' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
                           title="Align Center"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1462,7 +1256,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         <button
                           type="button"
                           onClick={() => updateElementProperty('text_anchor', 'end')}
-                          className={`p-2 flex-1 flex items-center justify-center tooltip-container ${(() => { console.log("Right alignment button, selectedElement.text_anchor:", selectedElement?.text_anchor); return selectedElement.text_anchor === "end" ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"; })()}`}
+                          className={`p-2 flex-1 flex items-center justify-center tooltip-container ${selectedElement.text_anchor === 'end' ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
                           title="Align Right"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1638,8 +1432,6 @@ function debugElementProps(element: Element, location: string): string | undefin
           mockupData={mockupData}
           onUpdateMockupData={setMockupData}
           contests={contests}
-          paperSize={paperSize}
-          calibration={calibration}
         />
       )}
       

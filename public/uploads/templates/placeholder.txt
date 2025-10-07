@@ -1,0 +1,2 @@
+This directory should contain the certificate template PDF files.
+The actual certificate background file should be here, not overwritten by test files.

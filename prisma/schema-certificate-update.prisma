@@ -1,0 +1,45 @@
+// Certificate Management Models Update
+
+// Target audience type for certificate templates
+enum CertTemplateTargetType {
+  GENERAL           // General participants (all participants in contestant table)
+  EVENT_PARTICIPANT // Participants of a specific event
+  EVENT_WINNER      // Winners of a specific event (with rank range)
+}
+
+// Certificate Template model with target audience fields
+model CertTemplate {
+  id              Int                  @id @default(autoincrement())
+  templateName    String               @db.VarChar(255)
+  basePdfPath     String?              @db.VarChar(1000)
+  configuration   Json
+  status          CertificateStatus    @default(ACTIVE)
+  
+  // New fields for target audience
+  targetType      CertTemplateTargetType @default(GENERAL)
+  eventId         Int?                 // Related event ID for EVENT_PARTICIPANT and EVENT_WINNER types
+  winnerRangeStart Int?                // Starting rank for EVENT_WINNER type (e.g., 1 for 1st place)
+  winnerRangeEnd   Int?                // Ending rank for EVENT_WINNER type (e.g., 3 for 3rd place)
+  
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  createdBy       Int
+  updatedBy       Int?
+
+  // Relations to user table
+  creator         user                 @relation("CreatedTemplates", fields: [createdBy], references: [id])
+  updater         user?                @relation("UpdatedTemplates", fields: [updatedBy], references: [id])
+  
+  // Relation to event table for event-specific templates
+  event           event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  
+  // Generated certificates using this template
+  certificates    Certificate[]
+
+  @@index([templateName], name: "idx_cert_template_name")
+  @@index([status], name: "idx_cert_template_status")
+  @@index([createdAt], name: "idx_cert_template_createdAt")
+  @@index([targetType], name: "idx_cert_template_targetType")
+  @@index([eventId], name: "idx_cert_template_eventId")
+  @@map("cert_template")
+}

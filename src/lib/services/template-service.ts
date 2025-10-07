@@ -1,4 +1,4 @@
-import { PrismaClient, Status } from '@prisma/client'
+import { PrismaClient, CertificateStatus } from '@prisma/client'
 import { prismaExecute } from "@/lib/prisma"
 
 // Template query params type
@@ -14,6 +14,11 @@ export type TemplateCreateParams = {
   templateName: string
   basePdfPath?: string
   configuration: any
+  // Target audience fields
+  targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER'
+  eventId?: number | null
+  winnerRangeStart?: number | null
+  winnerRangeEnd?: number | null
   createdBy: number
 }
 
@@ -22,6 +27,11 @@ export type TemplateUpdateParams = {
   templateName?: string
   basePdfPath?: string
   configuration?: any
+  // Target audience fields
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER'
+  eventId?: number | null
+  winnerRangeStart?: number | null
+  winnerRangeEnd?: number | null
   updatedBy: number
 }
 
@@ -37,7 +47,7 @@ export const TemplateService = {
     const page = params.page ? parseInt(String(params.page)) : 1
     const pageSize = params.pageSize ? parseInt(String(params.pageSize)) : 10
     const search = params.search || ''
-    const status = params.status as Status | undefined
+    const status = params.status as CertificateStatus | undefined
 
     // Calculate pagination values
     const skip = (page - 1) * pageSize
@@ -138,6 +148,11 @@ export const TemplateService = {
           basePdfPath: data.basePdfPath,
           configuration: data.configuration,
           status: 'ACTIVE',
+          // Target audience fields
+          targetType: data.targetType,
+          eventId: data.eventId || null,
+          winnerRangeStart: data.winnerRangeStart || null,
+          winnerRangeEnd: data.winnerRangeEnd || null,
           createdBy: data.createdBy,
         },
         include: {
@@ -147,7 +162,16 @@ export const TemplateService = {
               name: true,
               username: true,
             }
-          }
+          },
+          event: data.eventId ? {
+            select: {
+              id: true,
+              name: true,
+              startDate: true,
+              endDate: true,
+              scopeArea: true,
+            }
+          } : false
         }
       })
     )
@@ -164,6 +188,11 @@ export const TemplateService = {
           ...(data.templateName && { templateName: data.templateName }),
           ...(data.basePdfPath && { basePdfPath: data.basePdfPath }),
           ...(data.configuration && { configuration: data.configuration }),
+          // Target audience fields
+          ...(data.targetType && { targetType: data.targetType }),
+          ...(typeof data.eventId !== 'undefined' && { eventId: data.eventId }),
+          ...(typeof data.winnerRangeStart !== 'undefined' && { winnerRangeStart: data.winnerRangeStart }),
+          ...(typeof data.winnerRangeEnd !== 'undefined' && { winnerRangeEnd: data.winnerRangeEnd }),
           updatedBy: data.updatedBy,
         },
         include: {
@@ -180,7 +209,17 @@ export const TemplateService = {
               name: true,
               username: true,
             }
-          }
+          },
+          // Include event data if template is event-specific
+          event: data.eventId ? {
+            select: {
+              id: true,
+              name: true,
+              startDate: true,
+              endDate: true,
+              scopeArea: true,
+            }
+          } : undefined
         }
       })
     )

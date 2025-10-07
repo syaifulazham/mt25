@@ -9,10 +9,13 @@ import {
   School, 
   UsersRound, 
   Award,
-  ArrowUpRight
+  ArrowUpRight,
+  GraduationCap,
+  BarChart
 } from "lucide-react";
 import Link from "next/link";
 import { formatNumber } from "@/lib/utils/format";
+import SchoolContingentButton from "./school-contingent-button";
 
 // StatsCard component (moved from page.tsx)
 const StatsCard = ({ title, value, icon: Icon, link, linkText }: { 
@@ -20,7 +23,7 @@ const StatsCard = ({ title, value, icon: Icon, link, linkText }: {
   value: string | number; 
   icon: any; 
   link?: string; 
-  linkText?: string 
+  linkText?: string;
 }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -61,13 +64,34 @@ export default async function BasicStatsSection({ isAdmin = false }: { isAdmin?:
   // Fetch contingent count separately to avoid blocking if it's slow
   const contingentCount = await prismaExecute(prisma => prisma.contingent.count());
   
+  // Fetch school contingents count
+  const schoolContingentCount = await prismaExecute(prisma => 
+    prisma.contingent.count({
+      where: {
+        contingentType: 'SCHOOL'
+      }
+    })
+  );
+  
+  // Get school location data for the modal
+  const schoolLocations = await prismaExecute(async (prisma) => {
+    const result = await prisma.$queryRaw`
+      SELECT s.location, COUNT(c.id) as count 
+      FROM school s 
+      JOIN contingent c ON c.schoolId = s.id 
+      WHERE c.contingentType = 'SCHOOL' 
+      GROUP BY s.location
+    `;
+    return result;
+  });
+  
   // Fetch teams count
   const teamsCount = await prismaExecute(prisma => prisma.team.count());
 
   // Using centralized formatNumber utility for ###,##0 format
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
       <StatsCard 
         title="Managers" 
         value={formatNumber(participantCount)} 
@@ -81,6 +105,10 @@ export default async function BasicStatsSection({ isAdmin = false }: { isAdmin?:
         icon={School} 
         link="/organizer/contingents"
         linkText="View all"
+      />
+      <SchoolContingentButton 
+        count={schoolContingentCount} 
+        locations={schoolLocations}
       />
       <StatsCard 
         title="Teams" 

@@ -1,0 +1,8 @@
+  // IMMEDIATE DEBUG: Log template configuration as received from server
+  console.log('TEMPLATE RAW DATA FROM SERVER:', JSON.stringify(template?.configuration?.elements?.map(el => ({
+    id: el.id,
+    type: el.type,
+    text_anchor: el.text_anchor,
+    style: el.style,
+    prefix: el.prefix
+  })), null, 2));

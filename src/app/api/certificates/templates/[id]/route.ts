@@ -83,6 +83,29 @@ export async function PUT(
     }
 
     const body = await request.json()
+    
+    // Log incoming elements data for debugging
+    if (body.configuration && body.configuration.elements) {
+      const elements = body.configuration.elements;
+      console.log(`Updating template with ${elements.length} elements`);
+      
+      // Log sample of properties we want to ensure are preserved
+      const dynamicTextElements = elements.filter((el: any) => el.type === 'dynamic_text');
+      if (dynamicTextElements.length > 0) {
+        console.log('Sample dynamic text elements with prefix and text_anchor:', 
+          dynamicTextElements.slice(0, 3).map((el: any) => ({
+            id: el.id,
+            prefix: el.prefix,
+            text_anchor: el.text_anchor,
+            style: el.style ? {
+              align: el.style.align,
+              font_family: el.style.font_family
+            } : 'No style'
+          }))
+        );
+      }
+    }
+    
     const validatedData = templateUpdateSchema.parse({ ...body, id })
     
     const template = await TemplateService.updateTemplate(id, {

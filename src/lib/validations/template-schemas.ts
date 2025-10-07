@@ -20,6 +20,8 @@ const templateElementSchema = z.object({
   style: textStyleSchema.optional(),
   content: z.string().optional(),
   placeholder: z.string().optional(),
+  prefix: z.string().optional(), // Add prefix property for dynamic text
+  text_anchor: z.enum(['start', 'middle', 'end']).optional(), // Add text_anchor property
   source: z.string().optional(),
   dimensions: z.object({
     width: z.number(),
@@ -34,7 +36,15 @@ const templateConfigurationSchema = z.object({
     width: z.number().positive(),
     height: z.number().positive(),
     scale: z.number().positive(),
+    paperSize: z.string().optional(), // Paper size identifier (e.g., 'A4-Portrait')
+    orientation: z.enum(['portrait', 'landscape']).optional(), // Paper orientation
   }),
+  calibration: z.object({
+    scaleX: z.number().default(0.98),
+    scaleY: z.number().default(0.98),
+    offsetY: z.number().default(-20),
+    baselineRatio: z.number().default(0.35),
+  }).optional(),
   background: z.object({
     pdf_path: z.string(),
     page: z.number().int().positive(),
@@ -50,11 +60,19 @@ export const templateQuerySchema = z.object({
   status: z.enum(['ACTIVE', 'INACTIVE']).optional().nullable(),
 })
 
+// Target audience type enum
+export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER'])
+
 // Template creation schema
 export const templateCreateSchema = z.object({
   templateName: z.string().min(1, 'Template name is required').max(255, 'Template name cannot exceed 255 characters'),
   basePdfPath: z.string().optional(),
   configuration: templateConfigurationSchema,
+  // Target audience fields
+  targetType: targetTypeEnum.default('GENERAL'),
+  eventId: z.number().int().positive().nullable().optional(),
+  winnerRangeStart: z.number().int().min(1).nullable().optional(),
+  winnerRangeEnd: z.number().int().min(1).nullable().optional(),
   createdBy: z.number().optional(), // Added by the API route from the session
 })
 
@@ -64,6 +82,11 @@ export const templateUpdateSchema = z.object({
   templateName: z.string().min(1, 'Template name is required').max(255, 'Template name cannot exceed 255 characters').optional(),
   basePdfPath: z.string().optional(),
   configuration: templateConfigurationSchema.optional(),
+  // Target audience fields
+  targetType: targetTypeEnum.optional(),
+  eventId: z.number().int().positive().nullable().optional(),
+  winnerRangeStart: z.number().int().min(1).nullable().optional(),
+  winnerRangeEnd: z.number().int().min(1).nullable().optional(),
   updatedBy: z.number().optional(), // Added by the API route from the session
 })
 

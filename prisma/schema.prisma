@@ -183,6 +183,7 @@ model event {
   isActive         Boolean               @default(true)
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
+  certTemplates    CertTemplate[]
   contests         contest[]             @relation("eventToContest")
   state            state?                @relation(fields: [stateId], references: [id])
   zone             zone?                 @relation(fields: [zoneId], references: [id])
@@ -510,6 +511,7 @@ model school {
   address      String?            @db.Text
   city         String?
   postcode     String?
+  location     String?
   stateId      Int
   latitude     Float?
   longitude    Float?
@@ -584,29 +586,27 @@ model theme {
 }
 
 model user {
-  id                 Int                 @id @default(autoincrement())
-  name               String?
-  email              String              @unique(map: "User_email_key")
-  password           String?
-  role               user_role           @default(ADMIN)
-  username           String              @unique(map: "User_username_key")
-  isActive           Boolean             @default(true)
-  lastLogin          DateTime?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime
-  announcement       announcement[]
-  eventcontestjudges eventcontestjudge[]
-  judging            judging[]
-  judgingSession     judgingSession[]
-  news               news[]
-  notification       notification[]
-  photogalleries     photogallery[]
-  submission         submission[]
-  
-  // Certificate management relations
-  createdTemplates   CertTemplate[]      @relation("CreatedTemplates")
-  updatedTemplates   CertTemplate[]      @relation("UpdatedTemplates")
-  createdCertificates Certificate[]      @relation("CreatedCertificates")
+  id                  Int                 @id @default(autoincrement())
+  name                String?
+  email               String              @unique(map: "User_email_key")
+  password            String?
+  role                user_role           @default(ADMIN)
+  username            String              @unique(map: "User_username_key")
+  isActive            Boolean             @default(true)
+  lastLogin           DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime
+  announcement        announcement[]
+  createdTemplates    CertTemplate[]      @relation("CreatedTemplates")
+  updatedTemplates    CertTemplate[]      @relation("UpdatedTemplates")
+  createdCertificates Certificate[]       @relation("CreatedCertificates")
+  eventcontestjudges  eventcontestjudge[]
+  judging             judging[]
+  judgingSession      judgingSession[]
+  news                news[]
+  notification        notification[]
+  photogalleries      photogallery[]
+  submission          submission[]
 }
 
 model user_participant {
@@ -651,19 +651,21 @@ model question_bank {
   knowledge_field String
   question        String          @db.Text
   question_image  String?         @db.LongText
-  main_lang       String?         @db.VarChar(10)
-  alt_lang        String?         @db.VarChar(10)
-  alt_question    String?         @db.Text
   answer_type     String
   answer_options  Json
   answer_correct  String
   createdBy       String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  main_lang       String?         @db.VarChar(10)
+  alt_lang        String?         @db.VarChar(10)
+  alt_question    String?         @db.Text
   quiz_questions  quiz_question[]
 
   @@index([knowledge_field])
   @@index([target_group])
+  @@index([alt_lang], map: "idx_question_bank_alt_lang")
+  @@index([main_lang], map: "idx_question_bank_main_lang")
 }
 
 model quiz {
@@ -1229,6 +1231,68 @@ model microsite {
   @@index([contestantId])
 }
 
+model CertTemplate {
+  id                      Int                     @id @default(autoincrement())
+  templateName            String                  @db.VarChar(255)
+  basePdfPath             String?                 @db.VarChar(1000)
+  configuration           Json
+  status                  String                  @default("ACTIVE") @db.VarChar(10)
+  createdAt               DateTime                @default(now()) @db.DateTime(0)
+  updatedAt               DateTime                @default(now()) @updatedAt @db.DateTime(0)
+  createdBy               Int
+  updatedBy               Int?
+  targetType              CertTemplateTargetType  @default(GENERAL)
+  eventId                 Int?
+  winnerRangeStart        Int?
+  winnerRangeEnd          Int?
+  creator                 user                    @relation("CreatedTemplates", fields: [createdBy], references: [id], map: "fk_cert_template_createdBy")
+  event                   event?                  @relation(fields: [eventId], references: [id], map: "fk_cert_template_event")
+  certificate_status_enum certificate_status_enum @relation(fields: [status], references: [value], map: "fk_cert_template_status")
+  updater                 user?                   @relation("UpdatedTemplates", fields: [updatedBy], references: [id], map: "fk_cert_template_updatedBy")
+  certificates            Certificate[]
+
+  @@index([templateName], map: "idx_cert_template_name")
+  @@index([status], map: "idx_cert_template_status")
+  @@index([createdAt], map: "idx_cert_template_createdAt")
+  @@index([targetType], map: "idx_cert_template_targetType")
+  @@index([eventId], map: "idx_cert_template_eventId")
+  @@index([createdBy], map: "fk_cert_template_createdBy")
+  @@index([updatedBy], map: "fk_cert_template_updatedBy")
+  @@map("cert_template")
+}
+
+model Certificate {
+  id             Int          @id @default(autoincrement())
+  templateId     Int
+  recipientName  String       @db.VarChar(255)
+  recipientEmail String?      @db.VarChar(255)
+  recipientType  String       @db.VarChar(50)
+  contestName    String?      @db.VarChar(255)
+  awardTitle     String?      @db.VarChar(255)
+  uniqueCode     String       @unique(map: "unique_certificate_code") @db.VarChar(50)
+  filePath       String?      @db.VarChar(1000)
+  status         String       @default("DRAFT") @db.VarChar(20)
+  issuedAt       DateTime?    @db.DateTime(0)
+  createdAt      DateTime     @default(now()) @db.DateTime(0)
+  updatedAt      DateTime     @default(now()) @updatedAt @db.DateTime(0)
+  createdBy      Int
+  creator        user         @relation("CreatedCertificates", fields: [createdBy], references: [id], map: "fk_certificate_createdBy")
+  template       CertTemplate @relation(fields: [templateId], references: [id], map: "fk_certificate_templateId")
+
+  @@index([templateId], map: "idx_certificate_templateId")
+  @@index([recipientName], map: "idx_certificate_recipientName")
+  @@index([recipientEmail], map: "idx_certificate_recipientEmail")
+  @@index([status], map: "idx_certificate_status")
+  @@index([createdAt], map: "idx_certificate_createdAt")
+  @@index([createdBy], map: "fk_certificate_createdBy")
+  @@map("certificate")
+}
+
+model certificate_status_enum {
+  value         String         @id @db.VarChar(10)
+  cert_template CertTemplate[]
+}
+
 enum contest_contestType {
   QUIZ
   CODING
@@ -1315,64 +1379,8 @@ enum judgingSession_status {
   COMPLETED
 }
 
-// Certificate Management Models
-
-// Status enum for templates
-enum CertificateStatus {
-  ACTIVE
-  INACTIVE
-}
-
-// Certificate Template model
-model CertTemplate {
-  id              Int              @id @default(autoincrement())
-  templateName    String           @db.VarChar(255)
-  basePdfPath     String?          @db.VarChar(1000)
-  configuration   Json
-  status          CertificateStatus @default(ACTIVE)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  createdBy       Int
-  updatedBy       Int?
-
-  // Relations to user table
-  creator         user             @relation("CreatedTemplates", fields: [createdBy], references: [id])
-  updater         user?            @relation("UpdatedTemplates", fields: [updatedBy], references: [id])
-  
-  // Generated certificates using this template
-  certificates    Certificate[]
-
-  @@index([templateName], name: "idx_cert_template_name")
-  @@index([status], name: "idx_cert_template_status")
-  @@index([createdAt], name: "idx_cert_template_createdAt")
-  @@map("cert_template")
-}
-
-// Certificate model
-model Certificate {
-  id              Int       @id @default(autoincrement())
-  templateId      Int
-  recipientName   String    @db.VarChar(255)
-  recipientEmail  String?   @db.VarChar(255)
-  recipientType   String    @db.VarChar(50) // PARTICIPANT, CONTESTANT, JUDGE, ORGANIZER
-  contestName     String?   @db.VarChar(255)
-  awardTitle      String?   @db.VarChar(255)
-  uniqueCode      String    @unique @db.VarChar(50)
-  filePath        String?   @db.VarChar(1000)
-  status          String    @default("DRAFT") @db.VarChar(20) // DRAFT, GENERATED, SENT, DOWNLOADED
-  issuedAt        DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  createdBy       Int
-  
-  // Relations
-  template        CertTemplate @relation(fields: [templateId], references: [id])
-  creator         user        @relation("CreatedCertificates", fields: [createdBy], references: [id])
-  
-  @@index([templateId], name: "idx_certificate_templateId")
-  @@index([recipientName], name: "idx_certificate_recipientName")
-  @@index([recipientEmail], name: "idx_certificate_recipientEmail")
-  @@index([status], name: "idx_certificate_status")
-  @@index([createdAt], name: "idx_certificate_createdAt")
-  @@map("certificate")
+enum CertTemplateTargetType {
+  GENERAL
+  EVENT_PARTICIPANT
+  EVENT_WINNER
 }
