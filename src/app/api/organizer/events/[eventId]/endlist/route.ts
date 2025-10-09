@@ -119,12 +119,16 @@ export async function GET(
       })
     );
 
-    // Filter out teams where any member's age doesn't match target group age range
-    // unless the team status is 'APPROVED_SPECIAL'
-    const filteredTeams = teamsWithMembers.filter((team) => {
-      // If team status is APPROVED_SPECIAL, always include the team
+    // No longer filtering out teams based on age validation
+    // All teams with APPROVED, APPROVED_SPECIAL, or ACCEPTED status will be shown
+    // This matches the behavior in the sync process
+    const filteredTeams = teamsWithMembers;
+    
+    // Add debug info about age validation issues, but don't filter teams
+    const teamsWithAgeIssues = teamsWithMembers.filter((team) => {
+      // If team status is APPROVED_SPECIAL, age validation is not relevant
       if (team.status === 'APPROVED_SPECIAL') {
-        return true;
+        return false; // No issues for APPROVED_SPECIAL
       }
 
       // Check if all members' ages are within the target group age range
@@ -133,7 +137,7 @@ export async function GET(
         const minAge = parseInt(team.minAge);
         const maxAge = parseInt(team.maxAge);
         
-        // If age data is missing or invalid, exclude the team for safety
+        // If age data is missing or invalid, that's an issue
         if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) {
           return false;
         }
@@ -142,7 +146,12 @@ export async function GET(
         return memberAge >= minAge && memberAge <= maxAge;
       });
 
-      return allMembersAgeValid;
+      return !allMembersAgeValid; // Return true if there are age issues
+    });
+    
+    console.log(`Total teams: ${teamsWithMembers.length}, Teams with age validation issues: ${teamsWithAgeIssues.length}`);
+    teamsWithAgeIssues.forEach(team => {
+      console.log(`Team ID ${team.id} (${team.teamName}) has age validation issues but is included in endlist`);
     });
 
     return NextResponse.json(filteredTeams);

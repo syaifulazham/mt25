@@ -66,50 +66,50 @@ export async function GET(
       contingents.map(async (contingent) => {
         // Check if this contingent is already synced to attendance
         const attendanceRecord = await prisma.$queryRaw`
-          SELECT COUNT(*) as count FROM attendanceContingent 
+          SELECT COUNT(*) as count, MAX(updatedAt) as lastSyncDate FROM attendanceContingent 
           WHERE contingentId = ${contingent.id} AND eventId = ${eventId}
         ` as any[];
 
+        // Count all synced teams for this contingent (no age validation filtering)
         const attendanceTeamCount = await prisma.$queryRaw`
-          SELECT COUNT(*) as count FROM attendanceTeam 
-          WHERE contingentId = ${contingent.id} AND eventId = ${eventId}
+          SELECT COUNT(*) as count 
+          FROM attendanceTeam at
+          WHERE at.contingentId = ${contingent.id} 
+            AND at.eventId = ${eventId}
         ` as any[];
 
-        // Get the actual count of teams that would be synced (applying same filtering as sync API)
+        // Get the count of all approved teams without age validation filtering
         const syncableTeamsCount = await prisma.$queryRaw`
           SELECT COUNT(*) as count
           FROM eventcontestteam ect
           JOIN eventcontest ec ON ect.eventcontestId = ec.id
           JOIN team t ON ect.teamId = t.id
           JOIN contingent c ON t.contingentId = c.id
-          JOIN contest team_contest ON t.contestId = team_contest.id
-          JOIN contest ct ON ec.contestId = ct.id
-          JOIN _contesttotargetgroup ctg ON ctg.A = ct.id
-          JOIN targetgroup tg ON tg.id = ctg.B
           WHERE ec.eventId = ${eventId}
             AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
             AND c.id = ${contingent.id}
-            AND (
-              ect.status = 'APPROVED_SPECIAL' OR
-              NOT EXISTS (
-                SELECT 1 FROM teamMember tm 
-                JOIN contestant con ON tm.contestantId = con.id 
-                WHERE tm.teamId = t.id 
-                AND (
-                  con.age IS NULL OR 
-                  tg.minAge IS NULL OR 
-                  tg.maxAge IS NULL OR 
-                  CAST(con.age AS SIGNED) < CAST(tg.minAge AS SIGNED) OR 
-                  CAST(con.age AS SIGNED) > CAST(tg.maxAge AS SIGNED)
-                )
-              )
-            )
         ` as any[];
 
         const isSynced = Number(attendanceRecord[0]?.count || 0) > 0;
         const syncedTeamCount = Number(attendanceTeamCount[0]?.count || 0);
         const actualSyncableTeamCount = Number(syncableTeamsCount[0]?.count || 0);
-        const needsSync = !isSynced || syncedTeamCount < actualSyncableTeamCount;
+        
+        // TEMPORARY FIX: Show all contingents that have approved teams as needing sync
+        // This ensures all contingents appear in the sync list until a full resync is done
+        // Only mark contingent as not needing sync if it has the exact same number of synced teams as approved teams
+        const teamsExactlyMatch = syncedTeamCount === actualSyncableTeamCount && syncedTeamCount > 0;
+        
+        // Always show contingents with approved teams, unless the counts exactly match
+        const needsSync = actualSyncableTeamCount > 0 && !teamsExactlyMatch;
+        
+        // Log detailed info for troubleshooting
+        console.log(`Contingent ${contingent.name} (${contingent.id}): syncedTeamCount=${syncedTeamCount}, actualSyncableTeamCount=${actualSyncableTeamCount}, isSynced=${isSynced}, needsSync=${needsSync}`);
+        
+        if (syncedTeamCount < actualSyncableTeamCount && actualSyncableTeamCount > 0) {
+          console.log(`Contingent ${contingent.name} (${contingent.id}): needs sync - ${syncedTeamCount}/${actualSyncableTeamCount} teams synced`);
+        } else if (actualSyncableTeamCount === 0) {
+          console.log(`Contingent ${contingent.name} (${contingent.id}): has no syncable teams due to age validation or other criteria`);
+        }
 
         return {
           id: Number(contingent.id),
@@ -121,7 +121,8 @@ export async function GET(
           contestantCount: Number(contingent.contestantCount),
           isSynced,
           syncedTeamCount,
-          needsSync
+          needsSync,
+          lastSyncDate: attendanceRecord[0]?.lastSyncDate || null
         };
       })
     );

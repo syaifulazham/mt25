@@ -47,6 +47,11 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       totalTeams: number;
       newTeams: number;
       updatedTeams: number;
+      skippedTeams: number;
+      skippedTeamsReason: {
+        ageValidation: number;
+        missingData: number;
+      };
       totalContestants: number;
       newContestants: number;
       updatedContestants: number;
@@ -55,72 +60,77 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       newManagers: number;
       updatedManagers: number;
       removedManagers: number;
-      errorCount: number;
-      errors: string[];
+      errorCount?: number;
+      errors?: string[];
     }
 
-    const syncResults: SyncResults = {
-      totalContingents: 0,
-      newContingents: 0,
-      updatedContingents: 0,
-      totalTeams: 0,
-      newTeams: 0,
-      updatedTeams: 0,
-      totalContestants: 0,
-      newContestants: 0,
-      updatedContestants: 0,
-      removedContestants: 0,
-      totalManagers: 0,
-      newManagers: 0,
-      updatedManagers: 0,
-      removedManagers: 0,
-      errorCount: 0,
-      errors: [] as string[]
-    };
-
-    // Validate parameters
-    if (!eventId || isNaN(eventId)) {
-      return new NextResponse(JSON.stringify({
-        error: 'Invalid or missing eventId parameter'
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Ensure event exists
-    const event = await prisma.event.findUnique({
-      where: { id: eventId }
+   // Initialize sync results object
+  const syncResults = {
+    totalContingents: 0,
+    newContingents: 0,
+    updatedContingents: 0,
+    totalTeams: 0,
+    newTeams: 0,
+    updatedTeams: 0,
+    skippedTeams: 0,  // Track teams that are skipped due to validation
+    skippedTeamsReason: {  // Track reasons for skipping
+      ageValidation: 0,
+      missingData: 0
+    },
+    totalContestants: 0,
+    newContestants: 0,
+    updatedContestants: 0,
+    removedContestants: 0,
+    totalManagers: 0,
+    newManagers: 0,
+    updatedManagers: 0,
+    removedManagers: 0,
+    errorCount: 0,
+    errors: [] as string[]
+  };
+  
+  if (!eventId || isNaN(eventId)) {
+    return new NextResponse(JSON.stringify({
+      error: 'Invalid or missing eventId parameter'
+    }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
     });
-    
-    if (!event) {
-      return new NextResponse(JSON.stringify({
-        error: `Event with ID ${eventId} not found`
-      }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+  }
 
-    // Ensure contingent exists
-    const contingent = await prisma.contingent.findUnique({
-      where: { id: contingentId }
+  // Ensure event exists
+  const event = await prisma.event.findUnique({
+    where: { id: eventId }
+  });
+  
+  if (!event) {
+    return new NextResponse(JSON.stringify({
+      error: `Event with ID ${eventId} not found`
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
     });
-    
-    if (!contingent) {
-      return new NextResponse(JSON.stringify({
-        error: `Contingent with ID ${contingentId} not found`
-      }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+  }
 
-    console.log(`Starting attendance sync for event ${eventId}, contingent ${contingentId}`);
+  // Ensure contingent exists
+  const contingent = await prisma.contingent.findUnique({
+    where: { id: contingentId }
+  });
+  
+  if (!contingent) {
+    return new NextResponse(JSON.stringify({
+      error: `Contingent with ID ${contingentId} not found`
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
-    try {
-      // Query teams for the specific contingent with related data for the given event
-      const teamsQuery = `
+  console.log(`Starting attendance sync for event ${eventId}, contingent ${contingentId}`);
+
+  try {
+    // Query teams for the specific contingent with related data for the given event
+    const teamsQuery = `
         SELECT 
           t.id,
           t.name as teamName,
@@ -245,23 +255,32 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
 
         const members = await prisma.$queryRawUnsafe(membersQuery, team.id) as any[];
 
-        // Filter teams based on age validation (same logic as endlist)
-        if (team.status !== 'APPROVED_SPECIAL') {
-          const allMembersAgeValid = members.every((member: any) => {
-            const memberAge = parseInt(member.age);
-            const minAge = parseInt(team.minAge);
-            const maxAge = parseInt(team.maxAge);
-            
-            if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) {
-              return false;
-            }
-            
-            return memberAge >= minAge && memberAge <= maxAge;
-          });
+        // No longer filtering teams based on age validation - all approved teams will be synced
+        // Just tracking some statistics about potential age validation issues for reporting
+        const allMembersAgeValid = members.every((member: any) => {
+          const memberAge = parseInt(member.age);
+          const minAge = parseInt(team.minAge);
+          const maxAge = parseInt(team.maxAge);
+          
+          if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) {
+            return false;
+          }
+          
+          return memberAge >= minAge && memberAge <= maxAge;
+        });
 
-          if (!allMembersAgeValid) {
-            console.log(`Skipping team ${team.id} due to age validation failure`);
-            continue;
+        if (!allMembersAgeValid) {
+          console.log(`Team ${team.id} has age validation issues but will still be synced as requested`);
+          
+          // Just track statistics for reporting, but don't skip the team
+          const hasMissingData = members.some((member: any) => {
+            return isNaN(parseInt(member.age)) || isNaN(parseInt(team.minAge)) || isNaN(parseInt(team.maxAge));
+          });
+          
+          if (hasMissingData) {
+            console.log(`Team ${team.id} has missing age data but will be synced anyway`);
+          } else {
+            console.log(`Team ${team.id} has age range mismatch but will be synced anyway`);
           }
         }
 
@@ -518,11 +537,14 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       }
 
       // Create or update attendanceContingent record to mark this contingent as synced
+      console.log(`Checking for existing attendanceContingent record for contingent ${contingentId} and event ${eventId}...`);
       const existingContingentAttendance = await prisma.$queryRaw`
         SELECT id FROM attendanceContingent 
         WHERE contingentId = ${contingentId} AND eventId = ${eventId}
         LIMIT 1
       ` as any[];
+      
+      console.log(`Found ${existingContingentAttendance.length} existing records for contingent ${contingentId}...`);
 
       if (existingContingentAttendance.length === 0) {
         // Create new attendanceContingent record with hashcode
@@ -563,6 +585,7 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
     } catch (error: any) {
       console.error('Error syncing contingent attendance:', error);
       syncResults.errors.push(`Sync error: ${error?.message || 'Unknown error'}`);
+      syncResults.errorCount++;
       return new NextResponse(JSON.stringify({
         error: `Failed to sync contingent attendance data: ${error?.message || 'Unknown error'}`,
         syncResults
@@ -572,9 +595,9 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       });
     }
   } catch (error: any) {
-    console.error('Error syncing contingent attendance:', error);
+    console.error('Error in overall sync process:', error);
     return new NextResponse(JSON.stringify({
-      error: `Failed to sync contingent attendance data: ${error?.message || 'Unknown error'}`
+      error: `Failed to complete sync operation: ${error?.message || 'Unknown error'}`
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

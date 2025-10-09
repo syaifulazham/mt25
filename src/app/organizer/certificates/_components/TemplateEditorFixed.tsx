@@ -95,7 +95,7 @@ function debugElementProps(element: Element, location: string): string | undefin
     });
   };
   // IMMEDIATE DEBUG: Log template configuration as received from server
-  console.log("TEMPLATE RAW DATA FROM SERVER:", JSON.stringify(template?.configuration?.elements?.map(el => ({
+  console.log("TEMPLATE RAW DATA FROM SERVER:", JSON.stringify(template?.configuration?.elements?.map((el: Element) => ({
     id: el.id,
     type: el.type,
     text_anchor: el.text_anchor,
@@ -104,7 +104,7 @@ function debugElementProps(element: Element, location: string): string | undefin
   })), null, 2));
 
   // IMMEDIATE DEBUG: Log template configuration as received from server
-  console.log('TEMPLATE RAW DATA:', template?.configuration?.elements?.map(el => ({
+  console.log('TEMPLATE RAW DATA:', template?.configuration?.elements?.map((el: Element) => ({
     id: el.id,
     type: el.type,
     text_anchor: el.text_anchor,
@@ -245,6 +245,8 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [showPreview, setShowPreview] = useState(false)
   // Debug mode toggle
   const [debugMode, setDebugMode] = useState(true)
+  // Full page mode toggle
+  const [isFullPage, setIsFullPage] = useState(false)
   const [mockupData, setMockupData] = useState<Record<string, string>>({
     recipient_name: 'John Doe',
     recipient_email: 'john.doe@example.com',
@@ -253,6 +255,8 @@ function debugElementProps(element: Element, location: string): string | undefin
     issue_date: new Date().toLocaleDateString(),
     unique_code: 'CERT-' + Math.random().toString(36).substring(2, 10).toUpperCase()
   })
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(true)
+  const [showPropertiesPanel, setShowPropertiesPanel] = useState(true)
   const [contests, setContests] = useState<{id: number, name: string}[]>([])
   
   // Fetch contests for the preview mockup data
@@ -835,8 +839,40 @@ function debugElementProps(element: Element, location: string): string | undefin
     }
   }, [isDragging, dragStartPosition])
   
+  // Effect to handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Toggle fullscreen mode with F11 or Ctrl+Shift+F
+      if (e.key === 'F11' || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        setIsFullPage(!isFullPage);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [isFullPage])
+  
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${isFullPage ? 'fixed inset-0 bg-gray-50 z-50 overflow-auto' : ''}`}>
+      {isFullPage && (
+        <div className="bg-white p-4 shadow-md flex justify-between items-center sticky top-0 z-10">
+          <h1 className="text-xl font-semibold text-gray-800">Certificate Template Designer</h1>
+          <button 
+            onClick={() => setIsFullPage(false)}
+            className="w-10 h-10 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center justify-center tooltip-container"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span className="tooltip">Exit Fullscreen Mode</span>
+          </button>
+        </div>
+      )}
+      <div className={`${isFullPage ? 'px-4 py-2' : ''}`}>
       {/* Tooltip Styles */}
       <style jsx global>{
         `
@@ -897,176 +933,366 @@ function debugElementProps(element: Element, location: string): string | undefin
         </div>
       )}
       
-      {/* Template Name and Target Audience */}
-      <div className="bg-white rounded-lg shadow p-5 border border-gray-200">
-        <h2 className="text-lg font-semibold mb-4">Template Configuration</h2>
-        
-        {/* Template Name */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Template Name
-          </label>
-          <input
-            type="text"
-            value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter template name"
-            disabled={isLoading}
-            required
-          />
-        </div>
-        
-        {/* Paper Size Selector - Collapsible */}
-        <div className="mb-4">
-          <CollapsibleSection title="Certificate Size">
-            <PaperSizeSelector 
-              currentSize={{ width: paperSize.width, height: paperSize.height }} 
-              onSizeChange={(newSize) => {
-                setPaperSize(newSize);
-                setSuccess(`Paper size changed to ${newSize.name} (${newSize.width}×${newSize.height})`);
-                setTimeout(() => setSuccess(null), 1500);
-              }} 
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Choose the appropriate size for your certificate. This affects canvas dimensions and element positioning.
-            </p>
-          </CollapsibleSection>
-        </div>
-        
-        {/* PDF Calibration Settings - Collapsible */}
-        <div className="mb-4">
-          <CollapsibleSection title="PDF Calibration Settings">
-            <CalibrationControls
-              calibration={calibration}
-              onCalibrationChange={(newCalibration) => {
-                setCalibration(newCalibration);
-                setSuccess('Calibration settings updated');
-                setTimeout(() => setSuccess(null), 1500);
-              }}
-            />
-          </CollapsibleSection>
-        </div>
-        
-        {/* Target Audience Configuration - Collapsible */}
-        <div className="mb-4">
-          <CollapsibleSection title="Target Audience">
-            <div className="space-y-3">
-            {/* Target Type Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Certificate Type
-              </label>
-              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-                <label className="inline-flex items-center">
-                  <input 
-                    type="radio" 
-                    name="targetType"
-                    value="GENERAL" 
-                    checked={targetType === 'GENERAL'}
-                    onChange={() => setTargetType('GENERAL')}
-                    className="h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2">General Participants</span>
-                </label>
-                
-                <label className="inline-flex items-center">
-                  <input 
-                    type="radio" 
-                    name="targetType"
-                    value="EVENT_PARTICIPANT" 
-                    checked={targetType === 'EVENT_PARTICIPANT'}
-                    onChange={() => setTargetType('EVENT_PARTICIPANT')}
-                    className="h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2">Event Participants</span>
-                </label>
-                
-                <label className="inline-flex items-center">
-                  <input 
-                    type="radio" 
-                    name="targetType"
-                    value="EVENT_WINNER" 
-                    checked={targetType === 'EVENT_WINNER'}
-                    onChange={() => setTargetType('EVENT_WINNER')}
-                    className="h-4 w-4 text-blue-600"
-                  />
-                  <span className="ml-2">Event Winners</span>
-                </label>
-              </div>
+      {showKeyboardHelp && (
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
             </div>
-            
-            {/* Event Selection (for EVENT_PARTICIPANT and EVENT_WINNER) */}
-            {(targetType === 'EVENT_PARTICIPANT' || targetType === 'EVENT_WINNER') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Event
-                </label>
-                <select
-                  value={eventId || ''}
-                  onChange={(e) => setEventId(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  disabled={isLoading}
+            <div className="ml-3">
+              <div className="flex justify-between items-center">
+                <p className="text-sm font-medium text-blue-700">Keyboard Shortcuts Available</p>
+                <button
+                  onClick={() => setShowKeyboardHelp(false)}
+                  className="text-blue-500 hover:text-blue-700 ml-2"
                 >
-                  <option value="">-- Select an Event --</option>
-                  {events.map(event => (
-                    <option key={event.id} value={event.id}>{event.name}</option>
-                  ))}
-                </select>
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
               </div>
-            )}
-            
-            {/* Winner Range (only for EVENT_WINNER) */}
-            {targetType === 'EVENT_WINNER' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Winner Range Start
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={winnerRangeStart || ''}
-                    onChange={(e) => setWinnerRangeStart(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., 1 for 1st place"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Winner Range End
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={winnerRangeEnd || ''}
-                    onChange={(e) => setWinnerRangeEnd(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g., 3 for 3rd place"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Target Audience Summary */}
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
-              <h4 className="text-sm font-medium text-blue-800 mb-1">Certificate will be available for:</h4>
-              <p className="text-sm text-blue-700">
-                {targetType === 'GENERAL' && 'All participants in the system'}
-                {targetType === 'EVENT_PARTICIPANT' && eventId && `Participants of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
-                {targetType === 'EVENT_PARTICIPANT' && !eventId && 'Participants of selected event (please select an event)'}
-                {targetType === 'EVENT_WINNER' && eventId && winnerRangeStart && winnerRangeEnd && 
-                  `Winners (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
-                {targetType === 'EVENT_WINNER' && (!eventId || !winnerRangeStart || !winnerRangeEnd) && 
-                  'Event winners (please complete all fields)'}
-              </p>
+              <p className="text-sm text-blue-600 mt-1">Press <span className="font-mono font-bold">F11</span> or <span className="font-mono font-bold">Ctrl+Shift+F</span> to toggle fullscreen mode for better editing experience.</p>
             </div>
           </div>
-          </CollapsibleSection>
         </div>
-      </div>
+      )}
+      
+      {/* Template Configuration Section */}
+      {isFullPage ? (
+        <div className="fixed top-4 left-4 z-50 bg-white rounded-lg shadow border border-gray-200 max-w-md">
+          <div className="flex justify-between items-center p-3 border-b border-gray-200">
+            <h2 className="text-lg font-semibold">Template Configuration</h2>
+            <button 
+              onClick={() => setIsFullPage(false)}
+              className="p-1 rounded-full hover:bg-gray-100 text-gray-500 tooltip-container"
+              title="Exit Fullscreen"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="tooltip">Exit Fullscreen</span>
+            </button>
+          </div>
+          <div className="p-4 max-h-[80vh] overflow-auto">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Template Name</label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter template name"
+                disabled={isLoading}
+                required
+              />
+            </div>
+            
+            <div className="space-y-4">
+              <CollapsibleSection title="Certificate Size">
+                <PaperSizeSelector 
+                  currentSize={{ width: paperSize.width, height: paperSize.height }} 
+                  onSizeChange={(newSize) => {
+                    setPaperSize(newSize);
+                    setSuccess(`Paper size changed to ${newSize.name} (${newSize.width}×${newSize.height})`);
+                    setTimeout(() => setSuccess(null), 1500);
+                  }} 
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Choose the appropriate size for your certificate. This affects canvas dimensions and element positioning.
+                </p>
+              </CollapsibleSection>
+              
+              <CollapsibleSection title="PDF Calibration Settings">
+                <CalibrationControls
+                  calibration={calibration}
+                  onCalibrationChange={(newCalibration) => {
+                    setCalibration(newCalibration);
+                    setSuccess('Calibration settings updated');
+                    setTimeout(() => setSuccess(null), 1500);
+                  }}
+                />
+              </CollapsibleSection>
+              
+              <CollapsibleSection title="Target Audience">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Type</label>
+                    <div className="flex flex-col space-y-2">
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="GENERAL" 
+                          checked={targetType === 'GENERAL'}
+                          onChange={() => setTargetType('GENERAL')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">General Participants</span>
+                      </label>
+                      
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="EVENT_PARTICIPANT" 
+                          checked={targetType === 'EVENT_PARTICIPANT'}
+                          onChange={() => setTargetType('EVENT_PARTICIPANT')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">Event Participants</span>
+                      </label>
+                      
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="EVENT_WINNER" 
+                          checked={targetType === 'EVENT_WINNER'}
+                          onChange={() => setTargetType('EVENT_WINNER')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">Event Winners</span>
+                      </label>
+                    </div>
+                  </div>
+                  
+                  {(targetType === 'EVENT_PARTICIPANT' || targetType === 'EVENT_WINNER') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Select Event</label>
+                      <select
+                        value={eventId || ''}
+                        onChange={(e) => setEventId(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        disabled={isLoading}
+                      >
+                        <option value="">-- Select an Event --</option>
+                        {events.map(event => (
+                          <option key={event.id} value={event.id}>{event.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  {targetType === 'EVENT_WINNER' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Winner Range Start</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={winnerRangeStart || ''}
+                          onChange={(e) => setWinnerRangeStart(e.target.value ? parseInt(e.target.value) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., 1 for 1st place"
+                          disabled={isLoading}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Winner Range End</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={winnerRangeEnd || ''}
+                          onChange={(e) => setWinnerRangeEnd(e.target.value ? parseInt(e.target.value) : null)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="e.g., 3 for 3rd place"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                    <h4 className="text-sm font-medium text-blue-800 mb-1">Certificate will be available for:</h4>
+                    <p className="text-sm text-blue-700">
+                      {targetType === 'GENERAL' && 'All participants in the system'}
+                      {targetType === 'EVENT_PARTICIPANT' && eventId && `Participants of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
+                      {targetType === 'EVENT_PARTICIPANT' && !eventId && 'Participants of selected event (please select an event)'}
+                      {targetType === 'EVENT_WINNER' && eventId && winnerRangeStart && winnerRangeEnd && 
+                        `Winners (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
+                      {targetType === 'EVENT_WINNER' && (!eventId || !winnerRangeStart || !winnerRangeEnd) && 
+                        'Event winners (please complete all fields)'}
+                    </p>
+                  </div>
+                </div>
+              </CollapsibleSection>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow p-5 border border-gray-200">
+          <h2 className="text-lg font-semibold mb-4">Template Configuration</h2>
+        
+          {/* Template Name */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Template Name
+            </label>
+            <input
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter template name"
+              disabled={isLoading}
+              required
+            />
+          </div>
+          
+          {/* Paper Size Selector - Collapsible */}
+          <div className="mb-4">
+            <CollapsibleSection title="Certificate Size">
+              <PaperSizeSelector 
+                currentSize={{ width: paperSize.width, height: paperSize.height }} 
+                onSizeChange={(newSize) => {
+                  setPaperSize(newSize);
+                  setSuccess(`Paper size changed to ${newSize.name} (${newSize.width}×${newSize.height})`);
+                  setTimeout(() => setSuccess(null), 1500);
+                }} 
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Choose the appropriate size for your certificate. This affects canvas dimensions and element positioning.
+              </p>
+            </CollapsibleSection>
+          </div>
+          
+          {/* PDF Calibration Settings - Collapsible */}
+          <div className="mb-4">
+            <CollapsibleSection title="PDF Calibration Settings">
+              <CalibrationControls
+                calibration={calibration}
+                onCalibrationChange={(newCalibration) => {
+                  setCalibration(newCalibration);
+                  setSuccess('Calibration settings updated');
+                  setTimeout(() => setSuccess(null), 1500);
+                }}
+              />
+            </CollapsibleSection>
+          </div>
+        
+          {/* Target Audience Configuration - Collapsible */}
+          <div className="mb-4">
+            <CollapsibleSection title="Target Audience">
+              <div className="space-y-3">
+                {/* Target Type Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Certificate Type
+                  </label>
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="GENERAL" 
+                        checked={targetType === 'GENERAL'}
+                        onChange={() => setTargetType('GENERAL')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">General Participants</span>
+                    </label>
+                
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="EVENT_PARTICIPANT" 
+                        checked={targetType === 'EVENT_PARTICIPANT'}
+                        onChange={() => setTargetType('EVENT_PARTICIPANT')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">Event Participants</span>
+                    </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="EVENT_WINNER" 
+                        checked={targetType === 'EVENT_WINNER'}
+                        onChange={() => setTargetType('EVENT_WINNER')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">Event Winners</span>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Event Selection (for EVENT_PARTICIPANT and EVENT_WINNER) */}
+                {(targetType === 'EVENT_PARTICIPANT' || targetType === 'EVENT_WINNER') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select Event
+                    </label>
+                    <select
+                      value={eventId || ''}
+                      onChange={(e) => setEventId(e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isLoading}
+                    >
+                      <option value="">-- Select an Event --</option>
+                      {events.map(event => (
+                        <option key={event.id} value={event.id}>{event.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                {/* Winner Range (only for EVENT_WINNER) */}
+                {targetType === 'EVENT_WINNER' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Winner Range Start
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={winnerRangeStart || ''}
+                        onChange={(e) => setWinnerRangeStart(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., 1 for 1st place"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Winner Range End
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={winnerRangeEnd || ''}
+                        onChange={(e) => setWinnerRangeEnd(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., 3 for 3rd place"
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </div>
+                )}
+            
+                {/* Target Audience Summary */}
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                  <h4 className="text-sm font-medium text-blue-800 mb-1">Certificate will be available for:</h4>
+                  <p className="text-sm text-blue-700">
+                    {targetType === 'GENERAL' && 'All participants in the system'}
+                    {targetType === 'EVENT_PARTICIPANT' && eventId && `Participants of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
+                    {targetType === 'EVENT_PARTICIPANT' && !eventId && 'Participants of selected event (please select an event)'}
+                    {targetType === 'EVENT_WINNER' && eventId && winnerRangeStart && winnerRangeEnd && 
+                      `Winners (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
+                    {targetType === 'EVENT_WINNER' && (!eventId || !winnerRangeStart || !winnerRangeEnd) && 
+                      'Event winners (please complete all fields)'}
+                  </p>
+                </div>
+              </div>
+            </CollapsibleSection>
+          </div>
+        </div>
+      )}
+      
       
       {/* PDF Upload */}
       <div>
@@ -1122,28 +1348,45 @@ function debugElementProps(element: Element, location: string): string | undefin
               <button
                 type="button"
                 onClick={() => setShowPreview(true)}
-                className="mr-2 px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center space-x-1"
+                className="mr-2 w-9 h-9 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center justify-center tooltip-container"
                 title="Preview Certificate"
                 disabled={elements.length === 0 || !pdfUrl}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
-                <span>Preview</span>
+                <span className="tooltip">Preview Certificate</span>
               </button>
               
               {/* Debug toggle button */}
               <button
                 type="button"
                 onClick={() => setDebugMode(!debugMode)}
-                className={`mr-2 px-3 py-1.5 ${debugMode ? 'bg-yellow-500' : 'bg-gray-500'} text-white rounded hover:bg-yellow-600 flex items-center space-x-1`}
+                className={`mr-2 w-9 h-9 ${debugMode ? 'bg-yellow-500' : 'bg-gray-500'} text-white rounded hover:bg-yellow-600 flex items-center justify-center tooltip-container`}
                 title="Toggle Debug Mode"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
-                <span>Debug {debugMode ? 'ON' : 'OFF'}</span>
+                <span className="tooltip">Debug Mode {debugMode ? 'ON' : 'OFF'}</span>
+              </button>
+              
+              {/* Fullscreen toggle button */}
+              <button
+                type="button"
+                onClick={() => setIsFullPage(!isFullPage)}
+                className={`mr-2 w-9 h-9 ${isFullPage ? 'bg-indigo-600' : 'bg-blue-500'} text-white rounded hover:bg-indigo-700 flex items-center justify-center tooltip-container`}
+                title="Toggle Full Page Mode"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isFullPage ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4H4v5M9 15v5H4v-5M15 9h5V4h-5M15 15h5v5h-5" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                  )}
+                </svg>
+                <span className="tooltip">{isFullPage ? 'Exit Fullscreen Editor (F11 or Ctrl+Shift+F)' : 'Enter Fullscreen Editor Mode (F11 or Ctrl+Shift+F)'}</span>
               </button>
 {/* Element buttons */}
               <div className="flex items-center border border-gray-200 rounded-md bg-white divide-x divide-gray-200">
@@ -1186,19 +1429,19 @@ function debugElementProps(element: Element, location: string): string | undefin
           
           <div className="flex">
             {/* Canvas Area with PDF Background */}
-            <div className="flex-1 overflow-auto border-r" style={{ height: '700px' }}>
-              <div className="p-4 min-h-full flex justify-center">
+            <div className="flex-1 overflow-auto border-r" style={{ height: isFullPage ? '85vh' : '700px', width: isFullPage ? '100%' : 'auto' }}>
+              <div className="p-4 min-h-full flex justify-center" style={{ width: isFullPage ? '100%' : 'auto' }}>
                 <div className="relative mb-20" style={{ width: `${paperSize.width}px`, minHeight: `${paperSize.height}px` }}>
                   {/* Paper size indicator */}
                   <div className="absolute top-2 right-2 bg-white bg-opacity-80 px-2 py-1 text-xs text-gray-600 rounded shadow-sm">
                     {paperSize.name}: {paperSize.width} × {paperSize.height} pts
                   </div>
                   {/* PDF Frame */}
-                  <div className="mb-4 border border-gray-300 shadow-sm">
+                  <div className="mb-4 border border-gray-300 shadow-sm w-full">
                     <iframe
-                      src={pdfUrl.startsWith('/') ? `/uploads/templates/${pdfUrl.split('/').pop()}` : pdfUrl}
+                      src={`${pdfUrl.startsWith('/') ? `/uploads/templates/${pdfUrl.split('/').pop()}` : pdfUrl}#pagemode=none&sidebar=0&navpanes=0&scrollbar=0`}
                       className="w-full"
-                      style={{ height: `${paperSize.height}px` }}
+                      style={{ height: `${paperSize.height}px`, width: '100%' }}
                       title="PDF Template"
                     />
                   </div>
@@ -1233,10 +1476,8 @@ function debugElementProps(element: Element, location: string): string | undefin
                               position: 'relative',
                               transform: element.text_anchor === 'middle' ? 'translateX(-50%)' : 
                                         element.text_anchor === 'end' ? 'translateX(-100%)' : 'none',
-                              textAnchor: (() => {
-                                const anchor = debugElementProps(element, "render") || "start";
-                                return anchor;
-                              })(),
+                              // Remove textAnchor from inline styles as it's causing type errors
+                              // We're already handling alignment with the transform property
                               whiteSpace: 'nowrap'
                             }}
                           >
@@ -1255,10 +1496,8 @@ function debugElementProps(element: Element, location: string): string | undefin
                               position: 'relative',
                               transform: element.text_anchor === 'middle' ? 'translateX(-50%)' : 
                                         element.text_anchor === 'end' ? 'translateX(-100%)' : 'none',
-                              textAnchor: (() => {
-                                const anchor = debugElementProps(element, "render") || "start";
-                                return anchor;
-                              })(),
+                              // Remove textAnchor from inline styles as it's causing type errors
+                              // We're already handling alignment with the transform property
                               whiteSpace: 'nowrap'
                             }}
                           >
@@ -1287,9 +1526,41 @@ function debugElementProps(element: Element, location: string): string | undefin
               </div>
             </div>
             
+            {/* Show Properties Button (only in fullscreen when panel is hidden) */}
+            {isFullPage && !showPropertiesPanel && (
+              <div className="fixed top-20 right-4 z-10">
+                <button
+                  onClick={() => setShowPropertiesPanel(true)}
+                  className="bg-white p-2 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 tooltip-container"
+                  title="Show Properties Panel"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                  <span className="tooltip">Show Properties Panel</span>
+                </button>
+              </div>
+            )}
+            
             {/* Properties Panel */}
-            <div className="w-80 bg-gray-50 p-4 overflow-y-auto" style={{ maxHeight: '700px' }}>
-              <h3 className="font-medium mb-4">Properties</h3>
+            {(!isFullPage || (isFullPage && showPropertiesPanel)) && (
+              <div className={`${isFullPage ? 'fixed top-20 right-4 z-10 shadow-lg rounded-lg border border-gray-200' : ''} w-80 bg-gray-50 p-4 overflow-y-auto`} 
+                style={{ maxHeight: isFullPage ? '80vh' : '700px' }}>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-medium">Properties</h3>
+                  {isFullPage && (
+                    <button
+                      onClick={() => setShowPropertiesPanel(false)}
+                      className="text-gray-500 hover:text-gray-700 tooltip-container"
+                      title="Hide Properties Panel"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span className="tooltip">Hide Properties</span>
+                    </button>
+                  )}
+                </div>
               
               {selectedElement ? (
                 <div className="space-y-4">
@@ -1593,6 +1864,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       )}
@@ -1650,6 +1922,7 @@ function debugElementProps(element: Element, location: string): string | undefin
           selectedElementId={selectedElement?.id || null}
         />
       )}
+      </div>
     </div>
   )
 }

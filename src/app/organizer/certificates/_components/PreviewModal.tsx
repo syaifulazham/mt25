@@ -33,6 +33,7 @@ export function PreviewModal({
 }: PreviewModalProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'mockup'>('preview')
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isMaximized, setIsMaximized] = useState(false)
   const certificatePreviewRef = useRef<HTMLDivElement>(null)
 
   if (!isOpen) return null
@@ -124,7 +125,7 @@ export function PreviewModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-lg shadow-xl w-[95vw] max-w-7xl h-[90vh] flex flex-col">
+      <div className={`bg-white rounded-lg shadow-xl ${isMaximized ? 'w-[99vw] h-[99vh]' : 'w-[95vw] max-w-7xl h-[90vh]'} flex flex-col`}>
         <div className="p-4 border-b flex items-center justify-between">
           <h2 className="text-xl font-semibold">Certificate Preview</h2>
           <div className="flex items-center space-x-4">
@@ -151,6 +152,29 @@ export function PreviewModal({
                 Mockup Data
               </button>
             </div>
+            
+            {/* Maximize/Minimize Button */}
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="text-gray-500 hover:text-gray-700"
+              title={isMaximized ? "Minimize" : "Maximize"}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                {isMaximized ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9V4H4v5M9 15v5H4v-5M15 9h5V4h-5M15 15h5v5h-5" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
+                )}
+              </svg>
+            </button>
+            
+            {/* Close Button */}
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
@@ -176,14 +200,21 @@ export function PreviewModal({
         <div className="flex-1 overflow-auto">
           {activeTab === 'preview' ? (
             // Preview tab content
-            <div className="h-full p-4 flex justify-center overflow-auto">
-              <div ref={certificatePreviewRef} className="relative bg-white" style={{ width: `${paperSize.width}px`, minHeight: `${paperSize.height}px` }}>
+            <div className={`h-full ${isMaximized ? 'p-2' : 'p-4'} flex justify-center overflow-auto`}>
+              <div ref={certificatePreviewRef} className="relative bg-white" 
+                style={{
+                  width: `${paperSize.width}px`, 
+                  minHeight: `${paperSize.height}px`,
+                  transform: isMaximized ? 'scale(1.2)' : 'none',
+                  transformOrigin: 'center center',
+                  transition: 'transform 0.3s ease'
+                }}>
                 {/* PDF Background */}
                 {pdfUrl && (
                   <iframe
-                    src={pdfUrl}
+                    src={`${pdfUrl}#pagemode=none&sidebar=0&navpanes=0&scrollbar=0`}
                     className="absolute inset-0 w-full h-full"
-                    style={{ pointerEvents: 'none' }}
+                    style={{ pointerEvents: 'none', width: '100%' }}
                   />
                 )}
 

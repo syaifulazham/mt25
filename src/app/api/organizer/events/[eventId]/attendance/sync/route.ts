@@ -287,24 +287,30 @@ export async function POST(request: NextRequest, { params }: { params: { eventId
       const membersCount = teamsWithMembers.reduce((sum, team) => sum + (team.members?.length || 0), 0);
       console.log(`TOTAL MEMBER COUNT BEFORE FILTERING: ${membersCount}`);
       
-      // Filter out teams with zero members and teams where members' age doesn't match target group range
+      // Filter out teams with zero members only - no longer filter by age validation
+      // This matches the behavior in sync-contingent route
       const filteredTeams = teamsWithMembers.filter(team => {
-        const minAge = team.minAge || 0;
-        const maxAge = team.maxAge || 100;
-        
         // Filter out teams with no members
         if (!team.members || !Array.isArray(team.members) || team.members.length === 0) {
           console.log(`SKIPPING: Team ${team.id} (${team.name || 'unnamed'}) has no members - will not be processed`);
           return false; // Exclude teams without members from sync
         }
         
-        // Check all team members are within age range
+        // Track age validation issues for reporting but don't filter teams
+        const minAge = team.minAge || 0;
+        const maxAge = team.maxAge || 100;
+        
         const allMembersInRange = team.members.every((member: any) => {
           const age = member.age || 0;
           return age >= minAge && age <= maxAge;
         });
         
-        return allMembersInRange;
+        if (!allMembersInRange) {
+          console.log(`Team ${team.id} has age validation issues but will still be synced as requested`);
+        }
+        
+        // Include all teams with members regardless of age validation
+        return true;
       });
       
       // Debug to verify filteredTeams

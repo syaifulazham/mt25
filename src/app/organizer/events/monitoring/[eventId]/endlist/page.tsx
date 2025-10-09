@@ -36,6 +36,8 @@ import {
   Filter,
   Eye,
   ArrowRight,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
@@ -102,6 +104,9 @@ export default function EndListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [targetGroupFilter, setTargetGroupFilter] = useState<string>("ALL");
+  const [syncedTeamIds, setSyncedTeamIds] = useState<Set<number>>(new Set());
+  const [loadingSyncStatus, setLoadingSyncStatus] = useState(false);
+  const [syncFilter, setSyncFilter] = useState<string>("ALL");
   const [columnWidths, setColumnWidths] = useState<{[key: string]: number}>({
     record: 80,
     teamName: 200,
@@ -197,9 +202,35 @@ export default function EndListPage() {
     }
   };
 
+  // Fetch which teams are synced to attendanceTeam
+  const fetchSyncedTeams = async () => {
+    setLoadingSyncStatus(true);
+    try {
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/synced-teams`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch synced teams");
+      }
+      
+      const data = await response.json();
+      const syncedIds = new Set(data.syncedTeamIds.map((id: any) => Number(id)));
+      setSyncedTeamIds(syncedIds as Set<number>);
+      
+      console.log(`Loaded ${syncedIds.size} synced team IDs`);
+    } catch (error) {
+      console.error("Error fetching synced teams:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load sync status data.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingSyncStatus(false);
+    }
+  };
+
   useEffect(() => {
     if (eventId) {
-      Promise.all([fetchEventInfo(), fetchTeams()]).finally(() => {
+      Promise.all([fetchEventInfo(), fetchTeams(), fetchSyncedTeams()]).finally(() => {
         setLoading(false);
       });
     }
@@ -248,28 +279,43 @@ export default function EndListPage() {
     }
   };
 
-  const approvedTeams = teams.filter(team => team.status === "APPROVED" || team.status === "APPROVED_SPECIAL");
-  const specialApprovalTeams = teams.filter(team => team.status === "APPROVED_SPECIAL");
-  const acceptedTeams = teams.filter(team => team.status === "ACCEPTED");
-  const totalTeams = approvedTeams.length + acceptedTeams.length;
-  const totalParticipants = teams.reduce((total, team) => total + team.members.length, 0);
+  // Get unique team IDs to handle duplicates
+  const uniqueTeamIds = new Set(teams.map(team => team.id));
+  const uniqueTeams = teams.filter((team, index, self) => 
+    index === self.findIndex(t => t.id === team.id)
+  );
+  const uniqueTeamCount = uniqueTeamIds.size;
+  
+  console.log(`Total teams: ${teams.length}, Unique teams: ${uniqueTeamCount}, Difference: ${teams.length - uniqueTeamCount} duplicates`);
 
-  // Calculate additional statistics
-  const schoolContingents = new Set(teams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
-  const schoolTeams = teams.filter(team => team.contingentType === 'SCHOOL');
+  // Calculate basic statistics using unique teams
+  const approvedTeams = uniqueTeams.filter(team => team.status === "APPROVED" || team.status === "APPROVED_SPECIAL");
+  const specialApprovalTeams = uniqueTeams.filter(team => team.status === "APPROVED_SPECIAL");
+  const acceptedTeams = uniqueTeams.filter(team => team.status === "ACCEPTED");
+  const totalTeams = approvedTeams.length + acceptedTeams.length;
+  const totalParticipants = uniqueTeams.reduce((total, team) => total + team.members.length, 0);
+
+  // Calculate additional statistics with unique contingents
+  const schoolContingents = new Set(uniqueTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
+  const schoolTeams = uniqueTeams.filter(team => team.contingentType === 'SCHOOL');
+  
+  // Calculate sync statistics based on unique teams
+  const syncedCount = syncedTeamIds.size;
+  const notSyncedCount = uniqueTeamCount - syncedCount;
+  const syncPercentage = uniqueTeamCount > 0 ? (syncedCount / uniqueTeamCount) * 100 : 0;
   
   // Group teams by target group and count unique schools
-  const kidsTeams = teams.filter(team => team.targetGroupLabel === 'Kids');
+  const kidsTeams = uniqueTeams.filter(team => team.targetGroupLabel === 'Kids');
   const kidsSchools = new Set(kidsTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
   
-  const teensTeams = teams.filter(team => team.targetGroupLabel === 'Teens');
+  const teensTeams = uniqueTeams.filter(team => team.targetGroupLabel === 'Teens');
   const teensSchools = new Set(teensTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
   
-  const youthTeams = teams.filter(team => team.targetGroupLabel === 'Youth');
+  const youthTeams = uniqueTeams.filter(team => team.targetGroupLabel === 'Youth');
   const youthSchools = new Set(youthTeams.filter(team => team.contingentType === 'SCHOOL').map(team => team.contingentName));
 
-  // Filter teams based on search and filters
-  const filteredTeams = teams.filter(team => {
+  // Filter teams based on search and filters - use uniqueTeams to avoid duplicates
+  const filteredTeams = uniqueTeams.filter(team => {
     const matchesSearch = searchTerm === "" || 
       team.teamName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.contingentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -282,7 +328,13 @@ export default function EndListPage() {
     const matchesStatus = statusFilter === "ALL" || team.status === statusFilter;
     const matchesTargetGroup = targetGroupFilter === "ALL" || team.targetGroupLabel === targetGroupFilter;
     
-    return matchesSearch && matchesStatus && matchesTargetGroup;
+    // Filter by sync status if needed
+    const isSynced = syncedTeamIds.has(team.id);
+    const matchesSyncStatus = syncFilter === "ALL" || 
+      (syncFilter === "SYNCED" && isSynced) || 
+      (syncFilter === "NOT_SYNCED" && !isSynced);
+    
+    return matchesSearch && matchesStatus && matchesTargetGroup && matchesSyncStatus;
   });
 
   // Handle team expansion
@@ -425,6 +477,27 @@ export default function EndListPage() {
               View Raw List
             </Button>
             <Button
+              variant="outline"
+              onClick={() => fetchSyncedTeams()}
+              className="flex items-center gap-2 bg-blue-50 text-blue-700 border-blue-200"
+              disabled={loadingSyncStatus}
+            >
+              {loadingSyncStatus ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh Sync Status
+                </>
+              )}
+            </Button>
+            <Button
               onClick={handleGenerateDocx}
               disabled={isGeneratingDocx}
               className="flex items-center gap-2"
@@ -477,6 +550,34 @@ export default function EndListPage() {
                 {totalTeams}
               </CardTitle>
               <CardDescription>Total Teams</CardDescription>
+            </CardHeader>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-bold text-blue-600">
+                {syncedCount}
+              </CardTitle>
+              <CardDescription>
+                Synced Teams
+                <div className="text-xs text-green-600 mt-1">
+                  {syncPercentage.toFixed(1)}% of total
+                </div>
+              </CardDescription>
+            </CardHeader>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-2xl font-bold text-amber-600">
+                {notSyncedCount}
+              </CardTitle>
+              <CardDescription>
+                Not Synced Teams
+                <div className="text-xs text-amber-600 mt-1">
+                  {(100 - syncPercentage).toFixed(1)}% of total
+                </div>
+              </CardDescription>
             </CardHeader>
           </Card>
           
@@ -602,6 +703,24 @@ export default function EndListPage() {
                   <option value="Teens">Teens</option>
                   <option value="Youth">Youth</option>
                 </select>
+                <select
+                  value={syncFilter}
+                  onChange={(e) => setSyncFilter(e.target.value)}
+                  className="px-3 py-2 border border-input bg-background rounded-md text-sm bg-blue-50 border-blue-200"
+                >
+                  <option value="ALL">All Teams</option>
+                  <option value="SYNCED">Synced to Attendance</option>
+                  <option value="NOT_SYNCED">Not Synced to Attendance</option>
+                </select>
+                {loadingSyncStatus && (
+                  <div className="flex items-center text-xs text-blue-600 animate-pulse">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading sync status...
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -612,7 +731,9 @@ export default function EndListPage() {
           <CardHeader>
             <CardTitle>End List Database View</CardTitle>
             <CardDescription>
-              {filteredTeams.length} teams ({filteredTeams.reduce((sum, team) => sum + team.members.length, 0)} total participants) - Click team names to view members
+              {filteredTeams.length} teams shown ({filteredTeams.reduce((sum, team) => sum + team.members.length, 0)} participants) - 
+              {syncedTeamIds.size} of {uniqueTeamCount} unique teams synced to attendance ({((syncedTeamIds.size / uniqueTeamCount) * 100).toFixed(1)}%) - 
+              Click team names to view members
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -663,7 +784,12 @@ export default function EndListPage() {
                           className="px-4 py-3 font-mono text-xs text-muted-foreground"
                           style={{ width: columnWidths.record + 'px' }}
                         >
-                          <div className="truncate">{teamIndex + 1}</div>
+                          <div className="flex items-center gap-1">
+                            {syncedTeamIds.has(team.id) && (
+                              <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            )}
+                            <span className="truncate">{teamIndex + 1}</span>
+                          </div>
                         </td>
                         <td 
                           className="px-4 py-3 font-medium cursor-pointer hover:text-primary"

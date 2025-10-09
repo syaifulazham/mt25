@@ -162,6 +162,10 @@ export default function AttendancePage() {
   const [userEnteredCode, setUserEnteredCode] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
 
+  // Sync history dialog states
+  const [syncHistoryDialogOpen, setSyncHistoryDialogOpen] = useState(false);
+  const [selectedContingentHistory, setSelectedContingentHistory] = useState<any>(null);
+
   // State for event details
   const [eventDetails, setEventDetails] = useState<{
     name: string;
@@ -552,12 +556,27 @@ export default function AttendancePage() {
   const fetchAvailableContingents = async () => {
     setLoadingContingents(true);
     try {
-      const response = await fetch(`/api/organizer/events/${eventId}/attendance/endlist-contingents`);
+      // Use no-cache to ensure we always get fresh data
+      const response = await fetch(`/api/organizer/events/${eventId}/attendance/endlist-contingents`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+        }
+      });
+      
       if (!response.ok) {
         throw new Error('Failed to fetch contingents');
       }
+      
       const data = await response.json();
-      setAvailableContingents(data.contingents || []);
+      const contingents = data.contingents || [];
+      
+      // Log contingents that still need sync
+      const needSyncCount = contingents.filter((c: any) => c.needsSync).length;
+      console.log(`Fetched ${contingents.length} contingents, ${needSyncCount} need sync`);
+      
+      setAvailableContingents(contingents);
+      return contingents; // Return contingents for reuse
     } catch (error) {
       console.error('Error fetching contingents:', error);
       toast({
@@ -565,6 +584,7 @@ export default function AttendancePage() {
         description: 'Failed to fetch contingents list',
         variant: 'destructive',
       });
+      return []; // Return empty array in case of error
     } finally {
       setLoadingContingents(false);
     }
@@ -604,9 +624,11 @@ export default function AttendancePage() {
         description: `Contingent sync completed successfully. ${data.syncResults?.newTeams || 0} new teams, ${data.syncResults?.newContestants || 0} new contestants synced.`,
       });
 
-      // Refresh the sync status and contingents list
+      // Refresh sync status and update UI with latest data
       await checkSyncStatus();
-      await fetchAvailableContingents();
+      if (selectedContingent) {
+        await updateContingentHistoryDialog(selectedContingent);
+      }
       
       // Close the dialog
       setContingentSyncDialogOpen(false);
@@ -654,8 +676,59 @@ export default function AttendancePage() {
     );
   };
 
+  // Function to update the history dialog with latest contingent data
+  const updateContingentHistoryDialog = async (contingentId: number) => {
+    // Get contingent name for messages
+    const contingentName = availableContingents.find((c: any) => c.id === contingentId)?.name || `Contingent ID: ${contingentId}`;
+    
+    // Refresh the sync status and contingents list with force reload to ensure we get latest data
+    await checkSyncStatus();
+      
+    // Add a short delay to ensure the database changes have propagated
+    await new Promise(resolve => setTimeout(resolve, 300));
+      
+    // Force-fetch the latest contingent data with no-cache headers
+    const fetchResponse = await fetch(`/api/organizer/events/${eventId}/attendance/endlist-contingents`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+      
+    if (fetchResponse.ok) {
+      const fetchData = await fetchResponse.json();
+      const refreshedContingents = fetchData.contingents || [];
+      setAvailableContingents(refreshedContingents);
+      
+      // Check if contingent still needs sync
+      const updatedContingent = refreshedContingents.find((c: any) => c.id === contingentId);
+      
+      // Update the selectedContingentHistory if sync history dialog is open
+      if (syncHistoryDialogOpen && selectedContingentHistory && selectedContingentHistory.id === contingentId && updatedContingent) {
+        setSelectedContingentHistory(updatedContingent);
+      }
+      
+      // If this contingent no longer needs sync, show success message
+      if (updatedContingent && !updatedContingent.needsSync) {
+        toast({
+          title: 'Fully Synced',
+          description: `${contingentName} has been fully synced and removed from the sync list.`,
+          variant: 'default',
+        });
+      }
+      
+      // Return the updated contingent for further processing
+      return updatedContingent;
+    }
+    
+    return true;
+  };
+  
   // Function to handle individual contingent sync from table
   const handleIndividualContingentSync = async (contingentId: number) => {
+    // Find the contingent name for better user feedback
+    const contingentName = availableContingents.find((c: any) => c.id === contingentId)?.name || `ID: ${contingentId}`;
+    
     setSelectedContingent(contingentId);
     setContingentSyncing(true);
     
@@ -676,14 +749,50 @@ export default function AttendancePage() {
         throw new Error(data.error || 'Failed to sync contingent');
       }
 
+      // Check if any changes were actually made
+      const totalChanges = (
+        (data.syncResults?.newTeams || 0) + 
+        (data.syncResults?.updatedTeams || 0) + 
+        (data.syncResults?.newContestants || 0) + 
+        (data.syncResults?.updatedContestants || 0) +
+        (data.syncResults?.newManagers || 0) +
+        (data.syncResults?.updatedManagers || 0)
+      );
+
+      // Create a more detailed message
+      let description = '';
+      let title = '';
+      
+      if (totalChanges > 0) {
+        title = 'Sync Successful';
+        description = `${contingentName}: ${data.syncResults?.newTeams || 0} new teams, ${data.syncResults?.updatedTeams || 0} updated teams, ${data.syncResults?.newContestants || 0} new contestants synced.`;
+      } else {
+        title = 'Already Up-to-Date';
+        description = `${contingentName} was already fully synced. Last sync: ${new Date().toLocaleTimeString()}`;
+      }
+      
       toast({
-        title: 'Success',
-        description: `Contingent sync completed successfully. ${data.syncResults?.newTeams || 0} new teams, ${data.syncResults?.newContestants || 0} new contestants synced.`,
+        title: title,
+        description: description,
+        variant: 'default',
       });
 
-      // Refresh the sync status and contingents list
+      // Refresh sync status and update UI with latest data
       await checkSyncStatus();
-      await fetchAvailableContingents();
+      
+      // Add a small delay to ensure database changes propagate
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Update the contingent history dialog and get updated data
+      const updatedContingent = await updateContingentHistoryDialog(contingentId);
+      
+      // Force state update to refresh UI
+      if (updatedContingent && !updatedContingent.needsSync) {
+        // Trigger a re-render with the updated list by using setContingentSearchText
+        const currentSearch = contingentSearchText;
+        setContingentSearchText(' ' + currentSearch);
+        setTimeout(() => setContingentSearchText(currentSearch), 100);
+      }
 
     } catch (error) {
       console.error('Error syncing contingent:', error);
@@ -703,8 +812,8 @@ export default function AttendancePage() {
     const contingentsToSync = getContingentsNeedingSync();
     if (contingentsToSync.length === 0) {
       toast({
-        title: 'Info',
-        description: 'No contingents need synchronization',
+        title: 'Already Synced',
+        description: 'All contingents are already synchronized and up-to-date.',
       });
       return;
     }
@@ -712,6 +821,18 @@ export default function AttendancePage() {
     setContingentSyncing(true);
     let successCount = 0;
     let errorCount = 0;
+    let noChangeCount = 0;
+    let totalChanges = 0;
+    
+    // For detailed results
+    const syncResults = {
+      newTeams: 0,
+      updatedTeams: 0,
+      newContestants: 0,
+      updatedContestants: 0,
+      newManagers: 0,
+      updatedManagers: 0
+    };
 
     try {
       for (const contingent of contingentsToSync) {
@@ -734,30 +855,61 @@ export default function AttendancePage() {
             throw new Error(data.error || 'Failed to sync contingent');
           }
 
-          successCount++;
+          // Count changes from this contingent's sync
+          const contingentChanges = (
+            (data.syncResults?.newTeams || 0) + 
+            (data.syncResults?.updatedTeams || 0) + 
+            (data.syncResults?.newContestants || 0) + 
+            (data.syncResults?.updatedContestants || 0) +
+            (data.syncResults?.newManagers || 0) +
+            (data.syncResults?.updatedManagers || 0)
+          );
+          
+          // Aggregate changes across all contingents
+          syncResults.newTeams += (data.syncResults?.newTeams || 0);
+          syncResults.updatedTeams += (data.syncResults?.updatedTeams || 0);
+          syncResults.newContestants += (data.syncResults?.newContestants || 0);
+          syncResults.updatedContestants += (data.syncResults?.updatedContestants || 0);
+          syncResults.newManagers += (data.syncResults?.newManagers || 0);
+          syncResults.updatedManagers += (data.syncResults?.updatedManagers || 0);
+          
+          totalChanges += contingentChanges;
+          
+          if (contingentChanges > 0) {
+            successCount++;
+          } else {
+            noChangeCount++;
+          }
         } catch (error) {
           console.error(`Error syncing contingent ${contingent.id}:`, error);
           errorCount++;
         }
       }
 
-      // Show summary toast
-      if (errorCount === 0) {
+      // Show summary toast with more detailed information
+      if (errorCount === 0 && noChangeCount === 0) {
         toast({
-          title: 'Success',
-          description: `All ${successCount} contingents synced successfully.`,
+          title: 'Sync Successful',
+          description: `All ${successCount} contingents synced with changes: ${syncResults.newTeams} new teams, ${syncResults.updatedTeams} updated teams, ${syncResults.newContestants} new contestants.`,
+        });
+      } else if (errorCount === 0 && noChangeCount > 0 && successCount === 0) {
+        toast({
+          title: 'Already Up-to-Date',
+          description: `All ${noChangeCount} contingents were already fully synced. Last sync: ${new Date().toLocaleTimeString()}`,
         });
       } else {
         toast({
-          title: 'Partial Success',
-          description: `${successCount} contingents synced successfully, ${errorCount} failed.`,
-          variant: errorCount > successCount ? 'destructive' : 'default',
+          title: 'Sync Summary',
+          description: `${successCount} contingents synced with changes, ${noChangeCount} were already up-to-date, ${errorCount} failed.`,
+          variant: errorCount > 0 ? 'destructive' : 'default',
         });
       }
 
       // Refresh the sync status and contingents list
       await checkSyncStatus();
       await fetchAvailableContingents();
+      
+      // No need to update history dialog in batch sync as we're processing multiple contingents
 
     } catch (error) {
       console.error('Error during batch sync:', error);
@@ -1001,7 +1153,7 @@ export default function AttendancePage() {
               Sync by Contingent
             </DialogTitle>
             <DialogDescription>
-              Only contingents that need synchronization are shown below. Click the sync button for individual contingents.
+              All contingents with approved teams should appear below. If none appear, you may need to run a full sync first.
             </DialogDescription>
           </DialogHeader>
           
@@ -1030,15 +1182,35 @@ export default function AttendancePage() {
                 </div>
 
                 {/* Contingents Table */}
-                {getContingentsNeedingSync().length === 0 ? (
+                {loadingContingents ? (
+                  <div className="text-center py-20">
+                    <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading contingents...</p>
+                  </div>
+                ) : getContingentsNeedingSync().length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="mx-auto w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                      <svg className="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                    <div className="mx-auto w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                      <AlertCircle className="w-12 h-12 text-amber-600" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">All Contingents Synchronized</h3>
-                    <p className="text-gray-600">All contingents are up to date with the endlist. No synchronization needed.</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Contingents Found</h3>
+                    <p className="text-gray-600 mb-3">There might be a mismatch between the endlist and attendance records.</p>
+                    <div className="mb-4">
+                      <Button 
+                        variant="outline" 
+                        className="mx-auto" 
+                        onClick={() => fetchAvailableContingents()}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" /> Refresh List
+                      </Button>
+                    </div>
+                    <div className="mt-6 text-sm text-gray-500 border-t border-gray-200 pt-4">
+                      <p><strong>Recommendation:</strong> Try running a full sync first to update all contingent records:</p>
+                      <ol className="list-decimal pl-6 mt-2 text-left max-w-lg mx-auto">
+                        <li>Close this dialog</li>
+                        <li>Click the "Sync Now" button at the top of the page</li>
+                        <li>After the full sync completes, try opening this dialog again</li>
+                      </ol>
+                    </div>
                   </div>
                 ) : (
                   <div className="border rounded-lg overflow-hidden">
@@ -1066,11 +1238,19 @@ export default function AttendancePage() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm text-gray-900">
-                                  {contingent.teamCount}
-                                  {contingent.syncedTeamCount !== undefined && (
-                                    <span className="text-xs text-amber-600 ml-1">
-                                      ({contingent.teamCount - contingent.syncedTeamCount} need sync)
-                                    </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-medium">{contingent.teamCount}</span>
+                                    {contingent.syncedTeamCount !== undefined && contingent.syncedTeamCount !== contingent.teamCount && (
+                                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                                        {contingent.syncedTeamCount} / {contingent.teamCount} synced
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {contingent.syncedTeamCount !== undefined && contingent.teamCount > contingent.syncedTeamCount && (
+                                    <div className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3" />
+                                      {contingent.teamCount - contingent.syncedTeamCount} teams need sync
+                                    </div>
                                   )}
                                 </div>
                               </td>
@@ -1078,10 +1258,35 @@ export default function AttendancePage() {
                                 <div className="text-sm text-gray-900">{contingent.contestantCount}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                  <AlertCircle className="w-3 h-3 mr-1" />
-                                  Needs Sync
-                                </Badge>
+                                {contingent.lastSyncDate ? (
+                                  <div className="flex flex-col">
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 mb-1">
+                                      <AlertCircle className="w-3 h-3 mr-1" />
+                                      Needs Sync
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">
+                                      Last sync: {new Date(contingent.lastSyncDate).toLocaleString()}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                    <AlertCircle className="w-3 h-3 mr-1" />
+                                    Needs Sync
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <Button
+                                  onClick={() => {
+                                    setSelectedContingentHistory(contingent);
+                                    setSyncHistoryDialogOpen(true);
+                                  }}
+                                  size="sm"
+                                  variant="outline"
+                                  className="bg-gray-50 text-gray-700 hover:bg-gray-100"
+                                >
+                                  <Info className="h-3 w-3 mr-1" /> History
+                                </Button>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <Button
@@ -1366,6 +1571,163 @@ export default function AttendancePage() {
       </Dialog>
       
       {/* Reset Confirmation Dialog */}
+      {/* Sync History Dialog */}
+      <Dialog open={syncHistoryDialogOpen} onOpenChange={setSyncHistoryDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-blue-500" />
+              Sync History: {selectedContingentHistory?.name || ''}
+            </DialogTitle>
+            <DialogDescription>
+              Details about synchronization status and history for this contingent
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedContingentHistory && (
+            <div className="space-y-6 py-4">
+              {/* Contingent Details */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="text-base font-medium mb-2">Contingent Details</h3>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div><span className="font-medium">Name:</span> {selectedContingentHistory.name}</div>
+                  <div><span className="font-medium">Institution:</span> {selectedContingentHistory.institutionName}</div>
+                  <div><span className="font-medium">State:</span> {selectedContingentHistory.stateName}</div>
+                  <div><span className="font-medium">Type:</span> {selectedContingentHistory.contingentType}</div>
+                </div>
+              </div>
+              
+              {/* Sync Status */}
+              <div className={`p-4 rounded-lg ${selectedContingentHistory.isSynced ? 'bg-green-50' : 'bg-amber-50'}`}>
+                <h3 className="text-base font-medium mb-2">Sync Status</h3>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium">Status:</span>
+                    {selectedContingentHistory.isSynced ? 
+                      <Badge className="bg-green-100 text-green-800 ml-2">Fully Synced</Badge> : 
+                      <Badge className="bg-amber-100 text-amber-800 ml-2">Needs Sync</Badge>
+                    }
+                  </div>
+                  <div>
+                    <span className="font-medium">Last Sync Date:</span>{' '}
+                    {selectedContingentHistory.lastSyncDate ? 
+                      new Date(selectedContingentHistory.lastSyncDate).toLocaleString() : 
+                      'Never synced'
+                    }
+                  </div>
+                  <div>
+                    <span className="font-medium">Teams Count:</span> {selectedContingentHistory.teamCount}
+                  </div>
+                  <div>
+                    <span className="font-medium">Synced Teams:</span> {selectedContingentHistory.syncedTeamCount} / {selectedContingentHistory.teamCount}
+                    {selectedContingentHistory.syncedTeamCount < selectedContingentHistory.teamCount ? (
+                      <Badge className="bg-amber-100 text-amber-800 ml-2">
+                        {selectedContingentHistory.teamCount - selectedContingentHistory.syncedTeamCount} need sync
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-green-100 text-green-800 ml-2">
+                        All teams synced
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="pt-2 pb-2">
+                    <div className="h-2 w-full bg-gray-200 rounded-full">
+                      <div 
+                        className={`h-2 rounded-full ${selectedContingentHistory.syncedTeamCount === selectedContingentHistory.teamCount ? 'bg-green-500' : 'bg-amber-500'}`}
+                        style={{ width: `${selectedContingentHistory.teamCount > 0 ? Math.round((selectedContingentHistory.syncedTeamCount / selectedContingentHistory.teamCount) * 100) : 0}%` }}
+                      ></div>
+                    </div>
+                    <div className="text-xs text-gray-500 text-right mt-1">
+                      {selectedContingentHistory.teamCount > 0 ? 
+                        `${Math.round((selectedContingentHistory.syncedTeamCount / selectedContingentHistory.teamCount) * 100)}% synced` :
+                        'No syncable teams found'}
+                    </div>
+                    
+                    {/* Team Sync Details */}
+                    <div className="mt-2">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-2 py-1 text-left font-medium text-gray-500">Status</th>
+                            <th className="px-2 py-1 text-right font-medium text-gray-500">Count</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          <tr>
+                            <td className="px-2 py-1 text-gray-700">Synced Teams</td>
+                            <td className="px-2 py-1 text-right font-medium text-green-600">{selectedContingentHistory.syncedTeamCount}</td>
+                          </tr>
+                          <tr>
+                            <td className="px-2 py-1 text-gray-700">Teams Needing Sync</td>
+                            <td className="px-2 py-1 text-right font-medium text-amber-600">
+                              {selectedContingentHistory.teamCount - selectedContingentHistory.syncedTeamCount}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {selectedContingentHistory.teamCount === 0 && (
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                        <h4 className="text-sm font-medium text-amber-800 flex items-center gap-1">
+                          <AlertCircle className="h-4 w-4" />
+                          No Approved Teams
+                        </h4>
+                        <p className="text-xs text-amber-700 mt-1">
+                          This contingent doesn't have any teams with status APPROVED, ACCEPTED, or APPROVED_SPECIAL.
+                          Only teams with these statuses can be synced.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <span className="font-medium">Contestants:</span> {selectedContingentHistory.contestantCount}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Manual Sync Button */}
+              <div className="flex justify-end">
+                <Button 
+                  onClick={() => {
+                    handleIndividualContingentSync(selectedContingentHistory.id);
+                    // Keep dialog open to see updated info
+                  }}
+                  disabled={contingentSyncing}
+                  className={`${!selectedContingentHistory.needsSync ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {contingentSyncing && selectedContingent === selectedContingentHistory.id ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                      Syncing...
+                    </>
+                  ) : selectedContingentHistory.needsSync ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sync Now
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Sync Status
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setSyncHistoryDialogOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1480,8 +1842,40 @@ export default function AttendancePage() {
               <p className="text-green-600">Attendance data is up to date</p>
             )}
             
+            {/* Info about sync criteria */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+              <div className="flex items-center gap-2 mb-2 text-blue-800">
+                <Info className="h-4 w-4" />
+                <span className="font-medium">About Sync Process</span>
+              </div>
+              <p className="text-blue-700 mb-2">
+                Teams with the following statuses will be synced to attendance records:
+              </p>
+              <ul className="list-disc pl-5 text-blue-700 mb-2 space-y-1">
+                <li>APPROVED teams</li>
+                <li>ACCEPTED teams</li>
+                <li>APPROVED_SPECIAL teams</li>
+              </ul>
+              <p className="text-blue-700 italic">
+                Age validation is skipped for all teams with these statuses.
+                If no contingents appear for sync, try using the "Sync Now" button at the top of the page
+                to run a full sync first, then return to this dialog.
+              </p>
+              {selectedContingentHistory && selectedContingentHistory.teamCount === 0 && (
+                <p className="text-red-600 mt-2">
+                  No approved teams found for this contingent. Please use the "Sync Now" button at the top of the page
+                  to run a full sync first, then return to this dialog.
+                </p>
+              )}
+            </div>
+
             {syncing && (
               <div className="space-y-4 mt-4">
+                {/* Progress Indicator */}
+                <div className="flex items-center justify-center gap-3 text-blue-600">
+                  <RefreshCw className="h-5 w-5 animate-spin" />
+                  <span>Syncing in progress...</span>
+                </div>
                 {/* Progress Bar */}
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div 
@@ -1749,6 +2143,12 @@ export default function AttendancePage() {
             <Link href={`/organizer/events/${eventId}/reports`} className="w-full">
               <Button className="w-full">
                 View Reports
+              </Button>
+            </Link>
+            <Link href={`/organizer/events/monitoring/${eventId}/endlist`} className="w-full">
+              <Button variant="outline" className="w-full flex items-center justify-center gap-2 bg-blue-500 text-white hover:bg-blue-600">
+                <FileText className="h-4 w-4" />
+                View Endlist
               </Button>
             </Link>
             <Button 
