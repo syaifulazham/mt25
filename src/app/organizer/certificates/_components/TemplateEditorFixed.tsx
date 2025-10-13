@@ -252,12 +252,15 @@ function debugElementProps(element: Element, location: string): string | undefin
     recipient_email: 'john.doe@example.com',
     award_title: 'Certificate of Achievement',
     contest_name: 'Loading contests...',
+    contingent_name: 'ABC School',
+    team_name: 'Team Innovators',
+    ic_number: '990101-10-1234',
     issue_date: new Date().toLocaleDateString(),
     unique_code: 'CERT-' + Math.random().toString(36).substring(2, 10).toUpperCase()
   })
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(true)
   const [showPropertiesPanel, setShowPropertiesPanel] = useState(true)
-  const [contests, setContests] = useState<{id: number, name: string}[]>([])
+  const [contests, setContests] = useState<{id: number, name: string, code: string, displayName: string}[]>([])
   
   // Fetch contests for the preview mockup data
   const fetchContests = async () => {
@@ -273,7 +276,7 @@ function debugElementProps(element: Element, location: string): string | undefin
       if (data.contests && data.contests.length > 0) {
         setMockupData(prev => ({
           ...prev,
-          contest_name: data.contests[0].name
+          contest_name: data.contests[0].displayName
         }))
       }
     } catch (error) {
@@ -376,7 +379,10 @@ function debugElementProps(element: Element, location: string): string | undefin
         align: 'left'
       }
     } else if (type === 'dynamic_text') {
-      newElement.placeholder = '{{recipient_name}}'
+      // Choose from expanded set of placeholders
+      const placeholders = ['recipient_name', 'contingent_name', 'team_name', 'contest_name', 'award_title', 'ic_number'];
+      const randomIndex = Math.floor(Math.random() * placeholders.length);
+      newElement.placeholder = `{{${placeholders[randomIndex]}}}`
       newElement.prefix = '' // Initialize empty prefix for dynamic text
       newElement.style = {
         font_family: 'Arial',
@@ -1619,6 +1625,9 @@ function debugElementProps(element: Element, location: string): string | undefin
                           <option value="{{recipient_email}}">Recipient Email</option>
                           <option value="{{award_title}}">Award Title</option>
                           <option value="{{contest_name}}">Contest Name</option>
+                          <option value="{{contingent_name}}">Contingent Name</option>
+                          <option value="{{team_name}}">Team Name</option>
+                          <option value="{{ic_number}}">IC Number</option>
                           <option value="{{issue_date}}">Issue Date</option>
                           <option value="{{unique_code}}">Unique Code</option>
                         </select>

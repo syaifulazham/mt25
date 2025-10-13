@@ -10,7 +10,7 @@ interface PreviewModalProps {
   pdfUrl: string | null;
   mockupData: Record<string, string>;
   onUpdateMockupData: (newData: Record<string, string>) => void;
-  contests: Array<{ id: number; name: string }>;
+  contests: Array<{ id: number; name: string; code: string; displayName: string }>;
   paperSize?: { width: number; height: number; name?: string; };
   calibration?: { 
     scaleX: number;
@@ -341,6 +341,42 @@ export function PreviewModal({
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Contingent Name
+                    </label>
+                    <input
+                      type="text"
+                      value={mockupData.contingent_name}
+                      onChange={(e) => handleInputChange('contingent_name', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Team Name
+                    </label>
+                    <input
+                      type="text"
+                      value={mockupData.team_name}
+                      onChange={(e) => handleInputChange('team_name', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      IC Number
+                    </label>
+                    <input
+                      type="text"
+                      value={mockupData.ic_number}
+                      onChange={(e) => handleInputChange('ic_number', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       Contest Name
                     </label>
                     <select
@@ -350,8 +386,8 @@ export function PreviewModal({
                     >
                       {contests.length > 0 ? (
                         contests.map(contest => (
-                          <option key={contest.id} value={contest.name}>
-                            {contest.name}
+                          <option key={contest.id} value={contest.displayName}>
+                            {contest.displayName}
                           </option>
                         ))
                       ) : (

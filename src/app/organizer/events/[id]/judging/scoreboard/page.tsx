@@ -100,7 +100,7 @@ interface Event {
   startDate: string;
   endDate: string;
   status?: string;
-  scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN';
+  scopeArea?: 'NATIONAL' | 'ZONE' | 'STATE' | 'OPEN' | 'ONLINE_STATE';
   zoneId?: number;
   zoneName?: string;
   stateId?: number | null;
@@ -206,7 +206,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   
   // Clear state filter when splitByState is turned off
   useEffect(() => {
-    if (event?.scopeArea === 'OPEN' && !splitByState && selectedFilterState) {
+    if ((event?.scopeArea === 'OPEN' || event?.scopeArea === 'ONLINE_STATE') && !splitByState && selectedFilterState) {
       // Clear state filter when split by state is turned off
       setSelectedFilterState("");
     }
@@ -364,8 +364,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   
   // Fetch participating states for events
   useEffect(() => {
-    // When event is OPEN and splitByState is enabled, fetch participating states
-    if (event?.scopeArea === 'OPEN' && splitByState) {
+    // When event is OPEN or ONLINE_STATE and splitByState is enabled, fetch participating states
+    if ((event?.scopeArea === 'OPEN' || event?.scopeArea === 'ONLINE_STATE') && splitByState) {
       const fetchParticipatingStates = async () => {
         try {
           // Use SQL to fetch distinct states participating in this event
@@ -473,8 +473,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           contestId: selectedContest
         });
         
-        // Add stateId for ZONE events or OPEN events with splitByState if selected
-        if ((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && selectedFilterState) {
+        // Add stateId for ZONE events or OPEN/ONLINE_STATE events with splitByState if selected
+        if ((event?.scopeArea === 'ZONE' || ((event?.scopeArea === 'OPEN' || event?.scopeArea === 'ONLINE_STATE') && splitByState)) && selectedFilterState) {
           queryParams.append('stateId', selectedFilterState);
         }
         
@@ -529,7 +529,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
   
   // Re-rank results when not splitting by state to ensure proper ranking
   // This ensures ranks are always calculated correctly regardless of filter state
-  if (event?.scopeArea === 'OPEN' && !splitByState) {
+  if ((event?.scopeArea === 'OPEN' || event?.scopeArea === 'ONLINE_STATE') && !splitByState) {
     // Sort by score descending
     filteredResults = [...filteredResults].sort((a, b) => b.averageScore - a.averageScore);
     
@@ -551,8 +551,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         contestId: selectedContest
       });
       
-      // Add stateId for ZONE events or OPEN events with splitByState if selected
-      if ((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && selectedFilterState) {
+      // Add stateId for ZONE events or OPEN/ONLINE_STATE events with splitByState if selected
+      if ((event?.scopeArea === 'ZONE' || ((event?.scopeArea === 'OPEN' || event?.scopeArea === 'ONLINE_STATE') && splitByState)) && selectedFilterState) {
         queryParams.append('stateId', selectedFilterState);
       }
       
@@ -592,8 +592,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         contestId: selectedContest
       });
       
-      // Add stateId for ZONE events or OPEN events with splitByState if selected
-      if ((event?.scopeArea === 'ZONE' || (event?.scopeArea === 'OPEN' && splitByState)) && selectedFilterState) {
+      // Add stateId for ZONE events or OPEN/ONLINE_STATE events with splitByState if selected
+      if ((event?.scopeArea === 'ZONE' || ((event?.scopeArea === 'OPEN' || event?.scopeArea === 'ONLINE_STATE') && splitByState)) && selectedFilterState) {
         queryParams.append('stateId', selectedFilterState);
       }
       
@@ -656,8 +656,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
           </DialogHeader>
           
           <div className="space-y-6">
-            {/* State Filter Alert - Always visible for OPEN events when split toggle is on */}
-            {event.scopeArea === 'OPEN' && splitByState && availableStates.length > 0 && (
+            {/* State Filter Alert - Always visible for OPEN/ONLINE_STATE events when split toggle is on */}
+            {(event.scopeArea === 'OPEN' || event.scopeArea === 'ONLINE_STATE') && splitByState && availableStates.length > 0 && (
               <div className="bg-blue-900/40 border border-blue-500/50 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h3 className="font-semibold text-blue-300">State Filter Active</h3>
@@ -725,7 +725,7 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
                 <CardTitle>Filters</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* State Filter (for ZONE events only - OPEN events with splitByState use the alert box above) */}
+                {/* State Filter (for ZONE events only - OPEN/ONLINE_STATE events with splitByState use the alert box above) */}
                 {(event.scopeArea === 'ZONE' && availableStates.length > 0) && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium mb-1">
@@ -866,8 +866,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
       
 
       
-      {/* OPEN Event State Toggle */}
-      {event.scopeArea === 'OPEN' && (
+      {/* OPEN/ONLINE_STATE Event State Toggle */}
+      {(event.scopeArea === 'OPEN' || event.scopeArea === 'ONLINE_STATE') && (
         <div className="mb-4 flex justify-end">
           <div className="flex items-center space-x-2 bg-black/20 backdrop-blur-sm p-3 rounded-md border border-white/10">
             <div>
@@ -907,7 +907,8 @@ export default function ScoreboardPage({ params }: { params: { id: string } }) {
         </div>
       ) : selectedContest && filteredResults.length > 0 ? (
         // For ZONE events or OPEN events with splitByState enabled, group by state
-        (event.scopeArea === 'ZONE' || (event.scopeArea === 'OPEN' && splitByState)) ? (
+        // ONLINE_STATE events should be handled like OPEN events (unified table by default)
+        (event.scopeArea === 'ZONE' || ((event.scopeArea === 'OPEN' || event.scopeArea === 'ONLINE_STATE') && splitByState)) ? (
           // Group by state for ZONE events
           <div className="space-y-8">
             {/* Group results by state */}
