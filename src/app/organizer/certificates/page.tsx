@@ -37,6 +37,13 @@ export default async function CertificatesPage() {
     limit: 10
   });
 
+  // Format certificates to include template data at the top level
+  const formattedCertificates = certificatesResult.certificates.map((cert: any) => ({
+    ...cert,
+    templateName: cert.template?.templateName || 'Unknown Template',
+    templateTargetType: cert.template?.targetType
+  }));
+
   return (
     <div className="container mx-auto py-6 space-y-8">
       <PageHeader 
@@ -47,7 +54,7 @@ export default async function CertificatesPage() {
       <CertificateHub 
         session={session} 
         initialTemplates={templatesResult.templates} 
-        initialCertificates={certificatesResult.certificates}
+        initialCertificates={formattedCertificates}
         templatesPagination={templatesResult.pagination}
         certificatesPagination={certificatesResult.pagination}
       />

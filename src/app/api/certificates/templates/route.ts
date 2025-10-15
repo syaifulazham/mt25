@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/app/api/auth/auth-options'
-import { TemplateService } from '@/lib/services/template-service'
+import { TemplateService } from '@/lib/services/certificate-service'
 import { templateQuerySchema, templateCreateSchema } from '@/lib/validations/template-schemas'
 
 // Allowed roles for certificate templates management
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
       pageSize: searchParams.get('pageSize'),
       search: searchParams.get('search'),
       status: searchParams.get('status'),
+      targetType: searchParams.get('targetType'),
     }
 
     // Validate parameters

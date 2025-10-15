@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,14 +22,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Download, Mail, Printer } from 'lucide-react'
+import { MoreHorizontal, Eye, Download, Mail, Printer, FileText } from 'lucide-react'
 import { format } from 'date-fns'
+import { ViewCertificateModal } from './ViewCertificateModal'
+import { EditCertificateModal } from './EditCertificateModal'
 
 // Certificate interface
 interface Certificate {
   id: number
   templateId: number
   templateName: string
+  templateTargetType?: string
   recipientName: string
   recipientEmail: string | null
   recipientType: 'PARTICIPANT' | 'CONTESTANT' | 'JUDGE' | 'ORGANIZER'
@@ -63,42 +67,90 @@ export function CertificateList({ certificates: initialCertificates, pagination:
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(initialPagination.page)
+  const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [selectedCertificateId, setSelectedCertificateId] = useState<number | null>(null)
+  const [generatingCertificateId, setGeneratingCertificateId] = useState<number | null>(null)
   const router = useRouter()
   
   // Role-based permissions
   const isAdmin = session.user.role === 'ADMIN'
   const canManageCertificates = ['ADMIN', 'OPERATOR'].includes(session.user.role as string)
   
+  // Handle view certificate
+  const handleViewCertificate = (certificateId: number) => {
+    setSelectedCertificateId(certificateId)
+    setViewModalOpen(true)
+  }
+  
+  // Handle edit certificate
+  const handleEditCertificate = (certificateId: number) => {
+    setSelectedCertificateId(certificateId)
+    setEditModalOpen(true)
+  }
+  
+  // Fetch certificates function
+  const fetchCertificates = async () => {
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pagination.limit.toString(),
+        ...(searchTerm && { search: searchTerm }),
+      })
+      
+      const response = await fetch(`/api/certificates?${queryParams}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch certificates')
+      }
+      
+      const data = await response.json()
+      setCertificates(data.certificates)
+      setPagination(data.pagination)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      console.error('Error fetching certificates:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  
+  // Handle edit success - refresh the list
+  const handleEditSuccess = () => {
+    fetchCertificates()
+  }
+  
+  // Handle generate certificate
+  const handleGenerateCertificate = async (certificateId: number) => {
+    try {
+      setGeneratingCertificateId(certificateId)
+      
+      const response = await fetch(`/api/certificates/${certificateId}/generate`, {
+        method: 'POST'
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate certificate')
+      }
+      
+      // Refresh the list to show updated certificate
+      await fetchCertificates()
+      
+    } catch (error) {
+      console.error('Error generating certificate:', error)
+      setError(error instanceof Error ? error.message : 'Failed to generate certificate')
+      setTimeout(() => setError(null), 5000)
+    } finally {
+      setGeneratingCertificateId(null)
+    }
+  }
+  
   // Fetch certificates when search term or page changes
   useEffect(() => {
-    const fetchCertificates = async () => {
-      setIsLoading(true)
-      setError(null)
-      
-      try {
-        const queryParams = new URLSearchParams({
-          page: currentPage.toString(),
-          limit: pagination.limit.toString(),
-          ...(searchTerm && { search: searchTerm }),
-        })
-        
-        const response = await fetch(`/api/certificates?${queryParams}`)
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch certificates')
-        }
-        
-        const data = await response.json()
-        setCertificates(data.certificates)
-        setPagination(data.pagination)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
-        console.error('Error fetching certificates:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    
     fetchCertificates()
   }, [searchTerm, currentPage, pagination.limit])
   
@@ -201,6 +253,22 @@ export function CertificateList({ certificates: initialCertificates, pagination:
     }
   }
   
+  // Get certificate type label
+  const getCertificateTypeLabel = (type?: string) => {
+    switch(type) {
+      case 'GENERAL':
+        return 'General'
+      case 'EVENT_PARTICIPANT':
+        return 'Event Participant'
+      case 'EVENT_WINNER':
+        return 'Event Winner'
+      case 'NON_CONTEST_PARTICIPANT':
+        return 'Non-Contest Participant'
+      default:
+        return type || 'General'
+    }
+  }
+  
   return (
     <div className="space-y-6">
       {/* Error display */}
@@ -234,7 +302,7 @@ export function CertificateList({ certificates: initialCertificates, pagination:
             <TableHeader>
               <TableRow>
                 <TableHead>Recipient</TableHead>
-                <TableHead>Certificate Type</TableHead>
+                <TableHead>Certificate Name</TableHead>
                 <TableHead>Award / Contest</TableHead>
                 <TableHead>Unique Code</TableHead>
                 <TableHead>Status</TableHead>
@@ -246,9 +314,25 @@ export function CertificateList({ certificates: initialCertificates, pagination:
               {filteredCertificates.map((certificate) => {
                 const statusColor = getStatusBadgeClass(certificate.status)
                 const recipientTypeLabel = getRecipientTypeLabel(certificate.recipientType)
+                const isGenerating = generatingCertificateId === certificate.id
 
                 return (
-                  <TableRow key={certificate.id}>
+                  <TableRow key={certificate.id} className={isGenerating ? 'bg-blue-50 relative' : ''}>
+                    {isGenerating && (
+                      <td colSpan={7} className="absolute inset-0 pointer-events-none">
+                        <div className="relative h-full">
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-200">
+                            <div className="h-full bg-blue-600 animate-pulse" style={{ width: '100%' }}></div>
+                          </div>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-white px-4 py-2 rounded shadow-lg border border-blue-200 flex items-center gap-2">
+                              <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                              <span className="text-sm font-medium text-blue-900">Generating PDF...</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    )}
                     <TableCell>
                       <div className="font-medium">{certificate.recipientName}</div>
                       {certificate.recipientEmail && (
@@ -257,7 +341,10 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                       <Badge variant="outline" className="mt-1">{recipientTypeLabel}</Badge>
                     </TableCell>
                     <TableCell>
-                      <div>{certificate.templateName}</div>
+                      <div className="font-medium">{certificate.templateName}</div>
+                      <div className="text-sm text-gray-500">
+                        {getCertificateTypeLabel(certificate.templateTargetType)}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {certificate.awardTitle && (
@@ -271,7 +358,20 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                       <code className="text-xs bg-gray-100 p-1 rounded">{certificate.uniqueCode}</code>
                     </TableCell>
                     <TableCell>
-                      <Badge className={statusColor}>{certificate.status}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={statusColor}>{certificate.status}</Badge>
+                        {certificate.filePath && (
+                          <a
+                            href={certificate.filePath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 cursor-pointer"
+                            title="View generated PDF"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </a>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {certificate.issuedAt ? format(new Date(certificate.issuedAt), "MMM d, yyyy") : "Not issued yet"}
@@ -279,50 +379,58 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="h-8 w-8 p-0 bg-transparent border-0 inline-flex items-center justify-center text-gray-500 rounded-md hover:text-gray-700 hover:bg-gray-100">
+                          <Button variant="ghost" className="h-8 w-8 p-0">
                             <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
-                          </button>
+                          </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/organizer/certificates/${certificate.id}`} className="flex items-center">
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Certificate
-                            </Link>
+                          <DropdownMenuItem 
+                            className="flex items-center cursor-pointer"
+                            onClick={() => handleViewCertificate(certificate.id)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Certificate
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center">
+                          <DropdownMenuItem className="flex items-center cursor-pointer">
                             <Download className="h-4 w-4 mr-2" />
                             Download PDF
                           </DropdownMenuItem>
                           {certificate.recipientEmail && certificate.status !== "SENT" && canManageCertificates && (
                             <DropdownMenuItem 
-                              className="flex items-center"
+                              className="flex items-center cursor-pointer"
                               onClick={() => handleSendCertificate(certificate.id)}
                             >
                               <Mail className="h-4 w-4 mr-2" />
                               Send by Email
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem className="flex items-center">
+                          <DropdownMenuItem className="flex items-center cursor-pointer">
                             <Printer className="h-4 w-4 mr-2" />
                             Print
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          {certificate.status === "DRAFT" && canManageCertificates && (
-                            <DropdownMenuItem className="text-blue-600">
-                              Generate Certificate
+                          {canManageCertificates && (
+                            <DropdownMenuItem 
+                              className="text-blue-600 cursor-pointer"
+                              onClick={() => handleGenerateCertificate(certificate.id)}
+                              disabled={isGenerating}
+                            >
+                              {certificate.filePath ? 'Regenerate Certificate' : 'Generate Certificate'}
                             </DropdownMenuItem>
                           )}
                           {canManageCertificates && (
-                            <DropdownMenuItem className="text-amber-600">
+                            <DropdownMenuItem 
+                              className="text-amber-600 cursor-pointer"
+                              onClick={() => handleEditCertificate(certificate.id)}
+                            >
                               Edit Details
                             </DropdownMenuItem>
                           )}
                           {isAdmin && (
                             <DropdownMenuItem 
-                              className="text-red-600"
+                              className="text-red-600 cursor-pointer"
                               onClick={() => handleDeleteCertificate(certificate.id)}
                             >
                               Delete
@@ -386,6 +494,31 @@ export function CertificateList({ certificates: initialCertificates, pagination:
             </button>
           </nav>
         </div>
+      )}
+      
+      {/* View Certificate Modal */}
+      {selectedCertificateId && (
+        <ViewCertificateModal
+          isOpen={viewModalOpen}
+          onClose={() => {
+            setViewModalOpen(false)
+            setSelectedCertificateId(null)
+          }}
+          certificateId={selectedCertificateId}
+        />
+      )}
+      
+      {/* Edit Certificate Modal */}
+      {selectedCertificateId && (
+        <EditCertificateModal
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false)
+            setSelectedCertificateId(null)
+          }}
+          certificateId={selectedCertificateId}
+          onSuccess={handleEditSuccess}
+        />
       )}
     </div>
   )

@@ -235,7 +235,7 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [success, setSuccess] = useState<string | null>(null)
   
   // Target audience configuration states
-  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER'>(template?.targetType || 'GENERAL')
+  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT'>(template?.targetType || 'GENERAL')
   const [eventId, setEventId] = useState<number | null>(template?.eventId || null)
   const [winnerRangeStart, setWinnerRangeStart] = useState<number | null>(template?.winnerRangeStart || 1)
   const [winnerRangeEnd, setWinnerRangeEnd] = useState<number | null>(template?.winnerRangeEnd || 3)
@@ -247,20 +247,27 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [debugMode, setDebugMode] = useState(true)
   // Full page mode toggle
   const [isFullPage, setIsFullPage] = useState(false)
+  // Grid toggle
+  const [showGrid, setShowGrid] = useState(false)
+  // Vertical guide line
+  const [showGuideLine, setShowGuideLine] = useState(false)
+  const [guideLineX, setGuideLineX] = useState(paperSize.width / 2) // Center by default
+  const [isDraggingGuide, setIsDraggingGuide] = useState(false)
   const [mockupData, setMockupData] = useState<Record<string, string>>({
     recipient_name: 'John Doe',
     recipient_email: 'john.doe@example.com',
     award_title: 'Certificate of Achievement',
     contest_name: 'Loading contests...',
-    contingent_name: 'ABC School',
+    contingent_name: 'University of Technology',
     team_name: 'Team Innovators',
     ic_number: '990101-10-1234',
     issue_date: new Date().toLocaleDateString(),
-    unique_code: 'CERT-' + Math.random().toString(36).substring(2, 10).toUpperCase()
+    unique_code: 'CERT-' + Math.random().toString(36).substring(2, 10).toUpperCase(),
+    serial_number: 'MT25/GEN/000001'
   })
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(true)
   const [showPropertiesPanel, setShowPropertiesPanel] = useState(true)
-  const [contests, setContests] = useState<{id: number, name: string, code: string, displayName: string}[]>([])
+  const [contests, setContests] = useState<Array<{ id: number; name: string; code: string; displayName: string }>>([])
   
   // Fetch contests for the preview mockup data
   const fetchContests = async () => {
@@ -380,7 +387,7 @@ function debugElementProps(element: Element, location: string): string | undefin
       }
     } else if (type === 'dynamic_text') {
       // Choose from expanded set of placeholders
-      const placeholders = ['recipient_name', 'contingent_name', 'team_name', 'contest_name', 'award_title', 'ic_number'];
+      const placeholders = ['recipient_name', 'contingent_name', 'team_name', 'contest_name', 'award_title', 'ic_number', 'serial_number'];
       const randomIndex = Math.floor(Math.random() * placeholders.length);
       newElement.placeholder = `{{${placeholders[randomIndex]}}}`
       newElement.prefix = '' // Initialize empty prefix for dynamic text
@@ -632,6 +639,41 @@ function debugElementProps(element: Element, location: string): string | undefin
     setTimeout(() => setSuccess(null), 1500);
   }
   
+  // Handle guide line drag
+  const handleGuideLineDragStart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsDraggingGuide(true)
+  }
+
+  const handleGuideLineDrag = (e: MouseEvent) => {
+    if (!isDraggingGuide || !canvasRef.current) return
+    
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const newX = e.clientX - canvasRect.left
+    
+    // Constrain within canvas bounds
+    if (newX >= 0 && newX <= paperSize.width) {
+      setGuideLineX(newX)
+    }
+  }
+
+  const handleGuideLineDragEnd = () => {
+    setIsDraggingGuide(false)
+  }
+
+  // Effect for guide line dragging
+  useEffect(() => {
+    if (isDraggingGuide) {
+      window.addEventListener('mousemove', handleGuideLineDrag)
+      window.addEventListener('mouseup', handleGuideLineDragEnd)
+      
+      return () => {
+        window.removeEventListener('mousemove', handleGuideLineDrag)
+        window.removeEventListener('mouseup', handleGuideLineDragEnd)
+      }
+    }
+  }, [isDraggingGuide, paperSize.width])
+
   // Center element both horizontally and vertically on the page
   const centerElementBoth = () => {
     if (!selectedElement || !canvasRef.current) return
@@ -853,6 +895,26 @@ function debugElementProps(element: Element, location: string): string | undefin
         e.preventDefault();
         setIsFullPage(!isFullPage);
       }
+      
+      // Toggle grid with G key
+      if (e.key.toLowerCase() === 'g' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Only toggle if not in an input field
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setShowGrid(!showGrid);
+        }
+      }
+      
+      // Toggle guide line with L key
+      if (e.key.toLowerCase() === 'l' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Only toggle if not in an input field
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          setShowGuideLine(!showGuideLine);
+        }
+      }
     };
     
     window.addEventListener('keydown', handleKeyPress);
@@ -860,7 +922,7 @@ function debugElementProps(element: Element, location: string): string | undefin
     return () => {
       window.removeEventListener('keydown', handleKeyPress);
     };
-  }, [isFullPage])
+  }, [isFullPage, showGrid, showGuideLine])
   
   return (
     <div className={`space-y-6 ${isFullPage ? 'fixed inset-0 bg-gray-50 z-50 overflow-auto' : ''}`}>
@@ -959,7 +1021,11 @@ function debugElementProps(element: Element, location: string): string | undefin
                   </svg>
                 </button>
               </div>
-              <p className="text-sm text-blue-600 mt-1">Press <span className="font-mono font-bold">F11</span> or <span className="font-mono font-bold">Ctrl+Shift+F</span> to toggle fullscreen mode for better editing experience.</p>
+              <div className="text-sm text-blue-600 mt-1 space-y-1">
+                <p>• Press <span className="font-mono font-bold">F11</span> or <span className="font-mono font-bold">Ctrl+Shift+F</span> to toggle fullscreen mode</p>
+                <p>• Press <span className="font-mono font-bold">G</span> to toggle grid overlay</p>
+                <p>• Press <span className="font-mono font-bold">L</span> to toggle guide line</p>
+              </div>
             </div>
           </div>
         </div>
@@ -1062,6 +1128,19 @@ function debugElementProps(element: Element, location: string): string | undefin
                         <span className="ml-2">Event Winners</span>
                       </label>
                     </div>
+                    <div>
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="NON_CONTEST_PARTICIPANT" 
+                          checked={targetType === 'NON_CONTEST_PARTICIPANT'}
+                          onChange={() => setTargetType('NON_CONTEST_PARTICIPANT')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">Non Contest Participant</span>
+                      </label>
+                    </div>
                   </div>
                   
                   {(targetType === 'EVENT_PARTICIPANT' || targetType === 'EVENT_WINNER') && (
@@ -1120,6 +1199,8 @@ function debugElementProps(element: Element, location: string): string | undefin
                         `Winners (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
                       {targetType === 'EVENT_WINNER' && (!eventId || !winnerRangeStart || !winnerRangeEnd) && 
                         'Event winners (please complete all fields)'}
+                      {targetType === 'NON_CONTEST_PARTICIPANT' && 
+                        'Non-competing participants (observers, guests, volunteers, etc.)'}
                     </p>
                   </div>
                 </div>
@@ -1223,6 +1304,18 @@ function debugElementProps(element: Element, location: string): string | undefin
                       />
                       <span className="ml-2">Event Winners</span>
                     </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="NON_CONTEST_PARTICIPANT" 
+                        checked={targetType === 'NON_CONTEST_PARTICIPANT'}
+                        onChange={() => setTargetType('NON_CONTEST_PARTICIPANT')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">Non Contest Participant</span>
+                    </label>
                   </div>
                 </div>
                 
@@ -1290,7 +1383,9 @@ function debugElementProps(element: Element, location: string): string | undefin
                     {targetType === 'EVENT_WINNER' && eventId && winnerRangeStart && winnerRangeEnd && 
                       `Winners (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${events.find(e => e.id === eventId)?.name || 'selected event'}`}
                     {targetType === 'EVENT_WINNER' && (!eventId || !winnerRangeStart || !winnerRangeEnd) && 
-                      'Event winners (please complete all fields)'}
+                        'Event winners (please complete all fields)'}
+                      {targetType === 'NON_CONTEST_PARTICIPANT' && 
+                        'Non-competing participants (observers, guests, volunteers, etc.)'}
                   </p>
                 </div>
               </div>
@@ -1378,6 +1473,32 @@ function debugElementProps(element: Element, location: string): string | undefin
                 <span className="tooltip">Debug Mode {debugMode ? 'ON' : 'OFF'}</span>
               </button>
               
+              {/* Grid toggle button */}
+              <button
+                type="button"
+                onClick={() => setShowGrid(!showGrid)}
+                className={`mr-2 w-9 h-9 ${showGrid ? 'bg-green-600' : 'bg-gray-500'} text-white rounded hover:bg-green-700 flex items-center justify-center tooltip-container`}
+                title="Toggle Grid"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+                <span className="tooltip">Grid {showGrid ? 'ON' : 'OFF'}</span>
+              </button>
+              
+              {/* Guide line toggle button */}
+              <button
+                type="button"
+                onClick={() => setShowGuideLine(!showGuideLine)}
+                className={`mr-2 w-9 h-9 ${showGuideLine ? 'bg-purple-600' : 'bg-gray-500'} text-white rounded hover:bg-purple-700 flex items-center justify-center tooltip-container`}
+                title="Toggle Guide Line"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16" />
+                </svg>
+                <span className="tooltip">Guide {showGuideLine ? 'ON' : 'OFF'}</span>
+              </button>
+              
               {/* Fullscreen toggle button */}
               <button
                 type="button"
@@ -1452,12 +1573,84 @@ function debugElementProps(element: Element, location: string): string | undefin
                     />
                   </div>
                   
+                  {/* Grid Overlay */}
+                  {showGrid && (
+                    <svg
+                      className="absolute top-0 left-0 pointer-events-none"
+                      style={{ 
+                        width: `${paperSize.width}px`, 
+                        height: `${paperSize.height}px`,
+                        zIndex: 1
+                      }}
+                    >
+                      <defs>
+                        <pattern
+                          id="grid-pattern"
+                          width="50"
+                          height="50"
+                          patternUnits="userSpaceOnUse"
+                        >
+                          <path
+                            d="M 50 0 L 0 0 0 50"
+                            fill="none"
+                            stroke="rgba(59, 130, 246, 0.3)"
+                            strokeWidth="0.5"
+                          />
+                        </pattern>
+                        <pattern
+                          id="grid-pattern-major"
+                          width="100"
+                          height="100"
+                          patternUnits="userSpaceOnUse"
+                        >
+                          <rect width="100" height="100" fill="url(#grid-pattern)" />
+                          <path
+                            d="M 100 0 L 0 0 0 100"
+                            fill="none"
+                            stroke="rgba(59, 130, 246, 0.5)"
+                            strokeWidth="1"
+                          />
+                        </pattern>
+                      </defs>
+                      <rect width="100%" height="100%" fill="url(#grid-pattern-major)" />
+                    </svg>
+                  )}
+                  
+                  {/* Vertical Guide Line */}
+                  {showGuideLine && (
+                    <div
+                      className="absolute top-0 cursor-ew-resize"
+                      style={{
+                        left: `${guideLineX}px`,
+                        width: '3px',
+                        height: `${paperSize.height}px`,
+                        backgroundColor: 'rgba(147, 51, 234, 0.7)',
+                        zIndex: 10,
+                        boxShadow: '0 0 5px rgba(147, 51, 234, 0.5)'
+                      }}
+                      onMouseDown={handleGuideLineDragStart}
+                    >
+                      {/* Drag handle at top */}
+                      <div 
+                        className="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-purple-600 rounded-full"
+                        style={{ width: '12px', height: '12px' }}
+                      />
+                      {/* Position indicator */}
+                      <div 
+                        className="absolute top-4 left-4 bg-purple-600 text-white px-2 py-1 rounded text-xs font-mono whitespace-nowrap"
+                        style={{ pointerEvents: 'none' }}
+                      >
+                        {Math.round(guideLineX)}px
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Canvas for Elements */}
                   <div 
                     ref={canvasRef}
                     className="absolute top-0 left-0 right-0 bottom-0"
                     onClick={handleCanvasClick}
-                    style={{ height: `${paperSize.height}px` }}
+                    style={{ height: `${paperSize.height}px`, zIndex: 2 }}
                   >
                     {elements.map(element => (
                       <div
@@ -1630,6 +1823,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                           <option value="{{ic_number}}">IC Number</option>
                           <option value="{{issue_date}}">Issue Date</option>
                           <option value="{{unique_code}}">Unique Code</option>
+                          <option value="{{serial_number}}">Serial Number</option>
                         </select>
                       </div>
                     </>

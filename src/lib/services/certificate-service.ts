@@ -6,7 +6,7 @@ import {
   CertificateCreateParams,
   CertificateQueryParams
 } from '@/lib/interfaces/certificate-interfaces';
-import { CertTemplate, Certificate, CertificateStatus } from '@prisma/client';
+import { CertTemplate, Certificate } from '@prisma/client';
 
 /**
  * Service for managing certificate templates
@@ -19,6 +19,7 @@ export class TemplateService {
     const {
       search,
       status = 'ACTIVE',
+      targetType,
       page = 1,
       limit = 10,
       orderBy = 'createdAt',
@@ -26,9 +27,17 @@ export class TemplateService {
     } = queryParams;
 
     // Build where condition for filtering
-    const where: any = {
-      status: status as CertificateStatus
-    };
+    const where: any = {};
+    
+    // Add status filter if provided
+    if (status) {
+      where.status = status;
+    }
+
+    // Add targetType filter if provided
+    if (targetType) {
+      where.targetType = targetType;
+    }
 
     // Add search filter if provided
     if (search) {
@@ -233,7 +242,8 @@ export class CertificateService {
         template: {
           select: {
             id: true,
-            templateName: true
+            templateName: true,
+            targetType: true
           }
         },
         creator: {

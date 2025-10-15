@@ -4,12 +4,13 @@ import React, { useState, useEffect } from 'react'
 import { Session } from 'next-auth'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Search, Download, Upload, Filter, FileText, Printer, Mail } from 'lucide-react'
+import { PlusCircle, Search, Download, Upload, Filter, FileText, Printer, Mail, UserPlus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { CertTemplateList } from './CertTemplateList'
 import { CertificateList } from './CertificateList'
 import { TemplateListSkeleton } from './TemplateListSkeleton'
+import { CreateNonContestantCertModal } from './CreateNonContestantCertModal'
 
 // Template interfaces
 interface Template {
@@ -76,11 +77,19 @@ export function CertificateHub({
   const [activeTab, setActiveTab] = useState('certificates')
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   
   // Determine user's role-based permissions
   const isAdmin = session.user.role === 'ADMIN'
   const canCreateTemplate = ['ADMIN', 'OPERATOR'].includes(session.user.role as string)
   const canManageCertificates = ['ADMIN', 'OPERATOR'].includes(session.user.role as string)
+  
+  // Handle certificate creation success
+  const handleCertificateCreated = () => {
+    setRefreshKey(prev => prev + 1)
+    // Optionally refresh the certificate list here
+  }
   
   // Empty states component
   const EmptyState = ({ 
@@ -149,6 +158,15 @@ export function CertificateHub({
                 <Mail className="w-4 h-4" />
                 <span>Batch Send</span>
               </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-9 gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Create a Cert</span>
+              </Button>
               <Button asChild className="h-9 gap-1">
                 <Link href="/organizer/certificates/generate">
                   <PlusCircle className="w-4 h-4" />
@@ -204,6 +222,13 @@ export function CertificateHub({
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Create Non-Contestant Certificate Modal */}
+      <CreateNonContestantCertModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCertificateCreated}
+      />
     </div>
   )
 }

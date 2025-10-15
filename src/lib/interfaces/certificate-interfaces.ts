@@ -1,11 +1,10 @@
 // Certificate Management Interface Types
 
-import { CertificateStatus } from '@prisma/client';
-
 // Template Query Parameters
 export interface TemplateQueryParams {
-  search?: string;
-  status?: CertificateStatus;
+  search?: string | null;
+  status?: string | null;
+  targetType?: string | null;
   page?: number;
   limit?: number;
   orderBy?: string;
@@ -17,7 +16,7 @@ export interface TemplateCreateParams {
   templateName: string;
   basePdfPath?: string;
   configuration: TemplateConfiguration;
-  status?: CertificateStatus;
+  status?: string;
   createdBy: number;
 }
 
@@ -26,7 +25,7 @@ export interface TemplateUpdateParams {
   templateName?: string;
   basePdfPath?: string;
   configuration?: TemplateConfiguration;
-  status?: CertificateStatus;
+  status?: string;
   updatedBy: number;
 }
 
@@ -129,10 +128,10 @@ export interface CertificateCreateParams {
 
 // Certificate Query Parameters
 export interface CertificateQueryParams {
-  search?: string;
+  search?: string | null;
   templateId?: number;
-  recipientType?: string;
-  status?: string;
+  recipientType?: string | null;
+  status?: string | null;
   page?: number;
   limit?: number;
   orderBy?: string;

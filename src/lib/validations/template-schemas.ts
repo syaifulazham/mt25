@@ -54,14 +54,19 @@ const templateConfigurationSchema = z.object({
 
 // Template query parameters schema
 export const templateQuerySchema = z.object({
-  page: z.string().optional().transform(val => val ? parseInt(val) : 1),
-  pageSize: z.string().optional().transform(val => val ? parseInt(val) : 10),
-  search: z.string().optional().nullable(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).optional().nullable(),
+  page: z.string().nullable().optional().transform(val => val ? parseInt(val) : 1),
+  pageSize: z.string().nullable().optional().transform(val => val ? parseInt(val) : 10),
+  search: z.string().nullable().optional(),
+  status: z.string().nullable().optional().refine((val) => !val || ['ACTIVE', 'INACTIVE'].includes(val), {
+    message: 'Status must be ACTIVE or INACTIVE'
+  }),
+  targetType: z.string().nullable().optional().refine((val) => !val || ['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT'].includes(val), {
+    message: 'Invalid target type'
+  }),
 })
 
 // Target audience type enum
-export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER'])
+export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT'])
 
 // Template creation schema
 export const templateCreateSchema = z.object({

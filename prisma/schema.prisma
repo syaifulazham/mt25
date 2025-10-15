@@ -1250,6 +1250,7 @@ model CertTemplate {
   certificate_status_enum certificate_status_enum @relation(fields: [status], references: [value], map: "fk_cert_template_status")
   updater                 user?                   @relation("UpdatedTemplates", fields: [updatedBy], references: [id], map: "fk_cert_template_updatedBy")
   certificates            Certificate[]
+  serialNumbers           CertificateSerial[]
 
   @@index([templateName], map: "idx_cert_template_name")
   @@index([status], map: "idx_cert_template_status")
@@ -1273,6 +1274,7 @@ model Certificate {
   contestName    String?      @db.VarChar(255)
   awardTitle     String?      @db.VarChar(255)
   uniqueCode     String       @unique(map: "unique_certificate_code") @db.VarChar(50)
+  serialNumber   String?      @unique(map: "unique_serial_number") @db.VarChar(50)
   filePath       String?      @db.VarChar(1000)
   status         String       @default("DRAFT") @db.VarChar(20)
   issuedAt       DateTime?    @db.DateTime(0)
@@ -1290,6 +1292,24 @@ model Certificate {
   @@index([createdAt], map: "idx_certificate_createdAt")
   @@index([createdBy], map: "fk_certificate_createdBy")
   @@map("certificate")
+}
+
+model CertificateSerial {
+  id          Int                    @id @default(autoincrement())
+  year        Int
+  templateId  Int
+  targetType  CertTemplateTargetType
+  typeCode    String                 @db.VarChar(10)
+  lastSequence Int                   @default(0)
+  createdAt   DateTime               @default(now()) @db.DateTime(0)
+  updatedAt   DateTime               @default(now()) @updatedAt @db.DateTime(0)
+  template    CertTemplate           @relation(fields: [templateId], references: [id], map: "fk_cert_serial_template", onDelete: Cascade)
+
+  @@unique([year, targetType, templateId], map: "unique_year_type")
+  @@index([year], map: "idx_year")
+  @@index([templateId], map: "idx_template")
+  @@index([targetType], map: "idx_type")
+  @@map("certificate_serial")
 }
 
 model certificate_status_enum {
@@ -1387,4 +1407,5 @@ enum CertTemplateTargetType {
   GENERAL
   EVENT_PARTICIPANT
   EVENT_WINNER
+  NON_CONTEST_PARTICIPANT
 }

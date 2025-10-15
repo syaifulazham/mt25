@@ -1,0 +1,65 @@
+'use client'
+
+import React, { useState, useRef, useEffect } from 'react'
+import { PreviewModal } from './PreviewModal'
+import { Session } from 'next-auth'
+import { useRouter } from 'next/navigation'
+import { DebugPanel } from './DebugPanel'
+import PaperSizeSelector, { PAPER_SIZES, PaperSize } from './PaperSizeSelector'
+import CalibrationControls, { CalibrationSettings } from './CalibrationControls'
+import CollapsibleSection from './CollapsibleSection'
+
+// Define TextAnchor type for better type safety
+type TextAnchor = 'start' | 'middle' | 'end';
+
+interface TemplateEditorProps {
+  template?: any // Template data from database
+  session: Session
+  isNew?: boolean
+}
+
+interface Element {
+  id: string
+  type: 'static_text' | 'dynamic_text' | 'image'
+  position: { x: number, y: number }
+  content?: string
+  prefix?: string  // Added prefix field for dynamic text
+  placeholder?: string
+  style?: any
+  text_anchor?: TextAnchor  // Controls text alignment relative to position
+  layer: number
+  isSelected?: boolean
+}
+
+// Debug function to inspect element properties when rendering
+function debugElementProps(element: Element, location: string): string | undefined {
+  console.log(`Rendering element ${element.id} at ${location} with text_anchor: "${element.text_anchor}" (${typeof element.text_anchor})`)
+  return element.text_anchor
+}
+
+export function TemplateEditor({ template, session, isNew = false }: TemplateEditorProps) {
+  const [isFullPage, setIsFullPage] = useState(false)
+  
+  // Effect to handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Toggle fullscreen mode with F11 or Ctrl+Shift+F
+      if (e.key === 'F11' || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f')) {
+        e.preventDefault();
+        setIsFullPage(!isFullPage);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [isFullPage]);
+  
+  return (
+    <div className={`space-y-6 ${isFullPage ? 'fixed inset-0 bg-gray-50 z-50 overflow-auto' : ''}`}>
+      <h1>Template Editor</h1>
+    </div>
+  );
+}
