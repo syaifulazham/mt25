@@ -5,7 +5,7 @@ import { useLanguage } from "@/lib/i18n/language-context";
 import { downloadContestantsAsDocx } from "@/lib/docx-export";
 import { Contestant } from "@/types/contestant";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,7 +32,8 @@ import {
   FileDown,
   AlertTriangle,
   X,
-  LayoutGrid
+  LayoutGrid,
+  Award
 } from "lucide-react";
 import Link from "next/link";
 import EditContestantModal from "./_components/edit-contestant-modal";
@@ -80,12 +81,16 @@ import {
 export default function ContestantsPage() {
   const { data: session, status } = useSession();
   const { t } = useLanguage();
+  const searchParams = useSearchParams();
   const [contestants, setContestants] = useState<Contestant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [eduLevelFilter, setEduLevelFilter] = useState("all");
   const [error, setError] = useState<string | null>(null);
+  
+  // Check if certificate generation is enabled via URL parameter
+  const isCertificateEnabled = searchParams.get('cert') === 'enabled';
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -112,6 +117,9 @@ export default function ContestantsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [contestantToDelete, setContestantToDelete] = useState<{id: number, name: string} | null>(null);
   
+  // Certificate generation state
+  const [generatingCertificateId, setGeneratingCertificateId] = useState<number | null>(null);
+
   // Redirect if not logged in
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -380,6 +388,39 @@ export default function ContestantsPage() {
     }
   };
   
+  // Handle certificate generation
+  const handleGenerateCertificate = async (contestantId: number) => {
+    try {
+      setGeneratingCertificateId(contestantId);
+      toast.loading('Generating certificate...', { id: 'cert-gen' });
+      
+      const response = await fetch(`/api/participants/contestants/${contestantId}/generate-certificate`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate certificate');
+      }
+      
+      const data = await response.json();
+      
+      toast.success('Certificate generated successfully!', { id: 'cert-gen' });
+      
+      // Download the certificate
+      const link = document.createElement('a');
+      link.href = `/api/certificates/serve-pdf?path=${encodeURIComponent(data.certificate.filePath)}`;
+      link.download = `certificate-${data.certificate.uniqueCode}.pdf`;
+      link.click();
+      
+    } catch (error: any) {
+      console.error('Error generating certificate:', error);
+      toast.error(error.message || 'Failed to generate certificate', { id: 'cert-gen' });
+    } finally {
+      setGeneratingCertificateId(null);
+    }
+  };
+  
   // Education level badge component
   const EduLevelBadge = ({ eduLevel }: { eduLevel: string }) => {
     switch (eduLevel) {
@@ -484,28 +525,7 @@ export default function ContestantsPage() {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end items-center space-x-1">
-                  <AssignContestsModal
-                    contestantId={contestant.id}
-                    contestantName={contestant.name}
-                    onSuccess={() => fetchContestants(currentPage)}
-                  />
-                  <EditContestantModal 
-                    contestant={contestant} 
-                    onUpdate={(updatedContestant) => {
-                      // Update the contestant in the local state
-                      setContestants(prev => 
-                        prev.map(c => c.id === updatedContestant.id ? updatedContestant : c)
-                      );
-                    }} 
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => openDeleteDialog(contestant.id, contestant.name)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-100"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {/* All actions moved to dropdown menu to avoid duplication */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">
@@ -534,7 +554,10 @@ export default function ContestantsPage() {
                         <Pencil className="h-4 w-4 mr-2" /> {t('contestant.view')} Contingent
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <DropdownMenuItem 
+                      onSelect={(e) => e.preventDefault()}
+                      className="flex items-center"
+                    >
                       <EditContestantModal 
                         contestant={contestant} 
                         onUpdate={(updatedContestant) => {
@@ -552,8 +575,23 @@ export default function ContestantsPage() {
                         contestantName={contestant.name}
                         onSuccess={() => fetchContestants(currentPage)}
                       />
-                      <span className="ml-2">{t('contestant.contests.assign_button')}</span>
                     </DropdownMenuItem>
+                    
+                    {/* Only show Generate Certificate when cert=enabled in URL */}
+                    {isCertificateEnabled && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-green-600"
+                          onClick={() => handleGenerateCertificate(contestant.id)}
+                          disabled={generatingCertificateId === contestant.id}
+                        >
+                          <Award className="h-4 w-4 mr-2" />
+                          {generatingCertificateId === contestant.id ? 'Generating...' : 'Generate Certificate'}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-red-600"
