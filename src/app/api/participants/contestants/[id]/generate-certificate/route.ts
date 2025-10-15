@@ -94,72 +94,109 @@ export async function POST(
       institutionName = contestant.contingent.independent.name;
     }
 
-    // Generate unique code (same format as organizer certificates)
-    const uniqueCode = `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    console.log('Generated uniqueCode:', uniqueCode);
-
-    // Generate serial number using CertificateSerialService
-    console.log('Generating serial number...');
-    const serialNumber = await CertificateSerialService.generateSerialNumber(
-      template.id,
-      'GENERAL',
-      new Date().getFullYear()
-    );
-    console.log('Generated serialNumber:', serialNumber);
-
-    // Handle createdBy for participant-generated certificates
-    // Note: Participants are in user_participant table, not user table
-    // certificate.createdBy FK references user table (admin/operators only)
-    // For participant-generated certificates, we use NULL (now allowed after schema change)
-    const createdByUserId = null; // NULL for participant-generated certificates
-    
-    // Store participant email in recipientEmail for audit trail
-    const participantEmail = session.user.email || null;
-    
-    console.log('Participant-generated certificate (createdBy: NULL)');
-    console.log('Participant email:', participantEmail);
-
-    // Create certificate record using raw SQL (same as organizer)
-    console.log('Creating certificate record in database...');
-    await prisma.$executeRaw`
-      INSERT INTO certificate 
-      (templateId, recipientName, recipientEmail, recipientType, 
-       contingent_name, team_name, ic_number, contestName, awardTitle,
-       uniqueCode, serialNumber, status, createdAt, updatedAt, createdBy)
-      VALUES (
-        ${template.id},
-        ${contestant.name},
-        ${null},
-        'PARTICIPANT',
-        ${contestant.contingent.name},
-        ${null},
-        ${contestant.ic || null},
-        ${null},
-        ${null},
-        ${uniqueCode},
-        ${serialNumber},
-        'DRAFT',
-        NOW(),
-        NOW(),
-        ${createdByUserId}
-      )
-    `;
-
-    // Get the created certificate
-    const certificateResult = await prisma.$queryRaw`
+    // Check if certificate already exists for this IC number + template
+    const existingCertResult = await prisma.$queryRaw`
       SELECT * FROM certificate 
-      WHERE uniqueCode = ${uniqueCode}
+      WHERE ic_number = ${contestant.ic}
+        AND templateId = ${template.id}
       LIMIT 1
     ` as any[];
     
-    const certificate = certificateResult[0];
-    console.log('Certificate created:', {
-      id: certificate.id,
-      recipientName: certificate.recipientName,
-      contingentName: certificate.contingent_name,
-      uniqueCode: certificate.uniqueCode,
-      serialNumber: certificate.serialNumber
-    });
+    let certificate;
+    let isUpdate = false;
+    
+    if (existingCertResult.length > 0) {
+      // Certificate exists - update it
+      certificate = existingCertResult[0];
+      isUpdate = true;
+      
+      console.log('Certificate already exists for IC:', contestant.ic);
+      console.log('Updating existing certificate:', {
+        id: certificate.id,
+        uniqueCode: certificate.uniqueCode,
+        serialNumber: certificate.serialNumber
+      });
+      
+      // Update certificate details (keeping uniqueCode and serialNumber)
+      await prisma.$executeRaw`
+        UPDATE certificate 
+        SET recipientName = ${contestant.name},
+            contingent_name = ${contestant.contingent.name},
+            recipientType = 'PARTICIPANT',
+            status = 'DRAFT',
+            updatedAt = NOW()
+        WHERE id = ${certificate.id}
+      `;
+      
+      console.log('Certificate updated successfully');
+    } else {
+      // Certificate doesn't exist - create new one
+      console.log('Creating new certificate for IC:', contestant.ic);
+      
+      // Generate unique code (same format as organizer certificates)
+      const uniqueCode = `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+      console.log('Generated uniqueCode:', uniqueCode);
+
+      // Generate serial number using CertificateSerialService
+      console.log('Generating serial number...');
+      const serialNumber = await CertificateSerialService.generateSerialNumber(
+        template.id,
+        'GENERAL',
+        new Date().getFullYear()
+      );
+      console.log('Generated serialNumber:', serialNumber);
+
+      // Handle createdBy for participant-generated certificates
+      const createdByUserId = null; // NULL for participant-generated certificates
+      
+      console.log('Participant-generated certificate (createdBy: NULL)');
+
+      // Create certificate record using raw SQL
+      await prisma.$executeRaw`
+        INSERT INTO certificate 
+        (templateId, recipientName, recipientEmail, recipientType, 
+         contingent_name, team_name, ic_number, contestName, awardTitle,
+         uniqueCode, serialNumber, status, createdAt, updatedAt, createdBy)
+        VALUES (
+          ${template.id},
+          ${contestant.name},
+          ${null},
+          'PARTICIPANT',
+          ${contestant.contingent.name},
+          ${null},
+          ${contestant.ic || null},
+          ${null},
+          ${null},
+          ${uniqueCode},
+          ${serialNumber},
+          'DRAFT',
+          NOW(),
+          NOW(),
+          ${createdByUserId}
+        )
+      `;
+
+      // Get the created certificate
+      const certificateResult = await prisma.$queryRaw`
+        SELECT * FROM certificate 
+        WHERE uniqueCode = ${uniqueCode}
+        LIMIT 1
+      ` as any[];
+      
+      certificate = certificateResult[0];
+      console.log('Certificate created:', {
+        id: certificate.id,
+        recipientName: certificate.recipientName,
+        contingentName: certificate.contingent_name,
+        uniqueCode: certificate.uniqueCode,
+        serialNumber: certificate.serialNumber
+      });
+    }
+
+    // Extract values from certificate for PDF generation
+    const uniqueCode = certificate.uniqueCode;
+    const serialNumber = certificate.serialNumber;
+    console.log(`Certificate ${isUpdate ? 'updated' : 'created'} - uniqueCode: ${uniqueCode}, serialNumber: ${serialNumber}`);
 
     // Generate PDF
     console.log('Starting PDF generation...');
@@ -306,7 +343,10 @@ export async function POST(
         filePath,
         status: 'READY'
       },
-      message: 'Certificate generated successfully'
+      isUpdate,
+      message: isUpdate 
+        ? 'Certificate updated and regenerated successfully' 
+        : 'Certificate generated successfully'
     });
 
   } catch (error: any) {

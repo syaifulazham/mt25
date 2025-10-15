@@ -1280,8 +1280,8 @@ model Certificate {
   issuedAt       DateTime?    @db.DateTime(0)
   createdAt      DateTime     @default(now()) @db.DateTime(0)
   updatedAt      DateTime     @default(now()) @updatedAt @db.DateTime(0)
-  createdBy      Int
-  creator        user         @relation("CreatedCertificates", fields: [createdBy], references: [id], map: "fk_certificate_createdBy")
+  createdBy      Int?
+  creator        user?        @relation("CreatedCertificates", fields: [createdBy], references: [id], map: "fk_certificate_createdBy")
   template       CertTemplate @relation(fields: [templateId], references: [id], map: "fk_certificate_templateId")
 
   @@index([templateId], map: "idx_certificate_templateId")
