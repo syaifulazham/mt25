@@ -212,7 +212,7 @@ export function PreviewModal({
                 {/* PDF Background */}
                 {pdfUrl && (
                   <iframe
-                    src={`${pdfUrl}#pagemode=none&sidebar=0&navpanes=0&scrollbar=0`}
+                    src={`/api/certificates/serve-pdf?path=${encodeURIComponent(pdfUrl)}#pagemode=none&sidebar=0&navpanes=0&scrollbar=0`}
                     className="absolute inset-0 w-full h-full"
                     style={{ pointerEvents: 'none', width: '100%' }}
                   />

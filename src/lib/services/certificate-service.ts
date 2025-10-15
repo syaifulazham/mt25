@@ -117,8 +117,9 @@ export class TemplateService {
       data: {
         templateName: data.templateName,
         basePdfPath: data.basePdfPath,
-        configuration: data.configuration,
-        status: data.status || 'ACTIVE',
+        configuration: data.configuration as any,
+        // status will use default value 'ACTIVE' from schema
+        // Don't set it explicitly due to FK constraint with certificate_status_enum
         creator: {
           connect: { id: data.createdBy }
         }

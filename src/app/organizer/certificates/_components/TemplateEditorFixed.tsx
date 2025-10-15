@@ -1566,7 +1566,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                   {/* PDF Frame */}
                   <div className="mb-4 border border-gray-300 shadow-sm w-full">
                     <iframe
-                      src={`${pdfUrl.startsWith('/') ? `/uploads/templates/${pdfUrl.split('/').pop()}` : pdfUrl}#pagemode=none&sidebar=0&navpanes=0&scrollbar=0`}
+                      src={`/api/certificates/serve-pdf?path=${encodeURIComponent(pdfUrl)}#pagemode=none&sidebar=0&navpanes=0&scrollbar=0`}
                       className="w-full"
                       style={{ height: `${paperSize.height}px`, width: '100%' }}
                       title="PDF Template"

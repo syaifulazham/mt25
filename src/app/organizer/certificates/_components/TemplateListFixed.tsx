@@ -193,7 +193,7 @@ export function TemplateList({ session }: TemplateListProps) {
                   <div className="bg-gray-100 h-48 flex items-center justify-center">
                     {template.basePdfPath ? (
                       <iframe 
-                        src={`/uploads/templates/${template.basePdfPath.split('/').pop()}`} 
+                        src={`/api/certificates/serve-pdf?path=${encodeURIComponent(template.basePdfPath)}`} 
                         className="w-full h-full" 
                         title={template.templateName}
                       />
