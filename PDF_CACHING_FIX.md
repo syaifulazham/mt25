@@ -1,7 +1,11 @@
-# PDF Upload Caching Issue - Fixed
+# PDF Upload & Generation Caching Issue - Fixed
 
 ## Problem
-After uploading PDF templates at `https://techlympics.my/organizer/certificates/templates/create`, the PDFs were not immediately visible in the template editor. Users had to restart the PM2 server (`pm2 restart mt25`) before the uploaded files became accessible.
+Two scenarios required server restart (`pm2 restart mt25`) to view PDFs:
+
+1. **Template Upload**: After uploading PDF templates at `https://techlympics.my/organizer/certificates/templates/create`, the PDFs were not immediately visible in the template editor.
+
+2. **Certificate Generation**: After generating certificates at `https://techlympics.my/organizer/certificates`, clicking the PDF icon resulted in 404 errors until server restart.
 
 ## Root Cause
 Next.js in production mode aggressively caches static files from the `public` directory. When PDFs are uploaded to `public/uploads/templates/`, Next.js doesn't immediately recognize them because:
@@ -46,22 +50,32 @@ GET /api/certificates/serve-pdf?path=/uploads/templates/filename.pdf
 - Updated template thumbnail previews
 - Shows correct thumbnails for newly created templates
 
+**e) CertificateList.tsx**
+- Updated PDF icon link to use dynamic API route
+- Updated "Download PDF" menu item with proper download handler
+- Updated "Print" menu item with print window handler
+- Ensures generated certificates are immediately viewable/downloadable
+
 ## How It Works
 
 ### Before (Static Serving)
 ```
-Upload PDF → Save to public/uploads/templates/ → Browser requests /uploads/templates/file.pdf
-                                                  → Next.js checks static manifest
-                                                  → File not found (not in build manifest)
-                                                  → 404 error or no display
+Upload/Generate PDF → Save to public/uploads/templates/ or public/uploads/certificates/
+                   → Browser requests /uploads/.../file.pdf
+                   → Next.js checks static manifest
+                   → File not found (not in build manifest)
+                   → 404 error or no display
+                   → Requires server restart to rebuild manifest
 ```
 
 ### After (Dynamic Serving)
 ```
-Upload PDF → Save to public/uploads/templates/ → Browser requests /api/certificates/serve-pdf?path=...
-                                                  → API reads file from filesystem
-                                                  → Returns PDF directly
-                                                  → Displays immediately ✓
+Upload/Generate PDF → Save to public/uploads/templates/ or public/uploads/certificates/
+                   → Browser requests /api/certificates/serve-pdf?path=...
+                   → API reads file from filesystem
+                   → Returns PDF directly
+                   → Displays immediately ✓
+                   → No server restart needed ✓
 ```
 
 ## Benefits
@@ -89,12 +103,19 @@ These headers ensure:
 
 ## Testing Checklist
 
+### Template Upload
 ✅ Upload new template at `/organizer/certificates/templates/create`
 ✅ View template immediately in editor (no restart)
 ✅ Preview template in preview modal
 ✅ Template thumbnail shows in templates list
 ✅ Edit existing template works
-✅ Generated certificates display correctly
+
+### Certificate Generation
+✅ Generate certificate at `/organizer/certificates`
+✅ Click PDF icon to view certificate immediately (no restart)
+✅ "Download PDF" menu item works
+✅ "Print" menu item works
+✅ Regenerate certificate updates PDF instantly
 ✅ No 404 errors in browser console
 
 ## Security Considerations
@@ -162,6 +183,7 @@ If PDFs still don't load:
 - `/src/app/organizer/certificates/_components/PreviewModal.tsx` (MODIFIED)
 - `/src/app/organizer/certificates/_components/ViewCertificateModal.tsx` (MODIFIED)
 - `/src/app/organizer/certificates/_components/TemplateListFixed.tsx` (MODIFIED)
+- `/src/app/organizer/certificates/_components/CertificateList.tsx` (MODIFIED)
 
 ## Date
 October 15, 2025

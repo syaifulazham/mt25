@@ -362,7 +362,7 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                         <Badge className={statusColor}>{certificate.status}</Badge>
                         {certificate.filePath && (
                           <a
-                            href={certificate.filePath}
+                            href={`/api/certificates/serve-pdf?path=${encodeURIComponent(certificate.filePath)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 cursor-pointer"
@@ -393,10 +393,20 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                             <Eye className="h-4 w-4 mr-2" />
                             View Certificate
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="flex items-center cursor-pointer">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download PDF
-                          </DropdownMenuItem>
+                          {certificate.filePath && (
+                            <DropdownMenuItem 
+                              className="flex items-center cursor-pointer"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = `/api/certificates/serve-pdf?path=${encodeURIComponent(certificate.filePath!)}`;
+                                link.download = `certificate-${certificate.uniqueCode}.pdf`;
+                                link.click();
+                              }}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download PDF
+                            </DropdownMenuItem>
+                          )}
                           {certificate.recipientEmail && certificate.status !== "SENT" && canManageCertificates && (
                             <DropdownMenuItem 
                               className="flex items-center cursor-pointer"
@@ -406,10 +416,23 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                               Send by Email
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem className="flex items-center cursor-pointer">
-                            <Printer className="h-4 w-4 mr-2" />
-                            Print
-                          </DropdownMenuItem>
+                          {certificate.filePath && (
+                            <DropdownMenuItem 
+                              className="flex items-center cursor-pointer"
+                              onClick={() => {
+                                const printWindow = window.open(
+                                  `/api/certificates/serve-pdf?path=${encodeURIComponent(certificate.filePath!)}`,
+                                  '_blank'
+                                );
+                                if (printWindow) {
+                                  printWindow.onload = () => printWindow.print();
+                                }
+                              }}
+                            >
+                              <Printer className="h-4 w-4 mr-2" />
+                              Print
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           {canManageCertificates && (
                             <DropdownMenuItem 
