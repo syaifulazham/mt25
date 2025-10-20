@@ -11,6 +11,8 @@ interface Template {
   templateName: string
   basePdfPath: string | null
   status: 'ACTIVE' | 'INACTIVE'
+  targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT'
+  eventId: number | null
   createdAt: string
   updatedAt: string
   creator: {
@@ -26,10 +28,14 @@ interface Template {
 }
 
 interface TemplateListProps {
-  session: Session
+  session: Session | null
+  initialData?: any
+  userSession?: Session | null
 }
 
-export function TemplateList({ session }: TemplateListProps) {
+export function TemplateList({ session, userSession }: TemplateListProps) {
+  // Use userSession if provided (for compatibility), otherwise use session
+  const activeSession = userSession || session
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [templates, setTemplates] = useState<Template[]>([])
@@ -39,8 +45,8 @@ export function TemplateList({ session }: TemplateListProps) {
   const router = useRouter()
 
   // Role-based permissions
-  const isAdmin = session.user.role === 'ADMIN'
-  const canCreateTemplate = ['ADMIN', 'OPERATOR'].includes(session.user.role as string)
+  const isAdmin = activeSession?.user?.role === 'ADMIN'
+  const canCreateTemplate = activeSession?.user?.role && ['ADMIN', 'OPERATOR'].includes(activeSession.user.role as string)
 
   // Fetch templates from API
   useEffect(() => {
@@ -181,8 +187,40 @@ export function TemplateList({ session }: TemplateListProps) {
             {filteredTemplates.map(template => (
               <div key={template.id} className="bg-white shadow-sm rounded-md p-4">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-medium">{template.templateName}</h2>
-                  <div className="flex items-center">
+                  <div>
+                    <h2 className="text-lg font-medium">{template.templateName}</h2>
+                    <p className="text-sm text-gray-600">{template.creator.name}</p>
+                    {template.targetType && (
+                      <span className="inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        {template.targetType.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Generate button for EVENT_PARTICIPANT templates */}
+                    {template.targetType === 'EVENT_PARTICIPANT' && template.eventId && (
+                      <Link
+                        href={`/organizer/certificates/templates/${template.id}/generate`}
+                        className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 inline-flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Generate
+                      </Link>
+                    )}
+                    {/* Manage Winners button for EVENT_WINNER templates */}
+                    {template.targetType === 'EVENT_WINNER' && template.eventId && (
+                      <Link
+                        href={`/organizer/events/${template.eventId}/certificates/winners`}
+                        className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 inline-flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                        </svg>
+                        Manage Winners
+                      </Link>
+                    )}
                     {isAdmin && (
                       <button
                         onClick={() => handleDeleteTemplate(template.id)}
@@ -205,7 +243,6 @@ export function TemplateList({ session }: TemplateListProps) {
                     </button>
                   </div>
                 </div>
-                <p className="text-sm text-gray-600">{template.creator.name}</p>
               </div>
             ))}
           </div>

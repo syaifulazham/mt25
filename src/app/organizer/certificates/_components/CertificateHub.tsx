@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Session } from 'next-auth'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Search, Download, Upload, Filter, FileText, Printer, Mail, UserPlus } from 'lucide-react'
+import { Search, Filter, UserPlus, FileText, PlusCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { CertTemplateList } from './CertTemplateList'
@@ -18,6 +18,8 @@ interface Template {
   templateName: string
   basePdfPath: string | null
   status: 'ACTIVE' | 'INACTIVE'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT'
+  eventId?: number | null
   createdAt: string
   updatedAt: string
   creator: {
@@ -143,37 +145,17 @@ export function CertificateHub({
             <Filter className="w-4 h-4" />
             <span>Filter</span>
           </Button>
-          <Button variant="outline" size="sm" className="h-9 gap-1">
-            <Download className="w-4 h-4" />
-            <span>Export List</span>
-          </Button>
           
           {canManageCertificates && (
-            <>
-              <Button variant="outline" size="sm" className="h-9 gap-1">
-                <Printer className="w-4 h-4" />
-                <span>Batch Print</span>
-              </Button>
-              <Button variant="outline" size="sm" className="h-9 gap-1">
-                <Mail className="w-4 h-4" />
-                <span>Batch Send</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-9 gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                onClick={() => setIsCreateModalOpen(true)}
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Create a Cert</span>
-              </Button>
-              <Button asChild className="h-9 gap-1">
-                <Link href="/organizer/certificates/generate">
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Generate Certificates</span>
-                </Link>
-              </Button>
-            </>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-9 gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Create a Cert</span>
+            </Button>
           )}
         </div>
       </div>
@@ -189,9 +171,9 @@ export function CertificateHub({
             <EmptyState 
               title="No certificates found" 
               description={searchTerm ? `No certificates match '${searchTerm}'` : "No certificates have been generated yet"}
-              buttonText="Generate Certificates"
-              buttonHref="/organizer/certificates/generate"
-              showButton={canManageCertificates}
+              buttonText=""
+              buttonHref=""
+              showButton={false}
             />
           ) : (
             <CertificateList

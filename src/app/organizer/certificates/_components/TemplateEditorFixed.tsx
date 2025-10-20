@@ -269,6 +269,16 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [showPropertiesPanel, setShowPropertiesPanel] = useState(true)
   const [contests, setContests] = useState<Array<{ id: number; name: string; code: string; displayName: string }>>([])
   
+  // Template configuration collapsed state
+  const [isConfigCollapsed, setIsConfigCollapsed] = useState(false)
+  
+  // Prerequisites states
+  const [prerequisites, setPrerequisites] = useState<Array<{prerequisite: string; id: number}>>(
+    template?.prerequisites || []
+  )
+  const [surveys, setSurveys] = useState<Array<{id: number; name: string; description: string | null}>>([])
+  const [showSurveyModal, setShowSurveyModal] = useState(false)
+  
   // Fetch contests for the preview mockup data
   const fetchContests = async () => {
     try {
@@ -318,10 +328,25 @@ function debugElementProps(element: Element, location: string): string | undefin
     }
   }
 
+  // Fetch surveys for prerequisites
+  const fetchSurveys = async () => {
+    try {
+      const response = await fetch('/api/surveys')
+      if (!response.ok) {
+        throw new Error('Failed to fetch surveys')
+      }
+      const data = await response.json()
+      setSurveys(data.surveys || [])
+    } catch (error) {
+      console.error('Error fetching surveys:', error)
+    }
+  }
+
   // Fetch data when component mounts
   useEffect(() => {
     fetchContests()
     fetchEvents()
+    fetchSurveys()
   }, [])
   
   // Handle PDF file selection
@@ -360,6 +385,30 @@ function debugElementProps(element: Element, location: string): string | undefin
     } finally {
       setIsLoading(false)
     }
+  }
+  
+  // Handle adding survey prerequisite
+  const handleAddSurveyPrerequisite = (surveyId: number) => {
+    // Check if already exists
+    const exists = prerequisites.some(p => p.prerequisite === 'survey' && p.id === surveyId)
+    if (exists) {
+      setError('This survey is already added as a prerequisite')
+      setTimeout(() => setError(null), 3000)
+      return
+    }
+    
+    setPrerequisites([...prerequisites, { prerequisite: 'survey', id: surveyId }])
+    setShowSurveyModal(false)
+    setSuccess('Survey prerequisite added')
+    setTimeout(() => setSuccess(null), 2000)
+  }
+  
+  // Handle removing prerequisite
+  const handleRemovePrerequisite = (index: number) => {
+    const updated = prerequisites.filter((_, i) => i !== index)
+    setPrerequisites(updated)
+    setSuccess('Prerequisite removed')
+    setTimeout(() => setSuccess(null), 2000)
   }
   
   // Handle adding a new element
@@ -811,6 +860,8 @@ function debugElementProps(element: Element, location: string): string | undefin
         eventId: targetType === 'GENERAL' ? null : eventId,
         winnerRangeStart: targetType === 'EVENT_WINNER' ? winnerRangeStart : null,
         winnerRangeEnd: targetType === 'EVENT_WINNER' ? winnerRangeEnd : null,
+        // Add prerequisites
+        prerequisites: prerequisites.length > 0 ? prerequisites : null,
         configuration: {
           canvas: {
             width: paperSize.width,
@@ -1209,11 +1260,37 @@ function debugElementProps(element: Element, location: string): string | undefin
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow p-5 border border-gray-200">
-          <h2 className="text-lg font-semibold mb-4">Template Configuration</h2>
-        
-          {/* Template Name */}
-          <div className="mb-4">
+        <div className="bg-white rounded-lg shadow border border-gray-200">
+          {/* Collapsible Header */}
+          <div 
+            className="flex justify-between items-center p-5 cursor-pointer hover:bg-gray-50 transition-colors"
+            onClick={() => setIsConfigCollapsed(!isConfigCollapsed)}
+          >
+            <h2 className="text-lg font-semibold">Template Configuration</h2>
+            <button
+              type="button"
+              className="p-1 rounded-full hover:bg-gray-200 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsConfigCollapsed(!isConfigCollapsed)
+              }}
+            >
+              <svg
+                className={`w-5 h-5 transform transition-transform ${isConfigCollapsed ? '-rotate-90' : 'rotate-0'}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Collapsible Content */}
+          {!isConfigCollapsed && (
+            <div className="px-5 pb-5">
+              {/* Template Name */}
+              <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Template Name
             </label>
@@ -1391,53 +1468,129 @@ function debugElementProps(element: Element, location: string): string | undefin
               </div>
             </CollapsibleSection>
           </div>
+          
+          {/* Survey Prerequisites Configuration */}
+          <div className="mb-4">
+            <CollapsibleSection title="Survey Prerequisites">
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Require participants to complete specific surveys before generating this certificate.
+                </p>
+                
+                {/* Prerequisites Table */}
+                {prerequisites.length > 0 ? (
+                  <div className="border border-gray-200 rounded-md overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            Survey Name
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            Description
+                          </th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                            Action
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {prerequisites.map((prereq, index) => {
+                          const survey = surveys.find(s => s.id === prereq.id)
+                          return (
+                            <tr key={index}>
+                              <td className="px-4 py-2 text-sm text-gray-900">
+                                {survey?.name || `Survey ID: ${prereq.id}`}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-500">
+                                {survey?.description || '-'}
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePrerequisite(index)}
+                                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                  disabled={isLoading}
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 bg-gray-50 rounded-md border border-gray-200">
+                    <p className="text-sm text-gray-500">No survey prerequisites configured</p>
+                  </div>
+                )}
+                
+                {/* Add Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowSurveyModal(true)}
+                  className="w-full px-4 py-2 border border-blue-300 text-blue-700 rounded-md hover:bg-blue-50 font-medium"
+                  disabled={isLoading}
+                >
+                  + Add Survey Prerequisite
+                </button>
+              </div>
+            </CollapsibleSection>
+          </div>
+          
+          {/* PDF Upload Section */}
+          <div className="mb-4">
+            <CollapsibleSection title={isNew ? 'Upload PDF Template' : 'Replace PDF Template (Optional)'}>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                <div className="space-y-1 text-center">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-400"
+                    stroke="currentColor"
+                    fill="none"
+                    viewBox="0 0 48 48"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <div className="flex text-sm text-gray-600">
+                    <label
+                      htmlFor="file-upload"
+                      className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                    >
+                      <span>{isNew ? 'Upload a PDF file' : 'Replace PDF'}</span>
+                      <input
+                        id="file-upload"
+                        name="file-upload"
+                        type="file"
+                        className="sr-only"
+                        accept=".pdf,application/pdf"
+                        onChange={handlePdfUpload}
+                        disabled={isLoading}
+                      />
+                    </label>
+                    <p className="pl-1">or drag and drop</p>
+                  </div>
+                  <p className="text-xs text-gray-500">PDF up to 10MB</p>
+                </div>
+              </div>
+              {pdfUrl && (
+                <div className="mt-3 text-sm text-gray-600">
+                  <p className="font-medium">Current PDF: <span className="text-blue-600">{pdfUrl.split('/').pop()}</span></p>
+                </div>
+              )}
+            </CollapsibleSection>
+          </div>
+            </div>
+          )}
         </div>
       )}
-      
-      
-      {/* PDF Upload */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {isNew ? 'Upload PDF Template' : 'Replace PDF Template (Optional)'}
-        </label>
-        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-          <div className="space-y-1 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              stroke="currentColor"
-              fill="none"
-              viewBox="0 0 48 48"
-              aria-hidden="true"
-            >
-              <path
-                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div className="flex text-sm text-gray-600">
-              <label
-                htmlFor="file-upload"
-                className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-              >
-                <span>{isNew ? 'Upload a PDF file' : 'Replace PDF'}</span>
-                <input
-                  id="file-upload"
-                  name="file-upload"
-                  type="file"
-                  className="sr-only"
-                  accept=".pdf,application/pdf"
-                  onChange={handlePdfUpload}
-                  disabled={isLoading}
-                />
-              </label>
-              <p className="pl-1">or drag and drop</p>
-            </div>
-            <p className="text-xs text-gray-500">PDF up to 10MB</p>
-          </div>
-        </div>
-      </div>
       
       {/* PDF Preview & Editor */}
       {pdfUrl && (
@@ -2124,6 +2277,71 @@ function debugElementProps(element: Element, location: string): string | undefin
           elements={elements}
           selectedElementId={selectedElement?.id || null}
         />
+      )}
+      
+      {/* Survey Selection Modal */}
+      {showSurveyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Add Survey Prerequisite</h3>
+              <p className="text-sm text-gray-500 mt-1">Select a survey that participants must complete</p>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {surveys.length > 0 ? (
+                <div className="space-y-2">
+                  {surveys.map((survey) => {
+                    const isAdded = prerequisites.some(p => p.prerequisite === 'survey' && p.id === survey.id)
+                    return (
+                      <div
+                        key={survey.id}
+                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                          isAdded
+                            ? 'bg-gray-50 border-gray-300 cursor-not-allowed'
+                            : 'border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                        }`}
+                        onClick={() => !isAdded && handleAddSurveyPrerequisite(survey.id)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">{survey.name}</h4>
+                            {survey.description && (
+                              <p className="text-sm text-gray-500 mt-1">{survey.description}</p>
+                            )}
+                          </div>
+                          {isAdded && (
+                            <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                              Added
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No surveys available</p>
+                  <p className="text-sm text-gray-400 mt-1">Create surveys first to add them as prerequisites</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowSurveyModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </div>
     </div>

@@ -2238,10 +2238,15 @@ export default function AttendancePage() {
           <CardContent>
             <p>Access detailed scoring information and contest results</p>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-2">
             <Link href={`/organizer/events/${eventId}/judging/scoreboard`} className="w-full">
               <Button className="w-full">
                 View Scorecard
+              </Button>
+            </Link>
+            <Link href={`/organizer/events/${eventId}/certificates/winners`} className="w-full">
+              <Button variant="outline" className="w-full">
+                Manage Winners & Certificates
               </Button>
             </Link>
           </CardFooter>

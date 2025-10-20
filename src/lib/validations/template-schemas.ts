@@ -68,6 +68,12 @@ export const templateQuerySchema = z.object({
 // Target audience type enum
 export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT'])
 
+// Prerequisite schema
+const prerequisiteSchema = z.object({
+  prerequisite: z.string(),
+  id: z.number().int().positive()
+})
+
 // Template creation schema
 export const templateCreateSchema = z.object({
   templateName: z.string().min(1, 'Template name is required').max(255, 'Template name cannot exceed 255 characters'),
@@ -78,6 +84,8 @@ export const templateCreateSchema = z.object({
   eventId: z.number().int().positive().nullable().optional(),
   winnerRangeStart: z.number().int().min(1).nullable().optional(),
   winnerRangeEnd: z.number().int().min(1).nullable().optional(),
+  // Prerequisites field
+  prerequisites: z.array(prerequisiteSchema).nullable().optional(),
   createdBy: z.number().optional(), // Added by the API route from the session
 })
 
@@ -92,6 +100,8 @@ export const templateUpdateSchema = z.object({
   eventId: z.number().int().positive().nullable().optional(),
   winnerRangeStart: z.number().int().min(1).nullable().optional(),
   winnerRangeEnd: z.number().int().min(1).nullable().optional(),
+  // Prerequisites field
+  prerequisites: z.array(prerequisiteSchema).nullable().optional(),
   updatedBy: z.number().optional(), // Added by the API route from the session
 })
 

@@ -1,5 +1,11 @@
-import { PrismaClient, CertificateStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { prismaExecute } from "@/lib/prisma"
+
+// Prerequisite type
+type Prerequisite = {
+  prerequisite: string
+  id: number
+}
 
 // Template query params type
 export type TemplateQueryParams = {
@@ -19,6 +25,8 @@ export type TemplateCreateParams = {
   eventId?: number | null
   winnerRangeStart?: number | null
   winnerRangeEnd?: number | null
+  // Prerequisites field
+  prerequisites?: Prerequisite[] | null
   createdBy: number
 }
 
@@ -32,6 +40,8 @@ export type TemplateUpdateParams = {
   eventId?: number | null
   winnerRangeStart?: number | null
   winnerRangeEnd?: number | null
+  // Prerequisites field
+  prerequisites?: Prerequisite[] | null
   updatedBy: number
 }
 
@@ -47,7 +57,7 @@ export const TemplateService = {
     const page = params.page ? parseInt(String(params.page)) : 1
     const pageSize = params.pageSize ? parseInt(String(params.pageSize)) : 10
     const search = params.search || ''
-    const status = params.status as CertificateStatus | undefined
+    const status = params.status
 
     // Calculate pagination values
     const skip = (page - 1) * pageSize
@@ -131,6 +141,12 @@ export const TemplateService = {
               name: true,
               username: true,
             }
+          },
+          event: {
+            select: {
+              id: true,
+              name: true,
+            }
           }
         }
       })
@@ -153,6 +169,8 @@ export const TemplateService = {
           eventId: data.eventId || null,
           winnerRangeStart: data.winnerRangeStart || null,
           winnerRangeEnd: data.winnerRangeEnd || null,
+          // Prerequisites field
+          prerequisites: data.prerequisites || null,
           createdBy: data.createdBy,
         },
         include: {
@@ -193,6 +211,8 @@ export const TemplateService = {
           ...(typeof data.eventId !== 'undefined' && { eventId: data.eventId }),
           ...(typeof data.winnerRangeStart !== 'undefined' && { winnerRangeStart: data.winnerRangeStart }),
           ...(typeof data.winnerRangeEnd !== 'undefined' && { winnerRangeEnd: data.winnerRangeEnd }),
+          // Prerequisites field
+          ...(typeof data.prerequisites !== 'undefined' && { prerequisites: data.prerequisites }),
           updatedBy: data.updatedBy,
         },
         include: {

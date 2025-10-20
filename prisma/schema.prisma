@@ -1245,6 +1245,7 @@ model CertTemplate {
   eventId                 Int?
   winnerRangeStart        Int?
   winnerRangeEnd          Int?
+  prerequisites           Json?
   creator                 user                    @relation("CreatedTemplates", fields: [createdBy], references: [id], map: "fk_cert_template_createdBy")
   event                   event?                  @relation(fields: [eventId], references: [id], map: "fk_cert_template_event")
   certificate_status_enum certificate_status_enum @relation(fields: [status], references: [value], map: "fk_cert_template_status")
@@ -1280,6 +1281,7 @@ model Certificate {
   issuedAt       DateTime?    @db.DateTime(0)
   createdAt      DateTime     @default(now()) @db.DateTime(0)
   updatedAt      DateTime     @default(now()) @updatedAt @db.DateTime(0)
+  ownership      Json?
   createdBy      Int?
   creator        user?        @relation("CreatedCertificates", fields: [createdBy], references: [id], map: "fk_certificate_createdBy")
   template       CertTemplate @relation(fields: [templateId], references: [id], map: "fk_certificate_templateId")
