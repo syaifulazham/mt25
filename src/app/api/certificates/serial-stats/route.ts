@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/auth-options';
 import { CertificateSerialService } from '@/lib/services/certificate-serial-service';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 // Allowed roles for viewing serial number statistics
 const ALLOWED_ROLES = ['ADMIN', 'OPERATOR'];
 

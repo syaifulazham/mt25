@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/auth-options'
 import { prisma } from '@/lib/prisma'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 const ALLOWED_ROLES = ['ADMIN', 'OPERATOR']
 
 export async function GET(request: NextRequest) {
