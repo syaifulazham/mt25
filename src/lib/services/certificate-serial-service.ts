@@ -18,7 +18,7 @@ export class CertificateSerialService {
 
   /**
    * Generate next serial number for a certificate
-   * Format: MT25/GEN/000001
+   * Format: MT25/GEN/T5/000001 (includes template ID)
    * 
    * Uses database transaction to ensure uniqueness and prevent race conditions
    * 
@@ -73,10 +73,10 @@ export class CertificateSerialService {
         `;
       }
 
-      // Format: MT25/GEN/000001
+      // Format: MT25/GEN/T5/000001 (includes template ID)
       const yearShort = String(year).slice(-2); // Last 2 digits of year
       const paddedSequence = String(nextSequence).padStart(6, '0');
-      return `${this.PREFIX}${yearShort}/${typeCode}/${paddedSequence}`;
+      return `${this.PREFIX}${yearShort}/${typeCode}/T${templateId}/${paddedSequence}`;
     });
   }
 
@@ -162,8 +162,8 @@ export class CertificateSerialService {
    * @returns boolean - True if valid format
    */
   static validateSerialNumber(serialNumber: string): boolean {
-    // Format: MT25/GEN/000001
-    const pattern = new RegExp(`^${this.PREFIX}\\d{2}/(GEN|PART|WIN|NCP)/\\d{6}$`);
+    // Format: MT25/GEN/T5/000001 (includes template ID)
+    const pattern = new RegExp(`^${this.PREFIX}\\d{2}/(GEN|PART|WIN|NCP)/T\\d+/\\d{6}$`);
     return pattern.test(serialNumber);
   }
 
@@ -174,9 +174,9 @@ export class CertificateSerialService {
    * @returns object | null - Parsed components or null if invalid
    */
   static parseSerialNumber(serialNumber: string) {
-    // Format: MT25/GEN/000001
+    // Format: MT25/GEN/T5/000001 (includes template ID)
     const parts = serialNumber.split('/');
-    if (parts.length !== 3) return null;
+    if (parts.length !== 4) return null;
 
     // Extract prefix and year from first part (e.g., "MT25")
     const prefixYear = parts[0];
@@ -184,15 +184,20 @@ export class CertificateSerialService {
     const yearShort = prefixYear.slice(-2); // "25"
     const fullYear = 2000 + parseInt(yearShort); // 2025
 
-    const sequence = parseInt(parts[2]);
+    // Extract template ID from third part (e.g., "T5" -> 5)
+    const templateIdPart = parts[2];
+    const templateId = templateIdPart.startsWith('T') ? parseInt(templateIdPart.slice(1)) : null;
 
-    if (isNaN(fullYear) || isNaN(sequence)) return null;
+    const sequence = parseInt(parts[3]);
+
+    if (isNaN(fullYear) || isNaN(sequence) || templateId === null || isNaN(templateId)) return null;
 
     return {
       prefix: prefix,
       year: fullYear,
       yearShort: yearShort,
       typeCode: parts[1],
+      templateId: templateId,
       sequence: sequence
     };
   }
@@ -280,6 +285,6 @@ export class CertificateSerialService {
     
     const yearShort = String(year).slice(-2);
     const paddedSequence = String(nextSequence).padStart(6, '0');
-    return `${this.PREFIX}${yearShort}/${typeCode}/${paddedSequence}`;
+    return `${this.PREFIX}${yearShort}/${typeCode}/T${templateId}/${paddedSequence}`;
   }
 }
