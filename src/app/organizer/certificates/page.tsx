@@ -26,9 +26,10 @@ export default async function CertificatesPage() {
   }
 
   // Fetch initial data from database
+  // Fetch all templates since we do client-side pagination
   const templatesResult = await TemplateService.listTemplates({
     page: 1,
-    limit: 6,
+    limit: 1000,
     status: 'ACTIVE'
   });
 
