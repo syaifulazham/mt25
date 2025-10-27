@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/auth-options'
 import prisma from '@/lib/prisma'
 import { generateCertificatePDF } from '@/lib/certificate-generator'
+import { CertificateSerialService } from '@/lib/services/certificate-serial-service'
 
 const ALLOWED_ROLES = ['ADMIN', 'OPERATOR']
 
@@ -127,26 +128,9 @@ export async function POST(
 
     for (const member of members) {
       try {
-        // Generate unique code and serial number
+        // Generate unique code
         const uniqueCode = `WINNER-${eventId}-${contestId}-${member.contestantId}-${Date.now()}`
         
-        // Get last serial number for this template
-        const lastCert = await prisma.certificate.findFirst({
-          where: { templateId: template.id },
-          orderBy: { serialNumber: 'desc' },
-          select: { serialNumber: true }
-        })
-
-        let serialNumber = 'MT25/WIN/000001'
-        if (lastCert?.serialNumber) {
-          const match = lastCert.serialNumber.match(/\/(\d+)$/)
-          if (match) {
-            const lastNum = parseInt(match[1])
-            const nextNum = (lastNum + 1).toString().padStart(6, '0')
-            serialNumber = `MT25/WIN/${nextNum}`
-          }
-        }
-
         // Check if certificate already exists
         const existingCert = await prisma.certificate.findFirst({
           where: {
@@ -156,9 +140,18 @@ export async function POST(
           }
         })
 
-        // If exists, use existing serial number; otherwise generate new one
+        // Generate or reuse serial number
+        let serialNumber: string
         if (existingCert && existingCert.serialNumber) {
+          // Use existing serial number
           serialNumber = existingCert.serialNumber
+        } else {
+          // Generate new serial number using the service (includes template ID)
+          serialNumber = await CertificateSerialService.generateSerialNumber(
+            template.id,
+            'EVENT_WINNER',
+            new Date().getFullYear()
+          )
         }
 
         // Generate PDF
