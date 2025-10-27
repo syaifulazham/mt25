@@ -150,13 +150,13 @@ export default function AssignContestsModal({
   return (
     <>
       <Button 
-        variant="outline" 
-        size="sm"
-        className="h-8 px-2 text-xs"
+        variant="ghost" 
+        size="icon"
+        className="h-8 w-8"
         onClick={() => handleOpenChange(true)}
+        title={t('contestant.contests.assign_button')}
       >
-        <Award className="mr-1 h-3 w-3" />
-        {t('contestant.contests.assign_button')}
+        <Award className="h-4 w-4" />
       </Button>
       
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>

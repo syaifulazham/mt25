@@ -33,10 +33,14 @@ import {
   AlertTriangle,
   X,
   LayoutGrid,
-  Award
+  Award,
+  Eye,
+  MoreVertical
 } from "lucide-react";
 import Link from "next/link";
 import EditContestantModal from "./_components/edit-contestant-modal";
+import ViewContestantModal from "./_components/view-contestant-modal";
+import ViewCertificateModal from "./_components/view-certificate-modal";
 import ContestantsFilters from "./_components/contestants-filters";
 import Pagination from "./_components/pagination";
 import BulkAssignContests from "./_components/bulk-assign-contests";
@@ -525,82 +529,67 @@ export default function ContestantsPage() {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end items-center space-x-1">
-                  {/* All actions moved to dropdown menu to avoid duplication */}
+                  {/* View Contestant Details Button */}
+                  <ViewContestantModal contestant={contestant} />
+                  
+                  {/* View Certificate Button - Only show if certificate exists */}
+                  {contestant.hasCertificate && (
+                    <ViewCertificateModal 
+                      contestantId={contestant.id}
+                      contestantName={contestant.name}
+                    />
+                  )}
+                  
+                  {/* Edit Contestant Button */}
+                  <EditContestantModal 
+                    contestant={contestant} 
+                    onUpdate={(updatedContestant) => {
+                      setContestants(prev => 
+                        prev.map(c => c.id === updatedContestant.id ? updatedContestant : c)
+                      );
+                    }} 
+                  />
+                  
+                  {/* Assign Contests Button */}
+                  <AssignContestsModal
+                    contestantId={contestant.id}
+                    contestantName={contestant.name}
+                    onSuccess={() => fetchContestants(currentPage)}
+                  />
+                  
+                  {/* More Actions Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4"
-                        >
-                          <circle cx="12" cy="12" r="1" />
-                          <circle cx="12" cy="5" r="1" />
-                          <circle cx="12" cy="19" r="1" />
-                        </svg>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>{t('contestant.actions')}</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => {}}>
-                      <Link href={`/participants/contingents/${contestant.contingentId}`} className="flex items-center w-full">
-                        <Pencil className="h-4 w-4 mr-2" /> {t('contestant.view')} Contingent
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onSelect={(e) => e.preventDefault()}
-                      className="flex items-center"
-                    >
-                      <EditContestantModal 
-                        contestant={contestant} 
-                        onUpdate={(updatedContestant) => {
-                          // Update the contestant in the local state
-                          setContestants(prev => 
-                            prev.map(c => c.id === updatedContestant.id ? updatedContestant : c)
-                          );
-                        }} 
-                      />
-                      <span className="ml-2">{t('contestant.edit_contestant')}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                      <AssignContestsModal
-                        contestantId={contestant.id}
-                        contestantName={contestant.name}
-                        onSuccess={() => fetchContestants(currentPage)}
-                      />
-                    </DropdownMenuItem>
-                    
-                    {/* Only show Generate Certificate when cert=enabled in URL */}
-                    {isCertificateEnabled && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-green-600"
-                          onClick={() => handleGenerateCertificate(contestant.id)}
-                          disabled={generatingCertificateId === contestant.id}
-                        >
-                          <Award className="h-4 w-4 mr-2" />
-                          {generatingCertificateId === contestant.id ? 'Generating...' : 'Generate Certificate'}
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-red-600"
-                      onClick={() => openDeleteDialog(contestant.id, contestant.name)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" /> {t('contestant.delete')}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>{t('contestant.actions')}</DropdownMenuLabel>
+                      
+                      {/* Only show Generate Certificate when cert=enabled in URL */}
+                      {isCertificateEnabled && (
+                        <>
+                          <DropdownMenuItem
+                            className="text-green-600"
+                            onClick={() => handleGenerateCertificate(contestant.id)}
+                            disabled={generatingCertificateId === contestant.id}
+                          >
+                            <Award className="h-4 w-4 mr-2" />
+                            {generatingCertificateId === contestant.id ? 'Generating...' : 'Generate Certificate'}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      
+                      <DropdownMenuItem
+                        className="text-red-600"
+                        onClick={() => openDeleteDialog(contestant.id, contestant.name)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> {t('contestant.delete')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </TableCell>
             </TableRow>

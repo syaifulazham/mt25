@@ -226,10 +226,15 @@ export async function POST(
       // Remove {{ and }} from placeholder if present
       const cleanKey = key.replace(/^\{\{|\}\}$/g, '').trim();
       
+      // Helper function to remove 'contingent' word from contingent name
+      const cleanContingentName = (name: string): string => {
+        return name.replace(/\bcontingent\b/gi, '').trim();
+      };
+      
       const dataMap: Record<string, string> = {
         'recipient_name': contestant.name,
         'ic_number': contestant.ic || '',
-        'contingent_name': contestant.contingent.name,
+        'contingent_name': cleanContingentName(contestant.contingent.name),
         'institution_name': institutionName,
         'issue_date': new Date().toLocaleDateString(),
         'unique_code': uniqueCode,

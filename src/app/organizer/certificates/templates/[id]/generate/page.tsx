@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Eye, X } from 'lucide-react'
 
 interface Contestant {
   id: number
@@ -45,6 +46,8 @@ export default function BulkGeneratePage() {
     success: number[]
     failed: Array<{ id: number; error: string }>
   }>({ success: [], failed: [] })
+  const [viewCertificateId, setViewCertificateId] = useState<number | null>(null)
+  const [showViewModal, setShowViewModal] = useState(false)
 
   // Fetch template and contestants
   useEffect(() => {
@@ -325,12 +328,15 @@ export default function BulkGeneratePage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {contestants.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                   No contestants with attendance status "Present" found for this event.
                 </td>
               </tr>
@@ -405,6 +411,21 @@ export default function BulkGeneratePage() {
                         </span>
                       )}
                     </td>
+                    <td className="px-6 py-4">
+                      {contestant.certificateStatus === 'Generated' && contestant.certificateId && (
+                        <button
+                          onClick={() => {
+                            setViewCertificateId(contestant.certificateId!)
+                            setShowViewModal(true)
+                          }}
+                          className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                          title="View Certificate"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 )
               })
@@ -475,6 +496,59 @@ export default function BulkGeneratePage() {
                   Generate Certificates
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Certificate Modal */}
+      {showViewModal && viewCertificateId && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">View Certificate</h3>
+              <button
+                onClick={() => {
+                  setShowViewModal(false)
+                  setViewCertificateId(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Modal Content - PDF Viewer */}
+            <div className="flex-1 overflow-auto p-4 bg-gray-100">
+              <iframe
+                src={`/api/certificates/${viewCertificateId}/view`}
+                className="w-full h-full min-h-[600px] border-0 rounded"
+                title="Certificate Preview"
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-between items-center p-4 border-t bg-gray-50">
+              <a
+                href={`/api/certificates/${viewCertificateId}/download`}
+                download
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Certificate
+              </a>
+              <button
+                onClick={() => {
+                  setShowViewModal(false)
+                  setViewCertificateId(null)
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

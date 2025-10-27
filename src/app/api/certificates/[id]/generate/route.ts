@@ -116,19 +116,24 @@ export async function POST(
     const replacePlaceholder = (placeholder: string): string => {
       const key = placeholder.replace(/{{|}}/g, '').trim();
       
+      // Helper function to remove 'contingent' word from contingent name
+      const cleanContingentName = (name: string): string => {
+        return name.replace(/\bcontingent\b/gi, '').trim();
+      };
+      
       const dataMap: Record<string, any> = {
-        'recipient_name': certificate.recipientName,
-        'recipient_email': certificate.recipientEmail || '',
-        'award_title': certificate.awardTitle || '',
-        'contingent_name': certificate.contingent_name || '',
-        'team_name': certificate.team_name || '',
-        'ic_number': certificate.ic_number || '',
-        'contest_name': certificate.contestName || '',
+        'recipient_name': certificate.recipientName ? certificate.recipientName.toUpperCase() : '',
+        'recipient_email': certificate.recipientEmail ? certificate.recipientEmail.toUpperCase() : '',
+        'award_title': certificate.awardTitle ? certificate.awardTitle.toUpperCase() : '',
+        'contingent_name': certificate.contingent_name ? cleanContingentName(certificate.contingent_name).toUpperCase() : '',
+        'team_name': certificate.team_name ? certificate.team_name.toUpperCase() : '',
+        'ic_number': certificate.ic_number ? certificate.ic_number.toUpperCase() : '',
+        'contest_name': certificate.contestName ? certificate.contestName.toUpperCase() : '',
         'issue_date': certificate.issuedAt 
-          ? new Date(certificate.issuedAt).toLocaleDateString() 
-          : new Date().toLocaleDateString(),
-        'unique_code': certificate.uniqueCode || '',
-        'serial_number': (certificate as any).serialNumber || ''
+          ? new Date(certificate.issuedAt).toLocaleDateString().toUpperCase() 
+          : new Date().toLocaleDateString().toUpperCase(),
+        'unique_code': certificate.uniqueCode ? certificate.uniqueCode.toUpperCase() : '',
+        'serial_number': (certificate as any).serialNumber ? (certificate as any).serialNumber.toUpperCase() : ''
       };
 
       return dataMap[key] || '';

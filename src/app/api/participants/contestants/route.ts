@@ -182,9 +182,32 @@ export async function GET(request: NextRequest) {
         }
       }));
       
+      // Check certificate status for each contestant
+      const contestantsWithCertStatus = await Promise.all(
+        contestants.map(async (contestant) => {
+          if (!contestant.ic) {
+            return { ...contestant, hasCertificate: false };
+          }
+          
+          // Check if certificate exists for this IC
+          const certCount: any = await prismaExecute(prisma => prisma.$queryRaw`
+            SELECT COUNT(*) as count
+            FROM certificate c
+            LEFT JOIN cert_template t ON c.templateId = t.id
+            WHERE c.ic_number = ${contestant.ic}
+              AND t.targetType = 'GENERAL'
+              AND c.status IN ('READY', 'ISSUED')
+          `);
+          
+          const hasCertificate = (certCount && certCount[0]?.count > 0) || false;
+          
+          return { ...contestant, hasCertificate };
+        })
+      );
+      
       // Return contestants with pagination metadata
       return NextResponse.json({
-        data: contestants,
+        data: contestantsWithCertStatus,
         pagination: {
           total: totalCount,
           page,

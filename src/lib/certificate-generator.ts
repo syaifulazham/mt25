@@ -82,18 +82,23 @@ export async function generateCertificatePDF(options: {
   const replacePlaceholder = (placeholder: string): string => {
     const key = placeholder.replace(/{{|}}/g, '').trim();
     
+    // Helper function to remove 'contingent' word from contingent name
+    const cleanContingentName = (name: string): string => {
+      return name.replace(/\bcontingent\b/gi, '').trim();
+    };
+    
     const dataMap: Record<string, any> = {
-      'recipient_name': data.recipient_name || '',
-      'recipient_email': data.recipient_email || '',
-      'award_title': data.award_title || '',
-      'contingent_name': data.contingent_name || '',
-      'team_name': data.team_name || '',
-      'ic_number': data.ic_number || '',
-      'contest_name': data.contest_name || '',
-      'issue_date': data.issue_date || new Date().toLocaleDateString(),
-      'unique_code': data.unique_code || '',
-      'serial_number': data.serial_number || '',
-      'institution_name': data.institution_name || ''
+      'recipient_name': data.recipient_name ? data.recipient_name.toUpperCase() : '',
+      'recipient_email': data.recipient_email ? data.recipient_email.toUpperCase() : '',
+      'award_title': data.award_title ? data.award_title.toUpperCase() : '',
+      'contingent_name': data.contingent_name ? cleanContingentName(data.contingent_name).toUpperCase() : '',
+      'team_name': data.team_name ? data.team_name.toUpperCase() : '',
+      'ic_number': data.ic_number ? data.ic_number.toUpperCase() : '',
+      'contest_name': data.contest_name ? data.contest_name.toUpperCase() : '',
+      'issue_date': data.issue_date ? data.issue_date.toUpperCase() : new Date().toLocaleDateString().toUpperCase(),
+      'unique_code': data.unique_code ? data.unique_code.toUpperCase() : '',
+      'serial_number': data.serial_number ? data.serial_number.toUpperCase() : '',
+      'institution_name': data.institution_name ? data.institution_name.toUpperCase() : ''
     };
 
     return dataMap[key] || '';

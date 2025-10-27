@@ -124,9 +124,8 @@ export default function EditContestantModal({ contestant, onUpdate }: EditContes
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+        <Button variant="ghost" size="icon" className="h-8 w-8" title={t('contestant.edit.edit_button')}>
           <Pencil className="h-4 w-4" />
-          <span className="sr-only">{t('contestant.edit.edit_button')}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">

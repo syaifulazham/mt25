@@ -13,6 +13,7 @@ export interface Contestant {
   contingentId: number;
   status: string;
   is_ppki: boolean;
+  hasCertificate?: boolean;
   updatedBy?: string;
   createdAt?: string;
   updatedAt?: string;
