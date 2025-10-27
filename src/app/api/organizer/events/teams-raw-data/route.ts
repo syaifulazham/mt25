@@ -7,6 +7,9 @@ import { prismaExecute } from '@/lib/prisma';
  * GET /api/organizer/events/teams-raw-data
  * Returns raw team-level data with filtering options
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   console.log('[teams-raw-data] API request received:', request.nextUrl.toString());
   

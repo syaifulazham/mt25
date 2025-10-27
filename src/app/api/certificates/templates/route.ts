@@ -7,6 +7,9 @@ import { templateQuerySchema, templateCreateSchema } from '@/lib/validations/tem
 // Allowed roles for certificate templates management
 const ALLOWED_ROLES = ['ADMIN', 'OPERATOR']
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user using NextAuth

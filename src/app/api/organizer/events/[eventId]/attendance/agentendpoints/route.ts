@@ -15,6 +15,9 @@ function generatePasscode(length = 6): string {
 }
 
 // GET handler to fetch all attendance agent endpoints for an event
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { eventId: string } }

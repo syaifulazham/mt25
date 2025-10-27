@@ -6,6 +6,9 @@ import { join } from "path";
 import { writeFile, mkdir } from "fs/promises";
 
 // GET handler - Get a specific contingent by ID
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

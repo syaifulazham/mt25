@@ -9,6 +9,9 @@ const prisma = new PrismaClient();
  * GET /api/participants/contestants/[id]/certificate
  * Get certificate for a contestant
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

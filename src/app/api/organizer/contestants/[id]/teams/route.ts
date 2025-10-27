@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 // GET /api/organizer/contestants/[id]/teams
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }

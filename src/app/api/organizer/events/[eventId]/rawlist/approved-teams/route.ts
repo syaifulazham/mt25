@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import * as XLSX from 'xlsx';
 
 // New endpoint that accepts team IDs from frontend and approves them
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { eventId: string } }

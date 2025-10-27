@@ -4,6 +4,9 @@ import { authOptions } from "@/app/api/auth/auth-options";
 import { prismaExecute } from "@/lib/prisma";
 
 // GET handler - Get a specific contestant by ID
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

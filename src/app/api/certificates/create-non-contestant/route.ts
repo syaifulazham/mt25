@@ -13,6 +13,9 @@ const ALLOWED_ROLES = ['ADMIN', 'OPERATOR'];
  * POST /api/certificates/create-non-contestant
  * Create a certificate for a non-contestant participant
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user using NextAuth

@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 
 // DELETE handler to remove an attendance endpoint
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { eventId: string; id: string } }

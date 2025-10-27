@@ -5,6 +5,9 @@ import * as moodleApi from "@/lib/moodle-api";
 import { NextResponse } from "next/server";
 
 // POST /api/participants/teams/[id]/moodle/join
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }

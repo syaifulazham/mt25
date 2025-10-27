@@ -10,6 +10,9 @@ const ALLOWED_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER'];
  * GET /api/certificates/[id]
  * Get a specific certificate by ID
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

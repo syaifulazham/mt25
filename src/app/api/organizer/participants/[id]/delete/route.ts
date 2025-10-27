@@ -6,6 +6,9 @@ import { Prisma } from "@prisma/client";
 import bcrypt from "bcrypt";
 
 // This API endpoint safely deletes a user_participant by handling all dependencies
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }

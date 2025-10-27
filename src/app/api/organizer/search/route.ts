@@ -6,6 +6,9 @@ import { authOptions } from "@/app/api/auth/auth-options";
 // Define the types for search results
 type SearchResultType = 'contestant' | 'contingent' | 'team' | 'school' | 'participant';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   // Check authentication
   const session = await getServerSession(authOptions);

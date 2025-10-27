@@ -4,6 +4,9 @@ import { authOptions } from "@/app/api/auth/auth-options";
 import prisma from "@/lib/prisma";
 
 // POST handler - Cancel a contingent request
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

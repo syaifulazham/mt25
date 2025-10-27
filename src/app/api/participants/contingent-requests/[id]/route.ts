@@ -10,6 +10,9 @@ const updateRequestSchema = z.object({
 });
 
 // PATCH handler - Update a contingent request (approve/reject)
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

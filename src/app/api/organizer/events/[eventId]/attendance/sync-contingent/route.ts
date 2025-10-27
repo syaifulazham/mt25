@@ -10,6 +10,9 @@ function createHashcode(ic: string, eventId: number, contingentId: number): stri
   return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest, { params }: { params: { eventId: string } }) {
   const now = new Date();
   const eventId = parseInt(params.eventId);

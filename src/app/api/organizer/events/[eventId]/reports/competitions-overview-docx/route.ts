@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, AlignmentType, TextRun, HeadingLevel } from 'docx';
 import { formatNumber } from '@/lib/utils/format';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { eventId: string } }

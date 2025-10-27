@@ -11,6 +11,9 @@ const passwordUpdateSchema = z.object({
 });
 
 // POST /api/participants/teams/[id]/moodle/update-password
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }

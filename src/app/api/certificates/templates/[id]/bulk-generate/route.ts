@@ -5,6 +5,9 @@ import prisma from '@/lib/prisma'
 import { generateCertificatePDF } from '@/lib/certificate-generator'
 import { CertificateSerialService } from '@/lib/services/certificate-serial-service'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

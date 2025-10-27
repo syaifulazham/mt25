@@ -6,6 +6,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/auth-options";
 
 // API to get attendance statistics for dashboard
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: { eventId: string } }

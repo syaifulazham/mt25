@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import * as XLSX from 'xlsx';
 
 // Endpoint that accepts team IDs from frontend and generates Excel without changing status
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { eventId: string } }

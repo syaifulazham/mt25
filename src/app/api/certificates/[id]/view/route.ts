@@ -12,6 +12,9 @@ const ALLOWED_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER']
  * GET /api/certificates/[id]/view
  * View certificate PDF in browser
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

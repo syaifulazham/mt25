@@ -4,6 +4,9 @@ import { authOptions } from "@/app/api/auth/auth-options";
 import prisma from "@/lib/prisma";
 
 // GET handler - Get managers for a specific contingent
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

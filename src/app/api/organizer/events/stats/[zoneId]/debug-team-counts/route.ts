@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma';
 import { Role } from '@prisma/client';
 import { getZoneStatistics } from '@/app/organizer/events/stats/_utils/zone-statistics';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: { zoneId: string } }

@@ -296,6 +296,9 @@ async function fetchEndlistData(eventId: number): Promise<EndlistResponse | null
   }
 }
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: { eventId: string } }

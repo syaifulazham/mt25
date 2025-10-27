@@ -10,6 +10,9 @@ const ALLOWED_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER'];
  * GET /api/certificates
  * List certificates with pagination and filters
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     // Authenticate user using NextAuth

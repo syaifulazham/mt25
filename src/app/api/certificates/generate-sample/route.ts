@@ -13,6 +13,9 @@ const ALLOWED_ROLES = ['ADMIN', 'OPERATOR'];
  * API endpoint to generate a sample certificate with background PDF
  * This performs the generation server-side to avoid browser security restrictions
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user using NextAuth

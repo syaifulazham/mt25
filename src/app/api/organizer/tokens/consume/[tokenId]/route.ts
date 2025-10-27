@@ -4,6 +4,9 @@ import { PrismaClient } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 import { sendTokenEmail } from '@/lib/email-utils';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   req: NextRequest,
   { params }: { params: { tokenId: string } }

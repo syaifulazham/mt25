@@ -5,6 +5,9 @@ import prisma from '@/lib/prisma'
 
 const ALLOWED_ROLES = ['ADMIN', 'OPERATOR']
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

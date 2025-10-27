@@ -4,6 +4,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from '@/lib/prisma';
 
 // API to get contingents with attendance status for manual attendance entry
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { eventId: string } }

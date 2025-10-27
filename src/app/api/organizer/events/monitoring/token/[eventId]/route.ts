@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { PrismaClient } from '@prisma/client';
 import { authOptions } from '@/lib/auth';
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { eventId: string } }

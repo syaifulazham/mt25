@@ -7,6 +7,9 @@ import { prisma } from '@/lib/prisma';
  * GET /api/judging/sessions/[id]
  * Retrieves a specific judging session with all scores
  */
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
