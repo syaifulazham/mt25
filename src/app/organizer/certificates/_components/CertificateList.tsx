@@ -22,7 +22,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Download, Mail, Printer, FileText } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { MoreHorizontal, Eye, Download, Mail, Printer, FileText, Search, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ViewCertificateModal } from './ViewCertificateModal'
 import { EditCertificateModal } from './EditCertificateModal'
@@ -71,6 +79,8 @@ export function CertificateList({ certificates: initialCertificates, pagination:
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedCertificateId, setSelectedCertificateId] = useState<number | null>(null)
   const [generatingCertificateId, setGeneratingCertificateId] = useState<number | null>(null)
+  const [targetTypeFilter, setTargetTypeFilter] = useState<string>('all')
+  const [localSearchTerm, setLocalSearchTerm] = useState('')
   const router = useRouter()
   
   // Role-based permissions
@@ -99,6 +109,8 @@ export function CertificateList({ certificates: initialCertificates, pagination:
         page: currentPage.toString(),
         limit: pagination.limit.toString(),
         ...(searchTerm && { search: searchTerm }),
+        ...(localSearchTerm && { search: localSearchTerm }),
+        ...(targetTypeFilter && targetTypeFilter !== 'all' && { targetType: targetTypeFilter }),
       })
       
       const response = await fetch(`/api/certificates?${queryParams}`)
@@ -149,19 +161,41 @@ export function CertificateList({ certificates: initialCertificates, pagination:
     }
   }
   
-  // Fetch certificates when search term or page changes
+  // Fetch certificates when search term, filters or page changes
   useEffect(() => {
     fetchCertificates()
-  }, [searchTerm, currentPage, pagination.limit])
+  }, [searchTerm, localSearchTerm, targetTypeFilter, currentPage, pagination.limit])
   
-  // Filter certificates based on search term (client side filtering for immediate feedback)
-  const filteredCertificates = certificates.filter(certificate =>
-    certificate.recipientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    certificate.templateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (certificate.contestName && certificate.contestName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (certificate.awardTitle && certificate.awardTitle.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    certificate.uniqueCode.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1)
+    }
+  }, [targetTypeFilter, localSearchTerm])
+  
+  // Filter certificates based on search term and targetType (client side filtering for immediate feedback)
+  const filteredCertificates = certificates.filter(certificate => {
+    const searchFilter = searchTerm || localSearchTerm
+    const matchesSearch = !searchFilter || 
+      certificate.recipientName.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      certificate.templateName.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (certificate.contestName && certificate.contestName.toLowerCase().includes(searchFilter.toLowerCase())) ||
+      (certificate.awardTitle && certificate.awardTitle.toLowerCase().includes(searchFilter.toLowerCase())) ||
+      certificate.uniqueCode.toLowerCase().includes(searchFilter.toLowerCase())
+    
+    const matchesTargetType = targetTypeFilter === 'all' || certificate.templateTargetType === targetTypeFilter
+    
+    return matchesSearch && matchesTargetType
+  })
+  
+  // Clear filters
+  const clearFilters = () => {
+    setTargetTypeFilter('all')
+    setLocalSearchTerm('')
+  }
+  
+  // Check if any filters are active
+  const hasActiveFilters = targetTypeFilter !== 'all' || localSearchTerm !== ''
   
   // Handle certificate sending
   const handleSendCertificate = async (certificateId: number) => {
@@ -271,6 +305,61 @@ export function CertificateList({ certificates: initialCertificates, pagination:
   
   return (
     <div className="space-y-6">
+      {/* Filters */}
+      <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border">
+        <div className="flex-1 max-w-sm">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search by name, template, code..."
+              value={localSearchTerm}
+              onChange={(e) => setLocalSearchTerm(e.target.value)}
+              className="pl-9 h-9"
+            />
+            {localSearchTerm && (
+              <button
+                onClick={() => setLocalSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+        
+        <div className="w-64">
+          <Select value={targetTypeFilter} onValueChange={setTargetTypeFilter}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="GENERAL">General</SelectItem>
+              <SelectItem value="EVENT_PARTICIPANT">Event Participant</SelectItem>
+              <SelectItem value="EVENT_WINNER">Event Winner</SelectItem>
+              <SelectItem value="NON_CONTEST_PARTICIPANT">Non-Contest Participant</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        {hasActiveFilters && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearFilters}
+            className="h-9"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear Filters
+          </Button>
+        )}
+        
+        <div className="text-sm text-gray-600">
+          {filteredCertificates.length} {filteredCertificates.length === 1 ? 'certificate' : 'certificates'}
+        </div>
+      </div>
+      
       {/* Error display */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">

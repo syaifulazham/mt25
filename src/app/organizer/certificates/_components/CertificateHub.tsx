@@ -76,7 +76,7 @@ export function CertificateHub({
   certificatesPagination
 }: CertificateHubProps) {
   // State
-  const [activeTab, setActiveTab] = useState('certificates')
+  const [activeTab, setActiveTab] = useState('templates')
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -160,30 +160,11 @@ export function CertificateHub({
         </div>
       </div>
 
-      <Tabs defaultValue="certificates" value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="templates" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="certificates">Certificates</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="certificates">Certificates</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="certificates" className="space-y-4 mt-4">
-          {initialCertificates.length === 0 ? (
-            <EmptyState 
-              title="No certificates found" 
-              description={searchTerm ? `No certificates match '${searchTerm}'` : "No certificates have been generated yet"}
-              buttonText=""
-              buttonHref=""
-              showButton={false}
-            />
-          ) : (
-            <CertificateList
-              certificates={initialCertificates}
-              pagination={certificatesPagination}
-              session={session}
-              searchTerm={searchTerm}
-            />
-          )}
-        </TabsContent>
 
         <TabsContent value="templates" className="space-y-4 mt-4">
           {initialTemplates.length === 0 ? (
@@ -200,6 +181,25 @@ export function CertificateHub({
               initialTemplates={initialTemplates}
               initialPagination={templatesPagination}
               searchQuery={searchTerm}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="certificates" className="space-y-4 mt-4">
+          {initialCertificates.length === 0 ? (
+            <EmptyState 
+              title="No certificates found" 
+              description={searchTerm ? `No certificates match '${searchTerm}'` : "No certificates have been generated yet"}
+              buttonText=""
+              buttonHref=""
+              showButton={false}
+            />
+          ) : (
+            <CertificateList
+              certificates={initialCertificates}
+              pagination={certificatesPagination}
+              session={session}
+              searchTerm={searchTerm}
             />
           )}
         </TabsContent>

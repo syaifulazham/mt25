@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Session } from 'next-auth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 interface Template {
   id: number
@@ -48,49 +49,56 @@ export function CertTemplateList({
   const [error, setError] = useState<string | null>(null)
   const [templates, setTemplates] = useState<Template[]>(initialTemplates)
   const [searchTerm, setSearchTerm] = useState(searchQuery)
-  const [currentPage, setCurrentPage] = useState(initialPagination.page)
-  const [totalPages, setTotalPages] = useState(initialPagination.totalPages)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const router = useRouter()
+  
+  const ITEMS_PER_PAGE = 12
 
   // Role-based permissions
   const isAdmin = session.user.role === 'ADMIN'
   const canCreateTemplate = ['ADMIN', 'OPERATOR'].includes(session.user.role as string)
   
-  // Fetch templates from API
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      setIsLoading(true)
-      setError(null)
-      
-      try {
-        const queryParams = new URLSearchParams({
-          page: currentPage.toString(),
-          pageSize: '12',
-          ...(searchTerm && { search: searchTerm }),
-          status: 'ACTIVE'
-        })
-        
-        const response = await fetch(`/api/certificates/templates?${queryParams}`)
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch templates')
-        }
-        
-        const data = await response.json()
-        setTemplates(data.templates)
-        setTotalPages(data.pagination.totalPages)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred')
-        console.error('Error fetching templates:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  // Fetch all templates from API (no server-side pagination)
+  const fetchTemplates = async () => {
+    setIsLoading(true)
+    setError(null)
     
-    if (initialTemplates.length === 0 || searchTerm !== searchQuery || currentPage !== initialPagination.page) {
+    try {
+      const queryParams = new URLSearchParams({
+        page: '1',
+        pageSize: '1000', // Fetch all templates
+        ...(searchTerm && { search: searchTerm }),
+        status: 'ACTIVE'
+      })
+      
+      const response = await fetch(`/api/certificates/templates?${queryParams}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch templates')
+      }
+      
+      const data = await response.json()
+      setTemplates(data.templates)
+      setCurrentPage(1) // Reset to first page when data changes
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      console.error('Error fetching templates:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  
+  useEffect(() => {
+    if (initialTemplates.length === 0 || searchTerm !== searchQuery) {
       fetchTemplates()
     }
-  }, [searchTerm, currentPage, initialTemplates, initialPagination.page, searchQuery])
+  }, [searchTerm, initialTemplates, searchQuery])
+  
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
   // Handle template deletion
   const handleDeleteTemplate = async (templateId: number) => {
@@ -118,6 +126,8 @@ export function CertTemplateList({
   // Handle template duplication
   const handleDuplicateTemplate = async (templateId: number) => {
     try {
+      setDuplicatingId(templateId)
+      
       const response = await fetch(`/api/certificates/templates/${templateId}/duplicate`, {
         method: 'POST'
       })
@@ -126,11 +136,20 @@ export function CertTemplateList({
         throw new Error('Failed to duplicate template')
       }
       
+      const data = await response.json()
+      
+      // Show success message
+      toast.success('Template duplicated successfully!')
+      
       // Refresh templates list after duplication
-      router.refresh()
+      await fetchTemplates()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to duplicate template')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to duplicate template'
+      setError(errorMessage)
+      toast.error(errorMessage)
       console.error('Error duplicating template:', err)
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -138,6 +157,61 @@ export function CertTemplateList({
   const filteredTemplates = templates.filter(template =>
     template.templateName.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  // Group templates by targetType and sort by name
+  const groupedTemplates = filteredTemplates.reduce((acc, template) => {
+    const targetType = template.targetType || 'GENERAL'
+    if (!acc[targetType]) {
+      acc[targetType] = []
+    }
+    acc[targetType].push(template)
+    return acc
+  }, {} as Record<string, Template[]>)
+
+  // Sort templates within each group by name
+  Object.keys(groupedTemplates).forEach(key => {
+    groupedTemplates[key].sort((a, b) => a.templateName.localeCompare(b.templateName))
+  })
+
+  // Sort groups by targetType name
+  const sortedGroupKeys = Object.keys(groupedTemplates).sort()
+  
+  // Flatten grouped templates for pagination
+  const flattenedTemplates: Template[] = []
+  sortedGroupKeys.forEach(key => {
+    flattenedTemplates.push(...groupedTemplates[key])
+  })
+  
+  // Calculate pagination
+  const totalItems = flattenedTemplates.length
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedTemplates = flattenedTemplates.slice(startIndex, endIndex)
+  
+  // Re-group paginated templates
+  const paginatedGroupedTemplates = paginatedTemplates.reduce((acc, template) => {
+    const targetType = template.targetType || 'GENERAL'
+    if (!acc[targetType]) {
+      acc[targetType] = []
+    }
+    acc[targetType].push(template)
+    return acc
+  }, {} as Record<string, Template[]>)
+  
+  // Sort paginated groups
+  const paginatedGroupKeys = Object.keys(paginatedGroupedTemplates).sort()
+
+  // Helper function to format targetType labels
+  const formatTargetType = (targetType: string) => {
+    const typeLabels: Record<string, string> = {
+      'GENERAL': 'General Certificates',
+      'EVENT_PARTICIPANT': 'Event Participant Certificates',
+      'EVENT_WINNER': 'Event Winner Certificates',
+      'NON_CONTEST_PARTICIPANT': 'Non-Contest Participant Certificates'
+    }
+    return typeLabels[targetType] || targetType.replace(/_/g, ' ')
+  }
 
   const renderTemplateSkeletons = () => {
     return Array.from({ length: 6 }).map((_, index) => (
@@ -176,19 +250,26 @@ export function CertTemplateList({
 
       {/* Search input */}
       <div className="flex justify-between items-center">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search templates..."
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <div className="absolute left-3 top-2.5 text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        <div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search templates..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <div className="absolute left-3 top-2.5 text-gray-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
+          {totalItems > 0 && (
+            <div className="text-sm text-gray-500 mt-2">
+              Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} templates
+            </div>
+          )}
         </div>
         
         {canCreateTemplate && (
@@ -209,7 +290,7 @@ export function CertTemplateList({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {renderTemplateSkeletons()}
         </div>
-      ) : filteredTemplates.length === 0 ? (
+      ) : flattenedTemplates.length === 0 ? (
         <div className="text-center py-12 border rounded-lg">
           <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -230,8 +311,20 @@ export function CertTemplateList({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTemplates.map(template => (
+        <div className="space-y-8">
+          {paginatedGroupKeys.map(targetType => (
+            <div key={targetType} className="space-y-4">
+              {/* Group Header */}
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-semibold text-gray-900">{formatTargetType(targetType)}</h3>
+                <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                  {paginatedGroupedTemplates[targetType].length}
+                </span>
+              </div>
+              
+              {/* Templates Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedGroupedTemplates[targetType].map(template => (
             <div key={template.id} className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               {/* Template Thumbnail */}
               <div className="bg-gray-100 h-48 flex items-center justify-center">
@@ -301,10 +394,11 @@ export function CertTemplateList({
                   
                   {canCreateTemplate && (
                     <button
-                      className="px-3 py-1 text-sm text-purple-600 hover:text-purple-800"
+                      className="px-3 py-1 text-sm text-purple-600 hover:text-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleDuplicateTemplate(template.id)}
+                      disabled={duplicatingId === template.id}
                     >
-                      Duplicate
+                      {duplicatingId === template.id ? 'Duplicating...' : 'Duplicate'}
                     </button>
                   )}
                   
@@ -347,6 +441,9 @@ export function CertTemplateList({
                     </Link>
                   </div>
                 )}
+              </div>
+            </div>
+                ))}
               </div>
             </div>
           ))}

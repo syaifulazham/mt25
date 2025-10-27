@@ -132,6 +132,7 @@ export interface CertificateQueryParams {
   templateId?: number;
   recipientType?: string | null;
   status?: string | null;
+  targetType?: string | null;
   page?: number;
   limit?: number;
   orderBy?: string;

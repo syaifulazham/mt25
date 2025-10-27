@@ -1275,7 +1275,7 @@ model Certificate {
   contestName    String?      @db.VarChar(255)
   awardTitle     String?      @db.VarChar(255)
   uniqueCode     String       @unique(map: "unique_certificate_code") @db.VarChar(50)
-  serialNumber   String?      @unique(map: "unique_serial_number") @db.VarChar(50)
+  serialNumber   String?      @db.VarChar(50)
   filePath       String?      @db.VarChar(1000)
   status         String       @default("DRAFT") @db.VarChar(20)
   issuedAt       DateTime?    @db.DateTime(0)
@@ -1286,6 +1286,7 @@ model Certificate {
   creator        user?        @relation("CreatedCertificates", fields: [createdBy], references: [id], map: "fk_certificate_createdBy")
   template       CertTemplate @relation(fields: [templateId], references: [id], map: "fk_certificate_templateId")
 
+  @@unique([templateId, serialNumber], map: "unique_serial_per_template")
   @@index([templateId], map: "idx_certificate_templateId")
   @@index([recipientName], map: "idx_certificate_recipientName")
   @@index([recipientEmail], map: "idx_certificate_recipientEmail")

@@ -201,6 +201,7 @@ export class CertificateService {
       templateId,
       recipientType,
       status,
+      targetType,
       page = 1,
       limit = 10,
       orderBy = 'createdAt',
@@ -220,6 +221,13 @@ export class CertificateService {
 
     if (status) {
       where.status = status;
+    }
+
+    // Add targetType filter if provided - filter by template's targetType
+    if (targetType) {
+      where.template = {
+        targetType: targetType
+      };
     }
 
     // Add search filter if provided

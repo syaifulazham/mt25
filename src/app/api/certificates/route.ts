@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       templateId: searchParams.get('templateId') ? parseInt(searchParams.get('templateId')!) : undefined,
       status: searchParams.get('status'),
       recipientType: searchParams.get('recipientType'),
+      targetType: searchParams.get('targetType'),
     };
 
     // Fetch certificates
