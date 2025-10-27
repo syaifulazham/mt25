@@ -99,7 +99,7 @@ export async function POST(
       );
     }
 
-    // Check if team is registered for any upcoming events with CUTOFF_REGISTRATION status
+    // Check if team is registered for any events with CUTOFF_REGISTRATION status
     const upcomingCutoffEvents = await prisma.$queryRaw`
       SELECT DISTINCT e.id, e.name, e.status
       FROM event e
@@ -107,7 +107,6 @@ export async function POST(
       JOIN eventcontestteam ect ON ec.id = ect.eventcontestId
       WHERE ect.teamId = ${teamId}
         AND e.status = 'CUTOFF_REGISTRATION'
-        AND e.startDate > NOW()
         AND e.isActive = 1
         AND ec.isActive = 1
     ` as any[];
@@ -500,7 +499,7 @@ export async function DELETE(
       );
     }
 
-    // Check if team is registered for any upcoming events with CUTOFF_REGISTRATION status
+    // Check if team is registered for any events with CUTOFF_REGISTRATION status
     const upcomingCutoffEvents = await prisma.$queryRaw`
       SELECT DISTINCT e.id, e.name, e.status
       FROM event e
@@ -508,7 +507,6 @@ export async function DELETE(
       JOIN eventcontestteam ect ON ec.id = ect.eventcontestId
       WHERE ect.teamId = ${teamId}
         AND e.status = 'CUTOFF_REGISTRATION'
-        AND e.startDate > NOW()
         AND e.isActive = 1
         AND ec.isActive = 1
     ` as any[];
