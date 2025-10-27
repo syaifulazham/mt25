@@ -34,7 +34,7 @@ fi
 
 echo ""
 echo "Step 2: Updating database constraint..."
-mysql -u azham -p mtdb < update-serial-constraint-with-template-id.sql
+mysql -u azham -p mtdb < update-serial-constraint-safe.sql
 
 if [ $? -eq 0 ]; then
     echo "✅ Constraint updated successfully!"
