@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, Download, Clock, BarChart, Medal, Users, X, UserCircle, Calendar, Timer } from "lucide-react";
+import { ChevronLeft, Download, Clock, BarChart, Medal, Users, X, UserCircle, Calendar, Timer, FileText } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { format, formatDistanceToNow } from "date-fns";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +68,16 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<QuizResult | null>(null);
+  const [templates, setTemplates] = useState<any>(null);
+  const [generatingCert, setGeneratingCert] = useState<number | null>(null);
+  const [progressing, setProgressing] = useState<number | null>(null);
+  const [selectedContestants, setSelectedContestants] = useState<number[]>([]);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [certificateStatuses, setCertificateStatuses] = useState<Record<number, boolean>>({});
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [currentGeneratingName, setCurrentGeneratingName] = useState<string>('');
+  const [alertModal, setAlertModal] = useState<{ show: boolean; title: string; message: string }>({ show: false, title: '', message: '' });
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void }>({ show: false, title: '', message: '', onConfirm: () => {} });
 
   // Fetch quiz results
   useEffect(() => {
@@ -97,6 +108,51 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
       fetchQuizResults();
     }
   }, [quizId]);
+
+  // Fetch templates for certificate and progression actions
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await fetch(`/api/organizer/quizzes/${quizId}/templates`);
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data);
+        }
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+      }
+    };
+
+    if (quizId) {
+      fetchTemplates();
+    }
+  }, [quizId]);
+
+  // Check certificate status for contestants
+  useEffect(() => {
+    const checkCertificateStatuses = async () => {
+      if (results.length === 0) return;
+
+      try {
+        const response = await fetch(`/api/organizer/quizzes/${quizId}/certificates/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contestantIds: results.map(r => r.contestantId)
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setCertificateStatuses(data.statuses || {});
+        }
+      } catch (error) {
+        console.error('Error checking certificate statuses:', error);
+      }
+    };
+
+    checkCertificateStatuses();
+  }, [results, quizId]);
 
   // Filter results based on search term
   useEffect(() => {
@@ -194,6 +250,284 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // Handle participation certificate generation
+  const handleGenerateParticipationCert = async (result: QuizResult) => {
+    try {
+      setGeneratingCert(result.contestantId);
+      
+      const response = await fetch(
+        `/api/organizer/quizzes/${quizId}/certificates/generate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contestantId: result.contestantId,
+            certificateType: 'PARTICIPATION'
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate certificate');
+      }
+
+      // Update certificate status
+      setCertificateStatuses(prev => ({
+        ...prev,
+        [result.contestantId]: true
+      }));
+
+      setAlertModal({
+        show: true,
+        title: `Certificate ${data.regenerated ? 'Regenerated' : 'Generated'}`,
+        message: `✓ Successfully ${data.regenerated ? 'regenerated' : 'generated'} certificate\n\nSerial: ${data.certificate.serialNumber}\nStatus: PDF ${data.regenerated ? 'Regenerated' : 'Generated'}`
+      });
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      setAlertModal({
+        show: true,
+        title: 'Generation Failed',
+        message: error instanceof Error ? error.message : 'Failed to generate certificate'
+      });
+    } finally {
+      setGeneratingCert(null);
+    }
+  };
+
+  // Handle achievement certificate generation
+  const handleGenerateAchievementCert = async (result: QuizResult) => {
+    try {
+      setGeneratingCert(result.contestantId);
+      
+      const response = await fetch(
+        `/api/organizer/quizzes/${quizId}/certificates/generate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contestantId: result.contestantId,
+            certificateType: 'ACHIEVEMENT'
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate certificate');
+      }
+
+      setAlertModal({
+        show: true,
+        title: `Achievement Certificate ${data.regenerated ? 'Regenerated' : 'Generated'}`,
+        message: `✓ Successfully ${data.regenerated ? 'regenerated' : 'generated'} achievement certificate\n\nSerial: ${data.certificate.serialNumber}\nAward: ${data.certificate.awardTitle}\nStatus: PDF ${data.regenerated ? 'Regenerated' : 'Generated'}`
+      });
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      setAlertModal({
+        show: true,
+        title: 'Generation Failed',
+        message: error instanceof Error ? error.message : 'Failed to generate certificate'
+      });
+    } finally {
+      setGeneratingCert(null);
+    }
+  };
+
+  // Handle contestant progression to next level
+  const handleProgressToNext = async (result: QuizResult) => {
+    if (!templates?.nextQuiz) return;
+
+    setConfirmModal({
+      show: true,
+      title: 'Progress to Next Level',
+      message: `Progress ${result.contestantName} to ${templates.nextQuiz.quiz_name}?\n\nThis will mark them as eligible for the next level.`,
+      onConfirm: () => executeProgressToNext(result)
+    });
+  };
+
+  const executeProgressToNext = async (result: QuizResult) => {
+    if (!templates?.nextQuiz) return;
+
+    try {
+      setProgressing(result.contestantId);
+      
+      const response = await fetch(
+        `/api/organizer/quizzes/${quizId}/progress`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contestantId: result.contestantId
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to progress contestant');
+      }
+
+      setAlertModal({
+        show: true,
+        title: 'Success',
+        message: `✓ ${result.contestantName} has been progressed to ${templates.nextQuiz.quiz_name}!`
+      });
+    } catch (error) {
+      console.error('Error progressing contestant:', error);
+      setAlertModal({
+        show: true,
+        title: 'Progression Failed',
+        message: error instanceof Error ? error.message : 'Failed to progress contestant'
+      });
+    } finally {
+      setProgressing(null);
+    }
+  };
+
+  // Handle checkbox selection
+  const handleToggleSelection = (contestantId: number) => {
+    setSelectedContestants(prev => 
+      prev.includes(contestantId)
+        ? prev.filter(id => id !== contestantId)
+        : [...prev, contestantId]
+    );
+  };
+
+  // Handle select all / deselect all
+  const handleToggleSelectAll = () => {
+    if (selectedContestants.length === filteredResults.length) {
+      setSelectedContestants([]);
+    } else {
+      setSelectedContestants(filteredResults.map(r => r.contestantId));
+    }
+  };
+
+  // Handle bulk participation certificate generation
+  const handleBulkGenerateParticipation = async () => {
+    if (!templates?.templates?.participant) {
+      setAlertModal({
+        show: true,
+        title: 'Template Not Found',
+        message: 'No participation certificate template configured for this quiz.'
+      });
+      return;
+    }
+
+    if (selectedContestants.length === 0) {
+      setAlertModal({
+        show: true,
+        title: 'No Selection',
+        message: 'Please select at least one contestant to generate certificates.'
+      });
+      return;
+    }
+
+    setConfirmModal({
+      show: true,
+      title: 'Generate Certificates',
+      message: `Generate participation certificates for ${selectedContestants.length} selected contestant(s)?`,
+      onConfirm: () => executeBulkGeneration()
+    });
+  };
+
+  const executeBulkGeneration = async () => {
+
+    try {
+      setBulkGenerating(true);
+      setBulkProgress({ current: 0, total: selectedContestants.length });
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
+      const successfulIds: number[] = [];
+
+      for (let i = 0; i < selectedContestants.length; i++) {
+        const contestantId = selectedContestants[i];
+        const result = filteredResults.find(r => r.contestantId === contestantId);
+        
+        // Update progress
+        setBulkProgress({ current: i + 1, total: selectedContestants.length });
+        setCurrentGeneratingName(result?.contestantName || `Contestant ${contestantId}`);
+
+        try {
+          const response = await fetch(
+            `/api/organizer/quizzes/${quizId}/certificates/generate`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contestantId,
+                certificateType: 'PARTICIPATION'
+              })
+            }
+          );
+
+          if (response.ok) {
+            successCount++;
+            successfulIds.push(contestantId);
+          } else {
+            const data = await response.json();
+            errorCount++;
+            errors.push(`${result?.contestantName || contestantId}: ${data.error}`);
+          }
+        } catch (error) {
+          errorCount++;
+          errors.push(`${result?.contestantName || contestantId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+
+        // Small delay for visual feedback
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      // Update certificate statuses for successful generations
+      if (successfulIds.length > 0) {
+        setCertificateStatuses(prev => {
+          const updated = { ...prev };
+          successfulIds.forEach(id => {
+            updated[id] = true;
+          });
+          return updated;
+        });
+      }
+
+      let message = `✓ Successfully generated: ${successCount} PDFs\n`;
+      if (errorCount > 0) {
+        message += `\n❌ Errors: ${errorCount}\n`;
+        if (errors.length > 0) {
+          message += `\nDetails:\n${errors.slice(0, 5).join('\n')}`;
+          if (errors.length > 5) {
+            message += `\n...and ${errors.length - 5} more errors`;
+          }
+        }
+      }
+
+      setAlertModal({
+        show: true,
+        title: 'Bulk Generation Complete',
+        message
+      });
+      
+      // Clear selection after successful generation
+      if (successCount > 0) {
+        setSelectedContestants([]);
+      }
+    } catch (error) {
+      console.error('Error in bulk generation:', error);
+      setAlertModal({
+        show: true,
+        title: 'Generation Failed',
+        message: 'Failed to complete bulk generation. Please try again.'
+      });
+    } finally {
+      setBulkGenerating(false);
+      setBulkProgress(null);
+      setCurrentGeneratingName('');
+    }
   };
 
   // Show loading or error states
@@ -365,30 +699,80 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
               className="max-w-md"
             />
           </div>
+
+          {/* Bulk Actions */}
+          {templates?.templates?.participant && (
+            <div className="mb-4 flex items-center gap-4 p-3 bg-gray-50 border rounded-md">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={selectedContestants.length === filteredResults.length && filteredResults.length > 0}
+                  onCheckedChange={handleToggleSelectAll}
+                  id="select-all"
+                />
+                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                  {selectedContestants.length === filteredResults.length && filteredResults.length > 0
+                    ? 'Deselect All'
+                    : 'Select All'}
+                </label>
+              </div>
+              
+              {selectedContestants.length > 0 && (
+                <Button
+                  onClick={handleBulkGenerateParticipation}
+                  disabled={bulkGenerating}
+                  className="bg-green-600 hover:bg-green-700"
+                  size="sm"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {bulkGenerating
+                    ? 'Generating...'
+                    : `Generate ${selectedContestants.length} Selected`}
+                </Button>
+              )}
+              
+              {selectedContestants.length > 0 && (
+                <span className="text-sm text-gray-600">
+                  {selectedContestants.length} of {filteredResults.length} selected
+                </span>
+              )}
+            </div>
+          )}
           
           <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  {templates?.templates?.participant && (
+                    <TableHead className="w-[50px]"></TableHead>
+                  )}
                   <TableHead className="w-[60px]">Rank</TableHead>
                   <TableHead>Contestant</TableHead>
                   <TableHead className="font-semibold text-primary">Correct / Total</TableHead>
                   <TableHead className="font-semibold text-primary">Time Taken</TableHead>
                   <TableHead>Score</TableHead>
                   <TableHead>Completed</TableHead>
-                  <TableHead></TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredResults.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-gray-500">
+                    <TableCell colSpan={templates?.templates?.participant ? 8 : 7} className="text-center py-6 text-gray-500">
                       No results match your search
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredResults.map((result) => (
                     <TableRow key={result.attemptId}>
+                      {templates?.templates?.participant && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedContestants.includes(result.contestantId)}
+                            onCheckedChange={() => handleToggleSelection(result.contestantId)}
+                            disabled={bulkGenerating}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-medium">
                         {getRankBadge(result.rank)}
                       </TableCell>
@@ -442,17 +826,67 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                           {format(new Date(result.endTime), "MMM d, yyyy h:mm a")}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => {
-                            setSelectedResult(result);
-                            setDetailsOpen(true);
-                          }}
-                        >
-                          Details
-                        </Button>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Participation Certificate */}
+                          {templates?.templates?.participant && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleGenerateParticipationCert(result)}
+                              disabled={generatingCert === result.contestantId}
+                              title={certificateStatuses[result.contestantId] 
+                                ? "Regenerate Participation Certificate" 
+                                : "Generate Participation Certificate"}
+                              className={`h-8 w-8 ${
+                                certificateStatuses[result.contestantId]
+                                  ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                                  : ''
+                              }`}
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          )}
+
+                          {/* Achievement Certificate (for winners only) */}
+                          {templates?.templates?.winner && 
+                           result.rank >= (templates.templates.winner.winnerRangeStart || 1) &&
+                           result.rank <= (templates.templates.winner.winnerRangeEnd || 3) && (
+                            <Button
+                              size="icon"
+                              onClick={() => handleGenerateAchievementCert(result)}
+                              disabled={generatingCert === result.contestantId}
+                              title="Generate Achievement Certificate"
+                              className="h-8 w-8 bg-gradient-to-r from-yellow-400 to-amber-500 text-white hover:from-yellow-500 hover:to-amber-600 border-0 shadow-md"
+                            >
+                              <Medal className="h-4 w-4" />
+                            </Button>
+                          )}
+
+                          {/* Step to Next Level */}
+                          {templates?.nextQuiz && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleProgressToNext(result)}
+                              disabled={progressing === result.contestantId}
+                            >
+                              {progressing === result.contestantId ? 'Processing...' : 'Next Level'}
+                            </Button>
+                          )}
+
+                          {/* View Details */}
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedResult(result);
+                              setDetailsOpen(true);
+                            }}
+                          >
+                            Details
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -611,6 +1045,95 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Generation Progress Modal */}
+      {bulkProgress && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">Generating Certificates</h3>
+            
+            <div className="space-y-4">
+              {/* Progress Bar */}
+              <div>
+                <div className="flex justify-between text-sm text-gray-600 mb-2">
+                  <span>Progress</span>
+                  <span>{bulkProgress.current} of {bulkProgress.total}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-green-600 h-full transition-all duration-300 ease-out"
+                    style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                  />
+                </div>
+                <div className="text-center text-sm font-medium text-gray-700 mt-2">
+                  {Math.round((bulkProgress.current / bulkProgress.total) * 100)}%
+                </div>
+              </div>
+
+              {/* Current Item */}
+              <div className="border-t pt-4">
+                <div className="text-sm text-gray-600 mb-1">Currently generating:</div>
+                <div className="font-medium text-gray-900 flex items-center gap-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-green-600 border-t-transparent rounded-full"></div>
+                  {currentGeneratingName}
+                </div>
+              </div>
+
+              {/* Info Message */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <p className="text-sm text-blue-800">
+                  Please wait while certificates are being generated. Do not close this window.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      <Dialog open={alertModal.show} onOpenChange={(open) => setAlertModal({ ...alertModal, show: open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{alertModal.title}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="whitespace-pre-wrap text-sm text-gray-700">{alertModal.message}</p>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={() => setAlertModal({ ...alertModal, show: false })}>
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Modal */}
+      <Dialog open={confirmModal.show} onOpenChange={(open) => setConfirmModal({ ...confirmModal, show: open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmModal.title}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="whitespace-pre-wrap text-sm text-gray-700">{confirmModal.message}</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setConfirmModal({ ...confirmModal, show: false })}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                setConfirmModal({ ...confirmModal, show: false });
+                confirmModal.onConfirm();
+              }}
+            >
+              Confirm
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

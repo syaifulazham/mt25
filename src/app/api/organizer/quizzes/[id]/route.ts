@@ -55,6 +55,7 @@ export async function GET(
       publishedAt: quiz.publishedAt,
       createdAt: quiz.createdAt,
       updatedAt: quiz.updatedAt,
+      nextQuizId: quiz.nextQuizId,
       creatorName: quiz.createdBy || 'Quiz Administrator',
       totalQuestions: quiz.quiz_questions.length,
       totalPoints: quiz.quiz_questions.reduce((sum, q) => sum + q.points, 0),

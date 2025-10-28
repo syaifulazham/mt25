@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/auth-options';
 import { prisma } from '@/lib/prisma';
 import { CertificateSerialService } from '@/lib/services/certificate-serial-service';
+import { generateCertificatePDF } from '@/lib/certificate-generator';
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -130,30 +131,28 @@ export async function POST(
       where: {
         templateId: template.id,
         ownership: {
-          path: ['contestantId'],
+          path: '$.contestantId',
           equals: contestantId
         }
       }
     });
 
+    // Use existing unique identifiers or generate new ones
+    let uniqueCode: string;
+    let serialNumber: string | null;
+    
     if (existingCertificate) {
-      return NextResponse.json(
-        { 
-          error: 'Certificate already generated for this contestant',
-          certificate: existingCertificate
-        },
-        { status: 409 }
+      // Regeneration: Preserve unique identifiers
+      uniqueCode = existingCertificate.uniqueCode;
+      serialNumber = existingCertificate.serialNumber;
+    } else {
+      // New certificate: Generate new identifiers
+      uniqueCode = `CERT-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
+      serialNumber = await CertificateSerialService.generateSerialNumber(
+        template.id,
+        template.targetType as any
       );
     }
-
-    // Generate unique code
-    const uniqueCode = `CERT-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
-
-    // Generate serial number
-    const serialNumber = await CertificateSerialService.generateSerialNumber(
-      template.targetType as any,
-      template.id
-    );
 
     // Determine award title for winners
     let awardTitle = null;
@@ -174,50 +173,97 @@ export async function POST(
       const rank = allAttempts.findIndex(a => a.contestantId === contestantId) + 1;
       
       if (rank === 1) {
-        awardTitle = '1st Place';
-      } else if (rank === 2) {
-        awardTitle = '2nd Place';
-      } else if (rank === 3) {
-        awardTitle = '3rd Place';
-      } else if (rank <= 10) {
-        awardTitle = `${rank}th Place`;
+        awardTitle = 'TEMPAT PERTAMA';
       } else {
-        awardTitle = `Top ${rank}`;
+        awardTitle = `TEMPAT KE-${rank}`;
       }
     }
 
-    // Create certificate
-    const certificate = await prisma.certificate.create({
+    // Parse template configuration
+    const configuration = template.configuration as any;
+
+    // Generate PDF
+    const pdfPath = await generateCertificatePDF({
+      template: {
+        id: template.id,
+        basePdfPath: template.basePdfPath || '',
+        configuration: configuration
+      },
       data: {
-        templateId: template.id,
-        recipientName: contestant.name,
-        recipientType: 'PARTICIPANT',
-        contingent_name: contestant.contingent.name,
-        uniqueCode,
-        serialNumber,
-        awardTitle,
-        status: 'READY',
-        ownership: {
-          year: new Date().getFullYear(),
-          contingentId: contestant.contingent.id,
-          contestantId: contestant.id,
-          quizId: quizId,
-          score: attempt.score
-        },
-        issuedAt: new Date(),
-        createdBy: null // Organizer-generated
+        recipient_name: contestant.name,
+        contingent_name: contestant.contingent?.name || '',
+        unique_code: uniqueCode,
+        serial_number: serialNumber || '',
+        ic_number: contestant.ic || '',
+        institution_name: '',
+        issue_date: new Date().toLocaleDateString(),
+        contest_name: quiz.quiz_name || '',
+        award_title: awardTitle || ''
       }
     });
 
+    // Create or update certificate
+    let certificate;
+    
+    if (existingCertificate) {
+      // Regeneration: Update existing certificate with new PDF
+      certificate = await prisma.certificate.update({
+        where: { id: existingCertificate.id },
+        data: {
+          recipientName: contestant.name,
+          recipientType: 'PARTICIPANT',
+          contingent_name: contestant.contingent.name,
+          awardTitle,
+          filePath: pdfPath,
+          status: 'READY',
+          ownership: {
+            year: new Date().getFullYear(),
+            contingentId: contestant.contingent.id,
+            contestantId: contestant.id,
+            quizId: quizId,
+            score: attempt.score
+          },
+          issuedAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    } else {
+      // New certificate: Create new record
+      certificate = await prisma.certificate.create({
+        data: {
+          templateId: template.id,
+          recipientName: contestant.name,
+          recipientType: 'PARTICIPANT',
+          contingent_name: contestant.contingent.name,
+          uniqueCode,
+          serialNumber,
+          awardTitle,
+          filePath: pdfPath,
+          status: 'READY',
+          ownership: {
+            year: new Date().getFullYear(),
+            contingentId: contestant.contingent.id,
+            contestantId: contestant.id,
+            quizId: quizId,
+            score: attempt.score
+          },
+          issuedAt: new Date(),
+          createdBy: null // Organizer-generated
+        }
+      });
+    }
+
     return NextResponse.json({
       success: true,
+      regenerated: !!existingCertificate,
       certificate: {
         id: certificate.id,
         uniqueCode: certificate.uniqueCode,
         serialNumber: certificate.serialNumber,
         status: certificate.status,
         awardTitle: certificate.awardTitle,
-        recipientName: certificate.recipientName
+        recipientName: certificate.recipientName,
+        filePath: certificate.filePath
       }
     });
 

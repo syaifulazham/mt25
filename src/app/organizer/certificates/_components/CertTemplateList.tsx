@@ -11,8 +11,9 @@ interface Template {
   templateName: string
   basePdfPath: string | null
   status: 'ACTIVE' | 'INACTIVE'
-  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER'
   eventId?: number | null
+  quizId?: number | null
   createdAt: string
   updatedAt: string
   creator: {
@@ -208,7 +209,9 @@ export function CertTemplateList({
       'GENERAL': 'General Certificates',
       'EVENT_PARTICIPANT': 'Event Participant Certificates',
       'EVENT_WINNER': 'Event Winner Certificates',
-      'NON_CONTEST_PARTICIPANT': 'Non-Contest Participant Certificates'
+      'NON_CONTEST_PARTICIPANT': 'Non-Contest Participant Certificates',
+      'QUIZ_PARTICIPANT': 'Quiz Participant Certificates',
+      'QUIZ_WINNER': 'Quiz Winner Certificates'
     }
     return typeLabels[targetType] || targetType.replace(/_/g, ' ')
   }
@@ -436,6 +439,36 @@ export function CertTemplateList({
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                      </svg>
+                      Manage Winners
+                    </Link>
+                  </div>
+                )}
+                
+                {/* Manage Participants Button for QUIZ_PARTICIPANT templates */}
+                {template.targetType === 'QUIZ_PARTICIPANT' && template.quizId && canCreateTemplate && (
+                  <div className="mt-3">
+                    <Link
+                      href={`/organizer/quizzes/${template.quizId}/result`}
+                      className="w-full inline-flex justify-center items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                      Manage Participants
+                    </Link>
+                  </div>
+                )}
+                
+                {/* Manage Winners Button for QUIZ_WINNER templates */}
+                {template.targetType === 'QUIZ_WINNER' && template.quizId && canCreateTemplate && (
+                  <div className="mt-3">
+                    <Link
+                      href={`/organizer/quizzes/${template.quizId}/result/winners`}
+                      className="w-full inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                       </svg>
                       Manage Winners
                     </Link>

@@ -52,7 +52,18 @@ export class TemplateService {
       skip: (page - 1) * limit,
       take: limit,
       orderBy: { [orderBy]: orderDir },
-      include: {
+      select: {
+        id: true,
+        templateName: true,
+        basePdfPath: true,
+        status: true,
+        targetType: true,
+        eventId: true,
+        quizId: true,
+        winnerRangeStart: true,
+        winnerRangeEnd: true,
+        createdAt: true,
+        updatedAt: true,
         creator: {
           select: {
             id: true,

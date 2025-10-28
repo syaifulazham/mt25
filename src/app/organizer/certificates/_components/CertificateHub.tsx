@@ -18,8 +18,9 @@ interface Template {
   templateName: string
   basePdfPath: string | null
   status: 'ACTIVE' | 'INACTIVE'
-  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER'
   eventId?: number | null
+  quizId?: number | null
   createdAt: string
   updatedAt: string
   creator: {

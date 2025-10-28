@@ -36,8 +36,9 @@ export type TemplateUpdateParams = {
   basePdfPath?: string
   configuration?: any
   // Target audience fields
-  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER'
   eventId?: number | null
+  quizId?: number | null
   winnerRangeStart?: number | null
   winnerRangeEnd?: number | null
   // Prerequisites field
@@ -209,6 +210,7 @@ export const TemplateService = {
           // Target audience fields
           ...(data.targetType && { targetType: data.targetType }),
           ...(typeof data.eventId !== 'undefined' && { eventId: data.eventId }),
+          ...(typeof data.quizId !== 'undefined' && { quizId: data.quizId }),
           ...(typeof data.winnerRangeStart !== 'undefined' && { winnerRangeStart: data.winnerRangeStart }),
           ...(typeof data.winnerRangeEnd !== 'undefined' && { winnerRangeEnd: data.winnerRangeEnd }),
           // Prerequisites field
@@ -238,6 +240,16 @@ export const TemplateService = {
               startDate: true,
               endDate: true,
               scopeArea: true,
+            }
+          } : undefined,
+          // Include quiz data if template is quiz-specific
+          quiz: data.quizId ? {
+            select: {
+              id: true,
+              quiz_name: true,
+              target_group: true,
+              time_limit: true,
+              status: true,
             }
           } : undefined
         }

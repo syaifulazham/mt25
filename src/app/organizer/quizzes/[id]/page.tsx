@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, Edit, ChevronLeft, Pencil, Eye, List, Check, X, AlertTriangle } from "lucide-react";
+import { Clock, Calendar, Edit, ChevronLeft, Pencil, Eye, List, Check, X, AlertTriangle, ArrowRight, Trophy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -62,6 +62,7 @@ type Quiz = {
   creatorName: string;
   totalQuestions: number;
   totalPoints: number;
+  nextQuizId?: number | null;
   questions?: QuizQuestion[];
 };
 
@@ -76,6 +77,32 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isProgressionDialogOpen, setIsProgressionDialogOpen] = useState(false);
+  const [availableQuizzes, setAvailableQuizzes] = useState<Quiz[]>([]);
+  const [selectedNextQuizId, setSelectedNextQuizId] = useState<number | null>(null);
+  const [progressionLoading, setProgressionLoading] = useState(false);
+  const [nextQuizName, setNextQuizName] = useState<string>('');
+  
+  // Fetch next quiz name when nextQuizId changes
+  useEffect(() => {
+    const fetchNextQuizName = async () => {
+      if (quiz?.nextQuizId) {
+        try {
+          const response = await fetch(`/api/organizer/quizzes/${quiz.nextQuizId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setNextQuizName(data.quiz_name || '');
+          }
+        } catch (error) {
+          console.error('Error fetching next quiz name:', error);
+        }
+      } else {
+        setNextQuizName('');
+      }
+    };
+
+    fetchNextQuizName();
+  }, [quiz?.nextQuizId]);
   
   // Fetch quiz data
   useEffect(() => {
@@ -246,6 +273,72 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
+  // Open progression dialog and fetch available quizzes
+  const openProgressionDialog = async () => {
+    try {
+      // Fetch all quizzes excluding ended, retracted, and current quiz
+      const response = await fetch('/api/organizer/quizzes');
+      if (!response.ok) {
+        throw new Error('Failed to fetch quizzes');
+      }
+      
+      const data = await response.json();
+      // Response is an array directly, not wrapped in a property
+      const quizzes = Array.isArray(data) ? data : (data.quizzes || []);
+      const filtered = quizzes.filter((q: any) => 
+        q.id !== quizId && 
+        q.status !== 'ended' && 
+        q.status !== 'retracted' &&
+        q.status !== 'published'
+      );
+      
+      setAvailableQuizzes(filtered);
+      
+      // Set the current selection after quizzes are loaded
+      const currentNextQuizId = quiz?.nextQuizId || null;
+      setSelectedNextQuizId(currentNextQuizId);
+      
+      // Open dialog after everything is set
+      setIsProgressionDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching quizzes:', error);
+      toast.error('Failed to load available quizzes');
+    }
+  };
+
+  // Save progression setting
+  const saveProgression = async () => {
+    setProgressionLoading(true);
+    
+    try {
+      const response = await fetch(`/api/organizer/quizzes/${quizId}/progression`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nextQuizId: selectedNextQuizId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update progression');
+      }
+
+      toast.success(selectedNextQuizId ? 'Progression updated successfully!' : 'Progression removed successfully!');
+      setIsProgressionDialogOpen(false);
+
+      // Refresh quiz data
+      const updatedQuizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+      if (updatedQuizResponse.ok) {
+        const updatedQuizData = await updatedQuizResponse.json();
+        setQuiz(updatedQuizData);
+      }
+    } catch (error) {
+      console.error('Error updating progression:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update progression');
+    } finally {
+      setProgressionLoading(false);
+    }
+  };
+
   // Show loading or error states
   if (isLoading) {
     return (
@@ -348,6 +441,25 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                         {quiz.publishedAt 
                           ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") 
                           : "Not published yet"}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-500">Next Quiz (Progression)</p>
+                      <p className="font-medium flex items-center">
+                        {quiz.nextQuizId ? (
+                          <Link 
+                            href={`/organizer/quizzes/${quiz.nextQuizId}`}
+                            className="flex items-center text-blue-600 hover:text-blue-700 hover:underline"
+                            title={nextQuizName}
+                          >
+                            <ArrowRight className="w-4 h-4 mr-1 text-blue-500" />
+                            <span>
+                              {nextQuizName || `Quiz ID ${quiz.nextQuizId}`}
+                            </span>
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400">Not set</span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -850,10 +962,136 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   View Results
                 </Link>
               </Button>
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <Link href={`/organizer/quizzes/${quizId}/result/winners`}>
+                  <Trophy className="w-4 h-4 mr-2" />
+                  View Achievement/Progression
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start" 
+                onClick={openProgressionDialog}
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Progression
+              </Button>
+              {quiz?.nextQuizId && (
+                <Link 
+                  href={`/organizer/quizzes/${quiz.nextQuizId}`}
+                  className="mt-2 block px-3 py-2 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                >
+                  <p className="text-xs font-medium text-blue-800 mb-0.5">Next Quiz:</p>
+                  <p className="text-xs text-blue-700 truncate hover:underline" title={nextQuizName}>
+                    {nextQuizName || `Quiz ID ${quiz.nextQuizId}`}
+                  </p>
+                </Link>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Progression Dialog */}
+      <Dialog open={isProgressionDialogOpen} onOpenChange={setIsProgressionDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Set Quiz Progression</DialogTitle>
+            <DialogDescription>
+              Select the next quiz that winners should progress to after completing this quiz.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {quiz?.nextQuizId && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm font-medium text-blue-800 mb-1">
+                  Current Progression Set:
+                </p>
+                <p className="text-sm text-blue-700">
+                  {availableQuizzes.find(q => q.id === quiz.nextQuizId)?.quiz_name || `Quiz ID ${quiz.nextQuizId}`}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2 mb-4">
+              <Button
+                variant={selectedNextQuizId === null ? "default" : "outline"}
+                className="w-full justify-start"
+                onClick={() => setSelectedNextQuizId(null)}
+              >
+                <X className="w-4 h-4 mr-2" />
+                No Progression (Remove)
+              </Button>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="text-sm font-medium mb-3">Available Quizzes</h4>
+              {availableQuizzes.length === 0 ? (
+                <p className="text-sm text-gray-500">No available quizzes found</p>
+              ) : (
+                <div className="space-y-2">
+                  {availableQuizzes.map((q) => {
+                    const displayName = q.quiz_name.length > 40 
+                      ? q.quiz_name.substring(0, 40) + '...' 
+                      : q.quiz_name;
+                    
+                    const isCurrentlySet = quiz?.nextQuizId === q.id;
+                    const isSelected = selectedNextQuizId !== null && selectedNextQuizId === q.id;
+                    
+                    return (
+                      <Button
+                        key={q.id}
+                        variant={isSelected ? "default" : "outline"}
+                        className={`w-full justify-start text-left h-auto py-3 ${
+                          isCurrentlySet && !isSelected 
+                            ? 'bg-blue-50 border-blue-300 hover:bg-blue-100' 
+                            : ''
+                        }`}
+                        onClick={() => setSelectedNextQuizId(q.id)}
+                        title={q.quiz_name}
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium flex items-center gap-2">
+                            {displayName}
+                            {isCurrentlySet && !isSelected && (
+                              <span className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded-full">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Target: {q.target_group} • Status: {q.status}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-4 h-4 ml-2" />
+                        )}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsProgressionDialogOpen(false)}
+              disabled={progressionLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveProgression}
+              disabled={progressionLoading}
+            >
+              {progressionLoading ? 'Saving...' : 'Save Progression'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
