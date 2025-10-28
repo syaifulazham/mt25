@@ -71,6 +71,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
   const [assignedQuestions, setAssignedQuestions] = useState<QuizQuestion[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+  const [isEndDialogOpen, setIsEndDialogOpen] = useState(false);
   const [isRetractDialogOpen, setIsRetractDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -178,6 +179,37 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error("Error publishing quiz:", error);
       toast.error(error instanceof Error ? error.message : "Failed to publish quiz");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const endQuiz = async () => {
+    setActionLoading(true);
+
+    try {
+      // Send the request to the dedicated end endpoint
+      const response = await fetch(`/api/organizer/quizzes/${quizId}/end`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to end quiz');
+      }
+
+      toast.success("Quiz ended successfully!");
+      setIsEndDialogOpen(false);
+
+      // Refresh quiz data
+      const updatedQuizResponse = await fetch(`/api/organizer/quizzes/${quizId}`);
+      if (updatedQuizResponse.ok) {
+        const updatedQuizData = await updatedQuizResponse.json();
+        setQuiz(updatedQuizData);
+      }
+    } catch (error) {
+      console.error("Error ending quiz:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to end quiz");
     } finally {
       setActionLoading(false);
     }
@@ -376,6 +408,57 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                           </Button>
                           <Button onClick={publishQuiz} disabled={actionLoading}>
                             {actionLoading ? "Publishing..." : "Publish Quiz"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    
+                    {/* End Quiz Dialog */}
+                    <Dialog open={isEndDialogOpen} onOpenChange={setIsEndDialogOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>End Quiz</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to end this quiz? This will mark the quiz as completed and no new attempts will be allowed.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <div className="flex items-start gap-2 bg-amber-50 p-4 rounded-md text-amber-800">
+                            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-medium">Important Note</p>
+                              <p className="text-sm">
+                                Ending this quiz will change its status to 'ended'. The quiz will remain visible but participants won't be able to take new attempts. Existing results will be preserved.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-3">
+                            <div className="flex justify-between">
+                              <span>Quiz Name:</span>
+                              <span className="font-medium">{quiz.quiz_name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Current Status:</span>
+                              <span className="font-medium">Published → Ended</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Published On:</span>
+                              <span className="font-medium">
+                                {quiz.publishedAt ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") : 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsEndDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button 
+                            className="bg-amber-600 hover:bg-amber-700"
+                            onClick={endQuiz} 
+                            disabled={actionLoading}
+                          >
+                            {actionLoading ? "Ending..." : "End Quiz"}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -663,6 +746,27 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                       </div>
                     </>
                   )}
+                  
+                  {quiz.status === 'ended' && (
+                    <>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div>Quiz created successfully</div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div>Questions added ({assignedQuestions.length})</div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <div>Was published on {quiz.publishedAt ? format(new Date(quiz.publishedAt), "MMMM d, yyyy") : 'N/A'}</div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="w-5 h-5 text-red-500 flex-shrink-0" />
+                        <div>Quiz has ended - No new attempts allowed</div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -685,14 +789,34 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
               )}
               
               {quiz.status === 'published' && (
-                <Button 
-                  variant="outline" 
-                  className="w-full bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
-                  onClick={() => setIsRetractDialogOpen(true)}
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? 'Processing...' : 'Retract Quiz'}
-                </Button>
+                <>
+                  <div className="space-y-1">
+                    <Button 
+                      variant="outline" 
+                      className="w-full bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200"
+                      onClick={() => setIsEndDialogOpen(true)}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? 'Processing...' : 'End Quiz'}
+                    </Button>
+                    <p className="text-xs text-gray-500 text-center px-2">
+                      Closes quiz to new attempts. Results remain visible.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Button 
+                      variant="outline" 
+                      className="w-full bg-red-50 hover:bg-red-100 text-red-600 border-red-200"
+                      onClick={() => setIsRetractDialogOpen(true)}
+                      disabled={actionLoading}
+                    >
+                      {actionLoading ? 'Processing...' : 'Retract Quiz'}
+                    </Button>
+                    <p className="text-xs text-gray-500 text-center px-2">
+                      Returns to draft. Allows editing and republishing.
+                    </p>
+                  </div>
+                </>
               )}
             </CardFooter>
           </Card>
@@ -720,7 +844,7 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                   Preview Quiz
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full justify-start" disabled={quiz.status !== 'published'} asChild>
+              <Button variant="outline" className="w-full justify-start" asChild>
                 <Link href={`/organizer/quizzes/${quizId}/result`}>
                   <Check className="w-4 h-4 mr-2" />
                   View Results
