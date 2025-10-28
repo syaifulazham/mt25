@@ -108,6 +108,7 @@ model contingent {
   managers             contingentManager[]
   requests             contingentRequest[]
   teams                team[]
+  quizProgressions     quiz_progression[]
 
   @@index([schoolId], map: "Contingent_schoolId_fkey")
   @@index([participantId])
@@ -144,6 +145,7 @@ model contestant {
   surveyCompositions     survey_contestants_composition[]
   surveySubmissionStatus survey_submission_status[]
   teamMembers            teamMember[]
+  quizProgressions       quiz_progression[]
 
   @@index([contingentId], map: "contestant_contingentId_fkey")
 }
@@ -677,17 +679,23 @@ model quiz {
   publishedAt    DateTime?
   status         String
   createdBy      String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  contestId      Int?
-  contest        contest?        @relation(fields: [contestId], references: [id])
-  quiz_attempts  quiz_attempt[]
-  quiz_questions quiz_question[]
-  certTemplates  CertTemplate[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  contestId         Int?
+  nextQuizId        Int?
+  contest           contest?           @relation(fields: [contestId], references: [id])
+  nextQuiz          quiz?              @relation("QuizProgression", fields: [nextQuizId], references: [id], onDelete: SetNull)
+  previousQuizzes   quiz[]             @relation("QuizProgression")
+  quiz_attempts     quiz_attempt[]
+  quiz_questions    quiz_question[]
+  certTemplates     CertTemplate[]
+  progressionsFrom  quiz_progression[] @relation("ProgressionFromQuiz")
+  progressionsTo    quiz_progression[] @relation("ProgressionToQuiz")
 
   @@index([status])
   @@index([target_group])
   @@index([contestId], map: "quiz_contestId_fkey")
+  @@index([nextQuizId], map: "idx_quiz_nextQuizId")
 }
 
 model quiz_question {
@@ -737,6 +745,29 @@ model quiz_answer {
   attempt          quiz_attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@index([attemptId], map: "quiz_answer_attemptId_fkey")
+}
+
+model quiz_progression {
+  id            Int        @id @default(autoincrement())
+  quizId        Int
+  nextQuizId    Int
+  contingentId  Int
+  contestantId  Int
+  progressedAt  DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  quiz          quiz       @relation("ProgressionFromQuiz", fields: [quizId], references: [id], onDelete: Cascade)
+  nextQuiz      quiz       @relation("ProgressionToQuiz", fields: [nextQuizId], references: [id], onDelete: Cascade)
+  contingent    contingent @relation(fields: [contingentId], references: [id], onDelete: Cascade)
+  contestant    contestant @relation(fields: [contestantId], references: [id], onDelete: Cascade)
+
+  @@unique([contestantId, quizId, nextQuizId], map: "unique_contestant_quiz_progression")
+  @@index([quizId], map: "idx_progression_quizId")
+  @@index([nextQuizId], map: "idx_progression_nextQuizId")
+  @@index([contingentId], map: "idx_progression_contingentId")
+  @@index([contestantId], map: "idx_progression_contestantId")
+  @@index([contestantId, quizId], map: "idx_progression_contestant_quiz")
+  @@map("quiz_progression")
 }
 
 model contingentRequest {

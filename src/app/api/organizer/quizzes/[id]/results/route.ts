@@ -59,9 +59,8 @@ export async function GET(
       return NextResponse.json({ error: 'Quiz not found' }, { status: 404 });
     }
 
-    if (quiz.status !== 'published') {
-      return NextResponse.json({ error: 'Quiz is not published' }, { status: 400 });
-    }
+    // Allow viewing results regardless of quiz status
+    // Status check removed - organizers can view results for all quiz statuses
 
     // Get all attempts for this quiz with contestant information
     const attempts = await prisma.quiz_attempt.findMany({
