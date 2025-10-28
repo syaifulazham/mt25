@@ -683,6 +683,7 @@ model quiz {
   contest        contest?        @relation(fields: [contestId], references: [id])
   quiz_attempts  quiz_attempt[]
   quiz_questions quiz_question[]
+  certTemplates  CertTemplate[]
 
   @@index([status])
   @@index([target_group])
@@ -1243,11 +1244,13 @@ model CertTemplate {
   updatedBy               Int?
   targetType              CertTemplateTargetType  @default(GENERAL)
   eventId                 Int?
+  quizId                  Int?
   winnerRangeStart        Int?
   winnerRangeEnd          Int?
   prerequisites           Json?
   creator                 user                    @relation("CreatedTemplates", fields: [createdBy], references: [id], map: "fk_cert_template_createdBy")
   event                   event?                  @relation(fields: [eventId], references: [id], map: "fk_cert_template_event")
+  quiz                    quiz?                   @relation(fields: [quizId], references: [id], map: "fk_cert_template_quiz")
   certificate_status_enum certificate_status_enum @relation(fields: [status], references: [value], map: "fk_cert_template_status")
   updater                 user?                   @relation("UpdatedTemplates", fields: [updatedBy], references: [id], map: "fk_cert_template_updatedBy")
   certificates            Certificate[]
@@ -1258,6 +1261,7 @@ model CertTemplate {
   @@index([createdAt], map: "idx_cert_template_createdAt")
   @@index([targetType], map: "idx_cert_template_targetType")
   @@index([eventId], map: "idx_cert_template_eventId")
+  @@index([quizId], map: "idx_cert_template_quizId")
   @@index([createdBy], map: "fk_cert_template_createdBy")
   @@index([updatedBy], map: "fk_cert_template_updatedBy")
   @@map("cert_template")
@@ -1410,4 +1414,6 @@ enum CertTemplateTargetType {
   EVENT_PARTICIPANT
   EVENT_WINNER
   NON_CONTEST_PARTICIPANT
+  QUIZ_PARTICIPANT
+  QUIZ_WINNER
 }

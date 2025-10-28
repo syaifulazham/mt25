@@ -2,6 +2,9 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Type for certificate target types
+type CertTargetType = 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER';
+
 /**
  * Certificate Serial Number Service
  * Handles generation and management of unique serial numbers for certificates
@@ -13,7 +16,9 @@ export class CertificateSerialService {
     'GENERAL': 'GEN',
     'EVENT_PARTICIPANT': 'PART',
     'EVENT_WINNER': 'WIN',
-    'NON_CONTEST_PARTICIPANT': 'NCP'
+    'NON_CONTEST_PARTICIPANT': 'NCP',
+    'QUIZ_PARTICIPANT': 'QPART',
+    'QUIZ_WINNER': 'QWIN'
   };
 
   /**
@@ -23,13 +28,13 @@ export class CertificateSerialService {
    * Uses database transaction to ensure uniqueness and prevent race conditions
    * 
    * @param templateId - Certificate template ID
-   * @param targetType - Type of certificate (GENERAL, EVENT_PARTICIPANT, EVENT_WINNER, NON_CONTEST_PARTICIPANT)
+   * @param targetType - Type of certificate
    * @param issueYear - Year of issuance (defaults to current year)
    * @returns Promise<string> - Generated serial number
    */
   static async generateSerialNumber(
     templateId: number,
-    targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT',
+    targetType: CertTargetType,
     issueYear?: number
   ): Promise<string> {
     const year = issueYear || new Date().getFullYear();
@@ -90,7 +95,7 @@ export class CertificateSerialService {
    */
   static async getCurrentSequence(
     templateId: number,
-    targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT',
+    targetType: CertTargetType,
     year?: number
   ): Promise<number> {
     const currentYear = year || new Date().getFullYear();
@@ -163,7 +168,7 @@ export class CertificateSerialService {
    */
   static validateSerialNumber(serialNumber: string): boolean {
     // Format: MT25/GEN/T5/000001 (includes template ID)
-    const pattern = new RegExp(`^${this.PREFIX}\\d{2}/(GEN|PART|WIN|NCP)/T\\d+/\\d{6}$`);
+    const pattern = new RegExp(`^${this.PREFIX}\\d{2}/(GEN|PART|WIN|NCP|QPART|QWIN)/T\\d+/\\d{6}$`);
     return pattern.test(serialNumber);
   }
 
@@ -250,7 +255,7 @@ export class CertificateSerialService {
    */
   static async resetSequence(
     templateId: number,
-    targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT',
+    targetType: CertTargetType,
     year: number
   ): Promise<void> {
     await prisma.$executeRaw`
@@ -274,7 +279,7 @@ export class CertificateSerialService {
    */
   static async previewNextSerialNumber(
     templateId: number,
-    targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT',
+    targetType: CertTargetType,
     issueYear?: number
   ): Promise<string> {
     const year = issueYear || new Date().getFullYear();

@@ -235,11 +235,13 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [success, setSuccess] = useState<string | null>(null)
   
   // Target audience configuration states
-  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT'>(template?.targetType || 'GENERAL')
+  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER'>(template?.targetType || 'GENERAL')
   const [eventId, setEventId] = useState<number | null>(template?.eventId || null)
+  const [quizId, setQuizId] = useState<number | null>(template?.quizId || null)
   const [winnerRangeStart, setWinnerRangeStart] = useState<number | null>(template?.winnerRangeStart || 1)
   const [winnerRangeEnd, setWinnerRangeEnd] = useState<number | null>(template?.winnerRangeEnd || 3)
   const [events, setEvents] = useState<{id: number, name: string}[]>([])
+  const [quizzes, setQuizzes] = useState<{id: number, quiz_name: string}[]>([])
   
   // Set up state for showing preview modal
   const [showPreview, setShowPreview] = useState(false)
@@ -342,11 +344,39 @@ function debugElementProps(element: Element, location: string): string | undefin
     }
   }
 
+  // Fetch quizzes for quiz certificates
+  const fetchQuizzes = async () => {
+    try {
+      console.log('Fetching quizzes for certificates...')
+      const response = await fetch('/api/quizzes')
+      console.log('Quizzes API response status:', response.status)
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Failed to fetch quizzes, status:', response.status, 'response:', errorText)
+        throw new Error(`Failed to fetch quizzes: ${response.status} ${errorText}`)
+      }
+      
+      const data = await response.json()
+      console.log('Quizzes API response:', data)
+      
+      if (data && Array.isArray(data)) {
+        console.log(`Setting ${data.length} quizzes`)
+        setQuizzes(data)
+      } else {
+        console.error('Unexpected quizzes data format:', data)
+      }
+    } catch (error) {
+      console.error('Error fetching quizzes:', error)
+    }
+  }
+
   // Fetch data when component mounts
   useEffect(() => {
     fetchContests()
     fetchEvents()
     fetchSurveys()
+    fetchQuizzes()
   }, [])
   
   // Handle PDF file selection
@@ -798,8 +828,16 @@ function debugElementProps(element: Element, location: string): string | undefin
         }
       }
       
+      // Validation for quiz certificates
+      if (targetType === 'QUIZ_PARTICIPANT' || targetType === 'QUIZ_WINNER') {
+        if (!quizId) {
+          setError('Please select a quiz for this certificate template')
+          return
+        }
+      }
+      
       // Validation for winner range
-      if (targetType === 'EVENT_WINNER') {
+      if (targetType === 'EVENT_WINNER' || targetType === 'QUIZ_WINNER') {
         if (!winnerRangeStart || winnerRangeStart < 1) {
           setError('Winner range start must be at least 1')
           return
@@ -857,9 +895,10 @@ function debugElementProps(element: Element, location: string): string | undefin
         basePdfPath: pdfUrl,
         // Add target audience fields
         targetType,
-        eventId: targetType === 'GENERAL' ? null : eventId,
-        winnerRangeStart: targetType === 'EVENT_WINNER' ? winnerRangeStart : null,
-        winnerRangeEnd: targetType === 'EVENT_WINNER' ? winnerRangeEnd : null,
+        eventId: (targetType === 'EVENT_PARTICIPANT' || targetType === 'EVENT_WINNER') ? eventId : null,
+        quizId: (targetType === 'QUIZ_PARTICIPANT' || targetType === 'QUIZ_WINNER') ? quizId : null,
+        winnerRangeStart: (targetType === 'EVENT_WINNER' || targetType === 'QUIZ_WINNER') ? winnerRangeStart : null,
+        winnerRangeEnd: (targetType === 'EVENT_WINNER' || targetType === 'QUIZ_WINNER') ? winnerRangeEnd : null,
         // Add prerequisites
         prerequisites: prerequisites.length > 0 ? prerequisites : null,
         configuration: {
@@ -1191,6 +1230,30 @@ function debugElementProps(element: Element, location: string): string | undefin
                         />
                         <span className="ml-2">Non Contest Participant</span>
                       </label>
+                      
+                      <label className="inline-flex items-center mt-2">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="QUIZ_PARTICIPANT" 
+                          checked={targetType === 'QUIZ_PARTICIPANT'}
+                          onChange={() => setTargetType('QUIZ_PARTICIPANT')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">Quiz Participants</span>
+                      </label>
+                      
+                      <label className="inline-flex items-center mt-2">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="QUIZ_WINNER" 
+                          checked={targetType === 'QUIZ_WINNER'}
+                          onChange={() => setTargetType('QUIZ_WINNER')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2">Quiz Winners</span>
+                      </label>
                     </div>
                   </div>
                   
@@ -1211,7 +1274,24 @@ function debugElementProps(element: Element, location: string): string | undefin
                     </div>
                   )}
                   
-                  {targetType === 'EVENT_WINNER' && (
+                  {(targetType === 'QUIZ_PARTICIPANT' || targetType === 'QUIZ_WINNER') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Select Quiz</label>
+                      <select
+                        value={quizId || ''}
+                        onChange={(e) => setQuizId(e.target.value ? parseInt(e.target.value) : null)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        disabled={isLoading}
+                      >
+                        <option value="">-- Select a Quiz --</option>
+                        {quizzes.map(quiz => (
+                          <option key={quiz.id} value={quiz.id}>{quiz.quiz_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  {(targetType === 'EVENT_WINNER' || targetType === 'QUIZ_WINNER') && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Winner Range Start</label>
@@ -1252,6 +1332,12 @@ function debugElementProps(element: Element, location: string): string | undefin
                         'Event winners (please complete all fields)'}
                       {targetType === 'NON_CONTEST_PARTICIPANT' && 
                         'Non-competing participants (observers, guests, volunteers, etc.)'}
+                      {targetType === 'QUIZ_PARTICIPANT' && quizId && `Participants who completed ${quizzes.find(q => q.id === quizId)?.quiz_name || 'selected quiz'}`}
+                      {targetType === 'QUIZ_PARTICIPANT' && !quizId && 'Participants of selected quiz (please select a quiz)'}
+                      {targetType === 'QUIZ_WINNER' && quizId && winnerRangeStart && winnerRangeEnd && 
+                        `Top performers (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${quizzes.find(q => q.id === quizId)?.quiz_name || 'selected quiz'}`}
+                      {targetType === 'QUIZ_WINNER' && (!quizId || !winnerRangeStart || !winnerRangeEnd) && 
+                        'Quiz winners (please complete all fields)'}
                     </p>
                   </div>
                 </div>
@@ -1393,6 +1479,30 @@ function debugElementProps(element: Element, location: string): string | undefin
                       />
                       <span className="ml-2">Non Contest Participant</span>
                     </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="QUIZ_PARTICIPANT" 
+                        checked={targetType === 'QUIZ_PARTICIPANT'}
+                        onChange={() => setTargetType('QUIZ_PARTICIPANT')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">Quiz Participants</span>
+                    </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="QUIZ_WINNER" 
+                        checked={targetType === 'QUIZ_WINNER'}
+                        onChange={() => setTargetType('QUIZ_WINNER')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">Quiz Winners</span>
+                    </label>
                   </div>
                 </div>
                 
@@ -1416,8 +1526,28 @@ function debugElementProps(element: Element, location: string): string | undefin
                   </div>
                 )}
                 
-                {/* Winner Range (only for EVENT_WINNER) */}
-                {targetType === 'EVENT_WINNER' && (
+                {/* Quiz Selection (for QUIZ_PARTICIPANT and QUIZ_WINNER) */}
+                {(targetType === 'QUIZ_PARTICIPANT' || targetType === 'QUIZ_WINNER') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Select Quiz
+                    </label>
+                    <select
+                      value={quizId || ''}
+                      onChange={(e) => setQuizId(e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isLoading}
+                    >
+                      <option value="">-- Select a Quiz --</option>
+                      {quizzes.map(quiz => (
+                        <option key={quiz.id} value={quiz.id}>{quiz.quiz_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                
+                {/* Winner Range (for EVENT_WINNER and QUIZ_WINNER) */}
+                {(targetType === 'EVENT_WINNER' || targetType === 'QUIZ_WINNER') && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1463,6 +1593,12 @@ function debugElementProps(element: Element, location: string): string | undefin
                         'Event winners (please complete all fields)'}
                       {targetType === 'NON_CONTEST_PARTICIPANT' && 
                         'Non-competing participants (observers, guests, volunteers, etc.)'}
+                      {targetType === 'QUIZ_PARTICIPANT' && quizId && `Participants who completed ${quizzes.find(q => q.id === quizId)?.quiz_name || 'selected quiz'}`}
+                      {targetType === 'QUIZ_PARTICIPANT' && !quizId && 'Participants of selected quiz (please select a quiz)'}
+                      {targetType === 'QUIZ_WINNER' && quizId && winnerRangeStart && winnerRangeEnd && 
+                        `Top performers (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${quizzes.find(q => q.id === quizId)?.quiz_name || 'selected quiz'}`}
+                      {targetType === 'QUIZ_WINNER' && (!quizId || !winnerRangeStart || !winnerRangeEnd) && 
+                        'Quiz winners (please complete all fields)'}
                   </p>
                 </div>
               </div>

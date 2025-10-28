@@ -18,6 +18,14 @@ export interface TemplateCreateParams {
   configuration: TemplateConfiguration;
   status?: string;
   createdBy: number;
+  // Target audience fields
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER';
+  eventId?: number | null;
+  quizId?: number | null;
+  winnerRangeStart?: number | null;
+  winnerRangeEnd?: number | null;
+  // Prerequisites field
+  prerequisites?: Array<{prerequisite: string; id: number}> | null;
 }
 
 // Template Update Parameters
@@ -27,6 +35,14 @@ export interface TemplateUpdateParams {
   configuration?: TemplateConfiguration;
   status?: string;
   updatedBy: number;
+  // Target audience fields
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER';
+  eventId?: number | null;
+  quizId?: number | null;
+  winnerRangeStart?: number | null;
+  winnerRangeEnd?: number | null;
+  // Prerequisites field
+  prerequisites?: Array<{prerequisite: string; id: number}> | null;
 }
 
 // Template Canvas Configuration

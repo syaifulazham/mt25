@@ -60,13 +60,13 @@ export const templateQuerySchema = z.object({
   status: z.string().nullable().optional().refine((val) => !val || ['ACTIVE', 'INACTIVE'].includes(val), {
     message: 'Status must be ACTIVE or INACTIVE'
   }),
-  targetType: z.string().nullable().optional().refine((val) => !val || ['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT'].includes(val), {
+  targetType: z.string().nullable().optional().refine((val) => !val || ['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT', 'QUIZ_PARTICIPANT', 'QUIZ_WINNER'].includes(val), {
     message: 'Invalid target type'
   }),
 })
 
 // Target audience type enum
-export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT'])
+export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT', 'QUIZ_PARTICIPANT', 'QUIZ_WINNER'])
 
 // Prerequisite schema
 const prerequisiteSchema = z.object({
@@ -82,6 +82,7 @@ export const templateCreateSchema = z.object({
   // Target audience fields
   targetType: targetTypeEnum.default('GENERAL'),
   eventId: z.number().int().positive().nullable().optional(),
+  quizId: z.number().int().positive().nullable().optional(),
   winnerRangeStart: z.number().int().min(1).nullable().optional(),
   winnerRangeEnd: z.number().int().min(1).nullable().optional(),
   // Prerequisites field
@@ -98,6 +99,7 @@ export const templateUpdateSchema = z.object({
   // Target audience fields
   targetType: targetTypeEnum.optional(),
   eventId: z.number().int().positive().nullable().optional(),
+  quizId: z.number().int().positive().nullable().optional(),
   winnerRangeStart: z.number().int().min(1).nullable().optional(),
   winnerRangeEnd: z.number().int().min(1).nullable().optional(),
   // Prerequisites field

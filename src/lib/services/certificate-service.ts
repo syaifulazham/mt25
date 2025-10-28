@@ -120,6 +120,23 @@ export class TemplateService {
         configuration: data.configuration as any,
         // status will use default value 'ACTIVE' from schema
         // Don't set it explicitly due to FK constraint with certificate_status_enum
+        // Target audience fields
+        targetType: data.targetType || 'GENERAL',
+        // Use Prisma relation syntax for foreign keys
+        ...(data.eventId && {
+          event: {
+            connect: { id: data.eventId }
+          }
+        }),
+        ...(data.quizId && {
+          quiz: {
+            connect: { id: data.quizId }
+          }
+        }),
+        winnerRangeStart: data.winnerRangeStart,
+        winnerRangeEnd: data.winnerRangeEnd,
+        // Prerequisites
+        prerequisites: data.prerequisites as any,
         creator: {
           connect: { id: data.createdBy }
         }
@@ -138,6 +155,26 @@ export class TemplateService {
         ...(data.basePdfPath && { basePdfPath: data.basePdfPath }),
         ...(data.configuration && { configuration: data.configuration }),
         ...(data.status && { status: data.status }),
+        // Target audience fields
+        ...(data.targetType !== undefined && { targetType: data.targetType }),
+        // Use Prisma relation syntax for foreign keys
+        ...(data.eventId !== undefined && {
+          event: data.eventId ? {
+            connect: { id: data.eventId }
+          } : {
+            disconnect: true
+          }
+        }),
+        ...(data.quizId !== undefined && {
+          quiz: data.quizId ? {
+            connect: { id: data.quizId }
+          } : {
+            disconnect: true
+          }
+        }),
+        ...(data.winnerRangeStart !== undefined && { winnerRangeStart: data.winnerRangeStart }),
+        ...(data.winnerRangeEnd !== undefined && { winnerRangeEnd: data.winnerRangeEnd }),
+        ...(data.prerequisites !== undefined && { prerequisites: data.prerequisites as any }),
         updater: {
           connect: { id: data.updatedBy }
         }
