@@ -65,9 +65,10 @@ export async function GET(
     console.log("Event found:", event.name);
 
     // Use the exact same query as the working DOCX endpoint
+    // Use DISTINCT to avoid duplicates from target group joins
     console.log("Starting teams query (same as DOCX) for eventId:", eventId);
     const teams = await prisma.$queryRaw`
-      SELECT 
+      SELECT DISTINCT
         t.id,
         t.name as teamName,
         ect.status,
@@ -115,7 +116,7 @@ export async function GET(
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
         AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
-      ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
+      ORDER BY tg.schoolLevel, stateName, contingentName, teamName ASC
     ` as any[];
 
     console.log("Teams query completed, found", teams.length, "teams");
@@ -242,33 +243,27 @@ export async function GET(
 
     console.log("Team members queries completed, found", teamsWithMembers.length, "teams with members");
     
-    // Filter out teams where any member's age doesn't match target group age range
-    // unless the team status is 'APPROVED_SPECIAL' (same logic as main endlist API)
-    const filteredTeams = teamsWithMembers.filter((team) => {
-      // If team status is APPROVED_SPECIAL, always include the team
+    // No longer filtering out teams based on age validation
+    // All teams with APPROVED, APPROVED_SPECIAL, or ACCEPTED status will be included
+    // This matches the behavior in the endlist monitoring page
+    const filteredTeams = teamsWithMembers;
+    
+    // Log teams with potential age validation issues for reference
+    const teamsWithAgeIssues = teamsWithMembers.filter((team) => {
       if (team.status === 'APPROVED_SPECIAL') {
-        return true;
+        return false; // No issues for APPROVED_SPECIAL
       }
-
-      // Check if all members' ages are within the target group age range
       const allMembersAgeValid = team.members.every((member: any) => {
         const memberAge = parseInt(member.age);
         const minAge = parseInt(team.minAge);
         const maxAge = parseInt(team.maxAge);
-        
-        // If age data is missing or invalid, exclude the team for safety
-        if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) {
-          return false;
-        }
-        
-        // Check if member age is within the target group range
+        if (isNaN(memberAge) || isNaN(minAge) || isNaN(maxAge)) return false;
         return memberAge >= minAge && memberAge <= maxAge;
       });
-
-      return allMembersAgeValid;
+      return !allMembersAgeValid;
     });
     
-    console.log("After age validation filtering:", filteredTeams.length, "teams remain");
+    console.log(`Total teams: ${teamsWithMembers.length}, Teams with age validation issues (still included): ${teamsWithAgeIssues.length}`);
     
     // Prepare data for Excel with the specified headers
     console.log("Starting XLSX data preparation...");

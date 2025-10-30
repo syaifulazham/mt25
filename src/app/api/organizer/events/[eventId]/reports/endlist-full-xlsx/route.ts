@@ -67,9 +67,10 @@ export async function GET(
     console.log("Event found:", event.name);
 
     // Use the exact same query as the Full Endlist DOCX endpoint
+    // Use DISTINCT to avoid duplicates from target group joins
     console.log("Starting teams query (same as Full Endlist DOCX) for eventId:", eventId);
     const teams = await prisma.$queryRaw`
-      SELECT 
+      SELECT DISTINCT
         t.id,
         t.name as teamName,
         ect.status,
@@ -117,7 +118,7 @@ export async function GET(
       LEFT JOIN state st_i ON i.stateId = st_i.id
       WHERE ec.eventId = ${eventId}
         AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
-      ORDER BY tg.schoolLevel, st_s.name, st_hi.name, st_i.name, c.name, t.name ASC
+      ORDER BY tg.schoolLevel, stateName, contingentName, teamName ASC
     ` as any[];
 
     console.log("Teams query completed, found", teams.length, "teams");
@@ -197,14 +198,18 @@ export async function GET(
       members: membersByTeam[team.id] || []
     }));
 
-    console.log("Teams with members prepared, starting age validation...");
+    console.log("Teams with members prepared.");
 
-    // Filter teams based on age validation (same logic as other endpoints)
-    const filteredTeams = teamsWithMembers.filter((team: Team) => {
+    // No longer filtering out teams based on age validation
+    // All teams with APPROVED, APPROVED_SPECIAL, or ACCEPTED status will be included
+    // This matches the behavior in the endlist monitoring page
+    const filteredTeams = teamsWithMembers;
+    
+    // Log teams with potential age validation issues for reference
+    const teamsWithAgeIssues = teamsWithMembers.filter((team: Team) => {
       if (team.status === 'APPROVED_SPECIAL') {
-        return true; // Skip age validation for special approval
+        return false; // No issues for APPROVED_SPECIAL
       }
-
       const allMembersAgeValid = team.members.every((member: TeamMember) => {
         if (!member.age) return false;
         const memberAge = member.age;
@@ -212,11 +217,10 @@ export async function GET(
         const maxAge = (team as any).maxAge;
         return memberAge >= minAge && memberAge <= maxAge;
       });
-
-      return allMembersAgeValid;
+      return !allMembersAgeValid;
     });
     
-    console.log("After age validation filtering:", filteredTeams.length, "teams remain");
+    console.log(`Total teams: ${teamsWithMembers.length}, Teams with age validation issues (still included): ${teamsWithAgeIssues.length}`);
     
     // Prepare data for Excel with the specified headers (including IC column)
     console.log("Starting XLSX data preparation...");
