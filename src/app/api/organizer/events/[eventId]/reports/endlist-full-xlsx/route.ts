@@ -67,10 +67,9 @@ export async function GET(
     console.log("Event found:", event.name);
 
     // Use the exact same query as the Full Endlist DOCX endpoint
-    // Use DISTINCT to avoid duplicates from target group joins
     console.log("Starting teams query (same as Full Endlist DOCX) for eventId:", eventId);
     const teams = await prisma.$queryRaw`
-      SELECT DISTINCT
+      SELECT 
         t.id,
         t.name as teamName,
         ect.status,
@@ -128,8 +127,16 @@ export async function GET(
       return NextResponse.json({ error: "No teams found for this event" }, { status: 404 });
     }
 
+    // Deduplicate teams by ID (same as frontend does)
+    // Teams can appear multiple times if registered in multiple target groups
+    const uniqueTeams = teams.filter((team: any, index: number, self: any[]) => 
+      index === self.findIndex((t: any) => Number(t.id) === Number(team.id))
+    );
+    
+    console.log(`Total teams from query: ${teams.length}, Unique teams after deduplication: ${uniqueTeams.length}`);
+
     // Convert BigInt values to numbers to avoid serialization issues
-    const processedTeams = teams.map((team: any) => ({
+    const processedTeams = uniqueTeams.map((team: any) => ({
       ...team,
       id: Number(team.id),
       minAge: Number(team.minAge),

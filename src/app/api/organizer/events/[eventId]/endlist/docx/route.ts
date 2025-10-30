@@ -75,9 +75,8 @@ export async function GET(
     }
 
     // Fetch teams using the same structure as the working endlist API
-    // Use DISTINCT to avoid duplicates from target group joins
     const teams = await prisma.$queryRaw`
-      SELECT DISTINCT
+      SELECT 
         t.id,
         t.name as teamName,
         ect.status,
@@ -127,9 +126,17 @@ export async function GET(
       ORDER BY tg.schoolLevel, stateName, contingentName, teamName ASC
     ` as any[];
 
-    // Fetch team members for each team using the same structure as the working endlist API
+    // Deduplicate teams by ID (same as frontend does)
+    // Teams can appear multiple times if registered in multiple target groups
+    const uniqueTeams = teams.filter((team: any, index: number, self: any[]) => 
+      index === self.findIndex((t: any) => Number(t.id) === Number(team.id))
+    );
+    
+    console.log(`Total teams from query: ${teams.length}, Unique teams after deduplication: ${uniqueTeams.length}`);
+
+    // Fetch team members for each unique team
     const teamsWithMembers = await Promise.all(
-      teams.map(async (team: any) => {
+      uniqueTeams.map(async (team: any) => {
         const members = await prisma.$queryRaw`
           SELECT 
             con.id,
