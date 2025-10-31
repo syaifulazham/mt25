@@ -117,6 +117,41 @@ export default function NationalRegistrationSection({ participantId }: NationalR
     fetchNationalTeams();
   }, [participantId]);
 
+  // Handle accepting a team registration
+  const handleAccept = async (teamId: number) => {
+    try {
+      const response = await fetch("/api/participants/national-registration/accept", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ teamId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to accept registration");
+      }
+
+      // Update the local state to reflect the change
+      setTeams(
+        teams.map((team) => 
+          team.id === teamId ? { ...team, status: "ACCEPTED" } : team
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Team registration accepted successfully",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to accept team registration",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Show team members when expand is clicked
   const handleViewMembers = async (team: NationalTeam) => {
     try {
@@ -314,14 +349,25 @@ export default function NationalRegistrationSection({ participantId }: NationalR
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleViewMembers(team)}
-                    className="hover:bg-purple-100"
-                  >
-                    {t('dashboard.view_members')}
-                  </Button>
+                  <div className="flex justify-end space-x-2">
+                    {(team.status === 'APPROVED' || team.status === 'APPROVED_SPECIAL' || (team.status === 'CONDITIONAL' && !team.hasMultipleTeamMembers)) && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleAccept(team.id)}
+                      >
+                        {t('dashboard.accept')}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewMembers(team)}
+                      className="hover:bg-purple-100"
+                    >
+                      {t('dashboard.view_members')}
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

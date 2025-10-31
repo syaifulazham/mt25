@@ -1,12 +1,27 @@
-# National Registration Section - QR Code & Download List Buttons
+# National Registration Section - Complete Feature Set
 
 ## Update Summary
 
-Added **QR Code** and **Download List** buttons to the "Final Stage (National) Registration" section, matching the functionality from the "Zone Physical Event Registration" section.
+Added **QR Code**, **Download List**, and **Accept** buttons to the "Final Stage (National) Registration" section, matching the full functionality from the "Zone Physical Event Registration" section.
 
 ## Changes Made
 
-### 1. Created Download API Endpoint
+### 1. Created Accept API Endpoint
+**File:** `/src/app/api/participants/national-registration/accept/route.ts`
+
+**Functionality:**
+- Accepts team registration for national events
+- Changes status from APPROVED/APPROVED_SPECIAL to ACCEPTED
+- Validates user authorization (contingent manager or direct team manager)
+- Filters by NATIONAL events only to ensure correct event context
+- Updates eventcontestteam status to ACCEPTED
+
+**Security:**
+- Requires authentication via NextAuth session
+- Verifies user is manager of team's contingent OR direct team manager
+- Only updates status for NATIONAL events (prevents cross-event updates)
+
+### 2. Created Download API Endpoint
 **File:** `/src/app/api/participants/national-registration/download/route.ts`
 
 **Functionality:**
@@ -45,7 +60,7 @@ SENARAI JURULATIH
 - Malaysian language (Bahasa Melayu)
 - Includes header/footer with page numbers
 
-### 2. Updated Frontend Component
+### 3. Updated Frontend Component - Accept Button
 **File:** `/src/app/participants/dashboard/_components/national-registration.tsx`
 
 **Changes:**
@@ -56,8 +71,9 @@ SENARAI JURULATIH
 2. **Added State:**
    - `isLoading` state for download button
 
-3. **Added Function:**
+3. **Added Functions:**
    - `handleDownloadList()` - Downloads DOCX file
+   - `handleAccept()` - Accepts team registration (changes status to ACCEPTED)
 
 4. **Updated Header Section:**
 ```tsx
@@ -74,6 +90,40 @@ SENARAI JURULATIH
   </Button>
 </div>
 ```
+
+5. **Updated Actions Column:**
+```tsx
+<TableCell className="text-right">
+  <div className="flex justify-end space-x-2">
+    {(team.status === 'APPROVED' || team.status === 'APPROVED_SPECIAL' || 
+      (team.status === 'CONDITIONAL' && !team.hasMultipleTeamMembers)) && (
+      <Button
+        variant="default"
+        size="sm"
+        onClick={() => handleAccept(team.id)}
+      >
+        {t('dashboard.accept')}
+      </Button>
+    )}
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => handleViewMembers(team)}
+      className="hover:bg-purple-100"
+    >
+      {t('dashboard.view_members')}
+    </Button>
+  </div>
+</TableCell>
+```
+
+**Accept Button Conditions:**
+- Shows when status is `APPROVED` or `APPROVED_SPECIAL`
+- Shows when status is `CONDITIONAL` AND team has NO multiple team members
+- Hidden for `PENDING`, `ACCEPTED`, or `REJECTED` statuses
+- Updates team status to `ACCEPTED` when clicked
+- Updates local state immediately for instant UI feedback
+- Shows success/error toast notification
 
 ## Design Consistency
 
@@ -99,13 +149,15 @@ SENARAI JURULATIH
 |---------|-------------------|----------------------|
 | QR Code Button | ✅ Blue button | ✅ Default styling |
 | Download List | ✅ Blue button | ✅ Purple button |
+| Accept Button | ✅ In actions column | ✅ In actions column |
 | Background | Gray (`bg-muted/50`) | Purple/Indigo gradient |
 | Filter | `contest.method = 'PHYSICAL'` | `e.scopeArea = 'NATIONAL'` |
 | Document Title | Zone registration | National registration |
 
 ## Files Created
 
-1. `/src/app/api/participants/national-registration/download/route.ts` - Download API endpoint (711 lines)
+1. `/src/app/api/participants/national-registration/accept/route.ts` - Accept API endpoint (113 lines)
+2. `/src/app/api/participants/national-registration/download/route.ts` - Download API endpoint (711 lines)
 
 ## Files Modified
 
@@ -113,7 +165,9 @@ SENARAI JURULATIH
    - Added imports (FileText, QRCodeButton)
    - Added isLoading state
    - Added handleDownloadList function
+   - Added handleAccept function
    - Updated header section with buttons
+   - Updated actions column with Accept button
 
 2. `/NATIONAL_REGISTRATION_SECTION.md` - Updated documentation
 
@@ -136,6 +190,17 @@ SENARAI JURULATIH
 - [ ] Member details are complete
 - [ ] Manager information is correct
 - [ ] Document formatting is professional
+
+✅ **Accept Button:**
+- [ ] Button appears for APPROVED teams
+- [ ] Button appears for APPROVED_SPECIAL teams
+- [ ] Button appears for CONDITIONAL teams (without multiple team members)
+- [ ] Button hidden for PENDING teams
+- [ ] Button hidden for ACCEPTED teams
+- [ ] Clicking updates status to ACCEPTED
+- [ ] Status badge updates immediately
+- [ ] Success toast notification appears
+- [ ] Works together with View Members button
 
 ✅ **Integration:**
 - [ ] Section only shows when national teams exist
