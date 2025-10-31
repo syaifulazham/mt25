@@ -14,6 +14,7 @@ import ProfileCompletionAlert from "./profile-completion-alert";
 import UnassignedContestantsAlert from "./unassigned-contestants-alert";
 import ZoneRegistration from "./zone-registration";
 import OnlineRegistration from "./online-registration";
+import NationalRegistration from "./national-registration";
 
 interface DashboardClientProps {
   user: any;
@@ -105,6 +106,9 @@ export default function DashboardClient({ user, userDetails }: DashboardClientPr
       
       {/* Online Event Registration */}
       <OnlineRegistration participantId={Number(user.id)} />
+      
+      {/* Final Stage (National) Registration */}
+      <NationalRegistration participantId={Number(user.id)} />
       
       {/* Video Gallery - now more compact */}
       <div className="p-4 bg-muted/50 rounded-lg mb-6">
