@@ -16,6 +16,11 @@ interface Certificate {
   filePath: string | null
   contingent_name: string | null
   ic_number: string | null
+  ownership: any
+}
+
+interface CertificateWithState extends Certificate {
+  stateName?: string | null
 }
 
 export async function POST(
@@ -64,7 +69,8 @@ export async function POST(
         recipientName: true,
         filePath: true,
         contingent_name: true,
-        ic_number: true
+        ic_number: true,
+        ownership: true
       },
       orderBy: [
         { contingent_name: 'asc' },
@@ -74,6 +80,12 @@ export async function POST(
 
     if (certificates.length === 0) {
       return NextResponse.json({ error: 'No certificates found' }, { status: 404 })
+    }
+
+    // If merging by state, fetch state information for all certificates
+    let certificatesWithState: CertificateWithState[] = certificates
+    if (mergingType === 'merge_by_state') {
+      certificatesWithState = await enrichCertificatesWithState(certificates)
     }
 
     // Create a passthrough stream for the response
@@ -102,16 +114,19 @@ export async function POST(
           // Process based on merging type
           if (mergingType === 'split') {
             // Each certificate as separate PDF
-            await processSplitPDFs(archive, certificates, downloadType)
+            await processSplitPDFs(archive, certificatesWithState, downloadType)
           } else if (mergingType === 'merge_all') {
             // Merge all into single PDF
-            await processMergeAll(archive, certificates, template.templateName)
+            await processMergeAll(archive, certificatesWithState, template.templateName)
+          } else if (mergingType === 'merge_by_contingent') {
+            // Merge by contingent
+            await processMergeByContingent(archive, certificatesWithState, downloadType)
           } else if (mergingType === 'merge_by_state') {
-            // Merge by state/contingent
-            await processMergeByState(archive, certificates, downloadType)
+            // Merge by state
+            await processMergeByState(archive, certificatesWithState, downloadType)
           } else if (mergingType === 'merge_every_n') {
             // Merge every N files
-            await processMergeEveryN(archive, certificates, mergeEveryN || 10, downloadType)
+            await processMergeEveryN(archive, certificatesWithState, mergeEveryN || 10, downloadType)
           }
 
           // Finalize the archive
@@ -138,10 +153,51 @@ export async function POST(
   }
 }
 
+// Helper function: Enrich certificates with state information
+async function enrichCertificatesWithState(certificates: Certificate[]): Promise<CertificateWithState[]> {
+  const enriched: CertificateWithState[] = []
+
+  for (const cert of certificates) {
+    let stateName: string | null = null
+
+    try {
+      // Extract contingentId from ownership JSON
+      const ownership = cert.ownership as any
+      const contingentId = ownership?.contingentId
+
+      if (contingentId) {
+        // Query to get state name from contingent -> school/independent -> state
+        const result = await prisma.$queryRaw<Array<{ stateName: string }>>`
+          SELECT DISTINCT s.name as stateName
+          FROM contingent c
+          LEFT JOIN school sch ON c.schoolId = sch.id
+          LEFT JOIN independent ind ON c.independentId = ind.id
+          LEFT JOIN state s ON (sch.stateId = s.id OR ind.stateId = s.id)
+          WHERE c.id = ${contingentId}
+          LIMIT 1
+        `
+
+        if (result && result.length > 0) {
+          stateName = result[0].stateName
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching state for certificate ${cert.id}:`, error)
+    }
+
+    enriched.push({
+      ...cert,
+      stateName
+    })
+  }
+
+  return enriched
+}
+
 // Helper function: Process split PDFs
 async function processSplitPDFs(
   archive: Archiver,
-  certificates: Certificate[],
+  certificates: CertificateWithState[],
   downloadType: string
 ) {
   for (const cert of certificates) {
@@ -162,7 +218,7 @@ async function processSplitPDFs(
 // Helper function: Merge all PDFs into one
 async function processMergeAll(
   archive: Archiver,
-  certificates: Certificate[],
+  certificates: CertificateWithState[],
   templateName: string
 ) {
   const mergedPdf = await PDFDocument.create()
@@ -189,14 +245,14 @@ async function processMergeAll(
   })
 }
 
-// Helper function: Merge PDFs by state/contingent
-async function processMergeByState(
+// Helper function: Merge PDFs by contingent
+async function processMergeByContingent(
   archive: Archiver,
-  certificates: Certificate[],
+  certificates: CertificateWithState[],
   downloadType: string
 ) {
   // Group certificates by contingent
-  const grouped = new Map<string, Certificate[]>()
+  const grouped = new Map<string, CertificateWithState[]>()
   
   for (const cert of certificates) {
     const key = cert.contingent_name || 'Unknown'
@@ -238,10 +294,59 @@ async function processMergeByState(
   }
 }
 
+// Helper function: Merge PDFs by state (SELANGOR, PERAK, etc.)
+async function processMergeByState(
+  archive: Archiver,
+  certificates: CertificateWithState[],
+  downloadType: string
+) {
+  // Group certificates by state
+  const grouped = new Map<string, CertificateWithState[]>()
+  
+  for (const cert of certificates) {
+    const key = cert.stateName || 'Unknown'
+    if (!grouped.has(key)) {
+      grouped.set(key, [])
+    }
+    grouped.get(key)!.push(cert)
+  }
+
+  // Merge each group
+  for (const [stateName, certs] of grouped.entries()) {
+    const mergedPdf = await PDFDocument.create()
+
+    for (const cert of certs) {
+      if (!cert.filePath) continue
+
+      const pdfPath = path.join(process.cwd(), 'public', cert.filePath)
+      if (!fs.existsSync(pdfPath)) continue
+
+      try {
+        const pdfBytes = fs.readFileSync(pdfPath)
+        const pdf = await PDFDocument.load(pdfBytes)
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices())
+        copiedPages.forEach((page) => mergedPdf.addPage(page))
+      } catch (error) {
+        console.error(`Error merging PDF for ${cert.recipientName}:`, error)
+      }
+    }
+
+    const mergedPdfBytes = await mergedPdf.save()
+    const fileName = `${sanitizeFileName(stateName)}-certificates.pdf`
+    const folderPath = downloadType === 'state_folders' 
+      ? `${sanitizeFileName(stateName)}/`
+      : ''
+
+    archive.append(Buffer.from(mergedPdfBytes), { 
+      name: `${folderPath}${fileName}` 
+    })
+  }
+}
+
 // Helper function: Merge every N PDFs
 async function processMergeEveryN(
   archive: Archiver,
-  certificates: Certificate[],
+  certificates: CertificateWithState[],
   n: number,
   downloadType: string
 ) {

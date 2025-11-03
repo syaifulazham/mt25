@@ -50,7 +50,7 @@ export default function BulkGeneratePage() {
   const [showViewModal, setShowViewModal] = useState(false)
   const [ignoreAttendance, setIgnoreAttendance] = useState(false)
   const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false)
-  const [mergingType, setMergingType] = useState<'split' | 'merge_all' | 'merge_by_state' | 'merge_every_n'>('split')
+  const [mergingType, setMergingType] = useState<'split' | 'merge_all' | 'merge_by_contingent' | 'merge_by_state' | 'merge_every_n'>('split')
   const [downloadType, setDownloadType] = useState<'single_folder' | 'state_folders'>('single_folder')
   const [mergeEveryN, setMergeEveryN] = useState<number>(10)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -607,14 +607,28 @@ export default function BulkGeneratePage() {
                       <input
                         type="radio"
                         name="mergingType"
+                        value="merge_by_contingent"
+                        checked={mergingType === 'merge_by_contingent'}
+                        onChange={(e) => setMergingType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm">
+                        <span className="font-medium text-gray-900">Merge by Contingent</span>
+                        <span className="block text-gray-500">One merged PDF per contingent</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="mergingType"
                         value="merge_by_state"
                         checked={mergingType === 'merge_by_state'}
                         onChange={(e) => setMergingType(e.target.value as any)}
                         className="h-4 w-4 text-blue-600"
                       />
                       <span className="ml-3 text-sm">
-                        <span className="font-medium text-gray-900">Merge by State/Contingent</span>
-                        <span className="block text-gray-500">One merged PDF per state/contingent</span>
+                        <span className="font-medium text-gray-900">Merge by State</span>
+                        <span className="block text-gray-500">One merged PDF per state (SELANGOR, PERAK, etc.)</span>
                       </span>
                     </label>
                     <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
