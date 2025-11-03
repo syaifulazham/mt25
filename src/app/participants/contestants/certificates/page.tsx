@@ -663,21 +663,15 @@ export default function CertificatesPage() {
         
         {(() => {
           const schoolCount = contestants.filter(c => c.certificates.school).length
-          const isDisabled = schoolCount === 0
           return (
-            <div className={`rounded-lg p-4 ${isDisabled ? 'bg-gray-100 border border-gray-300 opacity-60' : 'bg-green-50 border border-green-200'}`}>
-              <p className={`text-sm font-medium ${isDisabled ? 'text-gray-600' : 'text-green-600'}`}>Sijil Sekolah</p>
-              <p className={`text-2xl font-bold ${isDisabled ? 'text-gray-900' : 'text-green-900'}`}>
+            <div className="rounded-lg p-4 bg-green-50 border border-green-200">
+              <p className="text-sm font-medium text-green-600">Sijil Sekolah</p>
+              <p className="text-2xl font-bold text-green-900">
                 {schoolCount}
               </p>
               <button
                 onClick={() => setShowBulkModal(true)}
-                disabled={isDisabled}
-                className={`mt-3 w-full px-3 py-2 text-white text-sm font-medium rounded-md transition-colors ${
-                  isDisabled 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
+                className="mt-3 w-full px-3 py-2 text-white text-sm font-medium rounded-md transition-colors bg-green-600 hover:bg-green-700"
               >
                 Tindakan Pukal
               </button>
