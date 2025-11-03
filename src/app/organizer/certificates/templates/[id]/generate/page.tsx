@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, X } from 'lucide-react'
+import { Eye, X, Download } from 'lucide-react'
 
 interface Contestant {
   id: number
@@ -48,6 +48,12 @@ export default function BulkGeneratePage() {
   }>({ success: [], failed: [] })
   const [viewCertificateId, setViewCertificateId] = useState<number | null>(null)
   const [showViewModal, setShowViewModal] = useState(false)
+  const [ignoreAttendance, setIgnoreAttendance] = useState(false)
+  const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false)
+  const [mergingType, setMergingType] = useState<'split' | 'merge_all' | 'merge_by_state' | 'merge_every_n'>('split')
+  const [downloadType, setDownloadType] = useState<'single_folder' | 'state_folders'>('single_folder')
+  const [mergeEveryN, setMergeEveryN] = useState<number>(10)
+  const [isDownloading, setIsDownloading] = useState(false)
 
   // Fetch template and contestants
   useEffect(() => {
@@ -66,7 +72,7 @@ export default function BulkGeneratePage() {
 
         // Fetch contestants with attendance status
         const contestantsResponse = await fetch(
-          `/api/certificates/templates/${templateId}/contestants-for-generation`
+          `/api/certificates/templates/${templateId}/contestants-for-generation?ignoreAttendance=${ignoreAttendance}`
         )
         if (!contestantsResponse.ok) {
           throw new Error('Failed to fetch contestants')
@@ -82,7 +88,7 @@ export default function BulkGeneratePage() {
     }
 
     fetchData()
-  }, [templateId])
+  }, [templateId, ignoreAttendance])
 
   // Handle select all (includes all contestants for regeneration support)
   const handleSelectAll = () => {
@@ -214,15 +220,42 @@ export default function BulkGeneratePage() {
         <Link href="/organizer/certificates" className="text-blue-600 hover:underline mb-2 inline-block">
           ← Back to Templates
         </Link>
-        <h1 className="text-3xl font-bold mb-2">Bulk Certificate Generation</h1>
-        <p className="text-xl text-gray-800 font-semibold mb-2">
-          {template?.templateName}
-        </p>
-        {template?.event && (
-          <p className="text-gray-600">
-            Event: <span className="font-semibold">{template.event.name}</span>
-          </p>
-        )}
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Bulk Certificate Generation</h1>
+            <p className="text-xl text-gray-800 font-semibold mb-2">
+              {template?.templateName}
+            </p>
+            {template?.event && (
+              <p className="text-gray-600">
+                Event: <span className="font-semibold">{template.event.name}</span>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+            <label htmlFor="ignore-attendance" className="text-sm font-medium text-gray-700 cursor-pointer">
+              Ignore Attendance Status
+            </label>
+            <button
+              id="ignore-attendance"
+              type="button"
+              onClick={() => setIgnoreAttendance(!ignoreAttendance)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                ignoreAttendance ? 'bg-blue-600' : 'bg-gray-200'
+              }`}
+              disabled={isGenerating}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  ignoreAttendance ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            {ignoreAttendance && (
+              <span className="text-xs text-amber-600 font-medium">All contestants shown</span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Statistics */}
@@ -275,6 +308,14 @@ export default function BulkGeneratePage() {
               disabled={contestants.length === 0 || isGenerating}
             >
               {selectedContestants.length === contestants.length ? 'Deselect All' : 'Select All'}
+            </button>
+            <button
+              onClick={() => setShowBulkDownloadModal(true)}
+              disabled={generatedCount === 0}
+              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-flex items-center mr-2"
+            >
+              <Download className="h-5 w-5 mr-1" />
+              Bulk Download ({generatedCount})
             </button>
             <button
               onClick={handleGenerateCertificates}
@@ -337,7 +378,9 @@ export default function BulkGeneratePage() {
             {contestants.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                  No contestants with attendance status "Present" found for this event.
+                  {ignoreAttendance 
+                    ? 'No contestants found for this event.'
+                    : 'No contestants with attendance status "Present" found for this event.'}
                 </td>
               </tr>
             ) : (
@@ -494,6 +537,222 @@ export default function BulkGeneratePage() {
                   className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
                   Generate Certificates
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Download Modal */}
+      {showBulkDownloadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-blue-100 rounded-full p-3">
+                    <Download className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h3 className="ml-4 text-lg font-semibold text-gray-900">
+                    Bulk Download Certificates
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowBulkDownloadModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="space-y-6">
+                {/* Merging Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    PDF Merging Type
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="mergingType"
+                        value="split"
+                        checked={mergingType === 'split'}
+                        onChange={(e) => setMergingType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm">
+                        <span className="font-medium text-gray-900">Split PDF</span>
+                        <span className="block text-gray-500">Each certificate as a separate PDF file</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="mergingType"
+                        value="merge_all"
+                        checked={mergingType === 'merge_all'}
+                        onChange={(e) => setMergingType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm">
+                        <span className="font-medium text-gray-900">Merge All in a Single PDF</span>
+                        <span className="block text-gray-500">All certificates combined into one PDF file</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="mergingType"
+                        value="merge_by_state"
+                        checked={mergingType === 'merge_by_state'}
+                        onChange={(e) => setMergingType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm">
+                        <span className="font-medium text-gray-900">Merge by State/Contingent</span>
+                        <span className="block text-gray-500">One merged PDF per state/contingent</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="mergingType"
+                        value="merge_every_n"
+                        checked={mergingType === 'merge_every_n'}
+                        onChange={(e) => setMergingType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm flex-1">
+                        <span className="font-medium text-gray-900">Merge Every N Files</span>
+                        <span className="block text-gray-500">Batch merge certificates</span>
+                      </span>
+                      {mergingType === 'merge_every_n' && (
+                        <input
+                          type="number"
+                          min="2"
+                          max="100"
+                          value={mergeEveryN}
+                          onChange={(e) => setMergeEveryN(parseInt(e.target.value) || 10)}
+                          className="ml-3 w-20 px-2 py-1 border rounded text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* Download Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Folder Structure
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="downloadType"
+                        value="single_folder"
+                        checked={downloadType === 'single_folder'}
+                        onChange={(e) => setDownloadType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm">
+                        <span className="font-medium text-gray-900">All in a Single Folder</span>
+                        <span className="block text-gray-500">Flat structure with all files in one folder</span>
+                      </span>
+                    </label>
+                    <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="radio"
+                        name="downloadType"
+                        value="state_folders"
+                        checked={downloadType === 'state_folders'}
+                        onChange={(e) => setDownloadType(e.target.value as any)}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-3 text-sm">
+                        <span className="font-medium text-gray-900">Group in State/Contingent Folders</span>
+                        <span className="block text-gray-500">Organized in folders by state/contingent</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <span className="font-medium">Download Summary:</span> {generatedCount} certificate(s) will be downloaded as a ZIP file.
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowBulkDownloadModal(false)}
+                  disabled={isDownloading}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsDownloading(true)
+                    try {
+                      const response = await fetch(`/api/certificates/templates/${templateId}/bulk-download`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          mergingType,
+                          downloadType,
+                          mergeEveryN: mergingType === 'merge_every_n' ? mergeEveryN : undefined
+                        })
+                      })
+
+                      if (!response.ok) {
+                        throw new Error('Failed to download certificates')
+                      }
+
+                      // Download the ZIP file
+                      const blob = await response.blob()
+                      const url = window.URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `certificates-${template?.templateName || 'bulk'}-${Date.now()}.zip`
+                      document.body.appendChild(a)
+                      a.click()
+                      window.URL.revokeObjectURL(url)
+                      document.body.removeChild(a)
+
+                      setShowBulkDownloadModal(false)
+                    } catch (error) {
+                      console.error('Download error:', error)
+                      alert('Failed to download certificates. Please try again.')
+                    } finally {
+                      setIsDownloading(false)
+                    }
+                  }}
+                  disabled={isDownloading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed inline-flex items-center"
+                >
+                  {isDownloading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Preparing Download...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download ZIP
+                    </>
+                  )}
                 </button>
               </div>
             </div>

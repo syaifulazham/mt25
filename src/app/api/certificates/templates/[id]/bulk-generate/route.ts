@@ -116,7 +116,8 @@ export async function POST(
           continue
         }
 
-        // Get contest information from attendanceContestant
+        // Get contest information from attendanceContestant (if available)
+        // If no attendance record, try to get from team registration
         const attendanceRecord = await prisma.attendanceContestant.findFirst({
           where: {
             contestantId: contestantId,
@@ -127,17 +128,18 @@ export async function POST(
           }
         })
 
-        if (!attendanceRecord) {
-          results.failed++
-          results.errors.push({ contestantId, error: 'Attendance record not found' })
-          continue
+        // Fetch contest details
+        let contest = null
+        let contestId = attendanceRecord?.contestId
+
+        // If no attendance record, try to get contest from team registration
+        if (!contestId && contestant.teamMembers?.[0]?.team?.contestId) {
+          contestId = contestant.teamMembers[0].team.contestId
         }
 
-        // Fetch contest details if contestId exists
-        let contest = null
-        if (attendanceRecord.contestId) {
+        if (contestId) {
           contest = await prisma.contest.findUnique({
-            where: { id: attendanceRecord.contestId },
+            where: { id: contestId },
             select: {
               code: true,
               name: true

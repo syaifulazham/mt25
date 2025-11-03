@@ -24,6 +24,8 @@ export async function GET(
     }
 
     const templateId = parseInt(params.id)
+    const { searchParams } = new URL(request.url)
+    const ignoreAttendance = searchParams.get('ignoreAttendance') === 'true'
 
     // Get template details including eventId
     const template = await prisma.certTemplate.findUnique({
@@ -54,28 +56,54 @@ export async function GET(
       )
     }
 
-    // Get all contestants with attendance status 'Present' for this event
-    const contestants = await prisma.$queryRaw<Array<{
+    // Get all contestants for this event
+    // If ignoreAttendance is true, get all contestants from teams registered to the event
+    // Otherwise, only get contestants with attendance status 'Present'
+    let contestants: Array<{
       id: number
       name: string
       ic: string
       contingentId: number
       contingentName: string
-    }>>`
-      SELECT DISTINCT
-        c.id,
-        c.name,
-        c.ic,
-        c.contingentId,
-        cg.name as contingentName
-      FROM contestant c
-      INNER JOIN attendanceContestant ac ON ac.contestantId = c.id
-      INNER JOIN attendanceContingent acon ON acon.contingentId = c.contingentId AND acon.eventId = ${template.eventId}
-      INNER JOIN contingent cg ON cg.id = c.contingentId
-      WHERE ac.attendanceStatus = 'Present'
-        AND ac.eventId = ${template.eventId}
-      ORDER BY cg.name, c.name
-    `
+    }>;
+
+    if (ignoreAttendance) {
+      // Get all contestants from teams registered to this event, regardless of attendance
+      contestants = await prisma.$queryRaw`
+        SELECT DISTINCT
+          c.id,
+          c.name,
+          c.ic,
+          c.contingentId,
+          cg.name as contingentName
+        FROM contestant c
+        INNER JOIN teamMember tm ON tm.contestantId = c.id
+        INNER JOIN team t ON t.id = tm.teamId
+        INNER JOIN eventcontestteam ect ON ect.teamId = t.id
+        INNER JOIN eventcontest ec ON ec.id = ect.eventContestId
+        INNER JOIN contingent cg ON cg.id = c.contingentId
+        WHERE ec.eventId = ${template.eventId}
+          AND ect.status IN ('APPROVED', 'ACCEPTED', 'APPROVED_SPECIAL')
+        ORDER BY cg.name, c.name
+      `
+    } else {
+      // Get only contestants with attendance status 'Present'
+      contestants = await prisma.$queryRaw`
+        SELECT DISTINCT
+          c.id,
+          c.name,
+          c.ic,
+          c.contingentId,
+          cg.name as contingentName
+        FROM contestant c
+        INNER JOIN attendanceContestant ac ON ac.contestantId = c.id
+        INNER JOIN attendanceContingent acon ON acon.contingentId = c.contingentId AND acon.eventId = ${template.eventId}
+        INNER JOIN contingent cg ON cg.id = c.contingentId
+        WHERE ac.attendanceStatus = 'Present'
+          AND ac.eventId = ${template.eventId}
+        ORDER BY cg.name, c.name
+      `
+    }
 
     // Check certificate status for each contestant
     const contestantsWithStatus = await Promise.all(
