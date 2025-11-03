@@ -70,6 +70,7 @@
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",
+    "jszip": "^3.10.1",
     "katex": "^0.16.22",
     "lodash.debounce": "^4.0.8",
     "lucide-react": "^0.483.0",
