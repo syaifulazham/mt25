@@ -19,10 +19,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all published quizzes
+    // Fetch only ended quizzes
     const quizzes = await prisma.quiz.findMany({
       where: {
-        status: 'published'
+        status: 'ended'
       },
       select: {
         id: true,
@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         description: true,
         target_group: true,
         contestId: true,
+        status: true,
         contest: {
           select: {
             name: true,

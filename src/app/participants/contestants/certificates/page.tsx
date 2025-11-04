@@ -250,7 +250,15 @@ export default function CertificatesPage() {
 
           // Prerequisites met, download the certificate
           setBulkProgress({ total: certsToDownload.length, current: i + 1, action: 'Downloading...' })
-          const response = await fetch(cert.filePath!)
+          const response = await fetch(`/api/certificates/download/${cert.id}`)
+          if (!response.ok) {
+            console.error(`Failed to download certificate ${cert.id}`)
+            skipped.push({ 
+              name: contestant.name, 
+              reason: 'Gagal memuat turun fail sijil' 
+            })
+            continue
+          }
           const blob = await response.blob()
           const fileName = `${contestant.name.replace(/[^a-zA-Z0-9]/g, '_')}_${cert.uniqueCode}.pdf`
           zip.file(fileName, blob)
@@ -360,7 +368,15 @@ export default function CertificatesPage() {
 
           // Prerequisites met, download the certificate
           setBulkProgress({ total: certsData.length, current: i + 1, action: 'Downloading...' })
-          const response = await fetch(cert.filePath!)
+          const response = await fetch(`/api/certificates/download/${cert.id}`)
+          if (!response.ok) {
+            console.error(`Failed to download certificate ${cert.id}`)
+            skipped.push({ 
+              name: contestant.name, 
+              reason: 'Gagal memuat turun fail sijil' 
+            })
+            continue
+          }
           const blob = await response.blob()
           const fileName = `${contestant.name.replace(/[^a-zA-Z0-9]/g, '_')}_${cert.uniqueCode}.pdf`
           zip.file(fileName, blob)
@@ -447,13 +463,35 @@ export default function CertificatesPage() {
         return
       }
 
-      // Prerequisites completed, proceed with download
+      // Prerequisites completed, download via API endpoint
+      const downloadUrl = `/api/certificates/download/${cert.id}`
+      
+      // Fetch the file
+      const response = await fetch(downloadUrl)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Download failed:', errorData)
+        alert(errorData.error || 'Failed to download certificate')
+        setDownloadingId(null)
+        return
+      }
+
+      // Get the blob and create download link
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      
       const link = document.createElement('a')
-      link.href = cert.filePath
+      link.href = url
       link.download = `Certificate-${level}-${cert.uniqueCode}.pdf`
       document.body.appendChild(link)
       link.click()
-      document.body.removeChild(link)
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      }, 100)
     } catch (error) {
       console.error('Download error:', error)
       alert('Failed to download certificate')

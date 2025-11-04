@@ -241,7 +241,7 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [winnerRangeStart, setWinnerRangeStart] = useState<number | null>(template?.winnerRangeStart || 1)
   const [winnerRangeEnd, setWinnerRangeEnd] = useState<number | null>(template?.winnerRangeEnd || 3)
   const [events, setEvents] = useState<{id: number, name: string}[]>([])
-  const [quizzes, setQuizzes] = useState<{id: number, quiz_name: string}[]>([])
+  const [quizzes, setQuizzes] = useState<{id: number, quiz_name: string, status?: string}[]>([])
   
   // Set up state for showing preview modal
   const [showPreview, setShowPreview] = useState(false)
@@ -1285,7 +1285,9 @@ function debugElementProps(element: Element, location: string): string | undefin
                       >
                         <option value="">-- Select a Quiz --</option>
                         {quizzes.map(quiz => (
-                          <option key={quiz.id} value={quiz.id}>{quiz.quiz_name}</option>
+                          <option key={quiz.id} value={quiz.id}>
+                            {quiz.quiz_name} {quiz.status && quiz.status !== 'published' ? `(${quiz.status})` : ''}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -1540,7 +1542,9 @@ function debugElementProps(element: Element, location: string): string | undefin
                     >
                       <option value="">-- Select a Quiz --</option>
                       {quizzes.map(quiz => (
-                        <option key={quiz.id} value={quiz.id}>{quiz.quiz_name}</option>
+                        <option key={quiz.id} value={quiz.id}>
+                          {quiz.quiz_name} {quiz.status && quiz.status !== 'published' ? `(${quiz.status})` : ''}
+                        </option>
                       ))}
                     </select>
                   </div>
