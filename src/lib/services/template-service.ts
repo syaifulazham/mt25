@@ -272,7 +272,19 @@ export const TemplateService = {
   /**
    * Duplicate an existing template
    */
-  async duplicateTemplate(id: number, userId: number) {
+  async duplicateTemplate(
+    id: number, 
+    userId: number,
+    customConfig?: {
+      templateName?: string
+      targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER'
+      eventId?: number | null
+      quizId?: number | null
+      winnerRangeStart?: number | null
+      winnerRangeEnd?: number | null
+      prerequisites?: any
+    }
+  ) {
     return await prismaExecute(async (prisma) => {
       // Get the original template
       const original = await prisma.certTemplate.findUnique({
@@ -284,14 +296,36 @@ export const TemplateService = {
       }
 
       // Create a copy with new name and user ID
+      const duplicateData: any = {
+        templateName: customConfig?.templateName || `${original.templateName} (Copy)`,
+        basePdfPath: original.basePdfPath,
+        configuration: original.configuration as any,
+        status: original.status,
+        createdBy: userId,
+      }
+
+      // Add target audience fields
+      if (customConfig?.targetType !== undefined || original.targetType) {
+        duplicateData.targetType = customConfig?.targetType || original.targetType
+      }
+      if (customConfig?.eventId !== undefined || original.eventId !== null) {
+        duplicateData.eventId = customConfig?.eventId !== undefined ? customConfig.eventId : original.eventId
+      }
+      if (customConfig?.quizId !== undefined || original.quizId !== null) {
+        duplicateData.quizId = customConfig?.quizId !== undefined ? customConfig.quizId : original.quizId
+      }
+      if (customConfig?.winnerRangeStart !== undefined || original.winnerRangeStart !== null) {
+        duplicateData.winnerRangeStart = customConfig?.winnerRangeStart !== undefined ? customConfig.winnerRangeStart : original.winnerRangeStart
+      }
+      if (customConfig?.winnerRangeEnd !== undefined || original.winnerRangeEnd !== null) {
+        duplicateData.winnerRangeEnd = customConfig?.winnerRangeEnd !== undefined ? customConfig.winnerRangeEnd : original.winnerRangeEnd
+      }
+      if (customConfig?.prerequisites !== undefined || original.prerequisites !== null) {
+        duplicateData.prerequisites = customConfig?.prerequisites !== undefined ? customConfig.prerequisites : original.prerequisites
+      }
+
       return await prisma.certTemplate.create({
-        data: {
-          templateName: `${original.templateName} (Copy)`,
-          basePdfPath: original.basePdfPath,
-          configuration: original.configuration,
-          status: original.status,
-          createdBy: userId,
-        }
+        data: duplicateData
       })
     })
   }

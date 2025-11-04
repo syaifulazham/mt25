@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react'
 import { Session } from 'next-auth'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { DuplicateTemplateModal } from './DuplicateTemplateModal'
 
 interface Template {
   id: number
@@ -14,6 +15,9 @@ interface Template {
   targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER'
   eventId?: number | null
   quizId?: number | null
+  winnerRangeStart?: number | null
+  winnerRangeEnd?: number | null
+  prerequisites?: any
   createdAt: string
   updatedAt: string
   creator: {
@@ -52,13 +56,19 @@ export function CertTemplateList({
   const [searchTerm, setSearchTerm] = useState(searchQuery)
   const [currentPage, setCurrentPage] = useState(1)
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false)
+  const [templateToDuplicate, setTemplateToDuplicate] = useState<Template | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   const ITEMS_PER_PAGE = 12
 
   // Role-based permissions
   const isAdmin = session.user.role === 'ADMIN'
   const canCreateTemplate = ['ADMIN', 'OPERATOR'].includes(session.user.role as string)
+  
+  // Check for removable parameter
+  const isRemovable = searchParams.get('removable') === 'true'
   
   // Fetch all templates from API (no server-side pagination)
   const fetchTemplates = async () => {
@@ -124,13 +134,33 @@ export function CertTemplateList({
     }
   }
 
-  // Handle template duplication
-  const handleDuplicateTemplate = async (templateId: number) => {
+  // Handle template duplication - open modal
+  const handleDuplicateTemplate = (template: Template) => {
+    setTemplateToDuplicate(template)
+    setShowDuplicateModal(true)
+  }
+
+  // Handle actual duplication with configuration
+  const handleConfirmDuplicate = async (config: {
+    templateName: string
+    targetType?: string
+    eventId?: number | null
+    quizId?: number | null
+    winnerRangeStart?: number | null
+    winnerRangeEnd?: number | null
+    prerequisites?: any
+  }) => {
+    if (!templateToDuplicate) return
+    
     try {
-      setDuplicatingId(templateId)
+      setDuplicatingId(templateToDuplicate.id)
       
-      const response = await fetch(`/api/certificates/templates/${templateId}/duplicate`, {
-        method: 'POST'
+      const response = await fetch(`/api/certificates/templates/${templateToDuplicate.id}/duplicate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
       })
       
       if (!response.ok) {
@@ -149,6 +179,7 @@ export function CertTemplateList({
       setError(errorMessage)
       toast.error(errorMessage)
       console.error('Error duplicating template:', err)
+      throw err // Re-throw to let modal handle it
     } finally {
       setDuplicatingId(null)
     }
@@ -398,14 +429,14 @@ export function CertTemplateList({
                   {canCreateTemplate && (
                     <button
                       className="px-3 py-1 text-sm text-purple-600 hover:text-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => handleDuplicateTemplate(template.id)}
+                      onClick={() => handleDuplicateTemplate(template)}
                       disabled={duplicatingId === template.id}
                     >
                       {duplicatingId === template.id ? 'Duplicating...' : 'Duplicate'}
                     </button>
                   )}
                   
-                  {isAdmin && (
+                  {isAdmin && isRemovable && (
                     <button
                       className="px-3 py-1 text-sm text-red-600 hover:text-red-800"
                       onClick={() => handleDeleteTemplate(template.id)}
@@ -530,6 +561,19 @@ export function CertTemplateList({
             </button>
           </nav>
         </div>
+      )}
+
+      {/* Duplicate Template Modal */}
+      {templateToDuplicate && (
+        <DuplicateTemplateModal
+          template={templateToDuplicate}
+          isOpen={showDuplicateModal}
+          onClose={() => {
+            setShowDuplicateModal(false)
+            setTemplateToDuplicate(null)
+          }}
+          onConfirm={handleConfirmDuplicate}
+        />
       )}
     </div>
   )

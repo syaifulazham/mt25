@@ -51,8 +51,28 @@ export async function POST(
       )
     }
 
+    // Parse custom configuration from request body (optional)
+    let customConfig = undefined
+    try {
+      const body = await request.json().catch(() => ({}))
+      if (body && Object.keys(body).length > 0) {
+        customConfig = {
+          templateName: body.templateName,
+          targetType: body.targetType,
+          eventId: body.eventId !== undefined ? (body.eventId === null ? null : parseInt(body.eventId)) : undefined,
+          quizId: body.quizId !== undefined ? (body.quizId === null ? null : parseInt(body.quizId)) : undefined,
+          winnerRangeStart: body.winnerRangeStart !== undefined ? (body.winnerRangeStart === null ? null : parseInt(body.winnerRangeStart)) : undefined,
+          winnerRangeEnd: body.winnerRangeEnd !== undefined ? (body.winnerRangeEnd === null ? null : parseInt(body.winnerRangeEnd)) : undefined,
+          prerequisites: body.prerequisites
+        }
+      }
+    } catch (error) {
+      // Ignore JSON parse errors - proceed with default duplication
+      console.log('No custom config provided, using defaults')
+    }
+
     // Call template service to duplicate the template
-    const duplicatedTemplate = await TemplateService.duplicateTemplate(id, userId)
+    const duplicatedTemplate = await TemplateService.duplicateTemplate(id, userId, customConfig)
 
     // Return the duplicated template
     return NextResponse.json({ 
