@@ -77,6 +77,9 @@ export default function WinnersCertificatesPage() {
   const [viewingTeam, setViewingTeam] = useState<TeamRanking | null>(null)
   const [teamCertificates, setTeamCertificates] = useState<any[]>([])
   const [isLoadingCerts, setIsLoadingCerts] = useState(false)
+  const [winnerTemplateId, setWinnerTemplateId] = useState<number | null>(null)
+  const [showDownloadAllByTemplateConfirm, setShowDownloadAllByTemplateConfirm] = useState(false)
+  const [totalPreGenCerts, setTotalPreGenCerts] = useState<number>(0)
 
   // Fetch event details to get scopeArea
   useEffect(() => {
@@ -181,7 +184,13 @@ export default function WinnersCertificatesPage() {
         )
         if (response.ok) {
           const data = await response.json()
-          setPreGeneratedCerts(data.certificates || [])
+          const certs = data.certificates || []
+          setPreGeneratedCerts(certs)
+          
+          // Capture templateId from first certificate
+          if (certs.length > 0 && certs[0].templateId) {
+            setWinnerTemplateId(certs[0].templateId)
+          }
         }
       } catch (err) {
         console.error('Failed to fetch pre-generated certificates:', err)
@@ -190,6 +199,27 @@ export default function WinnersCertificatesPage() {
 
     fetchPreGenerated()
   }, [eventId, selectedContest])
+
+  // Fetch total pre-generated certs count for this template across all contests
+  useEffect(() => {
+    if (!winnerTemplateId) return
+
+    const fetchTotalCount = async () => {
+      try {
+        const response = await fetch(
+          `/api/events/${eventId}/judging/pre-generated-certs-count?templateId=${winnerTemplateId}`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          setTotalPreGenCerts(data.count || 0)
+        }
+      } catch (err) {
+        console.error('Failed to fetch total pre-generated certificates count:', err)
+      }
+    }
+
+    fetchTotalCount()
+  }, [eventId, winnerTemplateId])
 
   // Fetch states count for state-based ranking calculations
   const fetchStatesCount = async () => {
@@ -413,6 +443,79 @@ export default function WinnersCertificatesPage() {
 
       // Update progress to complete
       setDownloadProgress({ current: certificateIds.length, total: certificateIds.length })
+      
+      // Hide progress, show completion
+      setShowDownloadProgress(false)
+      setShowDownloadComplete(true)
+    } catch (err) {
+      setShowDownloadProgress(false)
+      setError(err instanceof Error ? err.message : 'Error downloading certificates')
+      alert('Error downloading certificates: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    }
+  }
+
+  const handleDownloadAllByTemplate = () => {
+    if (!winnerTemplateId) {
+      alert('Template ID not found')
+      return
+    }
+    setShowDownloadAllByTemplateConfirm(true)
+  }
+
+  const confirmDownloadAllByTemplate = async () => {
+    setShowDownloadAllByTemplateConfirm(false)
+    
+    if (!winnerTemplateId) {
+      alert('Template ID not found')
+      return
+    }
+
+    // Show progress modal
+    setShowDownloadProgress(true)
+    setDownloadProgress({ current: 0, total: totalPreGenCerts })
+
+    try {
+      // Call API to generate merged batched ZIP for all contests
+      const response = await fetch(
+        `/api/events/${eventId}/judging/download-all-pregenerated-by-template`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            templateId: winnerTemplateId
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to download certificates')
+      }
+
+      // Get the ZIP file blob
+      const blob = await response.blob()
+      
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      const filename = filenameMatch 
+        ? filenameMatch[1] 
+        : `All_PreGenerated_Certificates_${new Date().toISOString().split('T')[0]}.zip`
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      // Update progress to complete
+      setDownloadProgress({ current: totalPreGenCerts, total: totalPreGenCerts })
       
       // Hide progress, show completion
       setShowDownloadProgress(false)
@@ -705,6 +808,35 @@ export default function WinnersCertificatesPage() {
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
           <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Download All Pre-Generated Certificates (All Contests) */}
+      {winnerTemplateId && totalPreGenCerts > 0 && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg shadow p-6 mb-6">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-5 w-5 text-indigo-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  All Pre-Generated Certificates
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-1">
+                Total certificates across all contests: <strong className="text-indigo-700">{totalPreGenCerts}</strong>
+              </p>
+              <p className="text-xs text-gray-500">
+                Download all pre-generated blank certificates for template ID {winnerTemplateId}
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadAllByTemplate}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <Download className="h-4 w-4" />
+              Download All ({totalPreGenCerts})
+            </button>
+          </div>
         </div>
       )}
 
@@ -1568,6 +1700,69 @@ export default function WinnersCertificatesPage() {
                   className="flex-1 px-4 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 transition-colors"
                 >
                   Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download All By Template Confirmation Modal */}
+      {showDownloadAllByTemplateConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-lg w-full mx-4">
+            <div className="flex flex-col">
+              <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <Download className="h-6 w-6 text-indigo-600" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
+                Download All Pre-Generated Certificates?
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-4">
+                You are about to download <strong>{totalPreGenCerts}</strong> certificate{totalPreGenCerts !== 1 ? 's' : ''} from <strong>all contests</strong>.
+              </p>
+              
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-indigo-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-indigo-900 font-medium mb-1">
+                      Scope: All Contests
+                    </p>
+                    <p className="text-sm text-indigo-800">
+                      Certificates will be merged in <strong>batches of 50 PDFs</strong> per file and compressed into a <strong>ZIP folder</strong>.
+                    </p>
+                    <p className="text-xs text-indigo-700 mt-2">
+                      Expected: {Math.ceil(totalPreGenCerts / 50)} merged PDF file{Math.ceil(totalPreGenCerts / 50) !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-6">
+                <p className="text-xs text-amber-800">
+                  💡 This will download certificates across <strong>all contests</strong> for template ID {winnerTemplateId}
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDownloadAllByTemplateConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDownloadAllByTemplate}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                  Download All
                 </button>
               </div>
             </div>
