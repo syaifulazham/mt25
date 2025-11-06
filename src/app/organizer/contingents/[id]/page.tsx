@@ -854,7 +854,10 @@ export default async function ContingentDetailPage({ params }: PageProps) {
           </div>
           
           {/* Right column - Contestants and Teams */}
-          <ContingentDetailTabs contingentData={contingentWithDetails} />
+          <ContingentDetailTabs 
+            contingentData={contingentWithDetails}
+            isAdmin={isAdmin}
+          />
         </div>
       </div>
     );

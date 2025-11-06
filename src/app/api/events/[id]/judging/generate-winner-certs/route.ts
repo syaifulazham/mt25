@@ -12,7 +12,7 @@ interface GenerationResult {
   reason?: string
   serialNumber?: string
   awardTitle?: string
-  action?: 'created' | 'updated'
+  action?: 'created' | 'updated' | 'assigned'
 }
 
 // Force dynamic rendering for this route
@@ -41,7 +41,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { attendanceTeamId, rank, contestId } = body
+    const { attendanceTeamId, rank, contestId, manualMapping } = body
 
     if (!attendanceTeamId || !rank || !contestId) {
       return NextResponse.json(
@@ -49,6 +49,10 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    // manualMapping format: { memberIndex: certificateId }
+    // e.g., { 0: 123, 1: 124, 2: 125 }
+    const hasManualMapping = manualMapping && Object.keys(manualMapping).length > 0
 
     // Get winner template for this event
     const template = await prisma.certTemplate.findFirst({
@@ -126,12 +130,47 @@ export async function POST(
       total: members.length
     }
 
-    for (const member of members) {
+    // Check for available pre-generated blank certificates for this rank
+    // Fetch ALL blank certificates (one for each team member)
+    const blankCertsForRank = await prisma.$queryRaw<any[]>`
+      SELECT id, serialNumber, uniqueCode, filePath, ownership
+      FROM certificate
+      WHERE templateId = ${template.id}
+        AND ic_number IS NULL
+        AND JSON_EXTRACT(ownership, '$.preGenerated') = true
+        AND JSON_EXTRACT(ownership, '$.rank') = ${rank}
+        AND JSON_EXTRACT(ownership, '$.contestId') = ${contestId}
+        AND JSON_EXTRACT(ownership, '$.eventId') = ${eventId}
+      ORDER BY JSON_EXTRACT(ownership, '$.memberNumber') ASC
+    `
+
+    const hasBlankCerts = blankCertsForRank && blankCertsForRank.length > 0
+    console.log(`Found ${blankCertsForRank.length} pre-generated certificates for rank ${rank}`)
+
+    // Map each team member to a pre-generated certificate
+    for (let memberIndex = 0; memberIndex < members.length; memberIndex++) {
+      const member = members[memberIndex]
       try {
-        // Generate unique code
-        const uniqueCode = `WINNER-${eventId}-${contestId}-${member.contestantId}-${Date.now()}`
+        // Get the corresponding pre-generated certificate for this team member
+        let blankCert = null
         
-        // Check if certificate already exists
+        if (hasManualMapping && manualMapping[memberIndex]) {
+          // Use manually selected certificate
+          const mappedCertId = manualMapping[memberIndex]
+          blankCert = blankCertsForRank.find(cert => cert.id === mappedCertId) || null
+          console.log(`Manual mapping: Member ${memberIndex + 1} (${member.contestantName}) → Cert ID ${mappedCertId}`)
+        } else if (hasBlankCerts && memberIndex < blankCertsForRank.length) {
+          // Auto-map: Use certificate in order
+          blankCert = blankCertsForRank[memberIndex]
+          console.log(`Auto mapping: Member ${memberIndex + 1} (${member.contestantName}) → Cert ${blankCert.serialNumber}`)
+        }
+        
+        // Generate unique code
+        const uniqueCode = blankCert 
+          ? blankCert.uniqueCode 
+          : `WINNER-${eventId}-${contestId}-${member.contestantId}-${Date.now()}`
+        
+        // Check if certificate already exists for this contestant
         const existingCert = await prisma.certificate.findFirst({
           where: {
             ic_number: member.ic,
@@ -140,13 +179,20 @@ export async function POST(
           }
         })
 
-        // Generate or reuse serial number
+        // Determine serial number source
         let serialNumber: string
+        let usePreGenerated = false
+        
         if (existingCert && existingCert.serialNumber) {
-          // Use existing serial number
+          // Use existing serial number from already assigned certificate
           serialNumber = existingCert.serialNumber
+        } else if (blankCert && blankCert.serialNumber) {
+          // Use serial number from pre-generated blank certificate
+          serialNumber = blankCert.serialNumber
+          usePreGenerated = true
+          console.log(`Assigning pre-generated cert ${blankCert.serialNumber} to member ${memberIndex + 1}: ${member.contestantName}`)
         } else {
-          // Generate new serial number using the service (includes template ID)
+          // Generate new serial number using the service
           serialNumber = await CertificateSerialService.generateSerialNumber(
             template.id,
             'EVENT_WINNER',
@@ -173,20 +219,33 @@ export async function POST(
         })
 
         if (existingCert) {
-          // Update existing certificate
+          // Update existing certificate - preserve serialNumber, update all other details
+          // Merge existing ownership with new assignment details
+          const existingOwnership = typeof existingCert.ownership === 'string' 
+            ? JSON.parse(existingCert.ownership) 
+            : (existingCert.ownership || {})
+          
+          const updatedOwnership = {
+            ...existingOwnership,
+            year: new Date().getFullYear(),
+            contingentId: Number(member.contingentId),
+            contestantId: Number(member.contestantId),
+            assignedFrom: usePreGenerated ? 'preGenerated' : 'direct',
+            updatedAt: new Date().toISOString()
+          }
+          
           await prisma.$executeRaw`
             UPDATE certificate 
             SET 
               recipientName = ${member.contestantName},
               contingent_name = ${team.contingentName},
               contestName = ${team.contestName},
+              ic_number = ${member.ic},
+              awardTitle = ${awardTitle},
+              uniqueCode = ${uniqueCode},
               filePath = ${pdfPath},
               status = 'READY',
-              ownership = ${JSON.stringify({
-                year: new Date().getFullYear(),
-                contingentId: Number(member.contingentId),
-                contestantId: Number(member.contestantId)
-              })},
+              ownership = ${JSON.stringify(updatedOwnership)},
               updatedAt = NOW()
             WHERE id = ${existingCert.id}
           `
@@ -196,6 +255,46 @@ export async function POST(
             serialNumber: serialNumber,
             awardTitle: awardTitle,
             action: 'updated'
+          })
+        } else if (usePreGenerated && blankCert) {
+          // Update pre-generated blank certificate with winner details
+          // Parse existing ownership and merge with new member details
+          const existingOwnership = typeof blankCert.ownership === 'string' 
+            ? JSON.parse(blankCert.ownership) 
+            : (blankCert.ownership || {})
+          
+          const updatedOwnership = {
+            ...existingOwnership,
+            // Add actual member assignment details
+            year: new Date().getFullYear(),
+            contingentId: Number(member.contingentId),
+            contestantId: Number(member.contestantId),
+            assignedFrom: 'preGenerated',
+            assignedAt: new Date().toISOString(),
+            // Keep pre-generation metadata
+            preGeneratedAt: existingOwnership.generatedAt,
+            originalMemberNumber: existingOwnership.memberNumber
+          }
+          
+          await prisma.$executeRaw`
+            UPDATE certificate 
+            SET 
+              recipientName = ${member.contestantName},
+              contingent_name = ${team.contingentName},
+              contestName = ${team.contestName},
+              ic_number = ${member.ic},
+              filePath = ${pdfPath},
+              status = 'READY',
+              ownership = ${JSON.stringify(updatedOwnership)},
+              updatedAt = NOW()
+            WHERE id = ${blankCert.id}
+          `
+
+          results.success.push({
+            member: member.contestantName,
+            serialNumber: serialNumber,
+            awardTitle: awardTitle,
+            action: 'assigned'
           })
         } else {
           // Create new certificate record using raw SQL to avoid BigInt issues

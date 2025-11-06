@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, UserRound, Plus } from "lucide-react";
 import { PaginatedContestantsList } from "./paginated-contestants-list";
-import { PaginatedTeamsList } from "./paginated-teams-list";
+import { PaginatedTeamsList, PaginatedTeamsListRef } from "./paginated-teams-list";
 import BulkUploadContestantsButton from "./bulk-upload-contestants-button";
 
 export interface ContingentTabsProps {
@@ -18,15 +18,30 @@ export interface ContingentTabsProps {
       teams: number;
     };
   };
+  isAdmin?: boolean;
 }
 
-export function ContingentDetailTabs({ contingentData }: ContingentTabsProps) {
+export function ContingentDetailTabs({ contingentData, isAdmin = false }: ContingentTabsProps) {
   const [activeTab, setActiveTab] = useState<'contestants' | 'teams'>('contestants');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [teamsRefreshKey, setTeamsRefreshKey] = useState(0);
+  const teamsListRef = useRef<PaginatedTeamsListRef>(null);
   
   // Function to refresh the contestants list
   const refreshContestants = () => {
     setRefreshKey(prev => prev + 1);
+  };
+  
+  // Function to refresh the teams list
+  const refreshTeams = () => {
+    setTeamsRefreshKey(prev => prev + 1);
+    // Also refresh the page to update team counts
+    window.location.reload();
+  };
+  
+  // Function to open create team dialog
+  const handleCreateTeam = () => {
+    teamsListRef.current?.openCreateDialog();
   };
   
   return (
@@ -66,9 +81,12 @@ export function ContingentDetailTabs({ contingentData }: ContingentTabsProps) {
                 </Button>
               </>
             ) : (
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
+              isAdmin && (
+                <Button size="sm" variant="default" onClick={handleCreateTeam}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Team
+                </Button>
+              )
             )}
           </div>
         </CardHeader>
@@ -84,7 +102,12 @@ export function ContingentDetailTabs({ contingentData }: ContingentTabsProps) {
             />
           ) : (
             <PaginatedTeamsList 
-              teams={contingentData.teams} 
+              ref={teamsListRef}
+              key={`teams-${teamsRefreshKey}`}
+              teams={contingentData.teams}
+              contingentId={contingentData.id}
+              isAdmin={isAdmin}
+              onTeamsUpdate={refreshTeams}
               pageSize={5} 
             />
           )}

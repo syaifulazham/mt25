@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Trophy, FileText, Plus, Loader2, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Trophy, FileText, Plus, Loader2, CheckCircle, Eye, Download } from 'lucide-react'
 
 interface TeamRanking {
   rank: number
@@ -51,6 +51,56 @@ export default function WinnersCertificatesPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationResults, setGenerationResults] = useState<any>(null)
   const [showResultsModal, setShowResultsModal] = useState(false)
+  const [showPreGenerateModal, setShowPreGenerateModal] = useState(false)
+  const [preGenRanks, setPreGenRanks] = useState<number[]>([1, 2, 3])
+  const [preGeneratedCerts, setPreGeneratedCerts] = useState<any[]>([])
+  const [isLoadingPreGen, setIsLoadingPreGen] = useState(false)
+  const [preGenScope, setPreGenScope] = useState<'current' | 'all'>('current')
+  const [allowRegenerate, setAllowRegenerate] = useState(false)
+  const [eventScopeArea, setEventScopeArea] = useState<string | null>(null)
+  const [rankingMode, setRankingMode] = useState<'national' | 'state'>('national')
+  const [statesCount, setStatesCount] = useState<number>(0)
+  const [showDownloadProgress, setShowDownloadProgress] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 })
+  const [showDownloadComplete, setShowDownloadComplete] = useState(false)
+  const [showDownloadConfirm, setShowDownloadConfirm] = useState(false)
+  const [showPreGenResults, setShowPreGenResults] = useState(false)
+  const [preGenResults, setPreGenResults] = useState({ success: 0, skipped: 0, failed: 0 })
+  const [showPdfViewer, setShowPdfViewer] = useState(false)
+  const [viewingCert, setViewingCert] = useState<any>(null)
+  const [showManualMapping, setShowManualMapping] = useState(false)
+  const [mappingTeam, setMappingTeam] = useState<TeamRanking | null>(null)
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
+  const [availableCerts, setAvailableCerts] = useState<any[]>([])
+  const [certMapping, setCertMapping] = useState<Record<number, number>>({})
+  const [showTeamCerts, setShowTeamCerts] = useState(false)
+  const [viewingTeam, setViewingTeam] = useState<TeamRanking | null>(null)
+  const [teamCertificates, setTeamCertificates] = useState<any[]>([])
+  const [isLoadingCerts, setIsLoadingCerts] = useState(false)
+
+  // Fetch event details to get scopeArea
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      try {
+        const response = await fetch(`/api/events/${eventId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setEventScopeArea(data.scopeArea)
+          
+          // Set default ranking mode based on scopeArea
+          if (data.scopeArea === 'ZONE') {
+            setRankingMode('state') // ZONE events always use state-based ranking
+          } else if (data.scopeArea === 'NATIONAL') {
+            setRankingMode('national') // NATIONAL events always use national ranking
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch event details:', err)
+      }
+    }
+
+    fetchEventDetails()
+  }, [eventId])
 
   // Check if winner templates exist for this event
   useEffect(() => {
@@ -120,6 +170,334 @@ export default function WinnersCertificatesPage() {
     fetchRankings()
   }, [eventId, selectedContest])
 
+  // Fetch pre-generated certificates when contest is selected
+  useEffect(() => {
+    if (!selectedContest) return
+
+    const fetchPreGenerated = async () => {
+      try {
+        const response = await fetch(
+          `/api/events/${eventId}/judging/pre-generated-certs?contestId=${selectedContest}`
+        )
+        if (response.ok) {
+          const data = await response.json()
+          setPreGeneratedCerts(data.certificates || [])
+        }
+      } catch (err) {
+        console.error('Failed to fetch pre-generated certificates:', err)
+      }
+    }
+
+    fetchPreGenerated()
+  }, [eventId, selectedContest])
+
+  // Fetch states count for state-based ranking calculations
+  const fetchStatesCount = async () => {
+    // For "all contests" mode, use first contest to get states count (should be same across all contests in event)
+    const contestIdToUse = preGenScope === 'all' && contests.length > 0 
+      ? contests[0].contestId 
+      : selectedContest
+    
+    if (!contestIdToUse) return 0
+    
+    try {
+      const response = await fetch(`/api/events/${eventId}/judging/states-count?contestId=${contestIdToUse}`)
+      if (response.ok) {
+        const data = await response.json()
+        return data.count || 0
+      }
+    } catch (err) {
+      console.error('Failed to fetch states count:', err)
+    }
+    return 0
+  }
+
+  // Update states count when contest changes, modal opens, or ranking mode changes
+  useEffect(() => {
+    if (showPreGenerateModal && rankingMode === 'state') {
+      fetchStatesCount().then(count => setStatesCount(count))
+    }
+  }, [showPreGenerateModal, selectedContest, rankingMode, preGenScope, contests])
+
+  const handlePreGenerate = async () => {
+    if (preGenScope === 'current' && !selectedContest) {
+      alert('Please select a contest first')
+      return
+    }
+
+    if (preGenRanks.length === 0) {
+      alert('Please specify at least one rank')
+      return
+    }
+
+    setIsLoadingPreGen(true)
+    setError(null)
+
+    try {
+      if (preGenScope === 'all') {
+        // Pre-generate for all contests
+        let totalSuccess = 0
+        let totalSkipped = 0
+        let totalFailed = 0
+
+        for (const contest of contests) {
+          const response = await fetch(`/api/events/${eventId}/judging/pre-generate-winner-certs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contestId: contest.contestId,
+              ranks: preGenRanks,
+              rankingMode: rankingMode,
+              allowRegenerate: allowRegenerate
+            })
+          })
+
+          const data = await response.json()
+          if (response.ok) {
+            totalSuccess += data.results.success.length
+            totalSkipped += data.results.skipped.length
+            totalFailed += data.results.failed.length
+          }
+        }
+
+        // Show results modal
+        setPreGenResults({
+          success: totalSuccess,
+          skipped: totalSkipped,
+          failed: totalFailed
+        })
+        setShowPreGenResults(true)
+        
+        // Refresh pre-generated certificates list for current contest
+        if (selectedContest) {
+          const refreshResponse = await fetch(
+            `/api/events/${eventId}/judging/pre-generated-certs?contestId=${selectedContest}`
+          )
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json()
+            setPreGeneratedCerts(refreshData.certificates || [])
+          }
+        }
+      } else {
+        // Pre-generate for current contest only
+        const response = await fetch(`/api/events/${eventId}/judging/pre-generate-winner-certs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contestId: selectedContest,
+            ranks: preGenRanks,
+            rankingMode: rankingMode,
+            allowRegenerate: allowRegenerate
+          })
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to pre-generate certificates')
+        }
+
+        // Show results modal
+        setPreGenResults({
+          success: data.results.success.length,
+          skipped: data.results.skipped.length,
+          failed: data.results.failed.length
+        })
+        setShowPreGenResults(true)
+        
+        // Refresh pre-generated certificates list
+        const refreshResponse = await fetch(
+          `/api/events/${eventId}/judging/pre-generated-certs?contestId=${selectedContest}`
+        )
+        if (refreshResponse.ok) {
+          const refreshData = await refreshResponse.json()
+          setPreGeneratedCerts(refreshData.certificates || [])
+        }
+      }
+      
+      setShowPreGenerateModal(false)
+      setAllowRegenerate(false) // Reset checkbox after generation
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to pre-generate certificates')
+      alert('Error: ' + (err instanceof Error ? err.message : 'Failed to pre-generate certificates'))
+    } finally {
+      setIsLoadingPreGen(false)
+    }
+  }
+
+  const handleViewCertificate = (cert: any) => {
+    // Open certificate PDF in modal viewer
+    if (cert.filePath) {
+      setViewingCert(cert)
+      setShowPdfViewer(true)
+    } else {
+      alert('Certificate PDF not available')
+    }
+  }
+
+  const handleDownloadCertificate = (cert: any) => {
+    // Download individual certificate
+    if (cert.filePath) {
+      const link = document.createElement('a')
+      link.href = `/api/certificates/serve-pdf?path=${encodeURIComponent(cert.filePath)}`
+      link.download = `${cert.serialNumber.replace(/\//g, '-')}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } else {
+      alert('Certificate PDF not available')
+    }
+  }
+
+  const handleDownloadAllPreGenerated = () => {
+    if (preGeneratedCerts.length === 0) return
+    setShowDownloadConfirm(true)
+  }
+
+  const confirmDownloadAll = async () => {
+    setShowDownloadConfirm(false)
+    
+    // Show progress modal
+    setShowDownloadProgress(true)
+    setDownloadProgress({ current: 0, total: preGeneratedCerts.length })
+
+    try {
+      // Download each certificate sequentially
+      for (let i = 0; i < preGeneratedCerts.length; i++) {
+        const cert = preGeneratedCerts[i]
+        if (cert.filePath) {
+          const link = document.createElement('a')
+          link.href = `/api/certificates/serve-pdf?path=${encodeURIComponent(cert.filePath)}`
+          link.download = `${cert.serialNumber.replace(/\//g, '-')}.pdf`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          
+          // Update progress
+          setDownloadProgress({ current: i + 1, total: preGeneratedCerts.length })
+          
+          // Small delay between downloads to avoid browser blocking
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
+      
+      // Hide progress, show completion
+      setShowDownloadProgress(false)
+      setShowDownloadComplete(true)
+    } catch (err) {
+      setShowDownloadProgress(false)
+      setError(err instanceof Error ? err.message : 'Error downloading certificates')
+    }
+  }
+
+  const openManualMapping = async (team: TeamRanking) => {
+    if (!selectedContest) {
+      alert('Please select a contest first')
+      return
+    }
+
+    setMappingTeam(team)
+    setIsGenerating(true)
+
+    try {
+      // Fetch team members
+      const membersResponse = await fetch(
+        `/api/events/${eventId}/judging/team-members?teamId=${team.team?.id}`
+      )
+      const membersData = await membersResponse.json()
+      setTeamMembers(membersData.members || [])
+
+      // Fetch available pre-generated certificates for this rank, contest, and state
+      let certsUrl = `/api/events/${eventId}/judging/available-certs?contestId=${selectedContest}&rank=${team.rank}`
+      
+      // Add stateId filter if team has a state (for state-based ranking)
+      if (team.state?.id) {
+        certsUrl += `&stateId=${team.state.id}`
+      }
+      
+      const certsResponse = await fetch(certsUrl)
+      const certsData = await certsResponse.json()
+      setAvailableCerts(certsData.certificates || [])
+
+      // Initialize empty mapping
+      setCertMapping({})
+      setShowManualMapping(true)
+    } catch (err) {
+      alert('Error loading data: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleManualGenerate = async () => {
+    if (!mappingTeam || !selectedContest) return
+
+    // Validate that all members are mapped
+    const unmappedMembers = teamMembers.filter((m, idx) => !certMapping[idx])
+    if (unmappedMembers.length > 0) {
+      alert(`Please map all team members to certificates (${unmappedMembers.length} unmapped)`)
+      return
+    }
+
+    setIsGenerating(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/judging/generate-winner-certs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attendanceTeamId: mappingTeam.attendanceTeamId,
+          rank: mappingTeam.rank,
+          contestId: selectedContest,
+          manualMapping: certMapping
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate certificates')
+      }
+
+      setGenerationResults(data)
+      setShowResultsModal(true)
+      setShowManualMapping(false)
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate certificates')
+      alert('Error: ' + (err instanceof Error ? err.message : 'Failed to generate certificates'))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleViewTeamCerts = async (team: TeamRanking) => {
+    setViewingTeam(team)
+    setIsLoadingCerts(true)
+    setShowTeamCerts(true)
+
+    try {
+      // Fetch team certificates
+      const response = await fetch(
+        `/api/events/${eventId}/judging/team-certificates?teamId=${team.team?.id}&contestId=${selectedContest}&rank=${team.rank}`
+      )
+      const data = await response.json()
+      
+      if (response.ok) {
+        setTeamCertificates(data.certificates || [])
+      } else {
+        throw new Error(data.error || 'Failed to fetch certificates')
+      }
+    } catch (err) {
+      console.error('Error fetching team certificates:', err)
+      setTeamCertificates([])
+      alert('Error loading certificates: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    } finally {
+      setIsLoadingCerts(false)
+    }
+  }
+
   const handleGenerateCert = async (team: TeamRanking) => {
     if (!selectedContest) {
       alert('Please select a contest first')
@@ -136,43 +514,8 @@ export default function WinnersCertificatesPage() {
       return
     }
 
-    const confirmed = confirm(
-      `Generate winner certificates for all members of "${team.team?.name}" (Rank ${team.rank})?\n\n` +
-      `Award Title: ${team.rank === 1 ? 'TEMPAT PERTAMA' : `TEMPAT KE-${team.rank}`}\n\n` +
-      `Note: Existing certificates will be regenerated with updated information.`
-    )
-
-    if (!confirmed) return
-
-    setIsGenerating(true)
-    setError(null)
-
-    try {
-      const response = await fetch(`/api/events/${eventId}/judging/generate-winner-certs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          attendanceTeamId: team.attendanceTeamId,
-          rank: team.rank,
-          contestId: selectedContest
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate certificates')
-      }
-
-      setGenerationResults(data)
-      setShowResultsModal(true)
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate certificates')
-      alert('Error: ' + (err instanceof Error ? err.message : 'Failed to generate certificates'))
-    } finally {
-      setIsGenerating(false)
-    }
+    // Open manual mapping modal instead of direct generation
+    openManualMapping(team)
   }
 
   const handleAddToFinal = async (team: TeamRanking) => {
@@ -333,9 +676,20 @@ export default function WinnersCertificatesPage() {
 
       {/* Contest Selector */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Select Contest
-        </label>
+        <div className="flex items-center justify-between mb-4">
+          <label className="block text-sm font-medium text-gray-700">
+            Select Contest
+          </label>
+          {selectedContest && hasWinnerTemplates && (
+            <button
+              onClick={() => setShowPreGenerateModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Pre-Generate Blank Certificates
+            </button>
+          )}
+        </div>
         <select
           value={selectedContest || ''}
           onChange={(e) => setSelectedContest(parseInt(e.target.value))}
@@ -348,6 +702,69 @@ export default function WinnersCertificatesPage() {
             </option>
           ))}
         </select>
+
+        {/* Pre-generated Certificates Status */}
+        {selectedContest && preGeneratedCerts.length > 0 && (
+          <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-sm font-medium text-purple-900">Pre-Generated Blank Certificates</h4>
+              <button
+                onClick={handleDownloadAllPreGenerated}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-md hover:bg-purple-700 transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download All ({preGeneratedCerts.length})
+              </button>
+            </div>
+            
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {preGeneratedCerts.map((cert) => (
+                <div
+                  key={cert.id}
+                  className="flex items-center justify-between p-3 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+                        Rank {cert.ownership?.rank}
+                      </span>
+                      {cert.ownership?.stateName && (
+                        <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                          {cert.ownership.stateName}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-600">{cert.serialNumber}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{cert.awardTitle}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleViewCertificate(cert)}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded hover:bg-blue-200 transition-colors"
+                      title="View Certificate"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => handleDownloadCertificate(cert)}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded hover:bg-green-200 transition-colors"
+                      title="Download Certificate"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <p className="text-xs text-purple-700 mt-3">
+              {preGeneratedCerts.length} blank certificate(s) ready to be assigned to winners
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Team Rankings Table */}
@@ -444,7 +861,16 @@ export default function WinnersCertificatesPage() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                                {team.team?.name || 'N/A'}
+                                {team.rank > 0 ? (
+                                  <button
+                                    onClick={() => handleViewTeamCerts(team)}
+                                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                                  >
+                                    {team.team?.name || 'N/A'}
+                                  </button>
+                                ) : (
+                                  <span>{team.team?.name || 'N/A'}</span>
+                                )}
                                 {team.hasCertificates && (
                                   <span title="Certificates generated" className="inline-flex">
                                     <CheckCircle className="h-4 w-4 text-green-600" />
@@ -546,7 +972,16 @@ export default function WinnersCertificatesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                          {team.team?.name || 'N/A'}
+                          {team.rank > 0 ? (
+                            <button
+                              onClick={() => handleViewTeamCerts(team)}
+                              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                            >
+                              {team.team?.name || 'N/A'}
+                            </button>
+                          ) : (
+                            <span>{team.team?.name || 'N/A'}</span>
+                          )}
                           {team.hasCertificates && (
                             <span title="Certificates generated" className="inline-flex">
                               <CheckCircle className="h-4 w-4 text-green-600" />
@@ -693,6 +1128,260 @@ export default function WinnersCertificatesPage() {
         </div>
       )}
 
+      {/* Pre-Generate Modal */}
+      {showPreGenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Pre-Generate Blank Certificates</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Generate blank certificates for specific winner ranks. These can be assigned to winners later.
+              </p>
+
+              {/* Scope Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Generation Scope
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="scope"
+                      value="current"
+                      checked={preGenScope === 'current'}
+                      onChange={() => setPreGenScope('current')}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">
+                      Current Contest Only
+                      {selectedContest && (
+                        <span className="ml-1 text-gray-500">
+                          ({contests.find(c => c.contestId === selectedContest)?.name})
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="scope"
+                      value="all"
+                      checked={preGenScope === 'all'}
+                      onChange={() => setPreGenScope('all')}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">
+                      All Contests ({contests.length} contests)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Ranking Mode Selection - Only for STATE/DISTRICT scopeArea */}
+              {eventScopeArea && eventScopeArea !== 'NATIONAL' && eventScopeArea !== 'ZONE' && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-medium text-blue-900 mb-2">
+                    Ranking Mode
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="rankingMode"
+                        value="national"
+                        checked={rankingMode === 'national'}
+                        onChange={() => setRankingMode('national')}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-blue-800">
+                        <strong>National Ranking</strong> - Ranks across all states
+                      </span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="radio"
+                        name="rankingMode"
+                        value="state"
+                        checked={rankingMode === 'state'}
+                        onChange={() => setRankingMode('state')}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-blue-800">
+                        <strong>State-Based Ranking</strong> - Separate ranks per state
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Info for ZONE and NATIONAL events */}
+              {eventScopeArea === 'ZONE' && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-xs text-green-800">
+                    <strong>ZONE Event:</strong> State-based ranking will be used (Rank 1 per state)
+                  </p>
+                </div>
+              )}
+              {eventScopeArea === 'NATIONAL' && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                  <p className="text-xs text-purple-800">
+                    <strong>NATIONAL Event:</strong> National ranking will be used (Rank 1 overall)
+                  </p>
+                </div>
+              )}
+              
+              {/* Rank Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Ranks to Pre-Generate
+                </label>
+                <div className="space-y-2">
+                  {[1, 2, 3, 4, 5].map((rank) => (
+                    <label key={rank} className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={preGenRanks.includes(rank)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setPreGenRanks([...preGenRanks, rank].sort((a, b) => a - b))
+                          } else {
+                            setPreGenRanks(preGenRanks.filter(r => r !== rank))
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">
+                        Rank {rank} - {rank === 1 ? 'TEMPAT PERTAMA' : `TEMPAT KE-${rank}`}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Regenerate Option */}
+              <div className="mb-4">
+                <label className="flex items-center p-3 bg-orange-50 border border-orange-200 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={allowRegenerate}
+                    onChange={(e) => setAllowRegenerate(e.target.checked)}
+                    className="mr-3 h-4 w-4"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-orange-900">
+                      Allow Regenerate
+                    </span>
+                    <p className="text-xs text-orange-700 mt-1">
+                      If checked, existing certificates for the same rank will be deleted and regenerated. 
+                      Otherwise, duplicates will be skipped.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Summary Info */}
+              <div className={`border rounded-lg p-3 mb-4 ${
+                preGenScope === 'all' ? 'bg-blue-50 border-blue-200' : 'bg-yellow-50 border-yellow-200'
+              }`}>
+                <p className={`text-xs font-medium mb-1 ${
+                  preGenScope === 'all' ? 'text-blue-900' : 'text-yellow-900'
+                }`}>
+                  {preGenScope === 'all' ? '📋 Bulk Generation' : '📄 Single Contest Generation'}
+                </p>
+                <p className={`text-xs ${
+                  preGenScope === 'all' ? 'text-blue-800' : 'text-yellow-800'
+                }`}>
+                  {preGenScope === 'all' ? (
+                    <>
+                      {rankingMode === 'state' ? (
+                        <>
+                          Will generate <strong>{preGenRanks.length} blank certificate{preGenRanks.length !== 1 ? 's' : ''}</strong> per rank for <strong>each of the {contests.length} contests</strong> × <strong>{statesCount || '?'} states</strong>.
+                          <br />
+                          Minimum: <strong>{preGenRanks.length * contests.length * (statesCount || 1)} certificates</strong>
+                          <br />
+                          <span className="text-xs italic">(State-based: Each state gets separate rankings)</span>
+                          <br />
+                          <span className="text-xs italic text-orange-600">⚠️ Team contests generate multiple certificates per rank (based on team size)</span>
+                        </>
+                      ) : (
+                        <>
+                          Will generate <strong>{preGenRanks.length} blank certificate{preGenRanks.length !== 1 ? 's' : ''}</strong> per rank for <strong>each of the {contests.length} contests</strong>.
+                          <br />
+                          Minimum: <strong>{preGenRanks.length * contests.length} certificates</strong>
+                          <br />
+                          <span className="text-xs italic">(National: One ranking per contest overall)</span>
+                          <br />
+                          <span className="text-xs italic text-orange-600">⚠️ Team contests generate multiple certificates per rank (based on team size)</span>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {rankingMode === 'state' && statesCount > 0 ? (
+                        <>
+                          Will generate <strong>{preGenRanks.length} blank certificate{preGenRanks.length !== 1 ? 's' : ''}</strong> per rank for <strong>{statesCount} state{statesCount !== 1 ? 's' : ''}</strong>.
+                          <br />
+                          Minimum: <strong>{preGenRanks.length * statesCount} certificates</strong>
+                          <br />
+                          <span className="text-xs italic">(Each state gets separate ranks)</span>
+                          <br />
+                          <span className="text-xs italic text-orange-600">⚠️ Team contests generate multiple certificates per rank (based on team size)</span>
+                        </>
+                      ) : (
+                        <>
+                          Will generate <strong>{preGenRanks.length} blank certificate{preGenRanks.length !== 1 ? 's' : ''}</strong> per rank.
+                          <br />
+                          <span className="text-xs italic text-orange-600">⚠️ Team contests generate multiple certificates per rank (based on team size)</span>
+                          <br />
+                          <span className="text-xs text-gray-600 mt-1">Blank certificates will be generated and can be assigned to actual winners later.</span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowPreGenerateModal(false)
+                    setPreGenRanks([1, 2, 3])
+                    setAllowRegenerate(false)
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePreGenerate}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
+                  disabled={isLoadingPreGen || preGenRanks.length === 0 || (preGenScope === 'current' && !selectedContest)}
+                >
+                  {isLoadingPreGen ? (
+                    <>
+                      <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      Generate {preGenScope === 'all' 
+                        ? rankingMode === 'state'
+                          ? `${preGenRanks.length * contests.length * (statesCount || 1)} Certificate${preGenRanks.length * contests.length * (statesCount || 1) !== 1 ? 's' : ''}`
+                          : `${preGenRanks.length * contests.length} Certificate${preGenRanks.length * contests.length !== 1 ? 's' : ''}`
+                        : rankingMode === 'state' && statesCount > 0
+                          ? `${preGenRanks.length * statesCount} Certificate${preGenRanks.length * statesCount !== 1 ? 's' : ''}`
+                          : `${preGenRanks.length} Certificate${preGenRanks.length !== 1 ? 's' : ''}`
+                      }
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Loading Overlay */}
       {isGenerating && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -700,6 +1389,560 @@ export default function WinnersCertificatesPage() {
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
             <p className="text-lg font-semibold">Generating Certificates...</p>
             <p className="text-sm text-gray-600 mt-2">Please wait while we generate certificates for all team members</p>
+          </div>
+        </div>
+      )}
+
+      {/* Download Progress Modal */}
+      {showDownloadProgress && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center">
+              <div className="relative w-24 h-24 mb-4">
+                <svg className="w-24 h-24 transform -rotate-90">
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    stroke="#e5e7eb"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    stroke="#9333ea"
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${2 * Math.PI * 40}`}
+                    strokeDashoffset={`${2 * Math.PI * 40 * (1 - downloadProgress.current / downloadProgress.total)}`}
+                    strokeLinecap="round"
+                    className="transition-all duration-300"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Download className="h-8 w-8 text-purple-600" />
+                </div>
+              </div>
+              
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Downloading Certificates
+              </h3>
+              
+              <p className="text-2xl font-bold text-purple-600 mb-2">
+                {downloadProgress.current} / {downloadProgress.total}
+              </p>
+              
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+                <div 
+                  className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+                />
+              </div>
+              
+              <p className="text-sm text-gray-600 text-center">
+                Please wait while we download all certificates...
+                <br />
+                <span className="text-xs text-gray-500">This may take a few moments</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download Complete Modal */}
+      {showDownloadComplete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="h-10 w-10 text-green-600" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Download Complete!
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-6">
+                Successfully downloaded <strong>{downloadProgress.total}</strong> certificate{downloadProgress.total !== 1 ? 's' : ''}
+              </p>
+              
+              <button
+                onClick={() => setShowDownloadComplete(false)}
+                className="px-6 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download Confirmation Modal */}
+      {showDownloadConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col">
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                <Download className="h-6 w-6 text-purple-600" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-900 mb-2 text-center">
+                Download All Certificates?
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-6">
+                You are about to download <strong>{preGeneratedCerts.length}</strong> certificate{preGeneratedCerts.length !== 1 ? 's' : ''}.
+                <br />
+                <span className="text-sm text-gray-500">This may take a few moments.</span>
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDownloadConfirm(false)}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDownloadAll}
+                  className="flex-1 px-4 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 transition-colors"
+                >
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Generation Results Modal */}
+      {showPreGenResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                <FileText className="h-10 w-10 text-purple-600" />
+              </div>
+              
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Pre-Generation Complete!
+              </h3>
+              
+              <p className="text-gray-600 text-center mb-6">
+                Certificate pre-generation has finished
+              </p>
+
+              {/* Results Summary */}
+              <div className="w-full space-y-3 mb-6">
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <span className="text-sm font-medium text-green-900">Generated</span>
+                  <span className="text-lg font-bold text-green-600">{preGenResults.success}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                  <span className="text-sm font-medium text-yellow-900">Skipped</span>
+                  <span className="text-lg font-bold text-yellow-600">{preGenResults.skipped}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                  <span className="text-sm font-medium text-red-900">Failed</span>
+                  <span className="text-lg font-bold text-red-600">{preGenResults.failed}</span>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setShowPreGenResults(false)}
+                className="px-6 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {showPdfViewer && viewingCert && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Certificate Preview
+                </h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+                    Rank {viewingCert.ownership?.rank}
+                  </span>
+                  {viewingCert.ownership?.stateName && (
+                    <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                      {viewingCert.ownership.stateName}
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-600">{viewingCert.serialNumber}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownloadCertificate(viewingCert)}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+                  title="Download Certificate"
+                >
+                  <Download className="h-4 w-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPdfViewer(false)
+                    setViewingCert(null)
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* PDF Viewer */}
+            <div className="flex-1 overflow-hidden bg-gray-100">
+              <iframe
+                src={`/api/certificates/serve-pdf?path=${encodeURIComponent(viewingCert.filePath)}`}
+                className="w-full h-full border-0"
+                title="Certificate Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Certificate Mapping Modal */}
+      {showManualMapping && mappingTeam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Certificate Assignment - {mappingTeam.team?.name}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Rank {mappingTeam.rank} - {mappingTeam.rank === 1 ? 'TEMPAT PERTAMA' : `TEMPAT KE-${mappingTeam.rank}`}
+                {mappingTeam.state && (
+                  <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                    {mappingTeam.state.name}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isGenerating ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <span className="ml-3 text-gray-600">Loading team data...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Instructions */}
+                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900">
+                      <strong>Choose Assignment Method:</strong><br/>
+                      • <strong>Auto-Map:</strong> Automatically assigns certificates in order (Member 1 → Cert 1, Member 2 → Cert 2, etc.)<br/>
+                      • <strong>Manual Map:</strong> Select specific certificates for each team member from the dropdowns below
+                    </p>
+                  </div>
+
+                  {/* Available Certificates Summary */}
+                  {availableCerts.length > 0 && (
+                    <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-900">
+                        ✓ <strong>{availableCerts.length} pre-generated certificate{availableCerts.length !== 1 ? 's' : ''}</strong> available
+                      </p>
+                      <p className="text-xs text-green-800 mt-1">
+                        Filtered for: Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
+                        {mappingTeam.state && `, ${mappingTeam.state.name}`}
+                      </p>
+                    </div>
+                  )}
+
+                  {availableCerts.length === 0 && (
+                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-900">
+                        ⚠️ No pre-generated certificates found for Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
+                        {mappingTeam.state && `, ${mappingTeam.state.name}`}.
+                      </p>
+                      <p className="text-xs text-yellow-800 mt-1">
+                        New certificates will be created with new serial numbers.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Team Members Mapping Table */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            #
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Team Member
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            IC Number
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Assign Certificate
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {teamMembers.map((member, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900">
+                              {idx + 1}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                              {member.name}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {member.ic || 'N/A'}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {availableCerts.length > 0 ? (
+                                <select
+                                  value={certMapping[idx] || ''}
+                                  onChange={(e) => setCertMapping({
+                                    ...certMapping,
+                                    [idx]: parseInt(e.target.value)
+                                  })}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500"
+                                >
+                                  <option value="">-- Select Certificate --</option>
+                                  {availableCerts.map((cert) => {
+                                    // Check if this certificate is already selected by another member
+                                    const isSelectedByOther = Object.entries(certMapping).some(
+                                      ([memberIdx, certId]) => 
+                                        parseInt(memberIdx) !== idx && certId === cert.id
+                                    )
+                                    
+                                    return (
+                                      <option 
+                                        key={cert.id} 
+                                        value={cert.id}
+                                        disabled={isSelectedByOther}
+                                      >
+                                        {cert.serialNumber} (Member #{cert.ownership?.memberNumber || '?'}
+                                        {cert.ownership?.stateName ? ` - ${cert.ownership.stateName}` : ''})
+                                        {isSelectedByOther ? ' - Already Assigned' : ''}
+                                      </option>
+                                    )
+                                  })}
+                                </select>
+                              ) : (
+                                <span className="text-gray-500 italic">New cert will be created</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowManualMapping(false)
+                  setCertMapping({})
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                disabled={isGenerating}
+              >
+                Cancel
+              </button>
+
+              <div className="flex gap-3">
+                {availableCerts.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      // Auto-map: Map each member to certificate in order
+                      const autoMapping: Record<number, number> = {}
+                      teamMembers.forEach((member, idx) => {
+                        if (availableCerts[idx]) {
+                          autoMapping[idx] = availableCerts[idx].id
+                        }
+                      })
+                      setCertMapping(autoMapping)
+                      
+                      // Automatically trigger generation with auto-mapping
+                      const confirmed = confirm(
+                        `Auto-assign certificates in order?\n\n` +
+                        teamMembers.map((m, i) => 
+                          `${m.name} → ${availableCerts[i]?.serialNumber || 'New cert'}`
+                        ).join('\n')
+                      )
+                      
+                      if (confirmed) {
+                        setCertMapping(autoMapping)
+                        setTimeout(() => handleManualGenerate(), 100)
+                      }
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
+                    disabled={isGenerating || availableCerts.length === 0}
+                  >
+                    Auto-Map & Generate
+                  </button>
+                )}
+                
+                <button
+                  onClick={handleManualGenerate}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
+                  disabled={isGenerating || teamMembers.filter((m, idx) => !certMapping[idx]).length > 0}
+                >
+                  {isGenerating ? 'Generating...' : 'Generate with Selected Mapping'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Certificates View Modal */}
+      {showTeamCerts && viewingTeam && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Team Certificates - {viewingTeam.team?.name}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Rank {viewingTeam.rank} - {viewingTeam.rank === 1 ? 'TEMPAT PERTAMA' : `TEMPAT KE-${viewingTeam.rank}`}
+                {viewingTeam.state && (
+                  <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+                    {viewingTeam.state.name}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {isLoadingCerts ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <span className="ml-3 text-gray-600">Loading certificates...</span>
+                </div>
+              ) : teamCertificates.length > 0 ? (
+                <div className="space-y-4">
+                  {teamCertificates.map((cert, idx) => (
+                    <div key={cert.id || idx} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 bg-purple-100 text-purple-700 font-bold rounded-full">
+                              {idx + 1}
+                            </div>
+                            <div>
+                              <h4 className="text-base font-semibold text-gray-900">{cert.memberName}</h4>
+                              <p className="text-sm text-gray-600">IC: {cert.ic || 'N/A'}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs text-gray-500">Serial Number</p>
+                              <p className="text-sm font-mono font-medium text-gray-900">
+                                {cert.serialNumber || (
+                                  <span className="text-gray-400 italic">Not assigned</span>
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Certificate Status</p>
+                              <p className="text-sm">
+                                {cert.certificateId ? (
+                                  cert.filePath ? (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      ✓ Generated
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                      Pre-generated (Blank)
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                    Not Created
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            {cert.certificateType && (
+                              <div>
+                                <p className="text-xs text-gray-500">Type</p>
+                                <p className="text-sm font-medium text-gray-900">{cert.certificateType}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {cert.certificateId && cert.filePath && (
+                          <div className="ml-4 flex flex-col gap-2">
+                            <button
+                              onClick={() => {
+                                setViewingCert(cert)
+                                setShowPdfViewer(true)
+                              }}
+                              className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View
+                            </button>
+                            <a
+                              href={`/api/certificates/serve-pdf?path=${encodeURIComponent(cert.filePath)}`}
+                              download
+                              className="inline-flex items-center justify-center px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700"
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              Download
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">No certificates found</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Certificates have not been generated for this team yet.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowTeamCerts(false)
+                  setViewingTeam(null)
+                  setTeamCertificates([])
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
