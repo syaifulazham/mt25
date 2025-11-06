@@ -62,6 +62,7 @@ export default function WinnersCertificatesPage() {
   const [statesCount, setStatesCount] = useState<number>(0)
   const [showDownloadProgress, setShowDownloadProgress] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 })
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
   const [showDownloadComplete, setShowDownloadComplete] = useState(false)
   const [showDownloadConfirm, setShowDownloadConfirm] = useState(false)
   const [showPreGenResults, setShowPreGenResults] = useState(false)
@@ -387,9 +388,23 @@ export default function WinnersCertificatesPage() {
   const confirmDownloadAll = async () => {
     setShowDownloadConfirm(false)
     
+    // Calculate expected batches
+    const BATCH_SIZE = 50
+    const expectedBatches = Math.ceil(preGeneratedCerts.length / BATCH_SIZE)
+
     // Show progress modal
     setShowDownloadProgress(true)
     setDownloadProgress({ current: 0, total: preGeneratedCerts.length })
+    setBatchProgress({ current: 0, total: expectedBatches })
+
+    // Simulate batch progress while waiting for download
+    let currentBatch = 0
+    const batchInterval = setInterval(() => {
+      if (currentBatch < expectedBatches) {
+        currentBatch++
+        setBatchProgress({ current: currentBatch, total: expectedBatches })
+      }
+    }, 800) // Update every 800ms to simulate progress
 
     try {
       // Get certificate IDs
@@ -398,6 +413,7 @@ export default function WinnersCertificatesPage() {
         .map(cert => cert.id)
 
       if (certificateIds.length === 0) {
+        clearInterval(batchInterval)
         throw new Error('No certificates with valid PDFs found')
       }
 
@@ -415,6 +431,9 @@ export default function WinnersCertificatesPage() {
           })
         }
       )
+
+      // Clear the simulation interval
+      clearInterval(batchInterval)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -443,11 +462,13 @@ export default function WinnersCertificatesPage() {
 
       // Update progress to complete
       setDownloadProgress({ current: certificateIds.length, total: certificateIds.length })
+      setBatchProgress({ current: expectedBatches, total: expectedBatches })
       
       // Hide progress, show completion
       setShowDownloadProgress(false)
       setShowDownloadComplete(true)
     } catch (err) {
+      clearInterval(batchInterval)
       setShowDownloadProgress(false)
       setError(err instanceof Error ? err.message : 'Error downloading certificates')
       alert('Error downloading certificates: ' + (err instanceof Error ? err.message : 'Unknown error'))
@@ -470,9 +491,23 @@ export default function WinnersCertificatesPage() {
       return
     }
 
+    // Calculate expected batches
+    const BATCH_SIZE = 50
+    const expectedBatches = Math.ceil(totalPreGenCerts / BATCH_SIZE)
+
     // Show progress modal
     setShowDownloadProgress(true)
     setDownloadProgress({ current: 0, total: totalPreGenCerts })
+    setBatchProgress({ current: 0, total: expectedBatches })
+
+    // Simulate batch progress while waiting for download
+    let currentBatch = 0
+    const batchInterval = setInterval(() => {
+      if (currentBatch < expectedBatches) {
+        currentBatch++
+        setBatchProgress({ current: currentBatch, total: expectedBatches })
+      }
+    }, 800) // Update every 800ms to simulate progress
 
     try {
       // Call API to generate merged batched ZIP for all contests
@@ -489,9 +524,21 @@ export default function WinnersCertificatesPage() {
         }
       )
 
+      // Clear the simulation interval
+      clearInterval(batchInterval)
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to download certificates')
+        let errorMessage = 'Failed to download certificates'
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorMessage
+        } catch (parseError) {
+          // If parsing fails, it might be an HTML error page
+          const text = await response.text()
+          console.error('Server error response:', text)
+          errorMessage = `Server error (${response.status}). The API endpoint may not be available. Please restart the development server.`
+        }
+        throw new Error(errorMessage)
       }
 
       // Get the ZIP file blob
@@ -516,11 +563,13 @@ export default function WinnersCertificatesPage() {
 
       // Update progress to complete
       setDownloadProgress({ current: totalPreGenCerts, total: totalPreGenCerts })
+      setBatchProgress({ current: expectedBatches, total: expectedBatches })
       
       // Hide progress, show completion
       setShowDownloadProgress(false)
       setShowDownloadComplete(true)
     } catch (err) {
+      clearInterval(batchInterval)
       setShowDownloadProgress(false)
       setError(err instanceof Error ? err.message : 'Error downloading certificates')
       alert('Error downloading certificates: ' + (err instanceof Error ? err.message : 'Unknown error'))
@@ -1593,25 +1642,41 @@ export default function WinnersCertificatesPage() {
               </div>
               
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Downloading Certificates
+                Merging Certificates
               </h3>
               
-              <p className="text-2xl font-bold text-purple-600 mb-2">
-                {downloadProgress.current} / {downloadProgress.total}
-              </p>
+              {batchProgress.total > 0 && (
+                <div className="mb-3">
+                  <p className="text-lg font-semibold text-indigo-600 mb-1">
+                    Processing Batch {batchProgress.current} of {batchProgress.total}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {downloadProgress.total} total certificates
+                  </p>
+                </div>
+              )}
               
-              <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
+              <div className="w-full bg-gray-200 rounded-full h-4 mb-4">
                 <div 
-                  className="bg-purple-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
-                />
+                  className="bg-gradient-to-r from-indigo-500 to-purple-600 h-4 rounded-full transition-all duration-300 flex items-center justify-center"
+                  style={{ width: `${batchProgress.total > 0 ? (batchProgress.current / batchProgress.total) * 100 : 0}%` }}
+                >
+                  {batchProgress.total > 0 && batchProgress.current > 0 && (
+                    <span className="text-xs font-medium text-white">
+                      {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+                    </span>
+                  )}
+                </div>
               </div>
               
-              <p className="text-sm text-gray-600 text-center">
-                Merging certificates in batches and creating ZIP file...
-                <br />
-                <span className="text-xs text-gray-500">This may take a few moments</span>
-              </p>
+              <div className="space-y-1 text-center">
+                <p className="text-sm text-gray-600">
+                  Merging PDFs in batches of 50...
+                </p>
+                <p className="text-xs text-gray-500">
+                  This may take a few moments
+                </p>
+              </div>
             </div>
           </div>
         </div>
