@@ -32,7 +32,7 @@ export async function POST(
 
     const eventId = parseInt(params.id)
     const body = await request.json()
-    const { templateId } = body
+    const { templateId, batchSize: customBatchSize } = body
 
     if (!templateId) {
       return NextResponse.json(
@@ -41,7 +41,10 @@ export async function POST(
       )
     }
 
-    console.log(`[Download All By Template] Fetching certificates for template ${templateId}, event ${eventId}`)
+    // Use custom batch size if provided, otherwise use default
+    const usedBatchSize = customBatchSize || BATCH_SIZE
+
+    console.log(`[Download All By Template] Fetching certificates for template ${templateId}, event ${eventId}, batch size: ${usedBatchSize}`)
     
     // Fetch ALL pre-generated certificates for this template and event (across all contests)
     const certificates = await prisma.$queryRaw<any[]>`
@@ -74,10 +77,10 @@ export async function POST(
       )
     }
 
-    // Create batches of 50 certificates
+    // Create batches based on the specified batch size
     const batches: typeof certificates[] = []
-    for (let i = 0; i < certificates.length; i += BATCH_SIZE) {
-      batches.push(certificates.slice(i, i + BATCH_SIZE))
+    for (let i = 0; i < certificates.length; i += usedBatchSize) {
+      batches.push(certificates.slice(i, i + usedBatchSize))
     }
 
     console.log(`[Download All By Template] Creating ${batches.length} batches`)
@@ -139,7 +142,7 @@ export async function POST(
       templateId: parseInt(templateId),
       totalCertificates: certificates.length,
       batches: batches.length,
-      batchSize: BATCH_SIZE,
+      batchSize: usedBatchSize,
       scope: 'all_contests',
       generatedAt: new Date().toISOString(),
       generatedBy: session.user.email

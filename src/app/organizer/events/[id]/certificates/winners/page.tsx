@@ -81,6 +81,9 @@ export default function WinnersCertificatesPage() {
   const [winnerTemplateId, setWinnerTemplateId] = useState<number | null>(null)
   const [showDownloadAllByTemplateConfirm, setShowDownloadAllByTemplateConfirm] = useState(false)
   const [totalPreGenCerts, setTotalPreGenCerts] = useState<number>(0)
+  const [batchSize, setBatchSize] = useState<number>(50)
+  const [downloadStrategy, setDownloadStrategy] = useState<'single-zip' | 'individual'>('individual')
+  const [showDownloadOptions, setShowDownloadOptions] = useState(false)
 
   // Fetch event details to get scopeArea
   useEffect(() => {
@@ -494,7 +497,76 @@ export default function WinnersCertificatesPage() {
       alert('Template ID not found')
       return
     }
-    setShowDownloadAllByTemplateConfirm(true)
+    setShowDownloadOptions(true)
+  }
+
+  const proceedWithDownload = () => {
+    setShowDownloadOptions(false)
+    if (downloadStrategy === 'individual') {
+      downloadIndividualBatches()
+    } else {
+      setShowDownloadAllByTemplateConfirm(true)
+    }
+  }
+
+  const downloadIndividualBatches = async () => {
+    if (!winnerTemplateId) return
+
+    const expectedBatches = Math.ceil(totalPreGenCerts / batchSize)
+    
+    setShowDownloadProgress(true)
+    setBatchProgress({ current: 0, total: expectedBatches })
+    setDownloadProgress({ current: 0, total: totalPreGenCerts })
+
+    try {
+      // Download each batch individually
+      for (let batchNum = 1; batchNum <= expectedBatches; batchNum++) {
+        setBatchProgress({ current: batchNum, total: expectedBatches })
+        
+        const response = await fetch(
+          `/api/events/${eventId}/judging/download-batch-by-template`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              templateId: winnerTemplateId,
+              batchNumber: batchNum,
+              batchSize: batchSize
+            })
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Failed to download batch ${batchNum}`)
+        }
+
+        const blob = await response.blob()
+        const contentDisposition = response.headers.get('Content-Disposition')
+        const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+        const filename = filenameMatch?.[1] || `Batch_${batchNum}.pdf`
+
+        // Auto-download the file
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        // Small delay between downloads
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      setBatchProgress({ current: expectedBatches, total: expectedBatches })
+      setShowDownloadProgress(false)
+      setShowDownloadComplete(true)
+    } catch (err) {
+      setShowDownloadProgress(false)
+      setError(err instanceof Error ? err.message : 'Error downloading batches')
+      alert('Error: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    }
   }
 
   const confirmDownloadAllByTemplate = async () => {
@@ -505,9 +577,8 @@ export default function WinnersCertificatesPage() {
       return
     }
 
-    // Calculate expected batches
-    const BATCH_SIZE = 50
-    const expectedBatches = Math.ceil(totalPreGenCerts / BATCH_SIZE)
+    // Calculate expected batches using the selected batch size
+    const expectedBatches = Math.ceil(totalPreGenCerts / batchSize)
 
     // Show progress modal
     setShowDownloadProgress(true)
@@ -533,7 +604,8 @@ export default function WinnersCertificatesPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            templateId: winnerTemplateId
+            templateId: winnerTemplateId,
+            batchSize: batchSize
           })
         }
       )
@@ -1784,6 +1856,118 @@ export default function WinnersCertificatesPage() {
                   className="flex-1 px-4 py-2 bg-purple-600 text-white font-medium rounded-md hover:bg-purple-700 transition-colors"
                 >
                   Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Download Options Modal */}
+      {showDownloadOptions && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
+            <div className="flex flex-col">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Download Options</h3>
+              
+              {/* Batch Size Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Certificates per Merged PDF
+                </label>
+                <select
+                  value={batchSize}
+                  onChange={(e) => setBatchSize(parseInt(e.target.value))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value={10}>10 certificates per PDF</option>
+                  <option value={25}>25 certificates per PDF</option>
+                  <option value={50}>50 certificates per PDF</option>
+                  <option value={100}>100 certificates per PDF</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Total batches: {Math.ceil(totalPreGenCerts / batchSize)} PDFs
+                </p>
+              </div>
+
+              {/* Download Strategy */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Download Strategy
+                </label>
+                
+                <div className="space-y-3">
+                  {/* Individual Downloads */}
+                  <div
+                    onClick={() => setDownloadStrategy('individual')}
+                    className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                      downloadStrategy === 'individual'
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-200 hover:border-indigo-300'
+                    }`}
+                  >
+                    <div className="flex items-start">
+                      <input
+                        type="radio"
+                        checked={downloadStrategy === 'individual'}
+                        onChange={() => setDownloadStrategy('individual')}
+                        className="mt-1 mr-3"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900">Download Each Batch Separately</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Downloads {Math.ceil(totalPreGenCerts / batchSize)} separate PDF files sequentially.
+                          <span className="block text-green-600 font-medium mt-1">
+                            ✓ Recommended - No timeout issues
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Single ZIP */}
+                  <div
+                    onClick={() => setDownloadStrategy('single-zip')}
+                    className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                      downloadStrategy === 'single-zip'
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-200 hover:border-indigo-300'
+                    }`}
+                  >
+                    <div className="flex items-start">
+                      <input
+                        type="radio"
+                        checked={downloadStrategy === 'single-zip'}
+                        onChange={() => setDownloadStrategy('single-zip')}
+                        className="mt-1 mr-3"
+                      />
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900">Compress All Into Single ZIP</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          All batches compressed into one ZIP file.
+                          <span className="block text-amber-600 font-medium mt-1">
+                            ⚠ May timeout for large numbers of certificates
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowDownloadOptions(false)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={proceedWithDownload}
+                  className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                  Proceed with Download
                 </button>
               </div>
             </div>
