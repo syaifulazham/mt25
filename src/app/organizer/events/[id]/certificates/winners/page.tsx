@@ -362,24 +362,57 @@ export default function WinnersCertificatesPage() {
     setDownloadProgress({ current: 0, total: preGeneratedCerts.length })
 
     try {
-      // Download each certificate sequentially
-      for (let i = 0; i < preGeneratedCerts.length; i++) {
-        const cert = preGeneratedCerts[i]
-        if (cert.filePath) {
-          const link = document.createElement('a')
-          link.href = `/api/certificates/serve-pdf?path=${encodeURIComponent(cert.filePath)}`
-          link.download = `${cert.serialNumber.replace(/\//g, '-')}.pdf`
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-          
-          // Update progress
-          setDownloadProgress({ current: i + 1, total: preGeneratedCerts.length })
-          
-          // Small delay between downloads to avoid browser blocking
-          await new Promise(resolve => setTimeout(resolve, 500))
-        }
+      // Get certificate IDs
+      const certificateIds = preGeneratedCerts
+        .filter(cert => cert.filePath)
+        .map(cert => cert.id)
+
+      if (certificateIds.length === 0) {
+        throw new Error('No certificates with valid PDFs found')
       }
+
+      // Call API to generate merged batched ZIP
+      const response = await fetch(
+        `/api/events/${eventId}/judging/download-all-pregenerated`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            certificateIds,
+            contestId: selectedContest
+          })
+        }
+      )
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to download certificates')
+      }
+
+      // Get the ZIP file blob
+      const blob = await response.blob()
+      
+      // Extract filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/)
+      const filename = filenameMatch 
+        ? filenameMatch[1] 
+        : `PreGenerated_Certificates_${new Date().toISOString().split('T')[0]}.zip`
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      // Update progress to complete
+      setDownloadProgress({ current: certificateIds.length, total: certificateIds.length })
       
       // Hide progress, show completion
       setShowDownloadProgress(false)
@@ -387,6 +420,7 @@ export default function WinnersCertificatesPage() {
     } catch (err) {
       setShowDownloadProgress(false)
       setError(err instanceof Error ? err.message : 'Error downloading certificates')
+      alert('Error downloading certificates: ' + (err instanceof Error ? err.message : 'Unknown error'))
     }
   }
 
@@ -1442,7 +1476,7 @@ export default function WinnersCertificatesPage() {
               </div>
               
               <p className="text-sm text-gray-600 text-center">
-                Please wait while we download all certificates...
+                Merging certificates in batches and creating ZIP file...
                 <br />
                 <span className="text-xs text-gray-500">This may take a few moments</span>
               </p>
@@ -1464,9 +1498,17 @@ export default function WinnersCertificatesPage() {
                 Download Complete!
               </h3>
               
-              <p className="text-gray-600 text-center mb-6">
-                Successfully downloaded <strong>{downloadProgress.total}</strong> certificate{downloadProgress.total !== 1 ? 's' : ''}
+              <p className="text-gray-600 text-center mb-2">
+                Successfully prepared <strong>{downloadProgress.total}</strong> certificate{downloadProgress.total !== 1 ? 's' : ''}
               </p>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
+                <p className="text-sm text-green-800 text-center">
+                  📦 Your ZIP file contains <strong>{Math.ceil(downloadProgress.total / 50)} merged PDF file{Math.ceil(downloadProgress.total / 50) !== 1 ? 's' : ''}</strong>
+                  <br />
+                  <span className="text-xs text-green-700">(50 certificates per PDF)</span>
+                </p>
+              </div>
               
               <button
                 onClick={() => setShowDownloadComplete(false)}
@@ -1492,11 +1534,27 @@ export default function WinnersCertificatesPage() {
                 Download All Certificates?
               </h3>
               
-              <p className="text-gray-600 text-center mb-6">
+              <p className="text-gray-600 text-center mb-4">
                 You are about to download <strong>{preGeneratedCerts.length}</strong> certificate{preGeneratedCerts.length !== 1 ? 's' : ''}.
-                <br />
-                <span className="text-sm text-gray-500">This may take a few moments.</span>
               </p>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-800">
+                      Certificates will be merged in <strong>batches of 50 PDFs</strong> per file and compressed into a <strong>ZIP folder</strong> for easy download.
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Expected: {Math.ceil(preGeneratedCerts.length / 50)} merged PDF file{Math.ceil(preGeneratedCerts.length / 50) !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
               
               <div className="flex gap-3">
                 <button
