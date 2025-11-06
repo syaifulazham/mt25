@@ -40,11 +40,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Build the filter
+    // Note: MySQL's contains is case-insensitive by default, so we don't need mode: "insensitive"
     const filter: any = {
       OR: [
-        { name: { contains: searchQuery, mode: "insensitive" } },
-        { code: { contains: searchQuery, mode: "insensitive" } },
-        { description: { contains: searchQuery, mode: "insensitive" } }
+        { name: { contains: searchQuery } },
+        { code: { contains: searchQuery } },
+        { description: { contains: searchQuery } }
       ],
       ...dateFilter
     };

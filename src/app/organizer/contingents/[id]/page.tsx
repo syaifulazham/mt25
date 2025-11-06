@@ -188,6 +188,7 @@ interface ContingentWithDetails {
     description: string | null;
     status: string;
     createdAt: Date;
+    evidence_doc: string | null;
     contest: {
       id: number;
       name: string;
@@ -195,6 +196,15 @@ interface ContingentWithDetails {
     _count: {
       members: number;
     };
+    eventcontestteam: Array<{
+      id: number;
+      eventcontest: {
+        event: {
+          id: number;
+          name: string;
+        };
+      };
+    }>;
   }>;
   _count: {
     contestants: number;
@@ -327,6 +337,21 @@ export default async function ContingentDetailPage({ params }: PageProps) {
               select: {
                 members: true
               }
+            },
+            eventcontestteam: {
+              select: {
+                id: true,
+                eventcontest: {
+                  select: {
+                    event: {
+                      select: {
+                        id: true,
+                        name: true
+                      }
+                    }
+                  }
+                }
+              }
             }
           },
           orderBy: {
@@ -345,6 +370,22 @@ export default async function ContingentDetailPage({ params }: PageProps) {
     if (!contingent) {
       notFound();
     }
+
+    // Transform eventcontestteam data to match PaginatedTeamsList interface
+    const transformedContingent = {
+      ...contingent,
+      teams: contingent.teams.map(team => ({
+        ...team,
+        eventRegistrations: team.eventcontestteam.map(ect => ({
+          id: ect.id,
+          event: {
+            id: ect.eventcontest.event.id,
+            name: ect.eventcontest.event.name,
+            location: null
+          }
+        }))
+      }))
+    };
 
     // Count contestants without any contest assignments for this specific contingent
     const contestantsWithoutContests = await prismaExecute(async (prisma) => {
@@ -384,8 +425,8 @@ export default async function ContingentDetailPage({ params }: PageProps) {
     // Get pagination from searchParams or use defaults
     const pageSize = 5; // Number of items per page
 
-    // Cast to our detailed type
-    const contingentWithDetails = contingent as unknown as ContingentWithDetails;
+    // Use transformed contingent with event registrations
+    const contingentWithDetails = transformedContingent as unknown as ContingentWithDetails;
     // Calculate contest participation statistics
     const contestStats = {
       uniqueContests: 0,  // Number of different contests

@@ -78,6 +78,14 @@ interface Team {
   _count: {
     members: number;
   };
+  eventRegistrations?: Array<{
+    id: number;
+    event: {
+      id: number;
+      name: string;
+      location: string | null;
+    };
+  }>;
 }
 
 interface Contest {
@@ -101,6 +109,13 @@ interface TeamMember {
   contestantId: number;
   contestant: Contestant;
   role: string | null;
+}
+
+interface Event {
+  id: number;
+  name: string;
+  startDate: Date;
+  endDate: Date;
 }
 
 interface PaginatedTeamsListProps {
@@ -141,11 +156,19 @@ export const PaginatedTeamsList = forwardRef<PaginatedTeamsListRef, PaginatedTea
   const [contestantSearchTerm, setContestantSearchTerm] = useState('');
   const [contestantDropdownOpen, setContestantDropdownOpen] = useState(false);
   
-  // Fetch contests and contestants
+  // Join event state
+  const [joinEventDialogOpen, setJoinEventDialogOpen] = useState(false);
+  const [selectedTeamForEvent, setSelectedTeamForEvent] = useState<Team | null>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [isJoiningEvent, setIsJoiningEvent] = useState(false);
+  
+  // Fetch contests, contestants, and events
   useEffect(() => {
     if (isAdmin) {
       fetchContests();
       fetchContestants();
+      fetchEvents();
     }
   }, [contingentId, isAdmin]);
   
@@ -181,6 +204,18 @@ export const PaginatedTeamsList = forwardRef<PaginatedTeamsListRef, PaginatedTea
       }
     } catch (error) {
       console.error("Error fetching contestants:", error);
+    }
+  };
+  
+  const fetchEvents = async () => {
+    try {
+      const response = await fetch('/api/events');
+      if (response.ok) {
+        const data = await response.json();
+        setEvents(data);
+      }
+    } catch (error) {
+      console.error("Error fetching events:", error);
     }
   };
   
@@ -307,6 +342,42 @@ export const PaginatedTeamsList = forwardRef<PaginatedTeamsListRef, PaginatedTea
     }
   };
   
+  const handleOpenJoinEvent = (team: Team) => {
+    setSelectedTeamForEvent(team);
+    setSelectedEventId(null);
+    setJoinEventDialogOpen(true);
+  };
+  
+  const handleJoinEvent = async () => {
+    if (!selectedTeamForEvent || !selectedEventId) {
+      toast.error("Please select an event");
+      return;
+    }
+    
+    try {
+      setIsJoiningEvent(true);
+      const response = await fetch(`/api/organizer/teams/${selectedTeamForEvent.id}/join-event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: selectedEventId })
+      });
+      
+      if (response.ok) {
+        toast.success("Team joined event successfully");
+        setJoinEventDialogOpen(false);
+        onTeamsUpdate?.();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to join event");
+      }
+    } catch (error) {
+      console.error("Error joining event:", error);
+      toast.error("Failed to join event");
+    } finally {
+      setIsJoiningEvent(false);
+    }
+  };
+  
   // Filter available contestants (not already in team)
   const availableContestants = contestants.filter(
     c => !teamMembers.some(tm => tm.contestantId === c.id)
@@ -393,16 +464,38 @@ export const PaginatedTeamsList = forwardRef<PaginatedTeamsListRef, PaginatedTea
                         <div>Members: {team._count.members}</div>
                         <div>Contest: {team.contest.name}</div>
                       </CardDescription>
+                      
+                      {/* Registered Events */}
+                      {team.eventRegistrations && team.eventRegistrations.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {team.eventRegistrations.map((reg) => (
+                            <Badge key={reg.id} variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                              📅 {reg.event.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     {isAdmin && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenManageMembers(team)}
-                      >
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Manage
-                      </Button>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenManageMembers(team)}
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Manage
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenJoinEvent(team)}
+                          className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Join Event
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </CardHeader>
@@ -699,6 +792,67 @@ export const PaginatedTeamsList = forwardRef<PaginatedTeamsListRef, PaginatedTea
               <DialogFooter>
                 <Button variant="outline" onClick={() => setManageMembersDialogOpen(false)}>
                   Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Join Event Dialog */}
+          <Dialog open={joinEventDialogOpen} onOpenChange={setJoinEventDialogOpen}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Join Event - {selectedTeamForEvent?.name}</DialogTitle>
+                <DialogDescription>
+                  Select an event for this team to participate in
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="event">Event</Label>
+                  <Select
+                    value={selectedEventId?.toString() || ""}
+                    onValueChange={(value) => setSelectedEventId(parseInt(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an event" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {events.length > 0 ? (
+                        events.map((event) => (
+                          <SelectItem key={event.id} value={event.id.toString()}>
+                            {event.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-events" disabled>
+                          No events available
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Current Registrations */}
+                {selectedTeamForEvent?.eventRegistrations && selectedTeamForEvent.eventRegistrations.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Already Registered:</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTeamForEvent.eventRegistrations.map((reg) => (
+                        <Badge key={reg.id} variant="secondary" className="text-xs">
+                          {reg.event.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setJoinEventDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleJoinEvent} disabled={isJoiningEvent || !selectedEventId}>
+                  {isJoiningEvent && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Join Event
                 </Button>
               </DialogFooter>
             </DialogContent>
