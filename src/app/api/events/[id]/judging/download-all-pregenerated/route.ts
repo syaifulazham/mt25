@@ -13,6 +13,8 @@ const BATCH_SIZE = 50
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic'
+// Increase timeout to 5 minutes for large certificate processing
+export const maxDuration = 300
 
 export async function POST(
   request: NextRequest,
@@ -112,9 +114,9 @@ export async function POST(
       })
     }
 
-    // Create ZIP file
+    // Create ZIP file with faster compression for better performance
     const archive = archiver('zip', {
-      zlib: { level: 9 } // Maximum compression
+      zlib: { level: 6 } // Balanced compression (faster than level 9)
     })
 
     // Add metadata file

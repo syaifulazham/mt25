@@ -13,6 +13,8 @@ const BATCH_SIZE = 50
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic'
+// Increase timeout to 5 minutes for large certificate processing
+export const maxDuration = 300
 
 export async function POST(
   request: NextRequest,
@@ -39,6 +41,8 @@ export async function POST(
       )
     }
 
+    console.log(`[Download All By Template] Fetching certificates for template ${templateId}, event ${eventId}`)
+    
     // Fetch ALL pre-generated certificates for this template and event (across all contests)
     const certificates = await prisma.$queryRaw<any[]>`
       SELECT 
@@ -61,6 +65,8 @@ export async function POST(
         JSON_EXTRACT(ownership, '$.memberNumber')
     `
 
+    console.log(`[Download All By Template] Found ${certificates.length} certificates`)
+
     if (certificates.length === 0) {
       return NextResponse.json(
         { error: 'No certificates found with valid PDF files' },
@@ -74,10 +80,13 @@ export async function POST(
       batches.push(certificates.slice(i, i + BATCH_SIZE))
     }
 
+    console.log(`[Download All By Template] Creating ${batches.length} batches`)
+
     // Create merged PDFs for each batch
     const mergedPdfs: { filename: string; buffer: Buffer }[] = []
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      console.log(`[Download All By Template] Processing batch ${batchIndex + 1}/${batches.length}`)
       const batch = batches[batchIndex]
       const mergedPdf = await PDFDocument.create()
 
@@ -117,9 +126,11 @@ export async function POST(
       })
     }
 
-    // Create ZIP file
+    console.log(`[Download All By Template] All batches processed. Creating ZIP with ${mergedPdfs.length} files`)
+
+    // Create ZIP file with faster compression for better performance
     const archive = archiver('zip', {
-      zlib: { level: 9 } // Maximum compression
+      zlib: { level: 6 } // Balanced compression (faster than level 9)
     })
 
     // Add metadata file
@@ -144,6 +155,8 @@ export async function POST(
     // Finalize the archive
     archive.finalize()
 
+    console.log(`[Download All By Template] ZIP archive finalized, converting to buffer...`)
+
     // Convert archive stream to buffer
     const chunks: Buffer[] = []
     for await (const chunk of archive) {
@@ -151,11 +164,16 @@ export async function POST(
     }
     const zipBuffer = Buffer.concat(chunks)
 
+    const zipSizeMB = (zipBuffer.length / (1024 * 1024)).toFixed(2)
+    console.log(`[Download All By Template] ZIP created successfully. Size: ${zipSizeMB} MB`)
+
     // Create a readable stream from the buffer
     const stream = Readable.from(zipBuffer)
 
     // Set response headers for ZIP download
     const zipFilename = `All_PreGenerated_Certificates_Template_${templateId}_Event_${eventId}_${new Date().toISOString().split('T')[0]}.zip`
+
+    console.log(`[Download All By Template] Sending response with filename: ${zipFilename}`)
 
     return new NextResponse(stream as any, {
       headers: {
