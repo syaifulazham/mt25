@@ -436,8 +436,22 @@ export default function WinnersCertificatesPage() {
       clearInterval(batchInterval)
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to download certificates')
+        let errorMessage = 'Failed to download certificates'
+        try {
+          // Read as text first, then try to parse as JSON
+          const text = await response.text()
+          try {
+            const errorData = JSON.parse(text)
+            errorMessage = errorData.error || errorMessage
+          } catch (jsonError) {
+            // If not JSON, it might be an HTML error page
+            console.error('Server error response:', text.substring(0, 500))
+            errorMessage = `Server error (${response.status})`
+          }
+        } catch (readError) {
+          errorMessage = `Server error (${response.status})`
+        }
+        throw new Error(errorMessage)
       }
 
       // Get the ZIP file blob
@@ -530,13 +544,18 @@ export default function WinnersCertificatesPage() {
       if (!response.ok) {
         let errorMessage = 'Failed to download certificates'
         try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-        } catch (parseError) {
-          // If parsing fails, it might be an HTML error page
+          // Read as text first, then try to parse as JSON
           const text = await response.text()
-          console.error('Server error response:', text)
-          errorMessage = `Server error (${response.status}). The API endpoint may not be available. Please restart the development server.`
+          try {
+            const errorData = JSON.parse(text)
+            errorMessage = errorData.error || errorMessage
+          } catch (jsonError) {
+            // If not JSON, it might be an HTML error page
+            console.error('Server error response:', text.substring(0, 500))
+            errorMessage = `Server error (${response.status}). The API endpoint may not be available. Please restart the development server.`
+          }
+        } catch (readError) {
+          errorMessage = `Server error (${response.status})`
         }
         throw new Error(errorMessage)
       }
