@@ -132,33 +132,31 @@ export async function GET(
     const presentContingents = Number(presentContingentsResult[0].count);
 
     // Get counts of total and present teams using raw SQL with optional contest group filtering
-    // Use COUNT(DISTINCT teamId) to match state-based statistics logic
+    // Query from attendanceContestant to match state-based statistics logic exactly
     const [totalTeamsResult, presentTeamsResult] = await Promise.all([
       filterByContestGroup
         ? prisma.$queryRaw<CountResult>`
-            SELECT COUNT(DISTINCT at.teamId) as count 
-            FROM attendanceTeam at
-            JOIN attendanceContestant ac ON at.teamId = ac.teamId AND at.eventId = ac.eventId
-            WHERE at.eventId = ${eventId}
+            SELECT COUNT(DISTINCT ac.teamId) as count 
+            FROM attendanceContestant ac
+            WHERE ac.eventId = ${eventId}
             AND ac.contestGroup IN (${Prisma.join(contestGroups)})
           `
         : prisma.$queryRaw<CountResult>`
             SELECT COUNT(DISTINCT teamId) as count 
-            FROM attendanceTeam 
+            FROM attendanceContestant
             WHERE eventId = ${eventId}
           `,
       filterByContestGroup
         ? prisma.$queryRaw<CountResult>`
-            SELECT COUNT(DISTINCT at.teamId) as count 
-            FROM attendanceTeam at
-            JOIN attendanceContestant ac ON at.teamId = ac.teamId AND at.eventId = ac.eventId
-            WHERE at.eventId = ${eventId} 
-            AND at.attendanceStatus = 'Present'
+            SELECT COUNT(DISTINCT ac.teamId) as count 
+            FROM attendanceContestant ac
+            WHERE ac.eventId = ${eventId} 
+            AND ac.attendanceStatus = 'Present'
             AND ac.contestGroup IN (${Prisma.join(contestGroups)})
           `
         : prisma.$queryRaw<CountResult>`
             SELECT COUNT(DISTINCT teamId) as count 
-            FROM attendanceTeam 
+            FROM attendanceContestant
             WHERE eventId = ${eventId} AND attendanceStatus = 'Present'
           `,
     ]);
