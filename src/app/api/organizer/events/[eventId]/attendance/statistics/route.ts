@@ -132,7 +132,7 @@ export async function GET(
     const presentContingents = Number(presentContingentsResult[0].count);
 
     // Get counts of total and present teams using raw SQL with optional contest group filtering
-    // Count teams directly from attendanceTeam to match endlist count
+    // Use COUNT(DISTINCT teamId) to match state-based statistics logic
     const [totalTeamsResult, presentTeamsResult] = await Promise.all([
       filterByContestGroup
         ? prisma.$queryRaw<CountResult>`
@@ -143,7 +143,7 @@ export async function GET(
             AND ac.contestGroup IN (${Prisma.join(contestGroups)})
           `
         : prisma.$queryRaw<CountResult>`
-            SELECT COUNT(*) as count 
+            SELECT COUNT(DISTINCT teamId) as count 
             FROM attendanceTeam 
             WHERE eventId = ${eventId}
           `,
@@ -157,7 +157,7 @@ export async function GET(
             AND ac.contestGroup IN (${Prisma.join(contestGroups)})
           `
         : prisma.$queryRaw<CountResult>`
-            SELECT COUNT(*) as count 
+            SELECT COUNT(DISTINCT teamId) as count 
             FROM attendanceTeam 
             WHERE eventId = ${eventId} AND attendanceStatus = 'Present'
           `,
