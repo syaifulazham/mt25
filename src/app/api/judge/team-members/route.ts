@@ -20,14 +20,13 @@ export async function GET(request: Request) {
 
     // Define the expected return type from the raw query
     interface TeamMemberResult {
-      id: number;
       contestantId: number;
       name: string;
     }
     
     // Get team members by querying attendance team contestants
     const teamMembers = await prisma.$queryRaw<TeamMemberResult[]>`
-      SELECT ac.id, ac.contestantId, c.name
+      SELECT DISTINCT ac.contestantId, c.name
       FROM attendanceContestant ac
       JOIN contestant c ON ac.contestantId = c.id
       WHERE ac.teamId = ${parsedTeamId}
@@ -37,7 +36,7 @@ export async function GET(request: Request) {
 
     // Format the results
     const formattedMembers = teamMembers.map((member) => ({
-      id: member.id,
+      id: member.contestantId,
       name: member.name,
       contestantId: member.contestantId,
     }));
