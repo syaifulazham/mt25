@@ -12,10 +12,13 @@ export async function GET(
   { params }: { params: { eventId: string } }
 ) {
   try {
+    console.log('Download Excel API called for event:', params.eventId);
+    
     // Auth check
     const session = await getServerSession(authOptions);
     
     if (!session || !(session.user.role === 'ADMIN' || session.user.role === 'OPERATOR')) {
+      console.error('Unauthorized access attempt');
       return NextResponse.json(
         { error: 'Unauthorized. Only admins and operators can download attendance data.' },
         { status: 401 }
@@ -24,11 +27,14 @@ export async function GET(
 
     const eventId = parseInt(params.eventId);
     if (isNaN(eventId)) {
+      console.error('Invalid event ID:', params.eventId);
       return NextResponse.json(
         { error: 'Invalid event ID' },
         { status: 400 }
       );
     }
+    
+    console.log('Fetching data for event ID:', eventId);
 
     // Parse contest group filters from URL
     const { searchParams } = new URL(request.url);
@@ -141,9 +147,9 @@ export async function GET(
           SELECT 
             am.id,
             am.managerId,
-            m.name,
-            m.ic,
-            m.phone,
+            p.name,
+            p.ic,
+            p.phoneNumber as phone,
             cg.name as contingentName,
             s.name as stateName,
             am.contestGroup,
@@ -151,21 +157,22 @@ export async function GET(
             am.attendanceDate,
             am.attendanceTime
           FROM attendanceManager am
-          JOIN contingentManager m ON am.managerId = m.id
+          JOIN contingentManager cm ON am.managerId = cm.id
+          JOIN user_participant p ON cm.participantId = p.id
           JOIN contingent cg ON am.contingentId = cg.id
           JOIN state s ON am.stateId = s.id
           WHERE am.eventId = ${eventId}
             AND am.attendanceStatus = 'Present'
             AND am.contestGroup IN (${Prisma.join(contestGroups)})
-          ORDER BY s.name, cg.name, m.name
+          ORDER BY s.name, cg.name, p.name
         `
       : await prisma.$queryRaw<ManagerResult>`
           SELECT 
             am.id,
             am.managerId,
-            m.name,
-            m.ic,
-            m.phone,
+            p.name,
+            p.ic,
+            p.phoneNumber as phone,
             cg.name as contingentName,
             s.name as stateName,
             am.contestGroup,
@@ -173,24 +180,27 @@ export async function GET(
             am.attendanceDate,
             am.attendanceTime
           FROM attendanceManager am
-          JOIN contingentManager m ON am.managerId = m.id
+          JOIN contingentManager cm ON am.managerId = cm.id
+          JOIN user_participant p ON cm.participantId = p.id
           JOIN contingent cg ON am.contingentId = cg.id
           JOIN state s ON am.stateId = s.id
           WHERE am.eventId = ${eventId}
             AND am.attendanceStatus = 'Present'
-          ORDER BY s.name, cg.name, m.name
+          ORDER BY s.name, cg.name, p.name
         `;
 
-    // Format contestants data for Excel
+    console.log(`Fetched ${contestants.length} contestants and ${managers.length} managers`);
+
+    // Format contestants data for Excel (convert BigInt to Number)
     const contestantsData = contestants.map((contestant: any, index: number) => ({
       'No.': index + 1,
-      'Name': contestant.name,
-      'IC Number': contestant.ic || 'N/A',
-      'Contingent': contestant.contingentName,
-      'State': contestant.stateName,
-      'Team': contestant.teamName || 'N/A',
-      'Contest': contestant.contestName || 'N/A',
-      'Contest Group': contestant.contestGroup || 'N/A',
+      'Name': String(contestant.name || ''),
+      'IC Number': String(contestant.ic || 'N/A'),
+      'Contingent': String(contestant.contingentName || ''),
+      'State': String(contestant.stateName || ''),
+      'Team': String(contestant.teamName || 'N/A'),
+      'Contest': String(contestant.contestName || 'N/A'),
+      'Contest Group': String(contestant.contestGroup || 'N/A'),
       'Attendance Date': contestant.attendanceDate 
         ? new Date(contestant.attendanceDate).toLocaleDateString() 
         : 'N/A',
@@ -199,15 +209,15 @@ export async function GET(
         : 'N/A'
     }));
 
-    // Format managers data for Excel
+    // Format managers data for Excel (convert BigInt to Number)
     const managersData = managers.map((manager: any, index: number) => ({
       'No.': index + 1,
-      'Name': manager.name,
-      'IC Number': manager.ic || 'N/A',
-      'Phone': manager.phone || 'N/A',
-      'Contingent': manager.contingentName,
-      'State': manager.stateName,
-      'Contest Group': manager.contestGroup || 'N/A',
+      'Name': String(manager.name || ''),
+      'IC Number': String(manager.ic || 'N/A'),
+      'Phone': String(manager.phone || 'N/A'),
+      'Contingent': String(manager.contingentName || ''),
+      'State': String(manager.stateName || ''),
+      'Contest Group': String(manager.contestGroup || 'N/A'),
       'Attendance Date': manager.attendanceDate 
         ? new Date(manager.attendanceDate).toLocaleDateString() 
         : 'N/A',
@@ -258,10 +268,10 @@ export async function GET(
 
     // Create summary sheet
     const summaryData = [
-      { 'Metric': 'Event Name', 'Value': event.name },
-      { 'Metric': 'Total Attended Contestants', 'Value': contestants.length },
-      { 'Metric': 'Total Attended Managers', 'Value': managers.length },
-      { 'Metric': 'Total Attended Participants', 'Value': contestants.length + managers.length },
+      { 'Metric': 'Event Name', 'Value': String(event.name || '') },
+      { 'Metric': 'Total Attended Contestants', 'Value': Number(contestants.length) },
+      { 'Metric': 'Total Attended Managers', 'Value': Number(managers.length) },
+      { 'Metric': 'Total Attended Participants', 'Value': Number(contestants.length + managers.length) },
       { 'Metric': 'Export Date', 'Value': new Date().toLocaleString() },
     ];
 
@@ -281,7 +291,9 @@ export async function GET(
     XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary');
 
     // Generate Excel file buffer
+    console.log('Generating Excel buffer...');
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    console.log('Excel buffer generated successfully, size:', excelBuffer.length);
 
     // Create filename with timestamp
     const timestamp = new Date().toISOString().split('T')[0];
@@ -289,8 +301,8 @@ export async function GET(
     const filename = `Attendance_Event${eventId}${filterSuffix}_${timestamp}.xlsx`;
 
     // Return Excel file
+    console.log('Returning Excel file:', filename);
     return new NextResponse(excelBuffer, {
-      status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
@@ -299,10 +311,12 @@ export async function GET(
 
   } catch (error: any) {
     console.error('Error generating attendance Excel:', error);
+    console.error('Error stack:', error.stack);
     return NextResponse.json(
       { 
         error: 'Failed to generate Excel file',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: error.message,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
       },
       { status: 500 }
     );
