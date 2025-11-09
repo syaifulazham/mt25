@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
-import { ArrowLeft, Users, CalendarDays, Clock } from "lucide-react";
+import { ArrowLeft, Users, CalendarDays, Clock, Download } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -82,6 +82,9 @@ export default function AttendanceDashboardPage() {
   const [kidsFilter, setKidsFilter] = useState(false);
   const [teensFilter, setTeensFilter] = useState(false);
   const [youthFilter, setYouthFilter] = useState(false);
+  
+  // Download state
+  const [downloading, setDownloading] = useState(false);
 
   // Colors for pie chart
   const COLORS = ['#0088FE', '#ECEFF1'];
@@ -162,16 +165,69 @@ export default function AttendanceDashboardPage() {
       ]
     : [];
 
+  // Handle Excel download
+  const handleDownloadExcel = async () => {
+    try {
+      setDownloading(true);
+      
+      // Build URL with active filters
+      let url = `/api/organizer/events/${eventId}/attendance/download-excel`;
+      const params = new URLSearchParams();
+      
+      // Add contest group filters if active
+      if (kidsFilter) params.append('kids', 'true');
+      if (teensFilter) params.append('teens', 'true');
+      if (youthFilter) params.append('youth', 'true');
+      
+      // Append params to URL if any filters are active
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Success',
+        description: 'Attendance list downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Error downloading Excel:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to download attendance list',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6">
-      <div className="mb-6 flex items-center">
-        <Link href={`/organizer/events/${eventId}/attendance`}>
-          <Button variant="outline" size="sm" className="mr-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
-        <h1 className="text-3xl font-bold">Attendance Dashboard</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center">
+          <Link href={`/organizer/events/${eventId}/attendance`}>
+            <Button variant="outline" size="sm" className="mr-4">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </Link>
+          <h1 className="text-3xl font-bold">Attendance Dashboard</h1>
+        </div>
+        <Button 
+          onClick={handleDownloadExcel}
+          disabled={downloading || loading}
+          className="bg-green-600 hover:bg-green-700"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          {downloading ? 'Downloading...' : 'Download Excel'}
+        </Button>
       </div>
       
       {/* Contest Group Filter Toggle Buttons */}
