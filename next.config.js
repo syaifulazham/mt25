@@ -5,6 +5,9 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
+  // Disable output file tracing to speed up build
+  // This prevents Next.js from scanning and copying thousands of PDFs
+  outputFileTracing: false,
   typescript: {
     // During build time, only warn about TypeScript errors without failing the build
     ignoreBuildErrors: true,
