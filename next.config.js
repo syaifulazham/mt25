@@ -5,9 +5,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
-  // Disable static optimization to reduce memory during build
-  // Pages will be server-rendered at runtime instead
-  output: 'standalone',
   typescript: {
     // During build time, only warn about TypeScript errors without failing the build
     ignoreBuildErrors: true,

@@ -4,7 +4,7 @@
 
 ### Memory Allocation
 - **Heap Size**: 8GB (`--max-old-space-size=8192`)
-- **Output Mode**: Standalone (reduces static generation)
+- **Output Mode**: Standard (standalone removed - saves disk space)
 - **Source Maps**: Disabled in production
 - **Minification**: SWC (handles modern JavaScript)
 
