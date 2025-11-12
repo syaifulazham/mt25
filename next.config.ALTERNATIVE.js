@@ -1,49 +1,43 @@
 /** @type {import('next').NextConfig} */
+// ALTERNATIVE CONFIG: Use this if SWC minification still causes memory issues
+// To use: cp next.config.ALTERNATIVE.js next.config.js
+
 const nextConfig = {
-  // Force all route handlers to be dynamic by default
-  // This prevents the 'Dynamic server usage' errors during build
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
-  // Disable static optimization to reduce memory during build
-  // Pages will be server-rendered at runtime instead
   output: 'standalone',
   typescript: {
-    // During build time, only warn about TypeScript errors without failing the build
     ignoreBuildErrors: true,
   },
   eslint: {
-    // During build time, only warn about ESLint errors without failing the build
     ignoreDuringBuilds: true,
   },
-  // Reduce build memory by disabling source maps in production
   productionBrowserSourceMaps: false,
-  // Use SWC minification (handles modern JS syntax better than Terser)
-  swcMinify: true,
-  // Optimize webpack configuration to reduce memory usage
+  
+  // DISABLE MINIFICATION - Fastest build, larger bundle size
+  swcMinify: false,
+  
   webpack: (config, { isServer, dev }) => {
-    // Only optimize in production builds
     if (!dev) {
-      // Optimize memory usage
+      // Disable all minification to reduce memory
       config.optimization = {
         ...config.optimization,
+        minimize: false, // <-- KEY: Disable minification
         moduleIds: 'deterministic',
         runtimeChunk: isServer ? undefined : 'single',
-        minimize: true,
         splitChunks: isServer ? false : {
           chunks: 'all',
-          maxSize: 244000, // Split chunks larger than 244kb
+          maxSize: 244000,
           cacheGroups: {
             default: false,
             vendors: false,
-            // Vendor chunk for node_modules
             vendor: {
               name: 'vendor',
               chunks: 'all',
               test: /node_modules/,
               priority: 20,
             },
-            // Common chunk for shared code
             common: {
               name: 'common',
               minChunks: 2,
@@ -56,27 +50,23 @@ const nextConfig = {
         },
       };
 
-      // Aggressive memory management
-      config.cache = false; // Disable persistent cache during build
-      
-      // Reduce memory usage by limiting parallel processing
+      config.cache = false;
       config.parallelism = 1;
       
-      // Optimize performance
       config.performance = {
-        maxAssetSize: 512000,
-        maxEntrypointSize: 512000,
+        maxAssetSize: 1024000, // Increased since no minification
+        maxEntrypointSize: 1024000,
         hints: false,
       };
     }
 
     return config;
   },
-  // Configure static file serving
+  
   publicRuntimeConfig: {
     staticFolder: '/uploads',
   },
-  // Add rewrites to ensure uploaded files are properly served
+  
   async rewrites() {
     return [
       {
@@ -85,7 +75,7 @@ const nextConfig = {
       },
     ];
   },
-  // Ensure images from uploads can be optimized
+  
   images: {
     remotePatterns: [
       {
