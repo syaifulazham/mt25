@@ -706,6 +706,60 @@ export default function WinnersCertificatesPage() {
     }
   }
 
+  const handleDirectGenerate = async () => {
+    if (!mappingTeam || !selectedContest) return
+
+    const confirmed = confirm(
+      `Generate new certificates for all ${teamMembers.length} team members?\n\n` +
+      `Team: ${mappingTeam.team?.name}\n` +
+      `Rank: ${mappingTeam.rank}\n\n` +
+      `New certificates will be created with fresh serial numbers.`
+    )
+
+    if (!confirmed) return
+
+    setIsGenerating(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/judging/generate-winner-certs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attendanceTeamId: mappingTeam.attendanceTeamId,
+          rank: mappingTeam.rank,
+          contestId: selectedContest,
+          manualMapping: {} // Empty mapping means generate new for all
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate certificates')
+      }
+
+      setGenerationResults(data)
+      setShowResultsModal(true)
+      setShowManualMapping(false)
+
+      // Refresh team rankings to show certificate status
+      const refreshResponse = await fetch(
+        `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}`
+      )
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+        setTeamRankings(refreshData.rankings || [])
+      }
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate certificates')
+      alert('Error: ' + (err instanceof Error ? err.message : 'Failed to generate certificates'))
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const handleManualGenerate = async () => {
     if (!mappingTeam || !selectedContest) return
 
@@ -2189,14 +2243,26 @@ export default function WinnersCertificatesPage() {
                   )}
 
                   {availableCerts.length === 0 && (
-                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-900">
-                        ⚠️ No pre-generated certificates found for Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
-                        {mappingTeam.state && `, ${mappingTeam.state.name}`}.
-                      </p>
-                      <p className="text-xs text-yellow-800 mt-1">
-                        New certificates will be created with new serial numbers.
-                      </p>
+                    <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-amber-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <p className="text-sm font-medium text-amber-900">
+                            No Pre-Generated Certificates Available
+                          </p>
+                          <p className="text-xs text-amber-800 mt-1">
+                            No pre-generated certificates found for Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
+                            {mappingTeam.state && `, ${mappingTeam.state.name}`}.
+                          </p>
+                          <p className="text-xs text-amber-700 mt-2 font-medium">
+                            💡 You can generate new certificates directly without pre-generation. Click "Direct Generate" below.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -2289,45 +2355,67 @@ export default function WinnersCertificatesPage() {
               </button>
 
               <div className="flex gap-3">
-                {availableCerts.length > 0 && (
-                  <button
-                    onClick={async () => {
-                      // Auto-map: Map each member to certificate in order
-                      const autoMapping: Record<number, number> = {}
-                      teamMembers.forEach((member, idx) => {
-                        if (availableCerts[idx]) {
-                          autoMapping[idx] = availableCerts[idx].id
-                        }
-                      })
-                      setCertMapping(autoMapping)
-                      
-                      // Automatically trigger generation with auto-mapping
-                      const confirmed = confirm(
-                        `Auto-assign certificates in order?\n\n` +
-                        teamMembers.map((m, i) => 
-                          `${m.name} → ${availableCerts[i]?.serialNumber || 'New cert'}`
-                        ).join('\n')
-                      )
-                      
-                      if (confirmed) {
+                {availableCerts.length > 0 ? (
+                  // Show mapping buttons when pre-generated certs are available
+                  <>
+                    <button
+                      onClick={async () => {
+                        // Auto-map: Map each member to certificate in order
+                        const autoMapping: Record<number, number> = {}
+                        teamMembers.forEach((member, idx) => {
+                          if (availableCerts[idx]) {
+                            autoMapping[idx] = availableCerts[idx].id
+                          }
+                        })
                         setCertMapping(autoMapping)
-                        setTimeout(() => handleManualGenerate(), 100)
-                      }
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
-                    disabled={isGenerating || availableCerts.length === 0}
+                        
+                        // Automatically trigger generation with auto-mapping
+                        const confirmed = confirm(
+                          `Auto-assign certificates in order?\n\n` +
+                          teamMembers.map((m, i) => 
+                            `${m.name} → ${availableCerts[i]?.serialNumber || 'New cert'}`
+                          ).join('\n')
+                        )
+                        
+                        if (confirmed) {
+                          setCertMapping(autoMapping)
+                          setTimeout(() => handleManualGenerate(), 100)
+                        }
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed"
+                      disabled={isGenerating}
+                    >
+                      Auto-Map & Generate
+                    </button>
+                    
+                    <button
+                      onClick={handleManualGenerate}
+                      className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
+                      disabled={isGenerating || teamMembers.filter((m, idx) => !certMapping[idx]).length > 0}
+                    >
+                      {isGenerating ? 'Generating...' : 'Generate with Selected Mapping'}
+                    </button>
+                  </>
+                ) : (
+                  // Show direct generate button when no pre-generated certs
+                  <button
+                    onClick={handleDirectGenerate}
+                    className="px-6 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-md hover:from-green-700 hover:to-emerald-700 disabled:from-green-400 disabled:to-emerald-400 disabled:cursor-not-allowed shadow-sm flex items-center gap-2"
+                    disabled={isGenerating}
                   >
-                    Auto-Map & Generate
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4" />
+                        Direct Generate ({teamMembers.length} Certificates)
+                      </>
+                    )}
                   </button>
                 )}
-                
-                <button
-                  onClick={handleManualGenerate}
-                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed"
-                  disabled={isGenerating || teamMembers.filter((m, idx) => !certMapping[idx]).length > 0}
-                >
-                  {isGenerating ? 'Generating...' : 'Generate with Selected Mapping'}
-                </button>
               </div>
             </div>
           </div>
