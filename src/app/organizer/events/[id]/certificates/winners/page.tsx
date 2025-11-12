@@ -709,14 +709,56 @@ export default function WinnersCertificatesPage() {
   const handleDirectGenerate = async () => {
     if (!mappingTeam || !selectedContest) return
 
-    const confirmed = confirm(
-      `Generate new certificates for all ${teamMembers.length} team members?\n\n` +
-      `Team: ${mappingTeam.team?.name}\n` +
-      `Rank: ${mappingTeam.rank}\n\n` +
-      `New certificates will be created with fresh serial numbers.`
-    )
-
-    if (!confirmed) return
+    setIsGenerating(true)
+    
+    try {
+      // First, check if any team members already have certificates
+      const certCheckResponse = await fetch(
+        `/api/events/${eventId}/judging/team-certificates?attendanceTeamId=${mappingTeam.attendanceTeamId}`
+      )
+      
+      let existingCertsCount = 0
+      let confirmMessage = ''
+      
+      if (certCheckResponse.ok) {
+        const certData = await certCheckResponse.json()
+        existingCertsCount = certData.certificates?.filter((c: any) => c.certificateId && c.filePath).length || 0
+      }
+      
+      if (existingCertsCount > 0) {
+        confirmMessage = (
+          `Generate certificates for all ${teamMembers.length} team members?\n\n` +
+          `Team: ${mappingTeam.team?.name}\n` +
+          `Rank: ${mappingTeam.rank}\n\n` +
+          `⚠️ ${existingCertsCount} certificate${existingCertsCount !== 1 ? 's' : ''} already exist${existingCertsCount === 1 ? 's' : ''}.\n` +
+          `✓ Existing certificates will be UPDATED and REGENERATED\n` +
+          `✓ Original serial numbers will be RETAINED\n` +
+          `✓ New certificates will be created for remaining members`
+        )
+      } else {
+        confirmMessage = (
+          `Generate new certificates for all ${teamMembers.length} team members?\n\n` +
+          `Team: ${mappingTeam.team?.name}\n` +
+          `Rank: ${mappingTeam.rank}\n\n` +
+          `New certificates will be created with fresh serial numbers.`
+        )
+      }
+      
+      setIsGenerating(false)
+      
+      const confirmed = confirm(confirmMessage)
+      if (!confirmed) return
+    } catch (err) {
+      setIsGenerating(false)
+      console.error('Error checking existing certificates:', err)
+      // Continue with generation anyway
+      const confirmed = confirm(
+        `Generate certificates for all ${teamMembers.length} team members?\n\n` +
+        `Team: ${mappingTeam.team?.name}\n` +
+        `Rank: ${mappingTeam.rank}`
+      )
+      if (!confirmed) return
+    }
 
     setIsGenerating(true)
     setError(null)
@@ -2258,9 +2300,16 @@ export default function WinnersCertificatesPage() {
                             No pre-generated certificates found for Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
                             {mappingTeam.state && `, ${mappingTeam.state.name}`}.
                           </p>
-                          <p className="text-xs text-amber-700 mt-2 font-medium">
-                            💡 You can generate new certificates directly without pre-generation. Click "Direct Generate" below.
-                          </p>
+                          <div className="mt-2 space-y-1">
+                            <p className="text-xs text-amber-700 font-medium">
+                              💡 You can generate certificates directly without pre-generation:
+                            </p>
+                            <ul className="text-xs text-amber-700 ml-4 list-disc space-y-0.5">
+                              <li>New certificates will get fresh serial numbers</li>
+                              <li>Existing certificates will be updated & regenerated</li>
+                              <li>Original serial numbers will be retained</li>
+                            </ul>
+                          </div>
                         </div>
                       </div>
                     </div>

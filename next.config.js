@@ -13,6 +13,45 @@ const nextConfig = {
     // During build time, only warn about ESLint errors without failing the build
     ignoreDuringBuilds: true,
   },
+  // Optimize webpack configuration to reduce memory usage
+  webpack: (config, { isServer }) => {
+    // Optimize memory usage
+    config.optimization = {
+      ...config.optimization,
+      moduleIds: 'deterministic',
+      runtimeChunk: isServer ? undefined : 'single',
+      splitChunks: isServer ? false : {
+        chunks: 'all',
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          // Vendor chunk for node_modules
+          vendor: {
+            name: 'vendor',
+            chunks: 'all',
+            test: /node_modules/,
+            priority: 20,
+          },
+          // Common chunk for shared code
+          common: {
+            name: 'common',
+            minChunks: 2,
+            chunks: 'all',
+            priority: 10,
+            reuseExistingChunk: true,
+            enforce: true,
+          },
+        },
+      },
+    };
+
+    // Reduce memory usage by limiting parallel processing
+    if (!isServer) {
+      config.parallelism = 1;
+    }
+
+    return config;
+  },
   // Configure static file serving
   publicRuntimeConfig: {
     staticFolder: '/uploads',
