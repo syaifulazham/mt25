@@ -14,15 +14,15 @@ interface Trainer {
   eventId: number
   contingentId: number
   attendanceStatus: string
-  attendanceCreatedAt: Date
+  attendanceCreatedAt: string | null
   managerName: string
   managerEmail: string | null
   managerPhone: string | null
   managerIc: string | null
   contingentName: string
   eventName: string
-  eventStartDate: Date | null
-  eventEndDate: Date | null
+  eventStartDate: string | null
+  eventEndDate: string | null
   institutionName: string | null
   stateName: string | null
 }

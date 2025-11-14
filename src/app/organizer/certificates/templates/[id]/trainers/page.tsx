@@ -63,16 +63,21 @@ async function getTrainers() {
         ORDER BY am.createdAt DESC
       ` as any[]
 
-      // Convert BigInt values to numbers for JSON serialization
+      // Convert BigInt values to numbers and Date objects to ISO strings for JSON serialization
       const processedResult = result.map(row => ({
         ...row,
         attendanceManagerId: Number(row.attendanceManagerId),
         managerId: Number(row.managerId),
         eventId: Number(row.eventId),
-        contingentId: Number(row.contingentId)
+        contingentId: Number(row.contingentId),
+        // Convert Date objects to ISO strings
+        attendanceCreatedAt: row.attendanceCreatedAt ? new Date(row.attendanceCreatedAt).toISOString() : null,
+        eventStartDate: row.eventStartDate ? new Date(row.eventStartDate).toISOString() : null,
+        eventEndDate: row.eventEndDate ? new Date(row.eventEndDate).toISOString() : null
       }))
 
       console.log('[Trainers Page] Fetched trainers count:', processedResult.length)
+      console.log('[Trainers Page] Sample trainer:', processedResult[0])
       return processedResult
     })
 
@@ -104,6 +109,9 @@ export default async function TrainersPage({ params }: { params: { id: string } 
 
   const trainers = await getTrainers()
 
+  console.log('[Trainers Page] Rendering page with', trainers.length, 'trainers')
+  console.log('[Trainers Page] Template:', template.templateName, 'ID:', templateId)
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -118,6 +126,13 @@ export default async function TrainersPage({ params }: { params: { id: string } 
         <p className="text-gray-600 mt-2">
           View and manage trainers for certificate template: <strong>{template.templateName}</strong>
         </p>
+        {trainers.length === 0 && (
+          <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-yellow-800 text-sm">
+              ⚠️ No trainers found in the system. Make sure trainers are registered in the attendance system.
+            </p>
+          </div>
+        )}
       </div>
 
       <TrainersManagement 
