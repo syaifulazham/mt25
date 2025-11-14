@@ -196,19 +196,19 @@ export async function POST(
 
         // Create or update certificate record
         if (existingCert) {
-          // Update existing certificate
+          // Update existing certificate - only update PDF path and status
+          // Keep serialNumber, uniqueCode unchanged
           await prisma.certificate.update({
             where: { id: existingCert.id },
             data: {
               filePath: pdfPath,
               status: 'READY',
-              updatedBy: parseInt(session.user.id as string),
               updatedAt: new Date()
             }
-          } as any)
+          })
           results.updated++
         } else {
-          // Create new certificate
+          // Create new certificate with all required fields
           await prisma.certificate.create({
             data: {
               recipientName: manager.name,
@@ -222,7 +222,7 @@ export async function POST(
               templateId: templateId,
               createdBy: parseInt(session.user.id as string)
             }
-          } as any)
+          } as any) // Keep 'as any' for createdBy compatibility
           results.generated++
         }
 

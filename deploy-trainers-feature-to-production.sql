@@ -35,6 +35,31 @@ ALTER TABLE certificate
 ADD COLUMN IF NOT EXISTS recipientEmail VARCHAR(255) DEFAULT NULL
 AFTER recipientType;
 
+-- 4. Ensure certificate_serial table has correct structure
+-- Verify certificate_serial table structure
+-- (Usually already correct, but here for reference)
+ALTER TABLE certificate_serial 
+ADD COLUMN IF NOT EXISTS templateId INT DEFAULT NULL
+AFTER serialNumber;
+
+-- Add TRAINERS to certificate_serial targetType enum
+ALTER TABLE certificate_serial 
+MODIFY COLUMN targetType ENUM(
+  'GENERAL',
+  'EVENT_PARTICIPANT',
+  'EVENT_WINNER',
+  'NON_CONTEST_PARTICIPANT',
+  'QUIZ_PARTICIPANT',
+  'QUIZ_WINNER',
+  'TRAINERS'
+) DEFAULT NULL;
+
+-- Add foreign key if not exists
+ALTER TABLE certificate_serial 
+ADD CONSTRAINT fk_cert_serial_template
+FOREIGN KEY (templateId) REFERENCES cert_template(id)
+ON DELETE SET NULL;
+
 -- 5. Ensure certificate table has filePath column
 ALTER TABLE certificate 
 ADD COLUMN IF NOT EXISTS filePath VARCHAR(1000) DEFAULT NULL
