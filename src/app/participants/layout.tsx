@@ -109,8 +109,14 @@ export default async function ParticipantLayout({ children }: ParticipantLayoutP
                   <a href="/participants/lms" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
                     Bengkel MT
                   </a>
-                  <a href="/participants/contestants/certificates" className="text-lg font-medium px-4 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
+                  <div className="text-lg font-medium px-4 py-2 text-gray-300">
                     Certificates
+                  </div>
+                  <a href="/participants/contestants/certificates" className="text-base font-normal px-8 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
+                    Participants
+                  </a>
+                  <a href="/participants/contestants/certificates-trainers" className="text-base font-normal px-8 py-2 hover:bg-blue-800/50 rounded-md hover:text-yellow-400 transition-colors">
+                    Trainers
                   </a>
                   <div className="border-t border-blue-700 my-4"></div>
                   {user ? (

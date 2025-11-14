@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Type for certificate target types
-type CertTargetType = 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER';
+type CertTargetType = 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS';
 
 /**
  * Certificate Serial Number Service
@@ -18,7 +18,8 @@ export class CertificateSerialService {
     'EVENT_WINNER': 'WIN',
     'NON_CONTEST_PARTICIPANT': 'NCP',
     'QUIZ_PARTICIPANT': 'QPART',
-    'QUIZ_WINNER': 'QWIN'
+    'QUIZ_WINNER': 'QWIN',
+    'TRAINERS': 'TRAIN'
   };
 
   /**
@@ -168,7 +169,7 @@ export class CertificateSerialService {
    */
   static validateSerialNumber(serialNumber: string): boolean {
     // Format: MT25/GEN/T5/000001 (includes template ID)
-    const pattern = new RegExp(`^${this.PREFIX}\\d{2}/(GEN|PART|WIN|NCP|QPART|QWIN)/T\\d+/\\d{6}$`);
+    const pattern = new RegExp(`^${this.PREFIX}\\d{2}/(GEN|PART|WIN|NCP|QPART|QWIN|TRAIN)/T\\d+/\\d{6}$`);
     return pattern.test(serialNumber);
   }
 

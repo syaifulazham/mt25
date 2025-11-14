@@ -3,6 +3,8 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useLanguage } from '@/lib/i18n/language-context';
+import { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface UserInfo {
   name?: string | null;
@@ -16,6 +18,9 @@ interface UserInfo {
 export default function ParticipantSidebar({ user }: { user: UserInfo | null }) {
   const pathname = usePathname();
   const { t } = useLanguage();
+  const [isCertificateMenuOpen, setIsCertificateMenuOpen] = useState(
+    pathname.includes('/certificates')
+  );
   
   // Function to determine if a link is active
   const isActive = (path: string) => {
@@ -207,29 +212,65 @@ export default function ParticipantSidebar({ user }: { user: UserInfo | null }) 
           {t('sidebar.lms')}
         </Link>
         
-        <Link
-          href="/participants/contestants/certificates"
-          className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-md group ${
-            isActive('/participants/contestants/certificates')
-              ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-              : 'hover:bg-gray-200 dark:hover:bg-gray-800'
-          }`}
-        >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            className={`h-5 w-5 mr-3 ${
-              isActive('/participants/contestants/certificates') 
-                ? 'text-blue-600' 
-                : 'text-gray-500 group-hover:text-blue-600'
-            }`} 
-            fill="none" 
-            viewBox="0 0 24 24" 
-            stroke="currentColor"
+        {/* Certificates Menu with Submenu */}
+        <div>
+          <button
+            onClick={() => setIsCertificateMenuOpen(!isCertificateMenuOpen)}
+            className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium rounded-md group ${
+              isActive('/participants/contestants/certificates')
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                : 'hover:bg-gray-200 dark:hover:bg-gray-800'
+            }`}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          Certificates
-        </Link>
+            <div className="flex items-center">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className={`h-5 w-5 mr-3 ${
+                  isActive('/participants/contestants/certificates') 
+                    ? 'text-blue-600' 
+                    : 'text-gray-500 group-hover:text-blue-600'
+                }`} 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Certificates
+            </div>
+            {isCertificateMenuOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+          
+          {/* Submenu */}
+          {isCertificateMenuOpen && (
+            <div className="ml-8 mt-1 space-y-1">
+              <Link
+                href="/participants/contestants/certificates"
+                className={`flex items-center px-4 py-2 text-sm rounded-md ${
+                  pathname === '/participants/contestants/certificates'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                }`}
+              >
+                Participants
+              </Link>
+              <Link
+                href="/participants/contestants/certificates-trainers"
+                className={`flex items-center px-4 py-2 text-sm rounded-md ${
+                  pathname === '/participants/contestants/certificates-trainers'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                }`}
+              >
+                Trainers
+              </Link>
+            </div>
+          )}
+        </div>
       </nav>
       
     </aside>

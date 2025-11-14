@@ -1,0 +1,252 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/app/api/auth/auth-options'
+import prisma from '@/lib/prisma'
+import { generateCertificatePDF } from '@/lib/certificate-generator'
+import { CertificateSerialService } from '@/lib/services/certificate-serial-service'
+
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic';
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check if user has required role
+    const allowedRoles = ['ADMIN', 'OPERATOR']
+    if (!session.user.role || !allowedRoles.includes(session.user.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const templateId = parseInt(params.id)
+    const body = await request.json()
+    const { managerIds } = body
+
+    if (!Array.isArray(managerIds) || managerIds.length === 0) {
+      return NextResponse.json(
+        { error: 'managerIds array is required' },
+        { status: 400 }
+      )
+    }
+
+    // Get template with configuration
+    const template = await prisma.certTemplate.findUnique({
+      where: { id: templateId }
+    })
+
+    if (!template) {
+      return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+    }
+
+    if (template.targetType?.toString() !== 'TRAINERS') {
+      return NextResponse.json(
+        { error: 'This template is not for trainers' },
+        { status: 400 }
+      )
+    }
+
+    const results = {
+      generated: 0,
+      updated: 0,
+      failed: 0,
+      errors: [] as Array<{ managerId: number; error: string }>
+    }
+
+    // Process each manager (trainer)
+    for (const managerId of managerIds) {
+      try {
+        // Get manager details with related attendance and contingent info
+        const manager = await prisma.manager.findUnique({
+          where: { id: managerId },
+          include: {
+            team: {
+              include: {
+                contingent: {
+                  include: {
+                    school: {
+                      select: {
+                        name: true,
+                        state: {
+                          select: {
+                            name: true
+                          }
+                        }
+                      }
+                    },
+                    higherInstitution: {
+                      select: {
+                        name: true,
+                        state: {
+                          select: {
+                            name: true
+                          }
+                        }
+                      }
+                    },
+                    independent: {
+                      select: {
+                        name: true,
+                        state: {
+                          select: {
+                            name: true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        })
+
+        if (!manager) {
+          results.failed++
+          results.errors.push({ managerId, error: 'Manager not found' })
+          continue
+        }
+
+        // Get attendance record with related data
+        const attendanceRecord = await prisma.attendanceManager.findFirst({
+          where: { managerId: managerId }
+        }) as any
+
+        if (!attendanceRecord) {
+          results.failed++
+          results.errors.push({ managerId, error: 'No attendance record found' })
+          continue
+        }
+
+        // Get event and contingent separately
+        const event = attendanceRecord.eventId ? await prisma.event.findUnique({
+          where: { id: attendanceRecord.eventId },
+          select: { name: true }
+        }) : null
+
+        const contingent = attendanceRecord.contingentId ? await prisma.contingent.findUnique({
+          where: { id: attendanceRecord.contingentId },
+          select: { 
+            name: true,
+            school: { select: { name: true, state: { select: { name: true } } } },
+            higherInstitution: { select: { name: true, state: { select: { name: true } } } },
+            independent: { select: { name: true, state: { select: { name: true } } } }
+          }
+        }) : null
+
+        // Check if certificate already exists
+        const existingCert = await prisma.certificate.findFirst({
+          where: {
+            ic_number: manager.ic,
+            templateId: templateId
+          }
+        })
+
+        // Use existing uniqueCode and serialNumber, or generate new ones
+        let uniqueCode: string
+        let serialNumber: string | null
+        
+        if (existingCert) {
+          // Regeneration: Preserve unique identifiers
+          uniqueCode = existingCert.uniqueCode
+          serialNumber = existingCert.serialNumber
+        } else {
+          // New certificate: Generate new identifiers
+          uniqueCode = `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+          serialNumber = await CertificateSerialService.generateSerialNumber(templateId, template.targetType)
+        }
+
+        // Parse template configuration
+        const configuration = template.configuration as any
+
+        // Get institution name from fetched contingent data
+        const institutionName = contingent?.school?.name ||
+          contingent?.higherInstitution?.name ||
+          contingent?.independent?.name ||
+          ''
+
+        const stateName = contingent?.school?.state?.name ||
+          contingent?.higherInstitution?.state?.name ||
+          contingent?.independent?.state?.name ||
+          ''
+
+        // Generate PDF
+        const pdfPath = await generateCertificatePDF({
+          template: {
+            id: template.id,
+            basePdfPath: template.basePdfPath || '',
+            configuration: configuration
+          },
+          data: {
+            recipient_name: manager.name,
+            contingent_name: contingent?.name || '',
+            institution_name: institutionName,
+            event_name: event?.name || '',
+            unique_code: uniqueCode,
+            serial_number: serialNumber || '',
+            ic_number: manager.ic
+          } as any
+        })
+
+        // Create or update certificate record
+        if (existingCert) {
+          // Update existing certificate
+          await prisma.certificate.update({
+            where: { id: existingCert.id },
+            data: {
+              filePath: pdfPath,
+              status: 'READY',
+              updatedBy: parseInt(session.user.id as string),
+              updatedAt: new Date()
+            }
+          } as any)
+          results.updated++
+        } else {
+          // Create new certificate
+          await prisma.certificate.create({
+            data: {
+              recipientName: manager.name,
+              recipientType: 'TRAINER',
+              recipientEmail: manager.email,
+              ic_number: manager.ic,
+              uniqueCode: uniqueCode,
+              serialNumber: serialNumber,
+              filePath: pdfPath,
+              status: 'READY',
+              templateId: templateId,
+              createdBy: parseInt(session.user.id as string)
+            }
+          } as any)
+          results.generated++
+        }
+
+      } catch (error) {
+        console.error(`Error generating certificate for manager ${managerId}:`, error)
+        results.failed++
+        results.errors.push({ 
+          managerId, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        })
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Generated ${results.generated} new certificates, updated ${results.updated}, failed ${results.failed}`,
+      results
+    })
+
+  } catch (error) {
+    console.error('Error in trainer certificate generation:', error)
+    return NextResponse.json(
+      { error: 'Failed to generate certificates' },
+      { status: 500 }
+    )
+  }
+}
