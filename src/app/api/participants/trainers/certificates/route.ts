@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN contingent c ON am.contingentId = c.id
       LEFT JOIN event e ON am.eventId = e.id
       LEFT JOIN school s ON c.schoolId = s.id
-      LEFT JOIN higherInstitution hi ON c.higherInstId = hi.id
+      LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
       LEFT JOIN certificate cert ON cert.ic_number = m.ic AND cert.recipientType = 'TRAINER'
       LEFT JOIN cert_template ct ON cert.templateId = ct.id

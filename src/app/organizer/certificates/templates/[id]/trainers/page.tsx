@@ -32,7 +32,11 @@ async function getTemplate(templateId: number) {
 
 async function getTrainers() {
   try {
+    console.log('[Trainers Page] Starting to fetch trainers...')
+    
     const trainers = await prismaExecute(async (prisma) => {
+      console.log('[Trainers Page] Executing SQL query...')
+      
       // Get all trainers from attendanceManager with related data
       const result = await prisma.$queryRaw`
         SELECT DISTINCT
@@ -57,11 +61,14 @@ async function getTrainers() {
         LEFT JOIN contingent c ON am.contingentId = c.id
         LEFT JOIN event e ON am.eventId = e.id
         LEFT JOIN school s ON c.schoolId = s.id
-        LEFT JOIN higherInstitution hi ON c.higherInstId = hi.id
+        LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
         LEFT JOIN independent i ON c.independentId = i.id
         LEFT JOIN state st ON s.stateId = st.id OR hi.stateId = st.id OR i.stateId = st.id
         ORDER BY am.createdAt DESC
       ` as any[]
+
+      console.log('[Trainers Page] Raw result count:', result.length)
+      console.log('[Trainers Page] Raw result sample:', JSON.stringify(result[0], null, 2))
 
       // Convert BigInt values to numbers and Date objects to ISO strings for JSON serialization
       const processedResult = result.map(row => ({
@@ -76,14 +83,17 @@ async function getTrainers() {
         eventEndDate: row.eventEndDate ? new Date(row.eventEndDate).toISOString() : null
       }))
 
-      console.log('[Trainers Page] Fetched trainers count:', processedResult.length)
-      console.log('[Trainers Page] Sample trainer:', processedResult[0])
+      console.log('[Trainers Page] Processed result count:', processedResult.length)
+      console.log('[Trainers Page] Processed result sample:', JSON.stringify(processedResult[0], null, 2))
       return processedResult
     })
 
+    console.log('[Trainers Page] Returning trainers array with length:', trainers.length)
     return trainers
   } catch (error) {
-    console.error('Error fetching trainers:', error)
+    console.error('[Trainers Page] ❌ ERROR fetching trainers:', error)
+    console.error('[Trainers Page] Error details:', error instanceof Error ? error.message : 'Unknown error')
+    console.error('[Trainers Page] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
     return []
   }
 }
