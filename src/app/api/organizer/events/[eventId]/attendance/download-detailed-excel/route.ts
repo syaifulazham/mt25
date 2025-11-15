@@ -72,6 +72,7 @@ export async function GET(
         st.name as stateName,
         z.name as zoneName,
         tm.name as teamName,
+        co.code as contestCode,
         co.name as contestName,
         ac.contestGroup,
         ac.attendanceStatus,
@@ -172,7 +173,9 @@ export async function GET(
       'State': String(contestant.stateName || ''),
       'Zone': String(contestant.zoneName || 'N/A'),
       'Team': String(contestant.teamName || 'N/A'),
-      'Contest': String(contestant.contestName || 'N/A'),
+      'Contest': contestant.contestCode 
+        ? `${contestant.contestCode} - ${contestant.contestName || 'N/A'}`
+        : String(contestant.contestName || 'N/A'),
       'Contest Group': String(contestant.contestGroup || 'N/A'),
       'Institution Name': String(contestant.institutionName || 'N/A'),
       'Institution Address': String(contestant.institutionAddress || 'N/A'),
