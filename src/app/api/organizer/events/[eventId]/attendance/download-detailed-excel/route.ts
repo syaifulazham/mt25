@@ -82,6 +82,7 @@ export async function GET(
         s.ppd as schoolPpd,
         s.category as schoolCategory,
         s.level as schoolLevel,
+        s.location as schoolLocation,
         s.latitude,
         s.longitude
       FROM attendanceContestant ac
@@ -120,6 +121,7 @@ export async function GET(
         s.ppd as schoolPpd,
         s.category as schoolCategory,
         s.level as schoolLevel,
+        s.location as schoolLocation,
         s.latitude,
         s.longitude
       FROM attendanceManager am
@@ -178,6 +180,7 @@ export async function GET(
       'School PPD': String(contestant.schoolPpd || 'N/A'),
       'School Category': String(contestant.schoolCategory || 'N/A'),
       'School Level': String(contestant.schoolLevel || 'N/A'),
+      'Locality Type': String(contestant.schoolLocation || 'N/A'),
       'Latitude': contestant.latitude ? String(contestant.latitude) : 'N/A',
       'Longitude': contestant.longitude ? String(contestant.longitude) : 'N/A',
       'Attendance Status': String(contestant.attendanceStatus || '')
@@ -199,6 +202,7 @@ export async function GET(
       'School PPD': String(manager.schoolPpd || 'N/A'),
       'School Category': String(manager.schoolCategory || 'N/A'),
       'School Level': String(manager.schoolLevel || 'N/A'),
+      'Locality Type': String(manager.schoolLocation || 'N/A'),
       'Latitude': manager.latitude ? String(manager.latitude) : 'N/A',
       'Longitude': manager.longitude ? String(manager.longitude) : 'N/A',
       'Attendance Status': String(manager.attendanceStatus || '')
@@ -230,6 +234,7 @@ export async function GET(
       { wch: 20 }, // School PPD
       { wch: 15 }, // School Category
       { wch: 15 }, // School Level
+      { wch: 15 }, // Locality Type
       { wch: 12 }, // Latitude
       { wch: 12 }, // Longitude
       { wch: 15 }, // Attendance Status
@@ -256,6 +261,7 @@ export async function GET(
       { wch: 20 }, // School PPD
       { wch: 15 }, // School Category
       { wch: 15 }, // School Level
+      { wch: 15 }, // Locality Type
       { wch: 12 }, // Latitude
       { wch: 12 }, // Longitude
       { wch: 15 }, // Attendance Status
