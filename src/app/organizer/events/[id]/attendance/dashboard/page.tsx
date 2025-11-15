@@ -85,6 +85,7 @@ export default function AttendanceDashboardPage() {
   
   // Download state
   const [downloading, setDownloading] = useState(false);
+  const [downloadingDetailed, setDownloadingDetailed] = useState(false);
 
   // Colors for pie chart
   const COLORS = ['#0088FE', '#ECEFF1'];
@@ -208,6 +209,49 @@ export default function AttendanceDashboardPage() {
     }
   };
 
+  // Handle Detailed Excel download
+  const handleDownloadDetailedExcel = async () => {
+    try {
+      setDownloadingDetailed(true);
+      
+      // Build URL with active filters
+      let url = `/api/organizer/events/${eventId}/attendance/download-detailed-excel`;
+      const params = new URLSearchParams();
+      
+      // Add contest group filters if active
+      if (kidsFilter) params.append('kids', 'true');
+      if (teensFilter) params.append('teens', 'true');
+      if (youthFilter) params.append('youth', 'true');
+      
+      // Append params to URL if any filters are active
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = '';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Success',
+        description: 'Detailed attendance information downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Error downloading detailed Excel:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to download detailed attendance information',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingDetailed(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6 flex items-center justify-between">
@@ -220,14 +264,24 @@ export default function AttendanceDashboardPage() {
           </Link>
           <h1 className="text-3xl font-bold">Attendance Dashboard</h1>
         </div>
-        <Button 
-          onClick={handleDownloadExcel}
-          disabled={downloading || loading}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          {downloading ? 'Downloading...' : 'Download Excel'}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleDownloadExcel}
+            disabled={downloading || loading}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {downloading ? 'Downloading...' : 'Download Summary'}
+          </Button>
+          <Button 
+            onClick={handleDownloadDetailedExcel}
+            disabled={downloadingDetailed || loading}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {downloadingDetailed ? 'Downloading...' : 'Download Detailed Info'}
+          </Button>
+        </div>
       </div>
       
       {/* Contest Group Filter Toggle Buttons */}
