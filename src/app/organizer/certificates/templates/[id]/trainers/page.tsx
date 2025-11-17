@@ -116,7 +116,6 @@ async function getTrainers() {
           WHERE NOT EXISTS (
             SELECT 1 FROM attendanceManager am2
             WHERE am2.managerId = m.id
-            AND am2.eventId = at.eventId
           )
         ) ranked
         WHERE rn = 1
@@ -125,8 +124,16 @@ async function getTrainers() {
 
       console.log('[Trainers Page] Late additions count:', lateAdditions.length)
 
+      // Get ICs from main list to exclude from late additions
+      const mainListICs = new Set(mainResult.map(r => r.managerIc).filter(Boolean))
+      
+      // Filter late additions to exclude any IC already in main list
+      const filteredLateAdditions = lateAdditions.filter(la => !mainListICs.has(la.managerIc))
+      
+      console.log('[Trainers Page] Late additions after IC deduplication:', filteredLateAdditions.length)
+
       // Combine both results
-      const combinedResult = [...mainResult, ...lateAdditions]
+      const combinedResult = [...mainResult, ...filteredLateAdditions]
       console.log('[Trainers Page] Combined result count:', combinedResult.length)
 
       // Convert BigInt values to numbers and Date objects to ISO strings for JSON serialization
