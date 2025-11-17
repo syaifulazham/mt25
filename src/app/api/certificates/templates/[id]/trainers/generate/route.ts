@@ -114,9 +114,32 @@ export async function POST(
         }
 
         // Get attendance record with related data
-        const attendanceRecord = await prisma.attendanceManager.findFirst({
+        // First try attendanceManager
+        let attendanceRecord = await prisma.attendanceManager.findFirst({
           where: { managerId: managerId }
         }) as any
+
+        // If not found in attendanceManager, check if this is a late addition via attendanceTeam
+        if (!attendanceRecord) {
+          const teamAttendance = await prisma.$queryRaw`
+            SELECT 
+              at.eventId,
+              t.contingentId
+            FROM attendanceTeam at
+            INNER JOIN team t ON at.teamId = t.id
+            INNER JOIN manager_team mt ON t.id = mt.teamId
+            WHERE mt.managerId = ${managerId}
+            LIMIT 1
+          ` as any[]
+
+          if (teamAttendance && teamAttendance.length > 0) {
+            // Use team attendance data
+            attendanceRecord = {
+              eventId: Number(teamAttendance[0].eventId),
+              contingentId: Number(teamAttendance[0].contingentId)
+            }
+          }
+        }
 
         if (!attendanceRecord) {
           results.failed++

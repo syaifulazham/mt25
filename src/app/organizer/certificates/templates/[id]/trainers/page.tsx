@@ -38,8 +38,9 @@ async function getTrainers() {
       console.log('[Trainers Page] Executing SQL query...')
       
       // Get all trainers from attendanceManager with related data
+      // Optimized query with proper joins
       const mainResult = await prisma.$queryRaw`
-        SELECT DISTINCT
+        SELECT 
           am.id as attendanceManagerId,
           am.managerId,
           am.eventId,
@@ -55,7 +56,12 @@ async function getTrainers() {
           e.startDate as eventStartDate,
           e.endDate as eventEndDate,
           COALESCE(s.name, hi.name, i.name) as institutionName,
-          COALESCE(st.name, NULL) as stateName,
+          CASE 
+            WHEN s.stateId IS NOT NULL THEN (SELECT name FROM state WHERE id = s.stateId)
+            WHEN hi.stateId IS NOT NULL THEN (SELECT name FROM state WHERE id = hi.stateId)
+            WHEN i.stateId IS NOT NULL THEN (SELECT name FROM state WHERE id = i.stateId)
+            ELSE NULL
+          END as stateName,
           NULL as status
         FROM attendanceManager am
         INNER JOIN manager m ON am.managerId = m.id
@@ -64,7 +70,6 @@ async function getTrainers() {
         LEFT JOIN school s ON c.schoolId = s.id
         LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
         LEFT JOIN independent i ON c.independentId = i.id
-        LEFT JOIN state st ON s.stateId = st.id OR hi.stateId = st.id OR i.stateId = st.id
         ORDER BY am.createdAt DESC
       ` as any[]
 
@@ -72,41 +77,50 @@ async function getTrainers() {
 
       // Get additional trainers from attendanceTeam -> manager_team -> manager
       // Only include those NOT already in attendanceManager
+      // Use ROW_NUMBER to pick only one record per IC
       const lateAdditions = await prisma.$queryRaw`
-        SELECT DISTINCT
-          NULL as attendanceManagerId,
-          m.id as managerId,
-          at.eventId,
-          t.contingentId,
-          at.attendanceStatus,
-          at.createdAt as attendanceCreatedAt,
-          m.name as managerName,
-          m.email as managerEmail,
-          m.phoneNumber as managerPhone,
-          m.ic as managerIc,
-          c.name as contingentName,
-          e.name as eventName,
-          e.startDate as eventStartDate,
-          e.endDate as eventEndDate,
-          COALESCE(s.name, hi.name, i.name) as institutionName,
-          COALESCE(st.name, NULL) as stateName,
-          'Late Addition' as status
-        FROM attendanceTeam at
-        INNER JOIN team t ON at.teamId = t.id
-        INNER JOIN manager_team mt ON t.id = mt.teamId
-        INNER JOIN manager m ON mt.managerId = m.id
-        LEFT JOIN contingent c ON t.contingentId = c.id
-        LEFT JOIN event e ON at.eventId = e.id
-        LEFT JOIN school s ON c.schoolId = s.id
-        LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
-        LEFT JOIN independent i ON c.independentId = i.id
-        LEFT JOIN state st ON s.stateId = st.id OR hi.stateId = st.id OR i.stateId = st.id
-        WHERE NOT EXISTS (
-          SELECT 1 FROM attendanceManager am2
-          WHERE am2.managerId = m.id
-          AND am2.eventId = at.eventId
-        )
-        ORDER BY at.createdAt DESC
+        SELECT * FROM (
+          SELECT 
+            NULL as attendanceManagerId,
+            m.id as managerId,
+            at.eventId,
+            t.contingentId,
+            at.attendanceStatus,
+            at.createdAt as attendanceCreatedAt,
+            m.name as managerName,
+            m.email as managerEmail,
+            m.phoneNumber as managerPhone,
+            m.ic as managerIc,
+            c.name as contingentName,
+            e.name as eventName,
+            e.startDate as eventStartDate,
+            e.endDate as eventEndDate,
+            COALESCE(s.name, hi.name, i.name) as institutionName,
+            CASE 
+              WHEN s.stateId IS NOT NULL THEN (SELECT name FROM state WHERE id = s.stateId)
+              WHEN hi.stateId IS NOT NULL THEN (SELECT name FROM state WHERE id = hi.stateId)
+              WHEN i.stateId IS NOT NULL THEN (SELECT name FROM state WHERE id = i.stateId)
+              ELSE NULL
+            END as stateName,
+            'Late Addition' as status,
+            ROW_NUMBER() OVER (PARTITION BY m.ic ORDER BY at.createdAt DESC) as rn
+          FROM attendanceTeam at
+          INNER JOIN team t ON at.teamId = t.id
+          INNER JOIN manager_team mt ON t.id = mt.teamId
+          INNER JOIN manager m ON mt.managerId = m.id
+          LEFT JOIN contingent c ON t.contingentId = c.id
+          LEFT JOIN event e ON at.eventId = e.id
+          LEFT JOIN school s ON c.schoolId = s.id
+          LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
+          LEFT JOIN independent i ON c.independentId = i.id
+          WHERE NOT EXISTS (
+            SELECT 1 FROM attendanceManager am2
+            WHERE am2.managerId = m.id
+            AND am2.eventId = at.eventId
+          )
+        ) ranked
+        WHERE rn = 1
+        ORDER BY attendanceCreatedAt DESC
       ` as any[]
 
       console.log('[Trainers Page] Late additions count:', lateAdditions.length)
