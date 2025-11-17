@@ -38,7 +38,7 @@ async function getTrainers() {
       console.log('[Trainers Page] Executing SQL query...')
       
       // Get all trainers from attendanceManager with related data
-      const result = await prisma.$queryRaw`
+      const mainResult = await prisma.$queryRaw`
         SELECT DISTINCT
           am.id as attendanceManagerId,
           am.managerId,
@@ -55,7 +55,8 @@ async function getTrainers() {
           e.startDate as eventStartDate,
           e.endDate as eventEndDate,
           COALESCE(s.name, hi.name, i.name) as institutionName,
-          COALESCE(st.name, NULL) as stateName
+          COALESCE(st.name, NULL) as stateName,
+          NULL as status
         FROM attendanceManager am
         INNER JOIN manager m ON am.managerId = m.id
         LEFT JOIN contingent c ON am.contingentId = c.id
@@ -67,20 +68,65 @@ async function getTrainers() {
         ORDER BY am.createdAt DESC
       ` as any[]
 
-      console.log('[Trainers Page] Raw result count:', result.length)
-      console.log('[Trainers Page] Raw result sample:', JSON.stringify(result[0], null, 2))
+      console.log('[Trainers Page] Main result count:', mainResult.length)
+
+      // Get additional trainers from attendanceTeam -> manager_team -> manager
+      // Only include those NOT already in attendanceManager
+      const lateAdditions = await prisma.$queryRaw`
+        SELECT DISTINCT
+          NULL as attendanceManagerId,
+          m.id as managerId,
+          at.eventId,
+          t.contingentId,
+          at.attendanceStatus,
+          at.createdAt as attendanceCreatedAt,
+          m.name as managerName,
+          m.email as managerEmail,
+          m.phoneNumber as managerPhone,
+          m.ic as managerIc,
+          c.name as contingentName,
+          e.name as eventName,
+          e.startDate as eventStartDate,
+          e.endDate as eventEndDate,
+          COALESCE(s.name, hi.name, i.name) as institutionName,
+          COALESCE(st.name, NULL) as stateName,
+          'Late Addition' as status
+        FROM attendanceTeam at
+        INNER JOIN team t ON at.teamId = t.id
+        INNER JOIN manager_team mt ON t.id = mt.teamId
+        INNER JOIN manager m ON mt.managerId = m.id
+        LEFT JOIN contingent c ON t.contingentId = c.id
+        LEFT JOIN event e ON at.eventId = e.id
+        LEFT JOIN school s ON c.schoolId = s.id
+        LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
+        LEFT JOIN independent i ON c.independentId = i.id
+        LEFT JOIN state st ON s.stateId = st.id OR hi.stateId = st.id OR i.stateId = st.id
+        WHERE NOT EXISTS (
+          SELECT 1 FROM attendanceManager am2
+          WHERE am2.managerId = m.id
+          AND am2.eventId = at.eventId
+        )
+        ORDER BY at.createdAt DESC
+      ` as any[]
+
+      console.log('[Trainers Page] Late additions count:', lateAdditions.length)
+
+      // Combine both results
+      const combinedResult = [...mainResult, ...lateAdditions]
+      console.log('[Trainers Page] Combined result count:', combinedResult.length)
 
       // Convert BigInt values to numbers and Date objects to ISO strings for JSON serialization
-      const processedResult = result.map(row => ({
+      const processedResult = combinedResult.map(row => ({
         ...row,
-        attendanceManagerId: Number(row.attendanceManagerId),
+        attendanceManagerId: row.attendanceManagerId ? Number(row.attendanceManagerId) : null,
         managerId: Number(row.managerId),
         eventId: Number(row.eventId),
         contingentId: Number(row.contingentId),
         // Convert Date objects to ISO strings
         attendanceCreatedAt: row.attendanceCreatedAt ? new Date(row.attendanceCreatedAt).toISOString() : null,
         eventStartDate: row.eventStartDate ? new Date(row.eventStartDate).toISOString() : null,
-        eventEndDate: row.eventEndDate ? new Date(row.eventEndDate).toISOString() : null
+        eventEndDate: row.eventEndDate ? new Date(row.eventEndDate).toISOString() : null,
+        status: row.status || null
       }))
 
       console.log('[Trainers Page] Processed result count:', processedResult.length)

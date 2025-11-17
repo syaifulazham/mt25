@@ -9,7 +9,7 @@ import GenerationProgressModal from './GenerationProgressModal'
 import CertificatePreviewModal from './CertificatePreviewModal'
 
 interface Trainer {
-  attendanceManagerId: number
+  attendanceManagerId: number | null
   managerId: number
   eventId: number
   contingentId: number
@@ -25,6 +25,7 @@ interface Trainer {
   eventEndDate: string | null
   institutionName: string | null
   stateName: string | null
+  status: string | null
 }
 
 interface TrainersManagementProps {
@@ -67,13 +68,17 @@ export default function TrainersManagement({ trainers, session, templateId, temp
       trainer.eventName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       trainer.institutionName?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesStatus = statusFilter === 'all' || trainer.attendanceStatus === statusFilter
+    const matchesStatus = statusFilter === 'all' || 
+                         trainer.attendanceStatus === statusFilter ||
+                         trainer.status === statusFilter
 
     return matchesSearch && matchesStatus
   })
 
-  // Get unique statuses for filter
-  const uniqueStatuses = Array.from(new Set(trainers.map(t => t.attendanceStatus)))
+  // Get unique statuses for filter (both attendance status and custom status)
+  const attendanceStatuses = Array.from(new Set(trainers.map(t => t.attendanceStatus)))
+  const customStatuses = Array.from(new Set(trainers.map(t => t.status).filter(Boolean))) as string[]
+  const uniqueStatuses = [...attendanceStatuses, ...customStatuses]
 
   // Fetch certificates for trainers
   useEffect(() => {
@@ -467,7 +472,7 @@ export default function TrainersManagement({ trainers, session, templateId, temp
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredTrainers.map((trainer, index) => (
                   <tr 
-                    key={`${trainer.attendanceManagerId}-${index}`} 
+                    key={`${trainer.managerId}-${trainer.eventId}-${index}`} 
                     className={`hover:bg-gray-50 ${selectedTrainers.includes(trainer.managerId) ? 'bg-orange-50' : ''}`}
                   >
                     <td className="px-6 py-4">
@@ -536,15 +541,22 @@ export default function TrainersManagement({ trainers, session, templateId, temp
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        trainer.attendanceStatus === 'Present' 
-                          ? 'bg-green-100 text-green-800'
-                          : trainer.attendanceStatus === 'Absent'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {trainer.attendanceStatus}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          trainer.attendanceStatus === 'Present' 
+                            ? 'bg-green-100 text-green-800'
+                            : trainer.attendanceStatus === 'Absent'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {trainer.attendanceStatus}
+                        </span>
+                        {trainer.status && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            {trainer.status}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {trainer.managerIc && trainerCertificates[trainer.managerIc] ? (
