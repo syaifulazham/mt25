@@ -687,8 +687,8 @@ export default function WinnersCertificatesPage() {
       // Fetch available pre-generated certificates for this rank, contest, and state
       let certsUrl = `/api/events/${eventId}/judging/available-certs?contestId=${selectedContest}&rank=${team.rank}`
       
-      // Add stateId filter if team has a state (for state-based ranking)
-      if (team.state?.id) {
+      // Add stateId filter ONLY if Split by State is ON and team has a state
+      if (splitByState && team.state?.id) {
         certsUrl += `&stateId=${team.state.id}`
       }
       
@@ -2278,8 +2278,7 @@ export default function WinnersCertificatesPage() {
                         ✓ <strong>{availableCerts.length} pre-generated certificate{availableCerts.length !== 1 ? 's' : ''}</strong> available
                       </p>
                       <p className="text-xs text-green-800 mt-1">
-                        Filtered for: Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
-                        {mappingTeam.state && `, ${mappingTeam.state.name}`}
+                        Filtered for: Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"{splitByState && mappingTeam.state && `, ${mappingTeam.state.name}`}
                       </p>
                     </div>
                   )}
@@ -2298,7 +2297,7 @@ export default function WinnersCertificatesPage() {
                           </p>
                           <p className="text-xs text-amber-800 mt-1">
                             No pre-generated certificates found for Rank {mappingTeam.rank}, Contest "{contests.find(c => c.contestId === selectedContest)?.name || 'Selected Contest'}"
-                            {mappingTeam.state && `, ${mappingTeam.state.name}`}.
+                            {splitByState && mappingTeam.state && `, ${mappingTeam.state.name}`}.
                           </p>
                           <div className="mt-2 space-y-1">
                             <p className="text-xs text-amber-700 font-medium">
