@@ -70,11 +70,12 @@ export async function POST(
       )
     }
 
-    // Get team details with contest name
+    // Get team details with contest name and stateId
     const teamQuery = `
       SELECT 
         at.Id as attendanceTeamId,
         at.teamId,
+        at.stateId,
         t.name as teamName,
         t.contestId,
         CONCAT(contest.code, ' - ', contest.name) as contestName,
@@ -132,20 +133,48 @@ export async function POST(
 
     // Check for available pre-generated blank certificates for this rank
     // Fetch ALL blank certificates (one for each team member)
+    // Use CAST to ensure proper type comparison for numeric values
+    // Handle both national and state-based rankings:
+    // - National ranking: stateId is NULL in ownership
+    // - State-based ranking: stateId matches team's stateId
+    const teamStateId = team.stateId
+    
     const blankCertsForRank = await prisma.$queryRaw<any[]>`
       SELECT id, serialNumber, uniqueCode, filePath, ownership
       FROM certificate
       WHERE templateId = ${template.id}
         AND ic_number IS NULL
-        AND JSON_EXTRACT(ownership, '$.preGenerated') = true
-        AND JSON_EXTRACT(ownership, '$.rank') = ${rank}
-        AND JSON_EXTRACT(ownership, '$.contestId') = ${contestId}
-        AND JSON_EXTRACT(ownership, '$.eventId') = ${eventId}
-      ORDER BY JSON_EXTRACT(ownership, '$.memberNumber') ASC
+        AND JSON_UNQUOTE(JSON_EXTRACT(ownership, '$.preGenerated')) = 'true'
+        AND CAST(JSON_EXTRACT(ownership, '$.rank') AS UNSIGNED) = ${rank}
+        AND CAST(JSON_EXTRACT(ownership, '$.contestId') AS UNSIGNED) = ${contestId}
+        AND CAST(JSON_EXTRACT(ownership, '$.eventId') AS UNSIGNED) = ${eventId}
+        AND (
+          JSON_EXTRACT(ownership, '$.stateId') IS NULL
+          ${
+            teamStateId 
+              ? `OR CAST(JSON_EXTRACT(ownership, '$.stateId') AS UNSIGNED) = ${teamStateId}`
+              : ''
+          }
+        )
+      ORDER BY CAST(JSON_EXTRACT(ownership, '$.memberNumber') AS UNSIGNED) ASC
     `
 
     const hasBlankCerts = blankCertsForRank && blankCertsForRank.length > 0
-    console.log(`Found ${blankCertsForRank.length} pre-generated certificates for rank ${rank}`)
+    console.log(`[Winner Cert Gen] Searching for pre-generated certs: templateId=${template.id}, rank=${rank}, contestId=${contestId}, eventId=${eventId}, teamStateId=${teamStateId || 'NULL'}`)
+    console.log(`[Winner Cert Gen] Found ${blankCertsForRank.length} pre-generated certificates for rank ${rank}`)
+    
+    // Log ranking mode detected from results
+    if (hasBlankCerts) {
+      const firstCert = blankCertsForRank[0]
+      const ownership = typeof firstCert.ownership === 'string' ? JSON.parse(firstCert.ownership) : firstCert.ownership
+      const detectedMode = ownership.stateId ? 'state-based' : 'national'
+      console.log(`[Winner Cert Gen] Detected ranking mode: ${detectedMode}`)
+    }
+    
+    // If no blank certs found, log a warning but continue with direct generation
+    if (!hasBlankCerts) {
+      console.log(`[Winner Cert Gen] No pre-generated certificates found. Will generate new serial numbers.`)
+    }
 
     // Map each team member to a pre-generated certificate
     for (let memberIndex = 0; memberIndex < members.length; memberIndex++) {
@@ -158,11 +187,16 @@ export async function POST(
           // Use manually selected certificate
           const mappedCertId = manualMapping[memberIndex]
           blankCert = blankCertsForRank.find(cert => cert.id === mappedCertId) || null
-          console.log(`Manual mapping: Member ${memberIndex + 1} (${member.contestantName}) → Cert ID ${mappedCertId}`)
+          console.log(`[Winner Cert Gen] 🎯 Manual mapping: Member ${memberIndex + 1} (${member.contestantName}) → Cert ID ${mappedCertId}`)
+          if (!blankCert) {
+            console.log(`[Winner Cert Gen] ⚠️ Warning: Manually mapped cert ID ${mappedCertId} not found in available pre-generated certs`)
+          }
         } else if (hasBlankCerts && memberIndex < blankCertsForRank.length) {
           // Auto-map: Use certificate in order
           blankCert = blankCertsForRank[memberIndex]
-          console.log(`Auto mapping: Member ${memberIndex + 1} (${member.contestantName}) → Cert ${blankCert.serialNumber}`)
+          console.log(`[Winner Cert Gen] 🔄 Auto mapping: Member ${memberIndex + 1} (${member.contestantName}) → Cert ${blankCert.serialNumber}`)
+        } else if (hasBlankCerts && memberIndex >= blankCertsForRank.length) {
+          console.log(`[Winner Cert Gen] ⚠️ Not enough pre-generated certs. Team has ${members.length} members, but only ${blankCertsForRank.length} certs available. Will generate new serial for member ${memberIndex + 1}.`)
         }
         
         // Generate unique code
@@ -186,18 +220,20 @@ export async function POST(
         if (existingCert && existingCert.serialNumber) {
           // Use existing serial number from already assigned certificate
           serialNumber = existingCert.serialNumber
+          console.log(`[Winner Cert Gen] Using existing serial ${serialNumber} for ${member.contestantName}`)
         } else if (blankCert && blankCert.serialNumber) {
           // Use serial number from pre-generated blank certificate
           serialNumber = blankCert.serialNumber
           usePreGenerated = true
-          console.log(`Assigning pre-generated cert ${blankCert.serialNumber} to member ${memberIndex + 1}: ${member.contestantName}`)
+          console.log(`[Winner Cert Gen] ✓ Assigning pre-generated cert ${blankCert.serialNumber} (ID: ${blankCert.id}) to member ${memberIndex + 1}: ${member.contestantName}`)
         } else {
-          // Generate new serial number using the service
+          // Generate new serial number using the service (direct generation)
           serialNumber = await CertificateSerialService.generateSerialNumber(
             template.id,
             'EVENT_WINNER',
             new Date().getFullYear()
           )
+          console.log(`[Winner Cert Gen] ⚡ Direct generation - created new serial ${serialNumber} for ${member.contestantName}`)
         }
 
         // Generate PDF

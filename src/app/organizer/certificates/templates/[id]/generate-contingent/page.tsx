@@ -287,29 +287,27 @@ export default function GenerateContingentCertificatesPage() {
     )
 
     if (certificatesToDownload.length === 0) {
-      toast.error('Please select contingents with generated certificates')
+      toast.error('No certificates available to download')
       return
     }
 
-    toast.info(`Downloading ${certificatesToDownload.length} certificate(s)...`)
-    
     for (const contingent of certificatesToDownload) {
       if (contingent.certificate) {
         const link = document.createElement('a')
-        link.href = contingent.certificate.filePath
+        link.href = `/api/certificates/${contingent.certificate.id}/download`
         link.download = `Certificate_${cleanContingentName(contingent.name)}.pdf`
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
-        await new Promise(resolve => setTimeout(resolve, 500)) // Delay between downloads
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
 
     toast.success('Download complete')
   }
 
-  const handleViewCertificate = (filePath: string) => {
-    setViewingCertPath(filePath)
+  const handleViewCertificate = (certificateId: number) => {
+    setViewingCertPath(`/api/certificates/${certificateId}/view`)
     setViewModalOpen(true)
   }
 
@@ -689,14 +687,13 @@ export default function GenerateContingentCertificatesPage() {
                           <div className="flex items-center justify-center gap-2">
                             <FileCheck className="h-5 w-5 text-green-600" />
                             <button
-                              onClick={() => handleViewCertificate(contingent.certificate!.filePath)}
+                              onClick={() => handleViewCertificate(contingent.certificate!.id)}
                               className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                             >
                               View
                             </button>
                             <a
-                              href={contingent.certificate.filePath}
-                              download
+                              href={`/api/certificates/${contingent.certificate.id}/download`}
                               className="text-green-600 hover:text-green-700 text-sm font-medium"
                             >
                               <Download className="h-4 w-4" />
