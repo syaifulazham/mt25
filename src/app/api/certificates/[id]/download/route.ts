@@ -104,12 +104,15 @@ export async function GET(
     const filename = `Certificate_${sanitizedName}_${certificate.uniqueCode}.pdf`
 
     // Return PDF with attachment disposition (force download)
+    // Use no-cache to ensure regenerated certificates are immediately available
     return new NextResponse(fileBuffer as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Cache-Control': 'public, max-age=31536000',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     })
 

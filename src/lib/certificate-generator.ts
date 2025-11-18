@@ -192,8 +192,21 @@ export async function generateCertificatePDF(options: {
   const outputPath = path.join(outputDir, filename);
   const relativePath = `/uploads/certificates/${filename}`;
 
-  // Write the PDF file
-  await fs.writeFile(outputPath, modifiedPdfBytes);
+  // Write the PDF file with explicit flush to ensure immediate availability
+  try {
+    await fs.writeFile(outputPath, modifiedPdfBytes, { flag: 'w' });
+    
+    // Ensure file is flushed to disk before proceeding
+    const fileHandle = await fs.open(outputPath, 'r+');
+    await fileHandle.sync(); // Force flush to disk
+    await fileHandle.close();
+    
+    // Small delay to ensure file system has updated
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } catch (err) {
+    console.error('Error writing PDF file:', err);
+    throw new Error('Failed to write certificate PDF');
+  }
 
   return relativePath;
 }

@@ -99,12 +99,15 @@ export async function GET(
     const fileBuffer = fs.readFileSync(filePath)
 
     // Return PDF with inline display (view in browser)
+    // Use no-cache to ensure regenerated certificates are immediately available
     return new NextResponse(fileBuffer as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'inline',
-        'Cache-Control': 'public, max-age=31536000',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     })
 

@@ -76,6 +76,28 @@ const nextConfig = {
   publicRuntimeConfig: {
     staticFolder: '/uploads',
   },
+  // Add headers to prevent caching of dynamically generated files
+  async headers() {
+    return [
+      {
+        source: '/uploads/certificates/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache, must-revalidate, max-age=0',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+    ];
+  },
   // Add rewrites to ensure uploaded files are properly served
   async rewrites() {
     return [
