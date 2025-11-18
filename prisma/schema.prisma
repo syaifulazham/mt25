@@ -1448,4 +1448,5 @@ enum CertTemplateTargetType {
   QUIZ_PARTICIPANT
   QUIZ_WINNER
   TRAINERS
+  CONTINGENT
 }

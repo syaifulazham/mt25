@@ -21,7 +21,7 @@ export type TemplateCreateParams = {
   basePdfPath?: string
   configuration: any
   // Target audience fields
-  targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS'
+  targetType: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT'
   eventId?: number | null
   quizId?: number | null
   winnerRangeStart?: number | null
@@ -37,7 +37,7 @@ export type TemplateUpdateParams = {
   basePdfPath?: string
   configuration?: any
   // Target audience fields
-  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT'
   eventId?: number | null
   quizId?: number | null
   winnerRangeStart?: number | null

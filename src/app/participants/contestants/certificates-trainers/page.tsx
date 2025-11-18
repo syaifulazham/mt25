@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, FileCheck, Loader2, Eye, Search, Users } from 'lucide-react'
+import { Download, FileCheck, Loader2, Eye, Search, Users, Award, X } from 'lucide-react'
 
 interface Certificate {
   id: number
@@ -23,6 +23,17 @@ interface Trainer {
   certificate: Certificate | null
 }
 
+interface ContingentCertificate {
+  id: number
+  recipientName: string
+  serialNumber: string | null
+  uniqueCode: string
+  filePath: string
+  status: string
+  templateName: string
+  contingentName: string | null
+}
+
 export default function TrainersCertificatesPage() {
   const [trainers, setTrainers] = useState<Trainer[]>([])
   const [filteredTrainers, setFilteredTrainers] = useState<Trainer[]>([])
@@ -35,9 +46,12 @@ export default function TrainersCertificatesPage() {
     trainerName: string
     serialNumber: string | null
   } | null>(null)
+  const [contingentCertificate, setContingentCertificate] = useState<ContingentCertificate | null>(null)
+  const [showContingentModal, setShowContingentModal] = useState(false)
 
   useEffect(() => {
     fetchTrainers()
+    fetchContingentCertificate()
   }, [])
 
   useEffect(() => {
@@ -61,6 +75,18 @@ export default function TrainersCertificatesPage() {
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchContingentCertificate = async () => {
+    try {
+      const response = await fetch('/api/participants/contingent-certificate')
+      if (response.ok) {
+        const data = await response.json()
+        setContingentCertificate(data.certificate)
+      }
+    } catch (err) {
+      console.error('Error fetching contingent certificate:', err)
     }
   }
 
@@ -126,6 +152,20 @@ export default function TrainersCertificatesPage() {
     }
   }
 
+  const handleContingentDownload = () => {
+    if (!contingentCertificate) return
+    
+    const link = document.createElement('a')
+    link.href = contingentCertificate.filePath
+    link.download = `Sijil-Kontinjen-${(contingentCertificate.contingentName || 'Contingent').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    
+    setTimeout(() => {
+      document.body.removeChild(link)
+    }, 100)
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -161,6 +201,43 @@ export default function TrainersCertificatesPage() {
           Senarai jurulatih/pengurus dan sijil yang tersedia untuk dimuat turun
         </p>
       </div>
+
+      {/* Contingent Certificate Greeting */}
+      {contingentCertificate && (
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-300 rounded-lg p-6 mb-6 shadow-md">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <Award className="h-8 w-8 text-purple-600" />
+                <h2 className="text-2xl font-bold text-purple-900">
+                  Tahniah! Sijil Kontinjen Tersedia
+                </h2>
+              </div>
+              <div className="space-y-2 text-gray-700">
+                <p className="text-lg">
+                  Terima kasih atas penyertaan kontinjen <span className="font-bold text-purple-800">{contingentCertificate.contingentName}</span> dalam MT2025!
+                </p>
+                <p>
+                  Penghargaan dan terima kasih diucapkan kepada semua yang terlibat dalam menjayakan penyertaan kontinjen ini. 
+                  Semoga pengalaman dan pembelajaran yang diperoleh dapat memberi manfaat dan inspirasi untuk terus maju ke hadapan.
+                </p>
+                <p className="text-sm text-gray-600 italic">
+                  Sijil ini adalah sebagai tanda penghargaan atas komitmen dan dedikasi kontinjen dalam Malaysia Techlympics 2025.
+                </p>
+              </div>
+            </div>
+            <div className="ml-6">
+              <button
+                onClick={() => setShowContingentModal(true)}
+                className="flex flex-col items-center gap-2 px-6 py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-lg hover:shadow-xl"
+              >
+                <Award className="h-10 w-10" />
+                <span className="font-semibold">Lihat & Muat Turun Sijil</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
@@ -394,6 +471,69 @@ export default function TrainersCertificatesPage() {
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contingent Certificate Modal */}
+      {showContingentModal && contingentCertificate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4" onClick={() => setShowContingentModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50">
+              <div>
+                <h3 className="text-lg font-semibold text-purple-900 flex items-center gap-2">
+                  <Award className="h-5 w-5" />
+                  Sijil Kontinjen
+                </h3>
+                <p className="text-sm text-gray-700 mt-0.5">
+                  {contingentCertificate.contingentName}
+                  {contingentCertificate.serialNumber && (
+                    <span className="ml-2 text-xs text-gray-600">
+                      Siri: {contingentCertificate.serialNumber}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowContingentModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* PDF Viewer */}
+            <div className="flex-1 overflow-hidden bg-gray-100">
+              <iframe
+                src={contingentCertificate.filePath}
+                className="w-full h-full border-0"
+                title="Sijil Kontinjen"
+              />
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-600">
+                <p className="font-medium text-purple-900">Malaysia Techlympics 2025</p>
+                <p>Sijil Penghargaan Kontinjen</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowContingentModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={handleContingentDownload}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Muat Turun Sijil
+                </button>
+              </div>
             </div>
           </div>
         </div>

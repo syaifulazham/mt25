@@ -235,7 +235,7 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [success, setSuccess] = useState<string | null>(null)
   
   // Target audience configuration states
-  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS'>(template?.targetType || 'GENERAL')
+  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT'>(template?.targetType || 'GENERAL')
   const [eventId, setEventId] = useState<number | null>(template?.eventId || null)
   const [quizId, setQuizId] = useState<number | null>(template?.quizId || null)
   const [winnerRangeStart, setWinnerRangeStart] = useState<number | null>(template?.winnerRangeStart || 1)
@@ -1529,6 +1529,18 @@ function debugElementProps(element: Element, location: string): string | undefin
                       />
                       <span className="ml-2">Trainers</span>
                     </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="CONTINGENT" 
+                        checked={targetType === 'CONTINGENT'}
+                        onChange={() => setTargetType('CONTINGENT')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2">Contingent</span>
+                    </label>
                   </div>
                 </div>
                 
@@ -1627,6 +1639,8 @@ function debugElementProps(element: Element, location: string): string | undefin
                         `Top performers (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${quizzes.find(q => q.id === quizId)?.quiz_name || 'selected quiz'}`}
                       {targetType === 'QUIZ_WINNER' && (!quizId || !winnerRangeStart || !winnerRangeEnd) && 
                         'Quiz winners (please complete all fields)'}
+                    {targetType === 'TRAINERS' && 'Trainers and instructors'}
+                    {targetType === 'CONTINGENT' && 'Contingents (team/group level certificates)'}
                   </p>
                 </div>
               </div>

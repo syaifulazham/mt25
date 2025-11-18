@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 interface Template {
   id: number
   templateName: string
-  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT'
   eventId?: number | null
   quizId?: number | null
   winnerRangeStart?: number | null
@@ -151,7 +151,7 @@ export function DuplicateTemplateModal({
               onChange={(e) => {
                 setTargetType(e.target.value)
                 // Reset related fields when changing target type
-                if (e.target.value === 'GENERAL' || e.target.value === 'NON_CONTEST_PARTICIPANT' || e.target.value === 'TRAINERS') {
+                if (e.target.value === 'GENERAL' || e.target.value === 'NON_CONTEST_PARTICIPANT' || e.target.value === 'TRAINERS' || e.target.value === 'CONTINGENT') {
                   setEventId(null)
                   setQuizId(null)
                   setWinnerRangeStart(null)
@@ -167,6 +167,7 @@ export function DuplicateTemplateModal({
               <option value="QUIZ_PARTICIPANT">Quiz Participant</option>
               <option value="QUIZ_WINNER">Quiz Winner</option>
               <option value="TRAINERS">Trainers</option>
+              <option value="CONTINGENT">Contingent</option>
             </select>
           </div>
 
@@ -262,6 +263,7 @@ export function DuplicateTemplateModal({
               {targetType === 'QUIZ_WINNER' && (!quizId || !winnerRangeStart || !winnerRangeEnd) && 
                 'Quiz winners (please complete all fields)'}
               {targetType === 'TRAINERS' && 'Trainers and instructors'}
+              {targetType === 'CONTINGENT' && 'Contingents (team/group level certificates)'}
             </p>
           </div>
 
