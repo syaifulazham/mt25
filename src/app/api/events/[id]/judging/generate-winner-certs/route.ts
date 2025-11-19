@@ -139,7 +139,12 @@ export async function POST(
     // - State-based ranking: stateId matches team's stateId
     const teamStateId = team.stateId
     
-    const blankCertsForRank = await prisma.$queryRaw<any[]>`
+    // Build the state filter condition dynamically
+    const stateCondition = teamStateId 
+      ? `OR CAST(JSON_EXTRACT(ownership, '$.stateId') AS UNSIGNED) = ${teamStateId}`
+      : ''
+    
+    const blankCertsQuery = `
       SELECT id, serialNumber, uniqueCode, filePath, ownership
       FROM certificate
       WHERE templateId = ${template.id}
@@ -150,14 +155,12 @@ export async function POST(
         AND CAST(JSON_EXTRACT(ownership, '$.eventId') AS UNSIGNED) = ${eventId}
         AND (
           JSON_EXTRACT(ownership, '$.stateId') IS NULL
-          ${
-            teamStateId 
-              ? `OR CAST(JSON_EXTRACT(ownership, '$.stateId') AS UNSIGNED) = ${teamStateId}`
-              : ''
-          }
+          ${stateCondition}
         )
       ORDER BY CAST(JSON_EXTRACT(ownership, '$.memberNumber') AS UNSIGNED) ASC
     `
+    
+    const blankCertsForRank = await prisma.$queryRawUnsafe<any[]>(blankCertsQuery)
 
     const hasBlankCerts = blankCertsForRank && blankCertsForRank.length > 0
     console.log(`[Winner Cert Gen] Searching for pre-generated certs: templateId=${template.id}, rank=${rank}, contestId=${contestId}, eventId=${eventId}, teamStateId=${teamStateId || 'NULL'}`)

@@ -236,7 +236,12 @@ const teamQuery = `
 ```javascript
 const teamStateId = team.stateId
 
-const blankCertsForRank = await prisma.$queryRaw`
+// Build the state filter condition dynamically
+const stateCondition = teamStateId 
+  ? `OR CAST(JSON_EXTRACT(ownership, '$.stateId') AS UNSIGNED) = ${teamStateId}`
+  : ''
+
+const blankCertsQuery = `
   SELECT id, serialNumber, uniqueCode, filePath, ownership
   FROM certificate
   WHERE templateId = ${template.id}
@@ -246,16 +251,34 @@ const blankCertsForRank = await prisma.$queryRaw`
     AND CAST(JSON_EXTRACT(ownership, '$.contestId') AS UNSIGNED) = ${contestId}
     AND CAST(JSON_EXTRACT(ownership, '$.eventId') AS UNSIGNED) = ${eventId}
     AND (
-      JSON_EXTRACT(ownership, '$.stateId') IS NULL  // ← National certs
-      ${
-        teamStateId 
-          ? `OR CAST(JSON_EXTRACT(ownership, '$.stateId') AS UNSIGNED) = ${teamStateId}`  // ← State certs
-          : ''
-      }
+      JSON_EXTRACT(ownership, '$.stateId') IS NULL
+      ${stateCondition}
     )
   ORDER BY CAST(JSON_EXTRACT(ownership, '$.memberNumber') AS UNSIGNED) ASC
 `
+
+const blankCertsForRank = await prisma.$queryRawUnsafe<any[]>(blankCertsQuery)
 ```
+
+The SQL looks like:
+```sql
+-- NEW QUERY - Explicit type casting ensures correct matching
+SELECT id, serialNumber, uniqueCode, filePath, ownership
+FROM certificate
+WHERE templateId = ${template.id}
+  AND ic_number IS NULL
+  AND JSON_UNQUOTE(JSON_EXTRACT(ownership, '$.preGenerated')) = 'true'
+  AND CAST(JSON_EXTRACT(ownership, '$.rank') AS UNSIGNED) = ${rank}
+  AND CAST(JSON_EXTRACT(ownership, '$.contestId') AS UNSIGNED) = ${contestId}
+  AND CAST(JSON_EXTRACT(ownership, '$.eventId') AS UNSIGNED) = ${eventId}
+  AND (
+    JSON_EXTRACT(ownership, '$.stateId') IS NULL
+    -- Conditionally added: OR CAST(JSON_EXTRACT(ownership, '$.stateId') AS UNSIGNED) = ${teamStateId}
+  )
+ORDER BY CAST(JSON_EXTRACT(ownership, '$.memberNumber') AS UNSIGNED) ASC
+```
+
+**Important:** This query is built using `prisma.$queryRawUnsafe` to allow dynamic SQL construction. The state condition is conditionally added as a string when `teamStateId` is present.
 
 #### Change 3: Enhanced logging
 ```javascript
