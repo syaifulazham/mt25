@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's participant data with contingents
+    // Get user's participant data with contingents (both direct and managed)
     const participant = await prisma.user_participant.findUnique({
       where: { email: session.user.email },
       select: {
@@ -22,16 +22,25 @@ export async function GET(request: NextRequest) {
           select: {
             id: true
           }
+        },
+        managedContingents: {
+          select: {
+            contingentId: true
+          }
         }
       }
     })
 
-    if (!participant || !participant.contingents || participant.contingents.length === 0) {
-      return NextResponse.json({ error: 'Participant not found or not associated with contingent' }, { status: 404 })
+    if (!participant) {
+      return NextResponse.json({ error: 'Participant not found' }, { status: 404 })
     }
 
-    // Get contingent IDs
-    const contingentIds = participant.contingents.map(c => c.id)
+    // Get contingent IDs from both direct contingents and managed contingents
+    const directContingentIds = (participant.contingents || []).map(c => c.id)
+    const managedContingentIds = (participant.managedContingents || []).map(cm => cm.contingentId)
+    
+    // Combine and deduplicate
+    const contingentIds = [...new Set([...directContingentIds, ...managedContingentIds])]
 
     // If no contingents, return empty array
     if (contingentIds.length === 0) {
