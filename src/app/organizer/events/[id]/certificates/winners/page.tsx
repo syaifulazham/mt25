@@ -84,6 +84,19 @@ export default function WinnersCertificatesPage() {
   const [batchSize, setBatchSize] = useState<number>(50)
   const [downloadStrategy, setDownloadStrategy] = useState<'single-zip' | 'individual'>('individual')
   const [showDownloadOptions, setShowDownloadOptions] = useState(false)
+  const [showBulkGenerateModal, setShowBulkGenerateModal] = useState(false)
+  const [bulkRankStart, setBulkRankStart] = useState<number>(1)
+  const [bulkRankEnd, setBulkRankEnd] = useState<number>(10)
+  const [bulkStateRanges, setBulkStateRanges] = useState<Record<string, { start: number, end: number }>>({})
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false)
+  const [bulkGenProgress, setBulkGenProgress] = useState({ current: 0, total: 0, currentRank: 0, currentState: '' })
+  const [showBulkGenResults, setShowBulkGenResults] = useState(false)
+  const [bulkGenResults, setBulkGenResults] = useState<any>(null)
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
+  const [bulkConfirmMessage, setBulkConfirmMessage] = useState('')
+  const [bulkConfirmData, setBulkConfirmData] = useState<any>(null)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorModalMessage, setErrorModalMessage] = useState('')
 
   // Fetch event details to get scopeArea
   useEffect(() => {
@@ -161,7 +174,7 @@ export default function WinnersCertificatesPage() {
       
       try {
         const response = await fetch(
-          `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}`
+          `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}&rankByState=${splitByState}`
         )
         if (!response.ok) throw new Error('Failed to fetch team rankings')
         
@@ -175,7 +188,7 @@ export default function WinnersCertificatesPage() {
     }
 
     fetchRankings()
-  }, [eventId, selectedContest])
+  }, [eventId, selectedContest, splitByState])
 
   // Fetch pre-generated certificates when contest is selected
   useEffect(() => {
@@ -787,7 +800,7 @@ export default function WinnersCertificatesPage() {
 
       // Refresh team rankings to show certificate status
       const refreshResponse = await fetch(
-        `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}`
+        `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}&rankByState=${splitByState}`
       )
       if (refreshResponse.ok) {
         const refreshData = await refreshResponse.json()
@@ -938,6 +951,221 @@ export default function WinnersCertificatesPage() {
     }
   }
 
+  const handleBulkGenerate = () => {
+    if (!selectedContest) {
+      setErrorModalMessage('Please select a contest first')
+      setShowErrorModal(true)
+      return
+    }
+
+    // Validation based on mode
+    if (splitByState) {
+      // Validate state-specific ranges
+      const states = Object.keys(bulkStateRanges)
+      if (states.length === 0) {
+        setErrorModalMessage('Please configure rank ranges for at least one state.')
+        setShowErrorModal(true)
+        return
+      }
+      for (const state of states) {
+        const range = bulkStateRanges[state]
+        if (range.start < 1 || range.end < range.start) {
+          setErrorModalMessage(`Invalid rank range for ${state}. Start must be at least 1 and End must be greater than or equal to Start.`)
+          setShowErrorModal(true)
+          return
+        }
+      }
+    } else {
+      // Validate single range for national
+      if (bulkRankStart < 1 || bulkRankEnd < bulkRankStart) {
+        setErrorModalMessage('Invalid rank range. Start must be at least 1 and End must be greater than or equal to Start.')
+        setShowErrorModal(true)
+        return
+      }
+    }
+
+    // Build confirmation message and prepare data
+    let confirmMessage = ''
+    let teamsToProcess: TeamRanking[] = []
+    
+    if (splitByState) {
+      const stateDetails: any[] = []
+      Object.entries(bulkStateRanges).forEach(([stateName, range]) => {
+        const stateTeams = teamRankings.filter(
+          team => team.state?.name === stateName && team.rank >= range.start && team.rank <= range.end
+        )
+        teamsToProcess.push(...stateTeams)
+        stateDetails.push({ stateName, range, count: stateTeams.length })
+      })
+      setBulkConfirmData({ mode: 'state', stateDetails, total: teamsToProcess.length, teamsToProcess })
+    } else {
+      teamsToProcess = teamRankings.filter(
+        team => team.rank >= bulkRankStart && team.rank <= bulkRankEnd
+      )
+      setBulkConfirmData({ 
+        mode: 'national', 
+        start: bulkRankStart, 
+        end: bulkRankEnd, 
+        total: teamsToProcess.length,
+        teamsToProcess 
+      })
+    }
+    
+    setShowBulkConfirm(true)
+  }
+
+  const executeBulkGenerate = async () => {
+    if (!bulkConfirmData) return
+    
+    setShowBulkConfirm(false)
+
+    setIsBulkGenerating(true)
+    setShowBulkGenerateModal(false)
+    setBulkGenProgress({ current: 0, total: 0, currentRank: 0, currentState: '' })
+
+    const results = {
+      total: 0,
+      success: 0,
+      failed: 0,
+      skipped: 0,
+      details: [] as any[]
+    }
+
+    const teamsToProcess = bulkConfirmData.teamsToProcess
+
+    try {
+      results.total = teamsToProcess.length
+      setBulkGenProgress({ current: 0, total: teamsToProcess.length, currentRank: 0, currentState: '' })
+
+      // Process each team
+      for (let i = 0; i < teamsToProcess.length; i++) {
+        const team = teamsToProcess[i]
+        const stateName = splitByState ? (team.state?.name || 'Unknown') : 'All States'
+        setBulkGenProgress({ 
+          current: i + 1, 
+          total: teamsToProcess.length, 
+          currentRank: team.rank,
+          currentState: stateName
+        })
+
+        try {
+          // Fetch available pre-generated certs for this rank
+          let certsUrl = `/api/events/${eventId}/judging/available-certs?contestId=${selectedContest}&rank=${team.rank}`
+          
+          // Add stateId filter ONLY if Split by State is ON and team has a state
+          if (splitByState && team.state?.id) {
+            certsUrl += `&stateId=${team.state.id}`
+          }
+
+          const certsResponse = await fetch(certsUrl)
+          const certsData = await certsResponse.json()
+          const availableCerts = certsData.certificates || []
+
+          // Fetch team members
+          const membersResponse = await fetch(
+            `/api/events/${eventId}/judging/team-members?teamId=${team.team?.id}`
+          )
+          const membersData = await membersResponse.json()
+          const members = membersData.members || []
+
+          // Auto-map if pre-generated certs available
+          let certMapping: Record<number, number> = {}
+          if (availableCerts.length > 0) {
+            members.forEach((member: any, idx: number) => {
+              if (availableCerts[idx]) {
+                certMapping[idx] = availableCerts[idx].id
+              }
+            })
+          }
+
+          // Generate certificates
+          const response = await fetch(`/api/events/${eventId}/judging/generate-winner-certs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              attendanceTeamId: team.attendanceTeamId,
+              rank: team.rank,
+              contestId: selectedContest,
+              manualMapping: certMapping
+            })
+          })
+
+          const data = await response.json()
+
+          if (response.ok) {
+            results.success++
+            results.details.push({
+              rank: team.rank,
+              teamName: team.team?.name,
+              state: team.state?.name,
+              status: 'success',
+              usedPreGenerated: availableCerts.length > 0,
+              certsGenerated: data.results?.success?.length || 0
+            })
+          } else {
+            results.failed++
+            results.details.push({
+              rank: team.rank,
+              teamName: team.team?.name,
+              state: team.state?.name,
+              status: 'failed',
+              error: data.error || 'Unknown error'
+            })
+          }
+        } catch (error) {
+          results.failed++
+          results.details.push({
+            rank: team.rank,
+            teamName: team.team?.name,
+            state: team.state?.name,
+            status: 'failed',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          })
+        }
+
+        // Small delay to prevent overwhelming the server
+        if (i < teamsToProcess.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+
+      setBulkGenResults(results)
+      setShowBulkGenResults(true)
+
+      // Refresh rankings to show updated certificate status
+      const refreshResponse = await fetch(
+        `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}&rankByState=${splitByState}`
+      )
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json()
+        setTeamRankings(refreshData.rankings || [])
+      }
+
+    } catch (err) {
+      console.error('Bulk generation error:', err)
+      setErrorModalMessage('Error during bulk generation: ' + (err instanceof Error ? err.message : 'Unknown error'))
+      setShowErrorModal(true)
+    } finally {
+      setIsBulkGenerating(false)
+    }
+  }
+
+  const openBulkGenerateModal = () => {
+    // Initialize state ranges with defaults when opening in state mode
+    if (splitByState) {
+      const stateGroups = groupedByState()
+      const initialRanges: Record<string, { start: number, end: number }> = {}
+      
+      Object.keys(stateGroups).forEach(stateName => {
+        initialRanges[stateName] = { start: 1, end: 10 }
+      })
+      
+      setBulkStateRanges(initialRanges)
+    }
+    
+    setShowBulkGenerateModal(true)
+  }
+
   // Group teams by state
   const groupedByState = () => {
     const groups: { [key: string]: TeamRanking[] } = {}
@@ -1083,13 +1311,22 @@ export default function WinnersCertificatesPage() {
             Select Contest
           </label>
           {selectedContest && hasWinnerTemplates && (
-            <button
-              onClick={() => setShowPreGenerateModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Pre-Generate Blank Certificates
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPreGenerateModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Pre-Generate Blank Certificates
+              </button>
+              <button
+                onClick={openBulkGenerateModal}
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
+              >
+                <Trophy className="h-4 w-4 mr-2" />
+                Bulk Generate Certificates
+              </button>
+            </div>
           )}
         </div>
         <select
@@ -1174,11 +1411,35 @@ export default function WinnersCertificatesPage() {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex justify-between items-center">
-              <div>
+              <div className="flex-1">
                 <h2 className="text-xl font-semibold">Team Rankings</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  {teamRankings.length} teams ranked
-                </p>
+                <div className="flex items-center gap-3 mt-2">
+                  <p className="text-sm text-gray-600">
+                    {teamRankings.length} teams ranked
+                  </p>
+                  {/* View Mode Indicator */}
+                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+                    splitByState 
+                      ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                      : 'bg-gray-100 text-gray-800 border border-gray-300'
+                  }`}>
+                    {splitByState ? (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        <span>State-Specific Rankings</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                        </svg>
+                        <span>Combined Results</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
               
               {/* Split by State Toggle */}
@@ -1203,7 +1464,55 @@ export default function WinnersCertificatesPage() {
             <div className="text-center py-12 text-gray-500">
               No team rankings available for this contest
             </div>
-          ) : splitByState ? (
+          ) : (
+            <>
+              {/* View Mode Info Banner */}
+              <div className={`px-6 py-3 ${
+                splitByState 
+                  ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200'
+                  : 'bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`flex-shrink-0 mt-0.5 ${
+                    splitByState ? 'text-blue-600' : 'text-gray-600'
+                  }`}>
+                    {splitByState ? (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    {splitByState ? (
+                      <>
+                        <p className="text-sm font-semibold text-blue-900">
+                          State-Specific Rankings View
+                        </p>
+                        <p className="text-xs text-blue-700 mt-0.5">
+                          Each state has independent rankings. Rank 1 in SELANGOR is the best team <strong>within SELANGOR</strong>, separate from Rank 1 in other states.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-gray-900">
+                          Combined Results View
+                        </p>
+                        <p className="text-xs text-gray-700 mt-0.5">
+                          Showing all teams combined across all states. Rankings are based on overall performance regardless of state.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!isLoadingRankings && teamRankings.length > 0 && splitByState ? (
             // Split by State View
             <div className="space-y-6 p-6">
               {Object.entries(groupedByState()).map(([stateName, teams]) => (
@@ -2596,6 +2905,488 @@ export default function WinnersCertificatesPage() {
                   setTeamCertificates([])
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Generate Modal */}
+      {showBulkGenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Bulk Generate Certificates
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {splitByState 
+                  ? 'Configure rank ranges for each state separately'
+                  : 'Generate certificates for multiple ranks at once'}
+              </p>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              {splitByState ? (
+                /* State-specific configuration */
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-900 font-medium">
+                      🗺️ Split by State Mode - Independent Rankings
+                    </p>
+                    <p className="text-xs text-blue-800 mt-1">
+                      Each state has its own independent ranking system.
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      <strong>Example:</strong> SELANGOR Rank 1-5 means the top 5 teams <strong>within SELANGOR only</strong>, separate from JOHOR's top 5.
+                    </p>
+                  </div>
+
+                  {Object.entries(groupedByState()).map(([stateName, teams]) => {
+                    const currentRange = bulkStateRanges[stateName] || { start: 1, end: 10 }
+                    const teamsInRange = teams.filter(t => t.rank >= currentRange.start && t.rank <= currentRange.end).length
+                    const totalTeamsInState = teams.length
+                    const maxAvailableRank = teams.length > 0 ? Math.max(...teams.map(t => t.rank)) : 0
+                    const hasGap = teamsInRange < (currentRange.end - currentRange.start + 1)
+                    
+                    return (
+                      <div key={stateName} className="border border-gray-300 rounded-lg p-4 bg-gradient-to-br from-white to-gray-50">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
+                          <h4 className="font-bold text-gray-900">{stateName}</h4>
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-medium">
+                            Independent Ranking
+                          </span>
+                          <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                            {totalTeamsInState} team{totalTeamsInState !== 1 ? 's' : ''} total
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Start Rank ({stateName})
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={currentRange.start}
+                              onChange={(e) => {
+                                const newStart = parseInt(e.target.value) || 1
+                                setBulkStateRanges(prev => ({
+                                  ...prev,
+                                  [stateName]: { ...currentRange, start: newStart }
+                                }))
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              End Rank ({stateName})
+                            </label>
+                            <input
+                              type="number"
+                              min={currentRange.start}
+                              value={currentRange.end}
+                              onChange={(e) => {
+                                const newEnd = parseInt(e.target.value) || 10
+                                setBulkStateRanges(prev => ({
+                                  ...prev,
+                                  [stateName]: { ...currentRange, end: newEnd }
+                                }))
+                              }}
+                              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-gray-600">
+                                <span className="font-medium text-gray-700">Configured:</span> Ranks {currentRange.start}-{currentRange.end}
+                              </p>
+                              <p className={`text-xs font-semibold mt-0.5 ${
+                                hasGap ? 'text-orange-600' : 'text-blue-600'
+                              }`}>
+                                <span className="font-medium text-gray-700">Will generate:</span> {teamsInRange} team(s) from {stateName}
+                              </p>
+                            </div>
+                            {hasGap && currentRange.end > maxAvailableRank && (
+                              <div className="text-right">
+                                <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                                  ⚠️ Only {totalTeamsInState} teams
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {hasGap && currentRange.end > maxAvailableRank && (
+                            <p className="text-xs text-yellow-700 mt-1 bg-yellow-50 px-2 py-1 rounded">
+                              Note: {stateName} only has {totalTeamsInState} team{totalTeamsInState !== 1 ? 's' : ''} participating (ranks 1-{maxAvailableRank}). Ranks {maxAvailableRank + 1}-{currentRange.end} don't exist.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Total Summary */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
+                    <p className="text-sm text-green-900 font-bold">
+                      Total Teams Across All States:
+                    </p>
+                    <p className="text-2xl font-bold text-green-700 mt-1">
+                      {Object.entries(bulkStateRanges).reduce((total, [stateName, range]) => {
+                        const stateTeams = teamRankings.filter(
+                          t => t.state?.name === stateName && t.rank >= range.start && t.rank <= range.end
+                        )
+                        return total + stateTeams.length
+                      }, 0)}
+                    </p>
+                    <p className="text-xs text-green-700 mt-1">
+                      (State-specific rankings combined)
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* National configuration */
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Start Rank
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={bulkRankStart}
+                        onChange={(e) => setBulkRankStart(parseInt(e.target.value) || 1)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        End Rank
+                      </label>
+                      <input
+                        type="number"
+                        min={bulkRankStart}
+                        value={bulkRankEnd}
+                        onChange={(e) => setBulkRankEnd(parseInt(e.target.value) || 10)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-900 font-medium">
+                      📋 Will process ranks {bulkRankStart} to {bulkRankEnd}
+                    </p>
+                    <p className="text-xs text-blue-800 mt-1">
+                      {teamRankings.filter(t => t.rank >= bulkRankStart && t.rank <= bulkRankEnd).length} team(s) in this range
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* How It Works */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                <p className="text-xs font-medium text-gray-700 mb-2">How it works:</p>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li>✓ Checks for pre-generated certificates</li>
+                  <li>✓ Auto-maps to team members if available</li>
+                  <li>✓ Generates new serials if not available</li>
+                  <li>✓ Processes each {splitByState ? 'state and ' : ''}rank sequentially</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowBulkGenerateModal(false)
+                  // Reset state ranges when closing
+                  if (splitByState) {
+                    setBulkStateRanges({})
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkGenerate}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+              >
+                Start Generation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Generation Progress Modal */}
+      {isBulkGenerating && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-8">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 text-green-600 animate-spin mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Generating Certificates...
+              </h3>
+              {splitByState && bulkGenProgress.currentState && (
+                <p className="text-sm text-blue-600 font-medium mb-1">
+                  {bulkGenProgress.currentState}
+                </p>
+              )}
+              <p className="text-gray-600 mb-6">
+                Processing Rank {bulkGenProgress.currentRank}
+              </p>
+              
+              <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                <div
+                  className="bg-green-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${(bulkGenProgress.current / bulkGenProgress.total) * 100}%` }}
+                />
+              </div>
+              <p className="text-sm text-gray-600">
+                {bulkGenProgress.current} of {bulkGenProgress.total} teams processed
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Generation Results Modal */}
+      {showBulkGenResults && bulkGenResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Bulk Generation Results
+              </h3>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-700">
+                    {bulkGenResults.success}
+                  </div>
+                  <div className="text-sm text-green-600 mt-1">Successful</div>
+                </div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-red-700">
+                    {bulkGenResults.failed}
+                  </div>
+                  <div className="text-sm text-red-600 mt-1">Failed</div>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-700">
+                    {bulkGenResults.total}
+                  </div>
+                  <div className="text-sm text-blue-600 mt-1">Total</div>
+                </div>
+              </div>
+
+              {/* Detailed Results */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Detailed Results:</h4>
+                {bulkGenResults.details.map((detail: any, idx: number) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-lg border ${
+                      detail.status === 'success'
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-red-50 border-red-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            detail.status === 'success'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            Rank {detail.rank}
+                          </span>
+                          {splitByState && detail.state && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                              {detail.state}
+                            </span>
+                          )}
+                          <span className="text-sm font-medium text-gray-900">
+                            {detail.teamName}
+                          </span>
+                        </div>
+                        {detail.status === 'success' ? (
+                          <div className="mt-1 text-xs text-gray-600">
+                            ✓ Generated {detail.certsGenerated} certificate(s)
+                            {detail.usedPreGenerated && (
+                              <span className="text-purple-600 ml-1">(using pre-generated)</span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="mt-1 text-xs text-red-600">
+                            ✗ {detail.error}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-end bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowBulkGenResults(false)
+                  setBulkGenResults(null)
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Generation Confirmation Modal */}
+      {showBulkConfirm && bulkConfirmData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Confirm Bulk Generation
+              </h3>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700 mb-4">
+                Generate certificates for the following:
+              </p>
+
+              {bulkConfirmData.mode === 'state' ? (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <p className="text-xs font-medium text-blue-900">
+                      🗺️ State-Specific Rankings
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Each state has independent rankings. Rank 1 in SELANGOR is separate from Rank 1 in JOHOR.
+                    </p>
+                  </div>
+                  <div className="space-y-2 mb-4">
+                    {bulkConfirmData.stateDetails.map((detail: any, idx: number) => {
+                      const requestedCount = detail.range.end - detail.range.start + 1
+                      const hasGap = detail.count < requestedCount
+                      
+                      return (
+                        <div key={idx} className={`py-2 px-3 rounded border-l-4 ${
+                          hasGap 
+                            ? 'bg-gradient-to-r from-yellow-50 to-white border-yellow-500'
+                            : 'bg-gradient-to-r from-gray-50 to-white border-blue-500'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-gray-900">{detail.stateName}</span>
+                                {hasGap && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+                                    ⚠️ Partial
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-600 mt-0.5">
+                                Configured: Ranks {detail.range.start}-{detail.range.end}
+                              </span>
+                              {hasGap && (
+                                <span className="text-xs text-yellow-700 mt-0.5 font-medium">
+                                  Only {detail.count} team{detail.count !== 1 ? 's' : ''} available (not {requestedCount})
+                                </span>
+                              )}
+                            </div>
+                            <span className={`text-sm font-bold ${
+                              hasGap ? 'text-yellow-600' : 'text-blue-600'
+                            }`}>
+                              {detail.count} team{detail.count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="mb-4 py-3 px-4 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-sm font-medium text-blue-900">
+                    Ranks {bulkConfirmData.start} to {bulkConfirmData.end}
+                  </p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    {bulkConfirmData.total} team{bulkConfirmData.total !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-semibold text-green-900">
+                  Total: {bulkConfirmData.total} team{bulkConfirmData.total !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="text-xs text-gray-600 space-y-1">
+                <p className="font-medium text-gray-700">This will:</p>
+                <ul className="list-disc pl-5 space-y-0.5">
+                  <li>Use pre-generated certificates (auto-map) if available</li>
+                  <li>Generate new certificates with fresh serial numbers if not</li>
+                  <li>Process all teams in the selected rank range</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowBulkConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeBulkGenerate}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-red-600">
+                Error
+              </h3>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm text-gray-700">
+                {errorModalMessage}
+              </p>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end">
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
               >
                 Close
               </button>

@@ -34,6 +34,7 @@ export async function GET(
 
     const { searchParams } = new URL(request.url)
     const contestIdParam = searchParams.get('contestId')
+    const rankByState = searchParams.get('rankByState') === 'true'
 
     if (!contestIdParam) {
       return NextResponse.json(
@@ -122,36 +123,83 @@ export async function GET(
 
     const results = await prisma.$queryRawUnsafe(querySQL) as any[]
 
-    console.log(`Found ${results.length} teams for eventId=${eventId}, contestId=${contestId}`)
+    console.log(`Found ${results.length} teams for eventId=${eventId}, contestId=${contestId}, rankByState=${rankByState}`)
 
-    // Add rank to each team (only for teams with scores)
-    let currentRank = 1
-    const rankedTeams = results.map((team, index) => {
-      const hasScore = team.totalScore !== null
-      const rank = hasScore ? currentRank++ : 0
+    // Add rank to each team
+    let rankedTeams: any[] = []
+    
+    if (rankByState) {
+      // Group teams by state and rank within each state
+      const teamsByState: Record<string, any[]> = {}
       
-      return {
-        rank: rank,
-        attendanceTeamId: Number(team.attendanceTeamId),
-        team: {
-          id: Number(team.teamId),
-          name: team.teamName
-        },
-        contingent: {
-          id: Number(team.contingentId),
-          name: team.contingentName,
-          logoUrl: team.contingentLogoUrl
-        },
-        state: team.stateId ? {
-          id: Number(team.stateId),
-          name: team.stateName || 'Unknown State'
-        } : null,
-        averageScore: team.totalScore ? parseFloat(team.totalScore.toString()) : 0,
-        sessionCount: 1,
-        contestId: contestId,
-        judgingStatus: team.judgingStatus
-      }
-    })
+      results.forEach(team => {
+        const stateKey = team.stateId ? team.stateId.toString() : 'NO_STATE'
+        if (!teamsByState[stateKey]) {
+          teamsByState[stateKey] = []
+        }
+        teamsByState[stateKey].push(team)
+      })
+      
+      // Rank teams within each state
+      Object.values(teamsByState).forEach(stateTeams => {
+        let currentRank = 1
+        stateTeams.forEach(team => {
+          const hasScore = team.totalScore !== null
+          const rank = hasScore ? currentRank++ : 0
+          
+          rankedTeams.push({
+            rank: rank,
+            attendanceTeamId: Number(team.attendanceTeamId),
+            team: {
+              id: Number(team.teamId),
+              name: team.teamName
+            },
+            contingent: {
+              id: Number(team.contingentId),
+              name: team.contingentName,
+              logoUrl: team.contingentLogoUrl
+            },
+            state: team.stateId ? {
+              id: Number(team.stateId),
+              name: team.stateName || 'Unknown State'
+            } : null,
+            averageScore: team.totalScore ? parseFloat(team.totalScore.toString()) : 0,
+            sessionCount: 1,
+            contestId: contestId,
+            judgingStatus: team.judgingStatus
+          })
+        })
+      })
+    } else {
+      // National ranking - rank all teams together
+      let currentRank = 1
+      rankedTeams = results.map((team, index) => {
+        const hasScore = team.totalScore !== null
+        const rank = hasScore ? currentRank++ : 0
+        
+        return {
+          rank: rank,
+          attendanceTeamId: Number(team.attendanceTeamId),
+          team: {
+            id: Number(team.teamId),
+            name: team.teamName
+          },
+          contingent: {
+            id: Number(team.contingentId),
+            name: team.contingentName,
+            logoUrl: team.contingentLogoUrl
+          },
+          state: team.stateId ? {
+            id: Number(team.stateId),
+            name: team.stateName || 'Unknown State'
+          } : null,
+          averageScore: team.totalScore ? parseFloat(team.totalScore.toString()) : 0,
+          sessionCount: 1,
+          contestId: contestId,
+          judgingStatus: team.judgingStatus
+        }
+      })
+    }
 
     // Find national event for checking finals registration
     const nationalEvent = await prisma.event.findFirst({
