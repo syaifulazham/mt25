@@ -13,21 +13,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's participant data with contingents (both direct and managed)
+    // Get user's participant data (we only need the participant id here)
     const participant = await prisma.user_participant.findUnique({
       where: { email: session.user.email },
       select: {
-        id: true,
-        contingents: {
-          select: {
-            id: true
-          }
-        },
-        managedContingents: {
-          select: {
-            contingentId: true
-          }
-        }
+        id: true
       }
     })
 
@@ -35,25 +25,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Participant not found' }, { status: 404 })
     }
 
-    // Get contingent IDs from both direct contingents and managed contingents
-    const directContingentIds = (participant.contingents || []).map(c => c.id)
-    const managedContingentIds = (participant.managedContingents || []).map(cm => cm.contingentId)
-    
-    // Combine and deduplicate
-    const contingentIds = [...new Set([...directContingentIds, ...managedContingentIds])]
+    // Mirror the scope logic from /api/participants/managers:
+    // 1) Find contingents where current participant is a manager
+    // 2) Find all participants who manage those same contingents
+    // 3) Include all managers created by any of those participants
+    // 4) If user manages no contingents, only include managers they created
 
-    // If no contingents, return empty array
-    if (contingentIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        trainers: []
+    const userContingents = await prisma.contingentManager.findMany({
+      where: {
+        participantId: participant.id,
+      },
+      select: {
+        contingentId: true,
+      },
+    })
+
+    let managerCreatorIds: number[] = []
+
+    if (userContingents.length === 0) {
+      // If user is not a manager of any contingent, only return their own managers
+      managerCreatorIds = [participant.id]
+    } else {
+      const contingentIds = userContingents.map((c) => c.contingentId)
+
+      const contingentManagers = await prisma.contingentManager.findMany({
+        where: {
+          contingentId: { in: contingentIds },
+        },
+        select: {
+          participantId: true,
+        },
       })
+
+      managerCreatorIds = Array.from(
+        new Set(contingentManagers.map((cm) => cm.participantId))
+      )
+
+      if (managerCreatorIds.length === 0) {
+        managerCreatorIds = [participant.id]
+      }
     }
 
-    // Fetch all managers/trainers for the user's contingents using raw query
-    // Build the IN clause dynamically
-    const placeholders = contingentIds.map(() => '?').join(',')
-    
+    if (managerCreatorIds.length === 0) {
+      return NextResponse.json({ success: true, trainers: [] })
+    }
+
+    const placeholders = managerCreatorIds.map(() => '?').join(',')
+
+    // Fetch all managers/trainers in this scope and left-join any TRAINER certificates by IC.
+    // We also try to resolve contingent/event/institution information via manager_team/legacy
+    // teamId -> team -> contingent/event.
     const trainers = await prisma.$queryRawUnsafe<any[]>(
       `SELECT 
         m.id as managerId,
@@ -61,7 +82,7 @@ export async function GET(request: NextRequest) {
         m.email as managerEmail,
         m.ic as managerIc,
         c.name as contingentName,
-        e.name as eventName,
+        GROUP_CONCAT(DISTINCT e.name ORDER BY e.name SEPARATOR ', ') as eventNames,
         COALESCE(s.name, hi.name, i.name) as institutionName,
         cert.id as certificateId,
         cert.recipientName,
@@ -70,17 +91,22 @@ export async function GET(request: NextRequest) {
         cert.status,
         ct.templateName as templateName
       FROM manager m
-      INNER JOIN attendanceManager am ON m.id = am.managerId
-      LEFT JOIN contingent c ON am.contingentId = c.id
-      LEFT JOIN event e ON am.eventId = e.id
+      LEFT JOIN manager_team mt ON mt.managerId = m.id
+      LEFT JOIN team t ON t.id = COALESCE(mt.teamId, m.teamId)
+      LEFT JOIN contingent c ON t.contingentId = c.id
+      LEFT JOIN eventcontestteam ect ON ect.teamId = t.id
+      LEFT JOIN eventcontest ec ON ec.id = ect.eventcontestId
+      LEFT JOIN event e ON ec.eventId = e.id
       LEFT JOIN school s ON c.schoolId = s.id
       LEFT JOIN higherinstitution hi ON c.higherInstId = hi.id
       LEFT JOIN independent i ON c.independentId = i.id
       LEFT JOIN certificate cert ON cert.ic_number = m.ic AND cert.recipientType = 'TRAINER'
       LEFT JOIN cert_template ct ON cert.templateId = ct.id
-      WHERE am.contingentId IN (${placeholders})
+      WHERE m.createdBy IN (${placeholders})
+      GROUP BY m.id, m.name, m.email, m.ic, c.name, institutionName,
+               cert.id, cert.recipientName, cert.serialNumber, cert.uniqueCode, cert.status, ct.templateName
       ORDER BY m.name ASC`,
-      ...contingentIds
+      ...managerCreatorIds
     )
 
     // Transform the data into the expected structure
@@ -90,7 +116,7 @@ export async function GET(request: NextRequest) {
       managerEmail: trainer.managerEmail,
       managerIc: trainer.managerIc,
       contingentName: trainer.contingentName,
-      eventName: trainer.eventName,
+      eventName: trainer.eventNames || null,
       institutionName: trainer.institutionName,
       certificate: trainer.certificateId ? {
         id: Number(trainer.certificateId),
