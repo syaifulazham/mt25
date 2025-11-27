@@ -33,7 +33,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { contestantIds } = body;
+    const { contestantIds, certificateType } = body;
 
     if (!Array.isArray(contestantIds) || contestantIds.length === 0) {
       return NextResponse.json(
@@ -42,17 +42,29 @@ export async function POST(
       );
     }
 
+    // Determine target type based on certificate type
+    let targetType: 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' = 'QUIZ_PARTICIPANT';
+    if (certificateType === 'ACHIEVEMENT') {
+      targetType = 'QUIZ_WINNER';
+    }
+
     // Get template for this quiz
     const template = await prisma.certTemplate.findFirst({
       where: {
         quizId,
-        targetType: 'QUIZ_PARTICIPANT',
+        targetType,
         status: 'ACTIVE'
       }
     });
 
+    console.log('[Certificate Status API] QuizId:', quizId);
+    console.log('[Certificate Status API] Target Type:', targetType);
+    console.log('[Certificate Status API] Template found:', template?.id);
+    console.log('[Certificate Status API] Requested contestant IDs:', contestantIds);
+
     if (!template) {
       // No template, return empty statuses
+      console.log('[Certificate Status API] No template found, returning empty');
       return NextResponse.json({
         statuses: {}
       });
@@ -64,16 +76,24 @@ export async function POST(
       FROM certificate
       WHERE templateId = ${template.id}
         AND JSON_EXTRACT(ownership, '$.contestantId') IS NOT NULL
+        AND status = 'READY'
     `;
+
+    console.log('[Certificate Status API] Certificates found:', certificates.length);
+    console.log('[Certificate Status API] Certificate contestant IDs:', certificates.map(c => c.contestantId));
 
     // Build status map
     const statuses: Record<number, boolean> = {};
     
     certificates.forEach((cert) => {
-      if (cert.contestantId && contestantIds.includes(cert.contestantId)) {
-        statuses[cert.contestantId] = true;
+      // Convert BigInt to number for comparison
+      const contestantIdNum = Number(cert.contestantId);
+      if (contestantIdNum && contestantIds.includes(contestantIdNum)) {
+        statuses[contestantIdNum] = true;
       }
     });
+
+    console.log('[Certificate Status API] Final statuses:', statuses);
 
     return NextResponse.json({
       statuses

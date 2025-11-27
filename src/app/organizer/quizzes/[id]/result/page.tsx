@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, Download, Clock, BarChart, Medal, Users, X, UserCircle, Calendar, Timer, FileText } from "lucide-react";
+import { ChevronLeft, Download, Clock, BarChart, Medal, Users, X, UserCircle, Calendar, Timer, FileText, Eye } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { format, formatDistanceToNow } from "date-fns";
@@ -78,6 +78,8 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
   const [currentGeneratingName, setCurrentGeneratingName] = useState<string>('');
   const [alertModal, setAlertModal] = useState<{ show: boolean; title: string; message: string }>({ show: false, title: '', message: '' });
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; title: string; message: string; onConfirm: () => void }>({ show: false, title: '', message: '', onConfirm: () => {} });
+  const [certificateModal, setCertificateModal] = useState<{ show: boolean; contestant: QuizResult | null; certificate: any }>({ show: false, contestant: null, certificate: null });
+  const [loadingCertificate, setLoadingCertificate] = useState(false);
 
   // Fetch quiz results
   useEffect(() => {
@@ -336,6 +338,51 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
     } finally {
       setGeneratingCert(null);
     }
+  };
+
+  // Handle view certificate
+  const handleViewCertificate = async (result: QuizResult) => {
+    try {
+      setLoadingCertificate(true);
+      
+      // Fetch certificate for this contestant
+      const response = await fetch(
+        `/api/organizer/quizzes/${quizId}/certificates/view?contestantId=${result.contestantId}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Certificate not found');
+      }
+
+      const data = await response.json();
+      
+      setCertificateModal({
+        show: true,
+        contestant: result,
+        certificate: data.certificate
+      });
+    } catch (error) {
+      console.error('Error fetching certificate:', error);
+      setAlertModal({
+        show: true,
+        title: 'Certificate Not Found',
+        message: 'No certificate has been generated for this contestant yet. Please generate a certificate first.'
+      });
+    } finally {
+      setLoadingCertificate(false);
+    }
+  };
+
+  // Handle download certificate
+  const handleDownloadCertificate = () => {
+    if (!certificateModal.certificate?.filePath) return;
+    
+    const link = document.createElement('a');
+    link.href = `/api/certificates/serve-pdf?path=${certificateModal.certificate.filePath}`;
+    link.download = `Certificate_${certificateModal.contestant?.contestantName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Handle contestant progression to next level
@@ -875,6 +922,19 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
                             </Button>
                           )}
 
+                          {/* View Certificate */}
+                          {certificateStatuses[result.contestantId] && (
+                            <Button
+                              size="icon"
+                              onClick={() => handleViewCertificate(result)}
+                              disabled={loadingCertificate}
+                              title="View Certificate"
+                              className="h-8 w-8 bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+
                           {/* View Details */}
                           <Button 
                             variant="ghost" 
@@ -1134,6 +1194,79 @@ export default function QuizResultPage({ params }: { params: { id: string } }) {
               Confirm
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Certificate View Modal */}
+      <Dialog open={certificateModal.show} onOpenChange={(open) => setCertificateModal({ ...certificateModal, show: open })}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Certificate - {certificateModal.contestant?.contestantName}</span>
+              <DialogClose className="w-6 h-6 rounded-full hover:bg-gray-100">
+                <X className="w-4 h-4" />
+              </DialogClose>
+            </DialogTitle>
+            <DialogDescription>
+              {certificateModal.certificate?.templateName} • Serial: {certificateModal.certificate?.serialNumber}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {certificateModal.certificate && (
+            <div className="space-y-4">
+              {/* Certificate Details */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <div className="text-sm text-gray-500">Recipient</div>
+                  <div className="font-medium">{certificateModal.certificate.recipientName}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Contingent</div>
+                  <div className="font-medium">{certificateModal.certificate.contingent_name}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Unique Code</div>
+                  <div className="font-medium font-mono text-sm">{certificateModal.certificate.uniqueCode}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Status</div>
+                  <div>
+                    <Badge className={certificateModal.certificate.status === 'READY' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {certificateModal.certificate.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* PDF Preview */}
+              {certificateModal.certificate.filePath && (
+                <div className="border rounded-lg overflow-hidden bg-gray-100">
+                  <iframe
+                    src={`/api/certificates/serve-pdf?path=${certificateModal.certificate.filePath}#toolbar=0`}
+                    className="w-full h-[500px]"
+                    title="Certificate Preview"
+                  />
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setCertificateModal({ show: false, contestant: null, certificate: null })}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={handleDownloadCertificate}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

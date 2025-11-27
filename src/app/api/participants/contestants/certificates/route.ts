@@ -143,17 +143,55 @@ export async function GET(request: NextRequest) {
             AND e.scopeArea IN ('ZONE', 'ONLINE_STATE', 'NATIONAL')
         `
 
+        // Get quiz certificates - match by IC and targetType
+        const quizCertificates = await prisma.$queryRaw<Array<{
+          id: number
+          templateId: number
+          recipientName: string
+          filePath: string | null
+          uniqueCode: string
+          ownership: any
+          templateName: string
+          targetType: string
+          quizId: number | null
+        }>>`
+          SELECT 
+            c.id,
+            c.templateId,
+            c.recipientName,
+            c.filePath,
+            c.uniqueCode,
+            c.ownership,
+            ct.templateName,
+            ct.targetType,
+            ct.quizId
+          FROM certificate c
+          INNER JOIN cert_template ct ON c.templateId = ct.id
+          WHERE c.status = 'READY'
+            AND c.ic_number = ${contestant.ic}
+            AND ct.targetType IN ('QUIZ_PARTICIPANT', 'QUIZ_WINNER')
+        `
+
         // Debug logging
         if (contestant.contingent?.id === 202) {
           console.log(`\n[DEBUG] Contestant: ${contestant.name} (IC: ${contestant.ic})`)
           console.log(`  Contingent ID: ${contestant.contingent?.id}`)
           console.log(`  School certs found: ${schoolCertificates.length}`)
           console.log(`  Zone/National certs found: ${zoneNationalCertificates.length}`)
+          console.log(`  Quiz certs found: ${quizCertificates.length}`)
           
           if (zoneNationalCertificates.length > 0) {
             zoneNationalCertificates.forEach(cert => {
               console.log(`    - Cert ID ${cert.id}: ${cert.templateName}`)
               console.log(`      ScopeArea: ${cert.scopeArea}, EventID: ${cert.eventId}`)
+              console.log(`      FilePath: ${cert.filePath}`)
+            })
+          }
+          
+          if (quizCertificates.length > 0) {
+            quizCertificates.forEach(cert => {
+              console.log(`    - Quiz Cert ID ${cert.id}: ${cert.templateName}`)
+              console.log(`      TargetType: ${cert.targetType}, QuizID: ${cert.quizId}`)
               console.log(`      FilePath: ${cert.filePath}`)
             })
           }
@@ -164,10 +202,12 @@ export async function GET(request: NextRequest) {
         // - State: event.scopeArea = 'ZONE' (can have both EVENT_PARTICIPANT and EVENT_WINNER)
         // - Online: event.scopeArea = 'ONLINE_STATE' (can have both EVENT_PARTICIPANT and EVENT_WINNER)
         // - National: event.scopeArea = 'NATIONAL' (can have both EVENT_PARTICIPANT and EVENT_WINNER)
+        // - Quiz: targetType = 'QUIZ_PARTICIPANT' or 'QUIZ_WINNER'
         const schoolCert = schoolCertificates[0] || null
         const stateCerts = zoneNationalCertificates.filter(c => c.scopeArea === 'ZONE')
         const onlineCerts = zoneNationalCertificates.filter(c => c.scopeArea === 'ONLINE_STATE')
         const nationalCerts = zoneNationalCertificates.filter(c => c.scopeArea === 'NATIONAL')
+        const quizCerts = quizCertificates
 
         const classDisplay = contestant.class_name 
           ? `${contestant.class_grade || ''} ${contestant.class_name}`.trim()
@@ -205,6 +245,13 @@ export async function GET(request: NextRequest) {
               uniqueCode: cert.uniqueCode
             })),
             national: nationalCerts.map(cert => ({
+              id: cert.id,
+              templateName: cert.templateName || '',
+              targetType: cert.targetType || '',
+              filePath: cert.filePath,
+              uniqueCode: cert.uniqueCode
+            })),
+            quiz: quizCerts.map(cert => ({
               id: cert.id,
               templateName: cert.templateName || '',
               targetType: cert.targetType || '',

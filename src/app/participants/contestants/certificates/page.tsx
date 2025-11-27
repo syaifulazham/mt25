@@ -518,10 +518,10 @@ export default function CertificatesPage() {
       )
     }
 
-    // Green background for winner certificates
-    const isWinner = cert.targetType === 'EVENT_WINNER'
+    // Golden background for winner certificates (Pencapaian)
+    const isWinner = cert.targetType === 'EVENT_WINNER' || cert.targetType === 'QUIZ_WINNER'
     const bgColor = isWinner 
-      ? 'bg-green-600 hover:bg-green-700 disabled:bg-green-400' 
+      ? 'bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300' 
       : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400'
 
     return (
