@@ -235,7 +235,7 @@ function debugElementProps(element: Element, location: string): string | undefin
   const [success, setSuccess] = useState<string | null>(null)
   
   // Target audience configuration states
-  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT'>(template?.targetType || 'GENERAL')
+  const [targetType, setTargetType] = useState<'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT' | 'SCHOOL_WINNER'>(template?.targetType || 'GENERAL')
   const [eventId, setEventId] = useState<number | null>(template?.eventId || null)
   const [quizId, setQuizId] = useState<number | null>(template?.quizId || null)
   const [winnerRangeStart, setWinnerRangeStart] = useState<number | null>(template?.winnerRangeStart || 1)
@@ -1180,8 +1180,8 @@ function debugElementProps(element: Element, location: string): string | undefin
               <CollapsibleSection title="Target Audience">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Certificate Type</label>
-                    <div className="flex flex-col space-y-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Certificate Type</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <label className="inline-flex items-center">
                         <input 
                           type="radio" 
@@ -1191,7 +1191,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('GENERAL')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">General Participants</span>
+                        <span className="ml-2 text-sm">General</span>
                       </label>
                       
                       <label className="inline-flex items-center">
@@ -1203,7 +1203,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('EVENT_PARTICIPANT')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">Event Participants</span>
+                        <span className="ml-2 text-sm">Event Participants</span>
                       </label>
                       
                       <label className="inline-flex items-center">
@@ -1215,10 +1215,9 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('EVENT_WINNER')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">Event Winners</span>
+                        <span className="ml-2 text-sm">Event Winners</span>
                       </label>
-                    </div>
-                    <div>
+                      
                       <label className="inline-flex items-center">
                         <input 
                           type="radio" 
@@ -1228,10 +1227,10 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('NON_CONTEST_PARTICIPANT')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">Non Contest Participant</span>
+                        <span className="ml-2 text-sm">Non-Contest</span>
                       </label>
                       
-                      <label className="inline-flex items-center mt-2">
+                      <label className="inline-flex items-center">
                         <input 
                           type="radio" 
                           name="targetType"
@@ -1240,10 +1239,10 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('QUIZ_PARTICIPANT')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">Quiz Participants</span>
+                        <span className="ml-2 text-sm">Quiz Participants</span>
                       </label>
                       
-                      <label className="inline-flex items-center mt-2">
+                      <label className="inline-flex items-center">
                         <input 
                           type="radio" 
                           name="targetType"
@@ -1252,10 +1251,10 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('QUIZ_WINNER')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">Quiz Winners</span>
+                        <span className="ml-2 text-sm">Quiz Winners</span>
                       </label>
                       
-                      <label className="inline-flex items-center mt-2">
+                      <label className="inline-flex items-center">
                         <input 
                           type="radio" 
                           name="targetType"
@@ -1264,7 +1263,31 @@ function debugElementProps(element: Element, location: string): string | undefin
                           onChange={() => setTargetType('TRAINERS')}
                           className="h-4 w-4 text-blue-600"
                         />
-                        <span className="ml-2">Trainers</span>
+                        <span className="ml-2 text-sm">Trainers</span>
+                      </label>
+                      
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="CONTINGENT" 
+                          checked={targetType === 'CONTINGENT'}
+                          onChange={() => setTargetType('CONTINGENT')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2 text-sm">Contingent</span>
+                      </label>
+                      
+                      <label className="inline-flex items-center">
+                        <input 
+                          type="radio" 
+                          name="targetType"
+                          value="SCHOOL_WINNER" 
+                          checked={targetType === 'SCHOOL_WINNER'}
+                          onChange={() => setTargetType('SCHOOL_WINNER')}
+                          className="h-4 w-4 text-blue-600"
+                        />
+                        <span className="ml-2 text-sm">School Winners</span>
                       </label>
                     </div>
                   </div>
@@ -1352,6 +1375,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         `Top performers (ranks ${winnerRangeStart}-${winnerRangeEnd}) of ${quizzes.find(q => q.id === quizId)?.quiz_name || 'selected quiz'}`}
                       {targetType === 'QUIZ_WINNER' && (!quizId || !winnerRangeStart || !winnerRangeEnd) && 
                         'Quiz winners (please complete all fields)'}
+                      {targetType === 'SCHOOL_WINNER' && 'School-level achievement winners'}
                     </p>
                   </div>
                 </div>
@@ -1442,10 +1466,10 @@ function debugElementProps(element: Element, location: string): string | undefin
               <div className="space-y-3">
                 {/* Target Type Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Certificate Type
                   </label>
-                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <label className="inline-flex items-center">
                       <input 
                         type="radio" 
@@ -1455,7 +1479,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('GENERAL')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">General Participants</span>
+                      <span className="ml-2 text-sm">General</span>
                     </label>
                 
                     <label className="inline-flex items-center">
@@ -1467,7 +1491,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('EVENT_PARTICIPANT')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Event Participants</span>
+                      <span className="ml-2 text-sm">Event Participants</span>
                     </label>
                     
                     <label className="inline-flex items-center">
@@ -1479,7 +1503,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('EVENT_WINNER')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Event Winners</span>
+                      <span className="ml-2 text-sm">Event Winners</span>
                     </label>
                     
                     <label className="inline-flex items-center">
@@ -1491,7 +1515,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('NON_CONTEST_PARTICIPANT')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Non Contest Participant</span>
+                      <span className="ml-2 text-sm">Non-Contest</span>
                     </label>
                     
                     <label className="inline-flex items-center">
@@ -1503,7 +1527,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('QUIZ_PARTICIPANT')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Quiz Participants</span>
+                      <span className="ml-2 text-sm">Quiz Participants</span>
                     </label>
                     
                     <label className="inline-flex items-center">
@@ -1515,7 +1539,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('QUIZ_WINNER')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Quiz Winners</span>
+                      <span className="ml-2 text-sm">Quiz Winners</span>
                     </label>
                     
                     <label className="inline-flex items-center">
@@ -1527,7 +1551,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('TRAINERS')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Trainers</span>
+                      <span className="ml-2 text-sm">Trainers</span>
                     </label>
                     
                     <label className="inline-flex items-center">
@@ -1539,7 +1563,19 @@ function debugElementProps(element: Element, location: string): string | undefin
                         onChange={() => setTargetType('CONTINGENT')}
                         className="h-4 w-4 text-blue-600"
                       />
-                      <span className="ml-2">Contingent</span>
+                      <span className="ml-2 text-sm">Contingent</span>
+                    </label>
+                    
+                    <label className="inline-flex items-center">
+                      <input 
+                        type="radio" 
+                        name="targetType"
+                        value="SCHOOL_WINNER" 
+                        checked={targetType === 'SCHOOL_WINNER'}
+                        onChange={() => setTargetType('SCHOOL_WINNER')}
+                        className="h-4 w-4 text-blue-600"
+                      />
+                      <span className="ml-2 text-sm">School Winners</span>
                     </label>
                   </div>
                 </div>
@@ -1641,6 +1677,7 @@ function debugElementProps(element: Element, location: string): string | undefin
                         'Quiz winners (please complete all fields)'}
                     {targetType === 'TRAINERS' && 'Trainers and instructors'}
                     {targetType === 'CONTINGENT' && 'Contingents (team/group level certificates)'}
+                    {targetType === 'SCHOOL_WINNER' && 'School-level achievement winners'}
                   </p>
                 </div>
               </div>

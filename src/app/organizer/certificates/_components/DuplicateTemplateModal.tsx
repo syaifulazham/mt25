@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 interface Template {
   id: number
   templateName: string
-  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT'
+  targetType?: 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT' | 'SCHOOL_WINNER'
   eventId?: number | null
   quizId?: number | null
   winnerRangeStart?: number | null
@@ -168,6 +168,7 @@ export function DuplicateTemplateModal({
               <option value="QUIZ_WINNER">Quiz Winner</option>
               <option value="TRAINERS">Trainers</option>
               <option value="CONTINGENT">Contingent</option>
+              <option value="SCHOOL_WINNER">School Winners</option>
             </select>
           </div>
 
@@ -264,6 +265,7 @@ export function DuplicateTemplateModal({
                 'Quiz winners (please complete all fields)'}
               {targetType === 'TRAINERS' && 'Trainers and instructors'}
               {targetType === 'CONTINGENT' && 'Contingents (team/group level certificates)'}
+              {targetType === 'SCHOOL_WINNER' && 'School-level achievement winners'}
             </p>
           </div>
 

@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // Type for certificate target types
-type CertTargetType = 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT';
+type CertTargetType = 'GENERAL' | 'EVENT_PARTICIPANT' | 'EVENT_WINNER' | 'NON_CONTEST_PARTICIPANT' | 'QUIZ_PARTICIPANT' | 'QUIZ_WINNER' | 'TRAINERS' | 'CONTINGENT' | 'SCHOOL_WINNER';
 
 /**
  * Certificate Serial Number Service
@@ -20,7 +20,8 @@ export class CertificateSerialService {
     'QUIZ_PARTICIPANT': 'QPART',
     'QUIZ_WINNER': 'QWIN',
     'TRAINERS': 'TRAIN',
-    'CONTINGENT': 'CONT'
+    'CONTINGENT': 'CONT',
+    'SCHOOL_WINNER': 'SWIN'
   };
 
   /**

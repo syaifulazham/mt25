@@ -43,6 +43,7 @@ export default function CertificatesPage() {
   const [error, setError] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [prerequisiteModal, setPrerequisiteModal] = useState<PrerequisiteModalData | null>(null)
+  const [hasSchoolWinnerTemplate, setHasSchoolWinnerTemplate] = useState(false)
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -74,12 +75,26 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     fetchContestants()
+    checkSchoolWinnerTemplate()
   }, [])
 
   useEffect(() => {
     applyFilters()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contestants, searchQuery, filterSchool, filterState, filterOnline, filterNational])
+
+  const checkSchoolWinnerTemplate = async () => {
+    try {
+      const response = await fetch('/api/participants/certificates/templates/school-winners')
+      if (response.ok) {
+        const data = await response.json()
+        setHasSchoolWinnerTemplate(data.templates && data.templates.length > 0)
+      }
+    } catch (error) {
+      console.error('Error checking school winner templates:', error)
+      setHasSchoolWinnerTemplate(false)
+    }
+  }
 
   const fetchContestants = async () => {
     setIsLoading(true)
@@ -707,12 +722,22 @@ export default function CertificatesPage() {
               <p className="text-2xl font-bold text-green-900">
                 {schoolCount}
               </p>
-              <button
-                onClick={() => setShowBulkModal(true)}
-                className="mt-3 w-full px-3 py-2 text-white text-sm font-medium rounded-md transition-colors bg-green-600 hover:bg-green-700"
-              >
-                Tindakan Pukal
-              </button>
+              <div className="mt-3 space-y-2">
+                <button
+                  onClick={() => setShowBulkModal(true)}
+                  className="w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors bg-green-600 hover:bg-green-700"
+                >
+                  Tindakan Pukal
+                </button>
+                {hasSchoolWinnerTemplate && (
+                  <a
+                    href="/participants/contestants/certificates/school-winners"
+                    className="block w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors bg-yellow-600 hover:bg-yellow-700 text-center"
+                  >
+                    Pemenang (Peringkat Sekolah)
+                  </a>
+                )}
+              </div>
             </div>
           )
         })()}

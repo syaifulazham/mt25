@@ -88,12 +88,17 @@ export async function GET(
     const cleanTemplateName = templateName.replace(/[^a-z0-9]/gi, '_')
     const fileName = `${cleanTemplateName}_${certificate.uniqueCode}.pdf`
 
+    // Check if this is for viewing (inline) or downloading (attachment)
+    const searchParams = request.nextUrl.searchParams
+    const isView = searchParams.get('view') === 'true'
+    const disposition = isView ? 'inline' : 'attachment'
+
     // Return the file with proper headers
     return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Content-Disposition': `${disposition}; filename="${fileName}"`,
         'Content-Length': fileBuffer.length.toString(),
         'Cache-Control': 'public, max-age=31536000, immutable',
       },

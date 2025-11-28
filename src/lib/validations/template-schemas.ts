@@ -60,13 +60,13 @@ export const templateQuerySchema = z.object({
   status: z.string().nullable().optional().refine((val) => !val || ['ACTIVE', 'INACTIVE'].includes(val), {
     message: 'Status must be ACTIVE or INACTIVE'
   }),
-  targetType: z.string().nullable().optional().refine((val) => !val || ['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT', 'QUIZ_PARTICIPANT', 'QUIZ_WINNER', 'TRAINERS', 'CONTINGENT'].includes(val), {
+  targetType: z.string().nullable().optional().refine((val) => !val || ['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT', 'QUIZ_PARTICIPANT', 'QUIZ_WINNER', 'TRAINERS', 'CONTINGENT', 'SCHOOL_WINNER'].includes(val), {
     message: 'Invalid target type'
   }),
 })
 
 // Target audience type enum
-export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT', 'QUIZ_PARTICIPANT', 'QUIZ_WINNER', 'TRAINERS', 'CONTINGENT'])
+export const targetTypeEnum = z.enum(['GENERAL', 'EVENT_PARTICIPANT', 'EVENT_WINNER', 'NON_CONTEST_PARTICIPANT', 'QUIZ_PARTICIPANT', 'QUIZ_WINNER', 'TRAINERS', 'CONTINGENT', 'SCHOOL_WINNER'])
 
 // Prerequisite schema
 const prerequisiteSchema = z.object({
