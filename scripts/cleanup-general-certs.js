@@ -8,21 +8,31 @@
  * - TRAINERS certificates  
  * - CONTINGENT certificates
  * 
+ * Database Authentication:
+ * Uses environment variables (or defaults):
+ *   DB_HOST (default: localhost)
+ *   DB_USER (default: root)
+ *   DB_PASSWORD (default: empty)
+ *   DB_NAME (default: mtdb)
+ * 
  * Usage:
  *   node scripts/cleanup-general-certs.js --dry-run    # Preview only
  *   node scripts/cleanup-general-certs.js              # Actually delete
+ * 
+ * Example with custom DB:
+ *   DB_USER=azham DB_PASSWORD=mypass node scripts/cleanup-general-certs.js
  */
 
 const mysql = require('mysql2/promise')
 const fs = require('fs').promises
 const path = require('path')
 
-// Database configuration
+// Database configuration - uses environment variables or defaults
 const dbConfig = {
-  host: 'localhost',
-  user: 'azham',
-  password: 'DBAzham231',
-  database: 'mtdb'
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'mtdb'
 }
 
 // Configuration from command line

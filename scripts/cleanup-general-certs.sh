@@ -3,20 +3,25 @@
 # Targeted Certificate Cleanup - GENERAL Type Only
 # Deletes only GENERAL certificate PDFs
 # Preserves: EVENT_WINNER, TRAINERS, CONTINGENT certificates
+#
+# Database Authentication:
+# This script uses MySQL's default authentication methods:
+# - Reads from ~/.my.cnf if present
+# - Uses environment variable: DB_NAME (default: mtdb)
+# - Uses current user's MySQL credentials
 
 echo "╔════════════════════════════════════════════════════════════╗"
 echo "║    Targeted Cleanup - GENERAL Certificates Only           ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Database credentials
-DB_USER="azham"
-DB_NAME="mtdb"
+# Database configuration - uses environment variables or defaults
+DB_NAME="${DB_NAME:-mtdb}"
 
 # Get certificate distribution
 echo "=== Current Certificate Distribution ==="
 echo ""
-mysql -u $DB_USER -p$DB_NAME -t << 'EOF'
+mysql $DB_NAME -t << 'EOF'
 SELECT 
     ct.targetType as 'Type',
     COUNT(c.id) as 'Total',
@@ -36,7 +41,7 @@ echo ""
 echo "=== Getting GENERAL Certificate File Paths ==="
 
 # Export file paths to temporary file
-mysql -u $DB_USER -p$DB_NAME -N -B << 'EOF' > /tmp/general_cert_paths.txt
+mysql $DB_NAME -N -B << 'EOF' > /tmp/general_cert_paths.txt
 SELECT DISTINCT CONCAT('public', c.filePath)
 FROM certificate c
 JOIN cert_template ct ON c.templateId = ct.id
@@ -116,7 +121,7 @@ echo "=== Updating Database ==="
 echo "Marking GENERAL certificates for regeneration..."
 echo ""
 
-mysql -u $DB_USER -p$DB_NAME << 'EOF'
+mysql $DB_NAME << 'EOF'
 UPDATE certificate c
 JOIN cert_template ct ON c.templateId = ct.id
 SET 

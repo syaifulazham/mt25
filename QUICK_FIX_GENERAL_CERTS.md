@@ -8,6 +8,11 @@ chmod +x scripts/cleanup-general-certs.sh
 ./scripts/cleanup-general-certs.sh
 ```
 
+**Note:** The script uses MySQL's default authentication (reads from `~/.my.cnf` or uses current user credentials). If needed, set the database name:
+```bash
+DB_NAME=mtdb ./scripts/cleanup-general-certs.sh
+```
+
 **This will:**
 - ✅ Delete ONLY GENERAL certificate PDFs (~90-110GB freed)
 - ✅ Keep EVENT_WINNER certificates intact
