@@ -220,7 +220,8 @@ export default function CertificatesPage() {
 
   const handleBulkDownload = async (all: boolean) => {
     const targets = all ? filteredContestants : getSelectedContestants()
-    const certsToDownload = targets.filter(c => c.certificates.school?.filePath)
+    // On-demand generation: Include certificates even without filePath
+    const certsToDownload = targets.filter(c => c.certificates.school !== null)
     
     if (certsToDownload.length === 0) {
       alert('Tiada sijil tersedia untuk dimuat turun')
@@ -334,8 +335,9 @@ export default function CertificatesPage() {
         certs = contestant.certificates.online
       }
       
+      // On-demand generation: Include all certificates regardless of filePath
       const matchingCerts = certs.filter(
-        cert => cert.targetType === targetType && cert.filePath
+        cert => cert.targetType === targetType
       )
       matchingCerts.forEach(cert => {
         certsData.push({ contestant, cert })
@@ -434,11 +436,9 @@ export default function CertificatesPage() {
   }
 
   const handleDownload = async (cert: Certificate, level: string, contestantId: number, contestantName: string, teamId: number | null) => {
-    if (!cert.filePath) {
-      alert('Certificate file not available')
-      return
-    }
-
+    // On-demand generation: No need to check filePath anymore
+    // PDF will be generated when downloaded if it doesn't exist
+    
     const downloadKey = `${cert.id}-${level}`
     setDownloadingId(downloadKey)
 
@@ -744,6 +744,12 @@ export default function CertificatesPage() {
         
         {(() => {
           const stateCount = contestants.filter(c => c.certificates.state?.length > 0).length
+          const penyertaanCount = contestants.filter(c => 
+            c.certificates.state?.some(cert => cert.targetType === 'EVENT_PARTICIPANT')
+          ).length
+          const pencapaianCount = contestants.filter(c => 
+            c.certificates.state?.some(cert => cert.targetType === 'EVENT_WINNER')
+          ).length
           const isDisabled = stateCount === 0
           return (
             <div className={`rounded-lg p-4 ${isDisabled ? 'bg-gray-100 border border-gray-300 opacity-60' : 'bg-purple-50 border border-purple-200'}`}>
@@ -751,12 +757,18 @@ export default function CertificatesPage() {
               <p className={`text-2xl font-bold ${isDisabled ? 'text-gray-900' : 'text-purple-900'}`}>
                 {stateCount}
               </p>
+              {!isDisabled && (
+                <div className="mt-1 text-xs text-gray-600">
+                  <span className="mr-2">Penyertaan: {penyertaanCount}</span>
+                  <span>Pencapaian: {pencapaianCount}</span>
+                </div>
+              )}
               <div className="mt-3 space-y-2">
                 <button
                   onClick={() => setShowStatePenyertaanModal(true)}
-                  disabled={isDisabled}
+                  disabled={penyertaanCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    penyertaanCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-purple-600 hover:bg-purple-700'
                   }`}
@@ -765,9 +777,9 @@ export default function CertificatesPage() {
                 </button>
                 <button
                   onClick={() => setShowStatePencapaianModal(true)}
-                  disabled={isDisabled}
+                  disabled={pencapaianCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    pencapaianCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-purple-600 hover:bg-purple-700'
                   }`}
@@ -781,6 +793,12 @@ export default function CertificatesPage() {
         
         {(() => {
           const onlineCount = contestants.filter(c => c.certificates.online?.length > 0).length
+          const penyertaanCount = contestants.filter(c => 
+            c.certificates.online?.some(cert => cert.targetType === 'EVENT_PARTICIPANT')
+          ).length
+          const pencapaianCount = contestants.filter(c => 
+            c.certificates.online?.some(cert => cert.targetType === 'EVENT_WINNER')
+          ).length
           const isDisabled = onlineCount === 0
           return (
             <div className={`rounded-lg p-4 ${isDisabled ? 'bg-gray-100 border border-gray-300 opacity-60' : 'bg-amber-50 border border-amber-200'}`}>
@@ -788,12 +806,18 @@ export default function CertificatesPage() {
               <p className={`text-2xl font-bold ${isDisabled ? 'text-gray-900' : 'text-amber-900'}`}>
                 {onlineCount}
               </p>
+              {!isDisabled && (
+                <div className="mt-1 text-xs text-gray-600">
+                  <span className="mr-2">Penyertaan: {penyertaanCount}</span>
+                  <span>Pencapaian: {pencapaianCount}</span>
+                </div>
+              )}
               <div className="mt-3 space-y-2">
                 <button
                   onClick={() => setShowOnlinePenyertaanModal(true)}
-                  disabled={isDisabled}
+                  disabled={penyertaanCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    penyertaanCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-amber-600 hover:bg-amber-700'
                   }`}
@@ -802,9 +826,9 @@ export default function CertificatesPage() {
                 </button>
                 <button
                   onClick={() => setShowOnlinePencapaianModal(true)}
-                  disabled={isDisabled}
+                  disabled={pencapaianCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    pencapaianCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-amber-600 hover:bg-amber-700'
                   }`}
@@ -818,6 +842,12 @@ export default function CertificatesPage() {
         
         {(() => {
           const nationalCount = contestants.filter(c => c.certificates.national?.length > 0).length
+          const penyertaanCount = contestants.filter(c => 
+            c.certificates.national?.some(cert => cert.targetType === 'EVENT_PARTICIPANT')
+          ).length
+          const pencapaianCount = contestants.filter(c => 
+            c.certificates.national?.some(cert => cert.targetType === 'EVENT_WINNER')
+          ).length
           const isDisabled = nationalCount === 0
           return (
             <div className={`rounded-lg p-4 ${isDisabled ? 'bg-gray-100 border border-gray-300 opacity-60' : 'bg-indigo-50 border border-indigo-200'}`}>
@@ -825,12 +855,18 @@ export default function CertificatesPage() {
               <p className={`text-2xl font-bold ${isDisabled ? 'text-gray-900' : 'text-indigo-900'}`}>
                 {nationalCount}
               </p>
+              {!isDisabled && (
+                <div className="mt-1 text-xs text-gray-600">
+                  <span className="mr-2">Penyertaan: {penyertaanCount}</span>
+                  <span>Pencapaian: {pencapaianCount}</span>
+                </div>
+              )}
               <div className="mt-3 space-y-2">
                 <button
                   onClick={() => setShowNationalPenyertaanModal(true)}
-                  disabled={isDisabled}
+                  disabled={penyertaanCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    penyertaanCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
@@ -839,9 +875,9 @@ export default function CertificatesPage() {
                 </button>
                 <button
                   onClick={() => setShowNationalPencapaianModal(true)}
-                  disabled={isDisabled}
+                  disabled={pencapaianCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    pencapaianCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
@@ -855,6 +891,12 @@ export default function CertificatesPage() {
         
         {(() => {
           const quizCount = contestants.filter(c => c.certificates.quiz?.length > 0).length
+          const penyertaanCount = contestants.filter(c => 
+            c.certificates.quiz?.some(cert => cert.targetType === 'QUIZ_PARTICIPANT')
+          ).length
+          const pencapaianCount = contestants.filter(c => 
+            c.certificates.quiz?.some(cert => cert.targetType === 'QUIZ_WINNER')
+          ).length
           const isDisabled = quizCount === 0
           return (
             <div className={`rounded-lg p-4 ${isDisabled ? 'bg-gray-100 border border-gray-300 opacity-60' : 'bg-teal-50 border border-teal-200'}`}>
@@ -862,12 +904,18 @@ export default function CertificatesPage() {
               <p className={`text-2xl font-bold ${isDisabled ? 'text-gray-900' : 'text-teal-900'}`}>
                 {quizCount}
               </p>
+              {!isDisabled && (
+                <div className="mt-1 text-xs text-gray-600">
+                  <span className="mr-2">Penyertaan: {penyertaanCount}</span>
+                  <span>Pencapaian: {pencapaianCount}</span>
+                </div>
+              )}
               <div className="mt-3 space-y-2">
                 <button
                   onClick={() => setShowQuizPenyertaanModal(true)}
-                  disabled={isDisabled}
+                  disabled={penyertaanCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    penyertaanCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-teal-600 hover:bg-teal-700'
                   }`}
@@ -876,9 +924,9 @@ export default function CertificatesPage() {
                 </button>
                 <button
                   onClick={() => setShowQuizPencapaianModal(true)}
-                  disabled={isDisabled}
+                  disabled={pencapaianCount === 0}
                   className={`w-full px-3 py-2 text-white text-xs font-medium rounded-md transition-colors ${
-                    isDisabled 
+                    pencapaianCount === 0
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-teal-600 hover:bg-teal-700'
                   }`}

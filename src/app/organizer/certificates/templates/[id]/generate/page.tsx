@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, X, Download } from 'lucide-react'
+import { Eye, X, Download, Search } from 'lucide-react'
 
 interface Contestant {
   id: number
@@ -49,6 +49,8 @@ export default function BulkGeneratePage() {
   const [viewCertificateId, setViewCertificateId] = useState<number | null>(null)
   const [showViewModal, setShowViewModal] = useState(false)
   const [ignoreAttendance, setIgnoreAttendance] = useState(false)
+  const [generateWithoutFiles, setGenerateWithoutFiles] = useState(true) // On-demand by default
+  const [searchQuery, setSearchQuery] = useState('')
   const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false)
   const [mergingType, setMergingType] = useState<'split' | 'merge_all' | 'merge_by_contingent' | 'merge_by_state' | 'merge_every_n'>('split')
   const [downloadType, setDownloadType] = useState<'single_folder' | 'state_folders'>('single_folder')
@@ -90,12 +92,26 @@ export default function BulkGeneratePage() {
     fetchData()
   }, [templateId, ignoreAttendance])
 
-  // Handle select all (includes all contestants for regeneration support)
+  // Filter contestants based on search query
+  const filteredContestants = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return contestants
+    }
+    
+    const query = searchQuery.toLowerCase()
+    return contestants.filter(c => 
+      c.name.toLowerCase().includes(query) ||
+      c.contingent.name.toLowerCase().includes(query) ||
+      c.ic.toLowerCase().includes(query)
+    )
+  }, [contestants, searchQuery])
+
+  // Handle select all (includes all filtered contestants for regeneration support)
   const handleSelectAll = () => {
-    if (selectedContestants.length === contestants.length) {
+    if (selectedContestants.length === filteredContestants.length) {
       setSelectedContestants([])
     } else {
-      setSelectedContestants(contestants.map(c => c.id))
+      setSelectedContestants(filteredContestants.map(c => c.id))
     }
   }
 
@@ -140,7 +156,10 @@ export default function BulkGeneratePage() {
         const response = await fetch(`/api/certificates/templates/${templateId}/bulk-generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contestantIds: [contestantId] })
+          body: JSON.stringify({ 
+            contestantIds: [contestantId],
+            generateWithoutFiles
+          })
         })
 
         if (!response.ok) {
@@ -210,8 +229,8 @@ export default function BulkGeneratePage() {
     )
   }
 
-  const notGeneratedCount = contestants.filter(c => !c.certificateStatus || c.certificateStatus === 'Listed').length
-  const generatedCount = contestants.filter(c => c.certificateStatus === 'Generated').length
+  const notGeneratedCount = filteredContestants.filter(c => !c.certificateStatus || c.certificateStatus === 'Listed').length
+  const generatedCount = filteredContestants.filter(c => c.certificateStatus === 'Generated').length
 
   return (
     <div className="container mx-auto py-8">
@@ -232,28 +251,56 @@ export default function BulkGeneratePage() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
-            <label htmlFor="ignore-attendance" className="text-sm font-medium text-gray-700 cursor-pointer">
-              Ignore Attendance Status
-            </label>
-            <button
-              id="ignore-attendance"
-              type="button"
-              onClick={() => setIgnoreAttendance(!ignoreAttendance)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                ignoreAttendance ? 'bg-blue-600' : 'bg-gray-200'
-              }`}
-              disabled={isGenerating}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  ignoreAttendance ? 'translate-x-6' : 'translate-x-1'
+          <div className="flex flex-col gap-3">
+            {/* Ignore Attendance Toggle */}
+            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <label htmlFor="ignore-attendance" className="text-sm font-medium text-gray-700 cursor-pointer">
+                Ignore Attendance Status
+              </label>
+              <button
+                id="ignore-attendance"
+                type="button"
+                onClick={() => setIgnoreAttendance(!ignoreAttendance)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                  ignoreAttendance ? 'bg-blue-600' : 'bg-gray-200'
                 }`}
-              />
-            </button>
-            {ignoreAttendance && (
-              <span className="text-xs text-amber-600 font-medium">All contestants shown</span>
-            )}
+                disabled={isGenerating}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    ignoreAttendance ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              {ignoreAttendance && (
+                <span className="text-xs text-amber-600 font-medium">All contestants shown</span>
+              )}
+            </div>
+
+            {/* On-Demand Generation Toggle */}
+            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-3 shadow-sm">
+              <label htmlFor="generate-mode" className="text-sm font-medium text-gray-700 cursor-pointer">
+                On-Demand Generation
+              </label>
+              <button
+                id="generate-mode"
+                type="button"
+                onClick={() => setGenerateWithoutFiles(!generateWithoutFiles)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                  generateWithoutFiles ? 'bg-green-600' : 'bg-gray-200'
+                }`}
+                disabled={isGenerating}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    generateWithoutFiles ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs font-medium ${generateWithoutFiles ? 'text-green-600' : 'text-gray-600'}`}>
+                {generateWithoutFiles ? 'No physical files' : 'Save physical files'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -262,7 +309,10 @@ export default function BulkGeneratePage() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-600 font-medium">Total Contestants</p>
-          <p className="text-2xl font-bold text-blue-900">{contestants.length}</p>
+          <p className="text-2xl font-bold text-blue-900">{filteredContestants.length}</p>
+          {searchQuery && (
+            <p className="text-xs text-gray-500 mt-1">of {contestants.length} total</p>
+          )}
         </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-600 font-medium">Pending Generation</p>
@@ -272,6 +322,36 @@ export default function BulkGeneratePage() {
           <p className="text-sm text-green-600 font-medium">Generated</p>
           <p className="text-2xl font-bold text-green-900">{generatedCount}</p>
         </div>
+      </div>
+
+      {/* Search Bar */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by name, contingent, or IC number..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isGenerating}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-gray-600 mt-2">
+            Showing {filteredContestants.length} of {contestants.length} contestants
+          </p>
+        )}
       </div>
 
       {/* Actions */}
@@ -305,9 +385,9 @@ export default function BulkGeneratePage() {
             <button
               onClick={handleSelectAll}
               className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={contestants.length === 0 || isGenerating}
+              disabled={filteredContestants.length === 0 || isGenerating}
             >
-              {selectedContestants.length === contestants.length ? 'Deselect All' : 'Select All'}
+              {selectedContestants.length === filteredContestants.length && filteredContestants.length > 0 ? 'Deselect All' : 'Select All'}
             </button>
             <button
               onClick={() => setShowBulkDownloadModal(true)}
@@ -351,9 +431,9 @@ export default function BulkGeneratePage() {
               <th className="px-6 py-3 text-left">
                 <input
                   type="checkbox"
-                  checked={selectedContestants.length === contestants.length && contestants.length > 0}
+                  checked={selectedContestants.length === filteredContestants.length && filteredContestants.length > 0}
                   onChange={handleSelectAll}
-                  disabled={contestants.length === 0}
+                  disabled={filteredContestants.length === 0}
                   className="rounded border-gray-300"
                 />
               </th>
@@ -375,16 +455,28 @@ export default function BulkGeneratePage() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {contestants.length === 0 ? (
+            {filteredContestants.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                  {ignoreAttendance 
-                    ? 'No contestants found for this event.'
-                    : 'No contestants with attendance status "Present" found for this event.'}
+                  {searchQuery ? (
+                    <>
+                      No contestants match your search "{searchQuery}".
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="ml-2 text-blue-600 hover:underline"
+                      >
+                        Clear search
+                      </button>
+                    </>
+                  ) : (
+                    ignoreAttendance 
+                      ? 'No contestants found for this event.'
+                      : 'No contestants with attendance status "Present" found for this event.'
+                  )}
                 </td>
               </tr>
             ) : (
-              contestants.map((contestant) => {
+              filteredContestants.map((contestant) => {
                 // Determine row background color based on generation status
                 let rowClassName = ''
                 if (contestant.generationStatus === 'generating') {

@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/auth-options'
 import prisma from '@/lib/prisma'
 import fs from 'fs/promises'
 import path from 'path'
+import { PDFGeneratorService } from '@/lib/services/pdf-generator-service'
 
 export async function GET(
   request: NextRequest,
@@ -50,38 +51,38 @@ export async function GET(
       )
     }
 
-    if (!certificate.filePath) {
-      return NextResponse.json(
-        { error: 'Certificate file not available' },
-        { status: 404 }
-      )
-    }
+    let fileBuffer: Uint8Array;
 
-    // Resolve the file path (handle both absolute and relative paths)
-    let filePath = certificate.filePath
-    
-    // If path is relative (starts with /public or /uploads), make it absolute
-    if (filePath.startsWith('/public/')) {
-      filePath = path.join(process.cwd(), filePath)
-    } else if (filePath.startsWith('/uploads/')) {
-      filePath = path.join(process.cwd(), 'public', filePath)
-    } else if (!path.isAbsolute(filePath)) {
-      filePath = path.join(process.cwd(), 'public', filePath)
-    }
+    // Check if physical file exists or generate on-demand
+    if (certificate.filePath) {
+      // Legacy mode: Physical file exists, read from disk
+      console.log('Using physical file:', certificate.filePath);
+      
+      let filePath = certificate.filePath;
+      
+      // If path is relative (starts with /public or /uploads), make it absolute
+      if (filePath.startsWith('/public/')) {
+        filePath = path.join(process.cwd(), filePath);
+      } else if (filePath.startsWith('/uploads/')) {
+        filePath = path.join(process.cwd(), 'public', filePath);
+      } else if (!path.isAbsolute(filePath)) {
+        filePath = path.join(process.cwd(), 'public', filePath);
+      }
 
-    // Check if file exists
-    try {
-      await fs.access(filePath)
-    } catch (error) {
-      console.error('File not found:', filePath)
-      return NextResponse.json(
-        { error: 'Certificate file not found on server' },
-        { status: 404 }
-      )
+      // Check if file exists
+      try {
+        await fs.access(filePath);
+        fileBuffer = await fs.readFile(filePath);
+      } catch (error) {
+        console.error('Physical file not found, generating on-demand:', filePath);
+        // File missing, fall back to on-demand generation
+        fileBuffer = await PDFGeneratorService.generateCertificatePDF(certificateId);
+      }
+    } else {
+      // On-demand mode: No physical file, generate in-memory
+      console.log('Generating certificate on-demand for ID:', certificateId);
+      fileBuffer = await PDFGeneratorService.generateCertificatePDF(certificateId);
     }
-
-    // Read the file
-    const fileBuffer = await fs.readFile(filePath)
 
     // Generate a clean filename
     const templateName = certificate.template?.templateName || 'Certificate'

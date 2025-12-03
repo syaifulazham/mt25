@@ -315,27 +315,14 @@ export async function POST(
       }
     }
 
-    // Save PDF
-    const modifiedPdfBytes = await pdfDoc.save();
-    const outputDir = path.join(process.cwd(), 'public', 'uploads', 'certificates');
-    
-    try {
-      await fs.mkdir(outputDir, { recursive: true });
-    } catch (err) {
-      // Directory might already exist
-    }
+    // NO LONGER SAVING PDF TO DISK - On-demand generation
+    // Just update certificate status to READY
+    console.log('Certificate will be generated on-demand when downloaded');
 
-    const filename = `cert-${uniqueCode}.pdf`;
-    const outputPath = path.join(outputDir, filename);
-    await fs.writeFile(outputPath, modifiedPdfBytes);
-    console.log('PDF saved to:', outputPath);
-
-    const filePath = `/uploads/certificates/${filename}`;
-
-    // Update certificate record using raw SQL
+    // Update certificate record using raw SQL (no filePath needed)
     await prisma.$executeRaw`
       UPDATE certificate 
-      SET filePath = ${filePath},
+      SET filePath = NULL,
           status = 'READY',
           issuedAt = NOW(),
           updatedAt = NOW()
@@ -348,13 +335,13 @@ export async function POST(
         id: certificate.id,
         uniqueCode,
         serialNumber,
-        filePath,
+        filePath: null, // On-demand generation - no physical file
         status: 'READY'
       },
       isUpdate,
       message: isUpdate 
-        ? 'Certificate updated and regenerated successfully' 
-        : 'Certificate generated successfully'
+        ? 'Certificate updated successfully (on-demand generation enabled)' 
+        : 'Certificate generated successfully (on-demand generation enabled)'
     });
 
   } catch (error: any) {

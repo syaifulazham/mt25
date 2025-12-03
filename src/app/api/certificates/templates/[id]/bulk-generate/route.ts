@@ -27,7 +27,7 @@ export async function POST(
 
     const templateId = parseInt(params.id)
     const body = await request.json()
-    const { contestantIds } = body
+    const { contestantIds, generateWithoutFiles = false } = body
 
     if (!Array.isArray(contestantIds) || contestantIds.length === 0) {
       return NextResponse.json(
@@ -35,6 +35,8 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    console.log(`Bulk generation mode: ${generateWithoutFiles ? 'On-demand (no physical files)' : 'Legacy (with physical files)'}`)
 
     // Get template with configuration
     const template = await prisma.certTemplate.findUnique({
@@ -186,25 +188,31 @@ export async function POST(
           ? `${contest.code} ${contest.name}`
           : ''
 
-        // Generate PDF
-        const pdfPath = await generateCertificatePDF({
-          template: {
-            id: template.id,
-            basePdfPath: template.basePdfPath || '',
-            configuration: configuration
-          },
-          data: {
-            recipient_name: contestant.name,
-            contingent_name: contestant.contingent?.name || '',
-            team_name: teamName,
-            unique_code: uniqueCode,
-            serial_number: serialNumber || '',
-            ic_number: contestant.ic || '',
-            institution_name: institutionName,
-            issue_date: new Date().toLocaleDateString(),
-            contest_name: contestName
-          }
-        })
+        // Generate PDF conditionally based on mode
+        let pdfPath: string | null = null
+        
+        if (!generateWithoutFiles) {
+          // Legacy mode: Generate physical PDF file
+          pdfPath = await generateCertificatePDF({
+            template: {
+              id: template.id,
+              basePdfPath: template.basePdfPath || '',
+              configuration: configuration
+            },
+            data: {
+              recipient_name: contestant.name,
+              contingent_name: contestant.contingent?.name || '',
+              team_name: teamName,
+              unique_code: uniqueCode,
+              serial_number: serialNumber || '',
+              ic_number: contestant.ic || '',
+              institution_name: institutionName,
+              issue_date: new Date().toLocaleDateString(),
+              contest_name: contestName
+            }
+          })
+        }
+        // On-demand mode: Skip PDF generation, will generate when downloaded
 
         // Prepare ownership data
         const ownership = {
