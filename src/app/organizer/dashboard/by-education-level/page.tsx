@@ -13,11 +13,21 @@ type CompetitionData = {
   code: string;
   name: string;
   total: number;
+  male: number;
+  female: number;
 };
 
 type StateData = {
   state: string;
   total: number;
+  male: number;
+  female: number;
+};
+
+type GenderBreakdown = {
+  Male: number;
+  Female: number;
+  Unknown: number;
 };
 
 type EducationLevelDetail = {
@@ -25,6 +35,12 @@ type EducationLevelDetail = {
   kids: number;
   teens: number;
   youth: number;
+  genderBreakdown: {
+    Total: GenderBreakdown;
+    Kids: GenderBreakdown;
+    Teens: GenderBreakdown;
+    Youth: GenderBreakdown;
+  };
   competitionsByCategory: {
     Kids: CompetitionData[];
     Teens: CompetitionData[];
@@ -41,21 +57,74 @@ const formatNumber = (value: number): string => {
   return new Intl.NumberFormat('en-US').format(value);
 };
 
+// Gender Chart Component
+const GenderChart = ({ data }: { data: GenderBreakdown }) => {
+  const total = data.Male + data.Female + data.Unknown;
+  if (total === 0) return null;
+  
+  const malePercent = (data.Male / total) * 100;
+  const femalePercent = (data.Female / total) * 100;
+  const unknownPercent = (data.Unknown / total) * 100;
+  
+  return (
+    <div className="mt-2">
+      <div className="flex h-6 w-full rounded overflow-hidden bg-gray-200 text-xs font-semibold">
+        {malePercent > 0 && (
+          <div 
+            className="bg-blue-500 text-white flex items-center justify-center px-1" 
+            style={{ width: `${malePercent}%` }}
+            title={`Male: ${formatNumber(data.Male)} (${malePercent.toFixed(1)}%)`}
+          >
+            {malePercent > 15 && <span>M: {formatNumber(data.Male)}</span>}
+          </div>
+        )}
+        {femalePercent > 0 && (
+          <div 
+            className="bg-pink-500 text-white flex items-center justify-center px-1" 
+            style={{ width: `${femalePercent}%` }}
+            title={`Female: ${formatNumber(data.Female)} (${femalePercent.toFixed(1)}%)`}
+          >
+            {femalePercent > 15 && <span>F: {formatNumber(data.Female)}</span>}
+          </div>
+        )}
+        {unknownPercent > 0 && (
+          <div 
+            className="bg-gray-400 text-white flex items-center justify-center px-1" 
+            style={{ width: `${unknownPercent}%` }}
+            title={`Unknown: ${formatNumber(data.Unknown)} (${unknownPercent.toFixed(1)}%)`}
+          >
+            {unknownPercent > 15 && <span>?: {formatNumber(data.Unknown)}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function EducationLevelDetailsPage() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<CategoryType>('Kids');
   const [data, setData] = useState<EducationLevelDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Initializing...');
 
   useEffect(() => {
     async function fetchData() {
       try {
+        setLoadingMessage('Fetching participation data...');
         const response = await fetch('/api/dashboard/education-level-details');
+        
+        setLoadingMessage('Processing education levels...');
         if (!response.ok) throw new Error('Failed to fetch data');
+        
+        setLoadingMessage('Aggregating statistics...');
         const result = await response.json();
+        
+        setLoadingMessage('Finalizing...');
         setData(result);
       } catch (error) {
         console.error('Error fetching education level details:', error);
+        setLoadingMessage('Error loading data');
       } finally {
         setLoading(false);
       }
@@ -66,8 +135,9 @@ export default function EducationLevelDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex flex-col justify-center items-center h-screen gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">{loadingMessage}</p>
       </div>
     );
   }
@@ -85,6 +155,20 @@ export default function EducationLevelDetailsPage() {
   
   const grandTotal = activeCategory === 'Kids' ? data.kids : 
                      activeCategory === 'Teens' ? data.teens : data.youth;
+  
+  // Calculate subtotals for competitions
+  const competitionsSubtotal = competitions.reduce((acc, comp) => ({
+    total: acc.total + comp.total,
+    male: acc.male + comp.male,
+    female: acc.female + comp.female
+  }), { total: 0, male: 0, female: 0 });
+  
+  // Calculate subtotals for states
+  const statesSubtotal = states.reduce((acc, state) => ({
+    total: acc.total + state.total,
+    male: acc.male + state.male,
+    female: acc.female + state.female
+  }), { total: 0, male: 0, female: 0 });
 
   return (
     <div className="p-4 space-y-4">
@@ -108,6 +192,7 @@ export default function EducationLevelDetailsPage() {
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <p className="text-2xl font-bold text-blue-900">{formatNumber(data.totalParticipation)}</p>
+            <GenderChart data={data.genderBreakdown.Total} />
           </CardContent>
         </Card>
 
@@ -129,6 +214,9 @@ export default function EducationLevelDetailsPage() {
             <p className={`text-2xl font-bold ${activeCategory === 'Kids' ? 'text-white' : 'text-gray-700'}`}>
               {formatNumber(data.kids)}
             </p>
+            <div className={activeCategory === 'Kids' ? 'opacity-90' : ''}>
+              <GenderChart data={data.genderBreakdown.Kids} />
+            </div>
           </CardContent>
         </Card>
 
@@ -150,6 +238,9 @@ export default function EducationLevelDetailsPage() {
             <p className={`text-2xl font-bold ${activeCategory === 'Teens' ? 'text-white' : 'text-gray-700'}`}>
               {formatNumber(data.teens)}
             </p>
+            <div className={activeCategory === 'Teens' ? 'opacity-90' : ''}>
+              <GenderChart data={data.genderBreakdown.Teens} />
+            </div>
           </CardContent>
         </Card>
 
@@ -171,6 +262,9 @@ export default function EducationLevelDetailsPage() {
             <p className={`text-2xl font-bold ${activeCategory === 'Youth' ? 'text-white' : 'text-gray-700'}`}>
               {formatNumber(data.youth)}
             </p>
+            <div className={activeCategory === 'Youth' ? 'opacity-90' : ''}>
+              <GenderChart data={data.genderBreakdown.Youth} />
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -191,11 +285,31 @@ export default function EducationLevelDetailsPage() {
                   <thead className="sticky top-0 bg-white border-b">
                     <tr>
                       <th className="text-left p-1.5 font-semibold">Competition</th>
+                      <th className="text-right p-1.5 font-semibold w-16">Male</th>
+                      <th className="text-right p-1.5 font-semibold w-16">Female</th>
                       <th className="text-right p-1.5 font-semibold w-20">Total</th>
                       <th className="p-1.5 w-32"></th>
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Subtotal Row */}
+                    <tr className="bg-gray-100 font-semibold border-b-2 border-gray-300 sticky top-[25px] z-10">
+                      <td className="p-1.5">PARTICIPATIONS</td>
+                      <td className="text-right p-1.5 text-blue-700">{formatNumber(competitionsSubtotal.male)}</td>
+                      <td className="text-right p-1.5 text-pink-700">{formatNumber(competitionsSubtotal.female)}</td>
+                      <td className="text-right p-1.5">{formatNumber(competitionsSubtotal.total)}</td>
+                      <td className="p-1.5">
+                        <div className="h-4 bg-gray-300 rounded overflow-hidden">
+                          <div 
+                            className={`h-full ${
+                              activeCategory === 'Kids' ? 'bg-emerald-600' :
+                              activeCategory === 'Teens' ? 'bg-blue-600' : 'bg-amber-600'
+                            }`}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
                     {competitions.map((comp, idx) => {
                       const percentage = grandTotal > 0 ? (comp.total / grandTotal) * 100 : 0;
                       return (
@@ -203,6 +317,8 @@ export default function EducationLevelDetailsPage() {
                           <td className="p-1.5 truncate max-w-0" title={`${comp.code} - ${comp.name}`}>
                             {comp.code} - {comp.name}
                           </td>
+                          <td className="text-right p-1.5 text-blue-600">{formatNumber(comp.male)}</td>
+                          <td className="text-right p-1.5 text-pink-600">{formatNumber(comp.female)}</td>
                           <td className="text-right p-1.5 font-medium">{formatNumber(comp.total)}</td>
                           <td className="p-1.5">
                             <div className="h-4 bg-gray-200 rounded overflow-hidden">
@@ -239,16 +355,38 @@ export default function EducationLevelDetailsPage() {
                   <thead className="sticky top-0 bg-white border-b">
                     <tr>
                       <th className="text-left p-1.5 font-semibold">State</th>
+                      <th className="text-right p-1.5 font-semibold w-16">Male</th>
+                      <th className="text-right p-1.5 font-semibold w-16">Female</th>
                       <th className="text-right p-1.5 font-semibold w-20">Total</th>
                       <th className="p-1.5 w-32"></th>
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Subtotal Row */}
+                    <tr className="bg-gray-100 font-semibold border-b-2 border-gray-300 sticky top-[25px] z-10">
+                      <td className="p-1.5">NATIONAL</td>
+                      <td className="text-right p-1.5 text-blue-700">{formatNumber(statesSubtotal.male)}</td>
+                      <td className="text-right p-1.5 text-pink-700">{formatNumber(statesSubtotal.female)}</td>
+                      <td className="text-right p-1.5">{formatNumber(statesSubtotal.total)}</td>
+                      <td className="p-1.5">
+                        <div className="h-4 bg-gray-300 rounded overflow-hidden">
+                          <div 
+                            className={`h-full ${
+                              activeCategory === 'Kids' ? 'bg-emerald-600' :
+                              activeCategory === 'Teens' ? 'bg-blue-600' : 'bg-amber-600'
+                            }`}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
                     {states.map((state, idx) => {
                       const percentage = grandTotal > 0 ? (state.total / grandTotal) * 100 : 0;
                       return (
                         <tr key={idx} className="border-b last:border-b-0 hover:bg-gray-50">
                           <td className="p-1.5">{state.state}</td>
+                          <td className="text-right p-1.5 text-blue-600">{formatNumber(state.male)}</td>
+                          <td className="text-right p-1.5 text-pink-600">{formatNumber(state.female)}</td>
                           <td className="text-right p-1.5 font-medium">{formatNumber(state.total)}</td>
                           <td className="p-1.5">
                             <div className="h-4 bg-gray-200 rounded overflow-hidden">

@@ -71,6 +71,12 @@ export async function GET() {
           kids: 0,
           teens: 0,
           youth: 0,
+          genderBreakdown: {
+            Total: { Male: 0, Female: 0, Unknown: 0 },
+            Kids: { Male: 0, Female: 0, Unknown: 0 },
+            Teens: { Male: 0, Female: 0, Unknown: 0 },
+            Youth: { Male: 0, Female: 0, Unknown: 0 }
+          },
           competitionsByCategory: { Kids: [], Teens: [], Youth: [] },
           statesByCategory: { Kids: [], Teens: [], Youth: [] }
         };
@@ -123,16 +129,41 @@ export async function GET() {
         contestMap.set(contest.id, contest);
       });
       
+      // Get gender breakdown data
+      console.log('Step 4: Getting gender breakdown...');
+      const genderByContestCategory = await prisma.$queryRaw<Array<{
+        contestId: number;
+        gender: string;
+        count: bigint;
+      }>>`
+        SELECT 
+          co.id as contestId,
+          COALESCE(c.gender, 'Unknown') as gender,
+          COUNT(cp.id) as count
+        FROM contestParticipation cp
+        JOIN contestant c ON cp.contestantId = c.id
+        JOIN contest co ON cp.contestId = co.id
+        GROUP BY co.id, c.gender
+      `;
+      
+      console.log(`Found ${genderByContestCategory.length} contest-gender combinations`);
+      
       // Aggregate data
-      console.log('Step 4: Aggregating data by categories...');
+      console.log('Step 5: Aggregating data by categories...');
       let totalParticipation = 0;
       const categoryCounts = { Kids: 0, Teens: 0, Youth: 0 };
-      const competitionsByCategory: Record<string, Record<string, number>> = {
+      const categoryGenderCounts = {
+        Total: { Male: 0, Female: 0, Unknown: 0 },
+        Kids: { Male: 0, Female: 0, Unknown: 0 },
+        Teens: { Male: 0, Female: 0, Unknown: 0 },
+        Youth: { Male: 0, Female: 0, Unknown: 0 }
+      };
+      const competitionsByCategory: Record<string, Record<string, { total: number; male: number; female: number }>> = {
         Kids: {},
         Teens: {},
         Youth: {}
       };
-      const statesByCategory: Record<string, Record<string, number>> = {
+      const statesByCategory: Record<string, Record<string, { total: number; male: number; female: number }>> = {
         Kids: {},
         Teens: {},
         Youth: {}
@@ -155,31 +186,122 @@ export async function GET() {
         const category = normalizeToDisplayCategory(schoolLevel);
         categoryCounts[category as keyof typeof categoryCounts] += count;
         
-        // By competition
+        // By competition - initialize if not exists
         const competitionKey = `${contest.code}|||${contest.name}`;
-        competitionsByCategory[category][competitionKey] = 
-          (competitionsByCategory[category][competitionKey] || 0) + count;
+        if (!competitionsByCategory[category][competitionKey]) {
+          competitionsByCategory[category][competitionKey] = { total: 0, male: 0, female: 0 };
+        }
+        competitionsByCategory[category][competitionKey].total += count;
         
         // By state - use actual state from contestant's contingent
         const stateName = item.stateName || 'Unknown';
-        statesByCategory[category][stateName] = 
-          (statesByCategory[category][stateName] || 0) + count;
+        if (!statesByCategory[category][stateName]) {
+          statesByCategory[category][stateName] = { total: 0, male: 0, female: 0 };
+        }
+        statesByCategory[category][stateName].total += count;
+      });
+      
+      // Get gender breakdown by contest and state
+      console.log('Step 6: Getting gender breakdown by contest and state...');
+      const genderByContestState = await prisma.$queryRaw<Array<{
+        contestId: number;
+        stateName: string | null;
+        gender: string;
+        count: bigint;
+      }>>`
+        SELECT 
+          co.id as contestId,
+          COALESCE(s.name, 'Unknown') as stateName,
+          COALESCE(c.gender, 'Unknown') as gender,
+          COUNT(cp.id) as count
+        FROM contestParticipation cp
+        JOIN contestant c ON cp.contestantId = c.id
+        JOIN contest co ON cp.contestId = co.id
+        JOIN contingent ct ON c.contingentId = ct.id
+        LEFT JOIN school sc ON ct.schoolId = sc.id
+        LEFT JOIN independent ind ON ct.independentId = ind.id
+        LEFT JOIN state s ON (
+          CASE 
+            WHEN sc.id IS NOT NULL THEN sc.stateId
+            WHEN ind.id IS NOT NULL THEN ind.stateId
+          END
+        ) = s.id
+        GROUP BY co.id, s.name, c.gender
+      `;
+      
+      console.log(`Found ${genderByContestState.length} contest-state-gender combinations`);
+      
+      // Process gender data for competition and state breakdowns
+      genderByContestState.forEach((item) => {
+        const contest = contestMap.get(item.contestId);
+        if (!contest) return;
+        
+        const count = Number(item.count);
+        const gender = item.gender.toLowerCase();
+        const isMale = gender === 'male';
+        const isFemale = gender === 'female';
+        
+        // Get school level from targetgroup
+        let schoolLevel = 'OTHER';
+        if (contest.targetgroup && Array.isArray(contest.targetgroup) && contest.targetgroup.length > 0) {
+          schoolLevel = contest.targetgroup[0].schoolLevel || 'OTHER';
+        }
+        
+        const category = normalizeToDisplayCategory(schoolLevel);
+        
+        // By competition
+        const competitionKey = `${contest.code}|||${contest.name}`;
+        if (!competitionsByCategory[category][competitionKey]) {
+          competitionsByCategory[category][competitionKey] = { total: 0, male: 0, female: 0 };
+        }
+        if (isMale) competitionsByCategory[category][competitionKey].male += count;
+        if (isFemale) competitionsByCategory[category][competitionKey].female += count;
+        
+        // By state
+        const stateName = item.stateName || 'Unknown';
+        if (!statesByCategory[category][stateName]) {
+          statesByCategory[category][stateName] = { total: 0, male: 0, female: 0 };
+        }
+        if (isMale) statesByCategory[category][stateName].male += count;
+        if (isFemale) statesByCategory[category][stateName].female += count;
+      });
+      
+      // Process gender data for summary cards
+      genderByContestCategory.forEach((item) => {
+        const contest = contestMap.get(item.contestId);
+        if (!contest) return;
+        
+        const count = Number(item.count);
+        const gender = item.gender.toLowerCase() === 'male' ? 'Male' : 
+                      item.gender.toLowerCase() === 'female' ? 'Female' : 'Unknown';
+        
+        // Get school level from targetgroup
+        let schoolLevel = 'OTHER';
+        if (contest.targetgroup && Array.isArray(contest.targetgroup) && contest.targetgroup.length > 0) {
+          schoolLevel = contest.targetgroup[0].schoolLevel || 'OTHER';
+        }
+        
+        const category = normalizeToDisplayCategory(schoolLevel);
+        
+        // Aggregate gender counts for summary cards
+        categoryGenderCounts.Total[gender as keyof typeof categoryGenderCounts.Total] += count;
+        categoryGenderCounts[category as keyof typeof categoryGenderCounts][gender as keyof typeof categoryGenderCounts.Total] += count;
       });
       
       // Format competition data
-      const formatCompetitions = (categoryData: Record<string, number>) => {
+      const formatCompetitions = (categoryData: Record<string, { total: number; male: number; female: number }>) => {
         return Object.entries(categoryData)
-          .map(([key, total]) => {
+          .map(([key, data]) => {
             const [code, name] = key.split('|||');
-            return { code, name, total };
+            return { code, name, total: data.total, male: data.male, female: data.female };
           })
           .sort((a, b) => b.total - a.total);
       };
       
       // Format state data
-      const formatStates = (categoryData: Record<string, number>) => {
+      const formatStates = (categoryData: Record<string, { total: number; male: number; female: number }>) => {
         return Object.entries(categoryData)
-          .map(([state, total]) => ({ state, total }))
+          .map(([state, data]) => ({ state, total: data.total, male: data.male, female: data.female }))
           .sort((a, b) => b.total - a.total);
       };
       
@@ -197,6 +319,7 @@ export async function GET() {
         kids: categoryCounts.Kids,
         teens: categoryCounts.Teens,
         youth: categoryCounts.Youth,
+        genderBreakdown: categoryGenderCounts,
         competitionsByCategory: {
           Kids: formatCompetitions(competitionsByCategory.Kids),
           Teens: formatCompetitions(competitionsByCategory.Teens),
