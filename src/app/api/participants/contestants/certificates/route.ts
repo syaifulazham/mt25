@@ -126,9 +126,9 @@ export async function GET(request: NextRequest) {
           SELECT 
             c.id,
             c.templateId,
-            c.recipientName,
+            TRIM(REPLACE(REPLACE(c.recipientName, '\r', ''), '\n', '')) as recipientName,
             c.filePath,
-            c.uniqueCode,
+            TRIM(c.uniqueCode) as uniqueCode,
             c.ownership,
             ct.templateName,
             ct.targetType,
@@ -158,9 +158,9 @@ export async function GET(request: NextRequest) {
           SELECT 
             c.id,
             c.templateId,
-            c.recipientName,
+            TRIM(REPLACE(REPLACE(c.recipientName, '\r', ''), '\n', '')) as recipientName,
             c.filePath,
-            c.uniqueCode,
+            TRIM(c.uniqueCode) as uniqueCode,
             c.ownership,
             ct.templateName,
             ct.targetType,
@@ -216,19 +216,19 @@ export async function GET(request: NextRequest) {
         return {
           id: contestant.id,
           contestantId: contestant.id,
-          name: contestant.name,
-          ic: contestant.ic,
+          name: contestant.name?.trim() || '',
+          ic: contestant.ic?.trim() || '',
           class: classDisplay,
-          team: contestant.teamMembers?.[0]?.team?.name || null,
+          team: contestant.teamMembers?.[0]?.team?.name?.trim() || null,
           teamId: contestant.teamMembers?.[0]?.team?.id || null,
-          contingent: contestant.contingent?.name,
+          contingent: contestant.contingent?.name?.trim() || '',
           certificates: {
             school: schoolCert ? {
               id: schoolCert.id,
               templateName: schoolCert.template?.templateName || '',
               targetType: schoolCert.template?.targetType || '',
               filePath: schoolCert.filePath,
-              uniqueCode: schoolCert.uniqueCode
+              uniqueCode: schoolCert.uniqueCode.replace(/[\r\n]/g, '').trim()
             } : null,
             state: stateCerts.map(cert => ({
               id: cert.id,
