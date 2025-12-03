@@ -111,21 +111,54 @@ export default function EducationLevelDetailsPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        setLoadingMessage('Fetching participation data...');
-        const response = await fetch('/api/dashboard/education-level-details');
+        // Step 1: Fetch summary data (fast)
+        setLoadingMessage('Loading summary data...');
+        const summaryResponse = await fetch('/api/dashboard/education-level-summary');
+        if (!summaryResponse.ok) throw new Error('Failed to fetch summary');
+        const summaryData = await summaryResponse.json();
         
-        setLoadingMessage('Processing education levels...');
-        if (!response.ok) throw new Error('Failed to fetch data');
+        // Set partial data to show summary cards immediately
+        setData({
+          totalParticipation: summaryData.totalParticipation,
+          kids: summaryData.kids,
+          teens: summaryData.teens,
+          youth: summaryData.youth,
+          genderBreakdown: summaryData.genderBreakdown,
+          competitionsByCategory: { Kids: [], Teens: [], Youth: [] },
+          statesByCategory: { Kids: [], Teens: [], Youth: [] }
+        });
         
-        setLoadingMessage('Aggregating statistics...');
-        const result = await response.json();
+        // Show the page with summary data while loading the rest
+        setLoading(false);
         
-        setLoadingMessage('Finalizing...');
-        setData(result);
+        // Step 2: Fetch competitions data
+        setLoadingMessage('Loading competition data...');
+        const competitionsResponse = await fetch('/api/dashboard/education-level-competitions');
+        if (!competitionsResponse.ok) throw new Error('Failed to fetch competitions');
+        const competitionsData = await competitionsResponse.json();
+        
+        // Update with competition data
+        setData(prev => prev ? {
+          ...prev,
+          competitionsByCategory: competitionsData
+        } : null);
+        
+        // Step 3: Fetch states data
+        setLoadingMessage('Loading state data...');
+        const statesResponse = await fetch('/api/dashboard/education-level-states');
+        if (!statesResponse.ok) throw new Error('Failed to fetch states');
+        const statesData = await statesResponse.json();
+        
+        // Update with complete data
+        setData(prev => prev ? {
+          ...prev,
+          statesByCategory: statesData
+        } : null);
+        
+        setLoadingMessage('');
       } catch (error) {
         console.error('Error fetching education level details:', error);
         setLoadingMessage('Error loading data');
-      } finally {
         setLoading(false);
       }
     }
@@ -155,6 +188,8 @@ export default function EducationLevelDetailsPage() {
   
   const grandTotal = activeCategory === 'Kids' ? data.kids : 
                      activeCategory === 'Teens' ? data.teens : data.youth;
+  
+  const isLoadingTables = loadingMessage !== '';
   
   // Calculate subtotals for competitions
   const competitionsSubtotal = competitions.reduce((acc, comp) => ({
@@ -270,7 +305,15 @@ export default function EducationLevelDetailsPage() {
       </div>
 
       {/* Data Tables - 2 Column Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 relative">
+        {isLoadingTables && (
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex items-center justify-center rounded-lg">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">{loadingMessage}</p>
+            </div>
+          </div>
+        )}
         {/* By Competition */}
         <Card>
           <CardHeader className="p-3 pb-2">

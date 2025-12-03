@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prismaExecute } from '@/lib/prisma-execute';
+import { authOptions } from '@/app/api/auth/auth-options';
+import { prismaExecute } from '@/lib/prisma';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 // Helper function to normalize school levels
 function normalizeToDisplayCategory(schoolLevel: string): 'Kids' | 'Teens' | 'Youth' {
