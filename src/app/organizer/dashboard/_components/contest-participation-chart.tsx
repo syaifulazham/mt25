@@ -74,9 +74,18 @@ export default function ContestParticipationChart({ data, educationLevels }: Con
         // Filter contests with count > 0 for this school_level and sort by count descending
         const contestsWithLevel = data.filter(contest => (contest[schoolLevel] || 0) > 0).sort((a, b) => (b[schoolLevel] || 0) - (a[schoolLevel] || 0));
         if (contestsWithLevel.length === 0) return null;
+        
+        // Calculate total for this category
+        const categoryTotal = contestsWithLevel.reduce((sum, contest) => sum + (contest[schoolLevel] || 0), 0);
+        
         return (
           <div key={eduIndex} className="mb-6 p-4 border border-gray-300 rounded-lg shadow-sm bg-white">
-            <div className="text-lg font-bold text-blue-600 mb-2">{getSchoolLevelDisplayName(schoolLevel)}</div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-lg font-bold text-blue-600">{getSchoolLevelDisplayName(schoolLevel)}</div>
+              <div className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
+                Total: {formatNumber(categoryTotal)}
+              </div>
+            </div>
             <div className="space-y-3">
               {contestsWithLevel.map((contest, contestIndex) => {
                 const shortName = contest.contestKey.replace(/-/g, ' - '); // Contest code prefixed name
@@ -108,16 +117,25 @@ export default function ContestParticipationChart({ data, educationLevels }: Con
           No data available
         </div>
       )}
-      {/* Overall legend */}
-      <div className="mt-6 pt-4 border-t border-muted">
-        <div className="text-xs font-medium mb-2">Legend</div>
+      {/* Overall legend and grand total */}
+      <div className="mt-6 pt-4 border-t border-muted w-full">
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm font-semibold">Legend</div>
+          <div className="text-base font-bold text-blue-700 bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
+            Grand Total: {formatNumber(data.reduce((sum, contest) => sum + contest.total, 0))}
+          </div>
+        </div>
         <div className="flex flex-wrap gap-3">
-          {schoolLevels.map((level, idx) => (
-            <div key={idx} className="flex items-center">
-              <div className={`w-3 h-3 mr-1 rounded-sm ${SCHOOL_LEVEL_COLORS[level] || 'bg-gray-400'}`}></div>
-              <span className="text-xs">{getSchoolLevelDisplayName(level)}</span>
-            </div>
-          ))}
+          {schoolLevels.map((level, idx) => {
+            const levelTotal = data.reduce((sum, contest) => sum + (contest[level] || 0), 0);
+            return (
+              <div key={idx} className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-md">
+                <div className={`w-3 h-3 rounded-sm ${SCHOOL_LEVEL_COLORS[level] || 'bg-gray-400'}`}></div>
+                <span className="text-xs font-medium">{getSchoolLevelDisplayName(level)}</span>
+                <span className="text-xs text-gray-600">({formatNumber(levelTotal)})</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
