@@ -27,14 +27,12 @@ export async function GET() {
     const results = await prismaExecute(async (prisma) => {
       const rawResults = await prisma.$queryRaw`
         SELECT 
-          c.edu_level as level, 
+          COALESCE(c.edu_level, 'UNKNOWN') as level, 
           COUNT(cp.id) as count
         FROM 
           contestParticipation cp
         JOIN 
           contestant c ON cp.contestantId = c.id
-        WHERE 
-          c.edu_level IS NOT NULL
         GROUP BY 
           c.edu_level
         ORDER BY 
