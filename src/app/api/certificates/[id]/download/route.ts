@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/auth-options'
 import prisma from '@/lib/prisma'
 import fs from 'fs'
 import path from 'path'
+import { PDFGeneratorService } from '@/lib/services/pdf-generator-service'
 
 // Allowed roles for certificate access (organizers)
 const ALLOWED_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER']
@@ -78,26 +79,29 @@ export async function GET(
       )
     }
 
-    if (!certificate.filePath) {
-      return NextResponse.json(
-        { error: 'Certificate PDF not available' },
-        { status: 404 }
-      )
+    let fileBuffer: Buffer
+
+    // Check if physical file exists or generate on-demand
+    if (certificate.filePath) {
+      // Legacy mode: Physical file exists, try to read from disk
+      console.log('Attempting to use physical file:', certificate.filePath)
+      
+      const filePath = path.join(process.cwd(), 'public', certificate.filePath)
+
+      // Check if file exists
+      if (fs.existsSync(filePath)) {
+        console.log('Reading physical file from disk')
+        fileBuffer = fs.readFileSync(filePath)
+      } else {
+        // File missing, fall back to on-demand generation
+        console.log('Physical file not found, generating on-demand')
+        fileBuffer = Buffer.from(await PDFGeneratorService.generateCertificatePDF(certificateId))
+      }
+    } else {
+      // On-demand mode: No physical file, generate in-memory
+      console.log('Generating certificate on-demand for ID:', certificateId)
+      fileBuffer = Buffer.from(await PDFGeneratorService.generateCertificatePDF(certificateId))
     }
-
-    // Construct absolute file path
-    const filePath = path.join(process.cwd(), 'public', certificate.filePath)
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return NextResponse.json(
-        { error: 'Certificate file not found on server' },
-        { status: 404 }
-      )
-    }
-
-    // Read the PDF file
-    const fileBuffer = fs.readFileSync(filePath)
 
     // Create safe filename
     const sanitizedName = certificate.recipientName.replace(/[^a-zA-Z0-9]/g, '_')

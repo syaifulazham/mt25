@@ -27,7 +27,7 @@ export async function POST(
 
     const templateId = parseInt(params.id)
     const body = await request.json()
-    const { managerIds } = body
+    const { managerIds, generateWithoutFiles = false } = body
 
     if (!Array.isArray(managerIds) || managerIds.length === 0) {
       return NextResponse.json(
@@ -35,6 +35,8 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    console.log(`Trainer certificate generation mode: ${generateWithoutFiles ? 'On-demand (no physical files)' : 'Legacy (with physical files)'}`)
 
     // Get template with configuration
     const template = await prisma.certTemplate.findUnique({
@@ -199,23 +201,29 @@ export async function POST(
           contingent?.independent?.state?.name ||
           ''
 
-        // Generate PDF
-        const pdfPath = await generateCertificatePDF({
-          template: {
-            id: template.id,
-            basePdfPath: template.basePdfPath || '',
-            configuration: configuration
-          },
-          data: {
-            recipient_name: manager.name,
-            contingent_name: contingent?.name || '',
-            institution_name: institutionName,
-            event_name: event?.name || '',
-            unique_code: uniqueCode,
-            serial_number: serialNumber || '',
-            ic_number: manager.ic
-          } as any
-        })
+        // Generate PDF conditionally based on mode
+        let pdfPath: string | null = null
+        
+        if (!generateWithoutFiles) {
+          // Legacy mode: Generate physical PDF file
+          pdfPath = await generateCertificatePDF({
+            template: {
+              id: template.id,
+              basePdfPath: template.basePdfPath || '',
+              configuration: configuration
+            },
+            data: {
+              recipient_name: manager.name,
+              contingent_name: contingent?.name || '',
+              institution_name: institutionName,
+              event_name: event?.name || '',
+              unique_code: uniqueCode,
+              serial_number: serialNumber || '',
+              ic_number: manager.ic
+            } as any
+          })
+        }
+        // On-demand mode: Skip PDF generation, will generate when downloaded
 
         // Create or update certificate record
         if (existingCert) {

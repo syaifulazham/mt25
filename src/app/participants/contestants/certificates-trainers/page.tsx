@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, FileCheck, Loader2, Eye, Search, Users, Award, X } from 'lucide-react'
+import { Download, FileCheck, Loader2, Eye, Search, Users, Award, X, FileText } from 'lucide-react'
 
 interface Certificate {
   id: number
@@ -48,6 +48,13 @@ export default function TrainersCertificatesPage() {
   } | null>(null)
   const [contingentCertificate, setContingentCertificate] = useState<ContingentCertificate | null>(null)
   const [showContingentModal, setShowContingentModal] = useState(false)
+  const [generatingIds, setGeneratingIds] = useState<number[]>([])
+  const [showMessageModal, setShowMessageModal] = useState(false)
+  const [messageModal, setMessageModal] = useState<{
+    type: 'success' | 'error'
+    title: string
+    message: string
+  } | null>(null)
 
   useEffect(() => {
     fetchTrainers()
@@ -150,6 +157,57 @@ export default function TrainersCertificatesPage() {
       console.error('Download error:', error)
       alert('Failed to download certificate')
     }
+  }
+
+  const handleGenerateCertificate = async (managerId: number, managerIc: string, managerName: string) => {
+    setGeneratingIds(prev => [...prev, managerId])
+    
+    try {
+      const response = await fetch('/api/participants/trainers/generate-certificate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          managerId,
+          managerIc
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to generate certificate')
+      }
+
+      // Show success message
+      setMessageModal({
+        type: 'success',
+        title: 'Berjaya',
+        message: `Sijil berjaya dijana untuk ${managerName}!`
+      })
+      setShowMessageModal(true)
+      
+      // Refresh the trainers list
+      fetchTrainers()
+    } catch (error) {
+      console.error('Generation error:', error)
+      
+      // Show error message
+      setMessageModal({
+        type: 'error',
+        title: 'Ralat',
+        message: `Gagal menjana sijil: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+      setShowMessageModal(true)
+    } finally {
+      setGeneratingIds(prev => prev.filter(id => id !== managerId))
+    }
+  }
+
+  const closeMessageModal = () => {
+    setShowMessageModal(false)
+    setTimeout(() => setMessageModal(null), 300)
   }
 
   const handleContingentDownload = () => {
@@ -412,10 +470,29 @@ export default function TrainersCertificatesPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="text-center">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                            Belum Tersedia
-                          </span>
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => handleGenerateCertificate(
+                              trainer.managerId,
+                              trainer.managerIc,
+                              trainer.managerName
+                            )}
+                            disabled={generatingIds.includes(trainer.managerId)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Jana Sijil"
+                          >
+                            {generatingIds.includes(trainer.managerId) ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Menjana...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="h-3 w-3" />
+                                Jana Sijil
+                              </>
+                            )}
+                          </button>
                         </div>
                       )}
                     </td>
@@ -534,6 +611,56 @@ export default function TrainersCertificatesPage() {
                   Muat Turun Sijil
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Message Modal */}
+      {showMessageModal && messageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+            {/* Modal Header */}
+            <div className={`p-6 ${messageModal.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className="flex items-center gap-3">
+                {messageModal.type === 'success' ? (
+                  <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                )}
+                <div>
+                  <h3 className={`text-lg font-semibold ${messageModal.type === 'success' ? 'text-green-900' : 'text-red-900'}`}>
+                    {messageModal.title}
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <p className="text-gray-700">{messageModal.message}</p>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={closeMessageModal}
+                className={`px-6 py-2 text-sm font-medium text-white rounded-md transition-colors ${
+                  messageModal.type === 'success'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                Tutup
+              </button>
             </div>
           </div>
         </div>

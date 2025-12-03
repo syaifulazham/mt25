@@ -40,6 +40,7 @@ export default function TrainersManagement({ trainers, session, templateId, temp
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedTrainers, setSelectedTrainers] = useState<number[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generateWithoutFiles, setGenerateWithoutFiles] = useState(true) // On-demand by default
   const [showProgressModal, setShowProgressModal] = useState(false)
   const [generationProgress, setGenerationProgress] = useState({
     total: 0,
@@ -163,7 +164,8 @@ export default function TrainersManagement({ trainers, session, templateId, temp
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            managerIds: [managerId]
+            managerIds: [managerId],
+            generateWithoutFiles
           })
         })
 
@@ -404,8 +406,35 @@ export default function TrainersManagement({ trainers, session, templateId, temp
           </div>
         </div>
 
+        {/* On-Demand Generation Toggle */}
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center gap-3">
+            <label htmlFor="generate-mode-trainers" className="text-sm font-medium text-gray-700 cursor-pointer">
+              On-Demand Generation
+            </label>
+            <button
+              id="generate-mode-trainers"
+              type="button"
+              onClick={() => setGenerateWithoutFiles(!generateWithoutFiles)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                generateWithoutFiles ? 'bg-green-600' : 'bg-gray-200'
+              }`}
+              disabled={isGenerating}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  generateWithoutFiles ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <span className={`text-xs font-medium ${generateWithoutFiles ? 'text-green-600' : 'text-gray-600'}`}>
+              {generateWithoutFiles ? 'No physical files' : 'Save physical files'}
+            </span>
+          </div>
+        </div>
+
         {/* Results count and selection info */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-4">
           <div className="text-sm text-gray-600">
             Showing {filteredTrainers.length} of {trainers.length} trainers
             {selectedTrainers.length > 0 && (
