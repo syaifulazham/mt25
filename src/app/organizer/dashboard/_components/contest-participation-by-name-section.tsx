@@ -17,30 +17,43 @@ type EducationLevelCount = {
   count: number;
 };
 
-// Function to normalize school level from targetgroup to our standard categories
+// Function to normalize school level from contestant edu_level to our standard categories
+// Must match the Education Levels chart mapping exactly
 function normalizeSchoolLevel(schoolLevel: string): string {
   const normalized = schoolLevel?.toLowerCase().trim() || '';
   
-  // Primary school variations
-  if (normalized.includes('primary') || normalized.includes('sekolah rendah') || 
-      normalized === 'primary school' || normalized === 'rendah') {
+  // Primary school variations - Includes "Sekolah Rendah" and "Sekolah Rendah (PPKI)"
+  if (normalized.includes('primary') || 
+      normalized.includes('sekolah rendah') ||  // Matches both "Sekolah Rendah" and "Sekolah Rendah (PPKI)"
+      normalized.includes('rendah') ||
+      normalized === 'primary school' || 
+      normalized === 'primary_school' || 
+      normalized.includes('kids')) {
     return 'PRIMARY_SCHOOL';
   }
   
-  // Secondary school variations
-  if (normalized.includes('secondary') || normalized.includes('sekolah menengah') ||
-      normalized === 'secondary school' || normalized === 'menengah') {
+  // Secondary school variations - Matches "Sekolah Menengah"
+  if (normalized.includes('secondary') || 
+      normalized.includes('sekolah menengah') ||
+      normalized.includes('menengah') ||
+      normalized === 'secondary school' || 
+      normalized === 'secondary_school' || 
+      normalized.includes('teens')) {
     return 'SECONDARY_SCHOOL';
   }
   
   // University/College variations
-  if (normalized.includes('university') || normalized.includes('universiti') ||
-      normalized.includes('college') || normalized.includes('kolej') ||
-      normalized.includes('higher') || normalized.includes('tinggi')) {
+  if (normalized.includes('university') || 
+      normalized.includes('universiti') ||
+      normalized.includes('college') || 
+      normalized.includes('kolej') ||
+      normalized.includes('higher') || 
+      normalized.includes('tinggi') ||
+      normalized.includes('youth')) {
     return 'UNIVERSITY';
   }
   
-  // Default to OTHER for unrecognized levels
+  // Default to OTHER for unrecognized levels (including UNKNOWN)
   return 'OTHER';
 }
 
@@ -78,12 +91,9 @@ async function fetchContestParticipationData() {
         return [] as EducationLevelCount[];
       }
       
-      console.log('Fetching contest participation data...');
+      console.log('Fetching contest participation data using contest targetgroup...');
       
-      // Use a more efficient approach: Get unique contest IDs first, then fetch contest details separately
-      // This avoids the "too many placeholders" error
-      
-      // Step 1: Get participation counts grouped by contest
+      // Get participation counts grouped by contest
       const participationCounts = await prisma.contestParticipation.groupBy({
         by: ['contestId'],
         _count: {
@@ -94,7 +104,7 @@ async function fetchContestParticipationData() {
             id: 'desc'
           }
         },
-        take: 50 // Limit to top 50 contests to avoid performance issues
+        take: 50
       });
       
       console.log('Participation counts by contest:', participationCounts.length, 'contests');
@@ -104,7 +114,7 @@ async function fetchContestParticipationData() {
         return [] as EducationLevelCount[];
       }
       
-      // Step 2: Get contest details and targetgroup info for these contests
+      // Get contest details with targetgroup
       const contestIds = participationCounts.map((p: any) => p.contestId);
       const contests = await prisma.contest.findMany({
         where: {
@@ -117,21 +127,6 @@ async function fetchContestParticipationData() {
       
       console.log('Contests with targetgroups:', contests.length);
       
-      // Step 3: Get a sample of contestants to determine edu_level fallback
-      const sampleContestants = await prisma.contestParticipation.findMany({
-        where: {
-          contestId: { in: contestIds }
-        },
-        include: {
-          contestant: {
-            select: { edu_level: true }
-          }
-        },
-        take: 1000 // Sample for edu_level distribution
-      });
-      
-      console.log('Sample contestants for edu_level:', sampleContestants.length);
-      
       // Process the data to count occurrences
       const countMap: Record<string, Record<string, number>> = {};
       
@@ -141,46 +136,20 @@ async function fetchContestParticipationData() {
         contestMap.set(contest.id, contest);
       });
       
-      // Process participation counts
+      // Process participation counts using contest's targetgroup
       participationCounts.forEach((participation: any, index: number) => {
         const contest = contestMap.get(participation.contestId);
         if (!contest) return;
         
         const contestKey = `${contest.code}-${contest.name}`;
         
-        // Try to get school level from targetgroup first, fallback to sample data
-        let schoolLevel = '';
+        // Get school level from targetgroup
+        let schoolLevel = 'OTHER';
         
         if (contest.targetgroup && Array.isArray(contest.targetgroup) && contest.targetgroup.length > 0) {
-          // Use targetgroup school level if available (use first targetgroup for simplicity)
           schoolLevel = contest.targetgroup[0].schoolLevel;
           if (index < 5) {
-            console.log(`Using targetgroup for ${contestKey}:`, schoolLevel, `(${contest.targetgroup.length} targetgroups)`);
-          }
-        } else {
-          // Fallback: Use the most common edu_level from sample contestants for this contest
-          const contestantSamples = sampleContestants.filter(s => s.contestId === participation.contestId);
-          if (contestantSamples.length > 0) {
-            // Get the most common edu_level for this contest
-            const eduLevelCounts: Record<string, number> = {};
-            contestantSamples.forEach(sample => {
-              const eduLevel = sample.contestant.edu_level || 'OTHER';
-              eduLevelCounts[eduLevel] = (eduLevelCounts[eduLevel] || 0) + 1;
-            });
-            
-            // Find the most common edu_level
-            const mostCommonEduLevel = Object.entries(eduLevelCounts)
-              .sort(([,a], [,b]) => b - a)[0]?.[0] || 'OTHER';
-            
-            schoolLevel = mostCommonEduLevel;
-            if (index < 5) {
-              console.log(`Using most common contestant edu_level for ${contestKey}:`, schoolLevel, `(from ${contestantSamples.length} samples)`);
-            }
-          } else {
-            schoolLevel = 'OTHER';
-            if (index < 5) {
-              console.log(`No data available for ${contestKey}, using default: OTHER`);
-            }
+            console.log(`Using targetgroup for ${contestKey}:`, schoolLevel);
           }
         }
         

@@ -12,6 +12,42 @@ const formatNumber = (value: number): string => {
   }).format(value);
 };
 
+// Function to normalize school level to display categories
+function normalizeToDisplayCategory(schoolLevel: string): string {
+  const normalized = schoolLevel?.toLowerCase().trim() || '';
+  
+  // Primary school variations - Maps to "Kids"
+  if (normalized.includes('primary') || 
+      normalized.includes('sekolah rendah') ||
+      normalized.includes('rendah') ||
+      normalized.includes('kids')) {
+    return 'Kids';
+  }
+  
+  // Secondary school variations - Maps to "Teens"
+  if (normalized.includes('secondary') || 
+      normalized.includes('sekolah menengah') ||
+      normalized.includes('menengah') ||
+      normalized.includes('teens')) {
+    return 'Teens';
+  }
+  
+  // University/College/Youth variations - Maps to "Youth"
+  if (normalized.includes('university') || 
+      normalized.includes('universiti') ||
+      normalized.includes('college') || 
+      normalized.includes('kolej') ||
+      normalized.includes('higher') || 
+      normalized.includes('tinggi') ||
+      normalized.includes('youth') ||
+      normalized.includes('belia')) {
+    return 'Youth';
+  }
+  
+  // Default to Youth for unrecognized levels
+  return 'Youth';
+}
+
 // Type definition for education level data
 type EducationLevelData = {
   level: string;
@@ -25,17 +61,27 @@ interface EducationLevelChartProps {
 
 // Mapping for icons
 const levelIcons = {
-  'Sekolah Rendah': School,
-  'Sekolah Menengah': GraduationCap,
-  'Belia': User,
+  'Kids': School,
+  'Teens': GraduationCap,
+  'Youth': User,
 } as const;
 
 export default function EducationLevelChart({ data }: EducationLevelChartProps) {
-  // Find the maximum count to calculate percentages
-  const maxCount = Math.max(...data.map(item => item.count), 1); // Ensure at least 1 to avoid division by zero
+  // Aggregate data by normalized categories
+  const aggregatedData: Record<string, number> = {};
   
-  // Sort data by count in descending order
-  const sortedData = [...data].sort((a, b) => b.count - a.count);
+  data.forEach(item => {
+    const category = normalizeToDisplayCategory(item.level);
+    aggregatedData[category] = (aggregatedData[category] || 0) + item.count;
+  });
+  
+  // Convert to array and sort by count descending
+  const sortedData = Object.entries(aggregatedData)
+    .map(([level, count]) => ({ level, count }))
+    .sort((a, b) => b.count - a.count);
+  
+  // Find the maximum count to calculate percentages
+  const maxCount = Math.max(...sortedData.map(item => item.count), 1);
 
   return (
     <div className="w-full">
@@ -49,9 +95,9 @@ export default function EducationLevelChart({ data }: EducationLevelChartProps) 
           
           // Determine bar color based on education level
           let barColor = "bg-blue-500";
-          if (item.level === 'Sekolah Rendah') barColor = "bg-emerald-500";
-          if (item.level === 'Sekolah Menengah') barColor = "bg-blue-500";
-          if (item.level === 'Belia') barColor = "bg-amber-500";
+          if (item.level === 'Kids') barColor = "bg-emerald-500";
+          if (item.level === 'Teens') barColor = "bg-blue-500";
+          if (item.level === 'Youth') barColor = "bg-amber-500";
           
           return (
             <div key={index} className="relative">
@@ -72,7 +118,7 @@ export default function EducationLevelChart({ data }: EducationLevelChartProps) 
           );
         })}
         
-        {data.length === 0 && (
+        {sortedData.length === 0 && (
           <div className="text-sm text-muted-foreground py-2 text-center">
             No data available
           </div>
