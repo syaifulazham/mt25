@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import EducationLevelChart from "./education-level-chart";
-import { Loader2 } from "lucide-react";
+import { Loader2, ExternalLink } from "lucide-react";
+import Link from 'next/link';
 
 type EducationLevelData = {
   level: string;
@@ -54,7 +55,16 @@ export default function EducationLevelSection() {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex-none">
-        <CardTitle>Education Levels</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>Education Levels</CardTitle>
+          <Link 
+            href="/organizer/dashboard/by-education-level"
+            className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium"
+          >
+            Show Details
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="flex-grow">
         {loading ? (
