@@ -183,32 +183,43 @@ export default function EducationLevelDetailsPage() {
             <CardTitle className="text-base">By Competition - {activeCategory}</CardTitle>
           </CardHeader>
           <CardContent className="p-2">
-            <div className="space-y-1 max-h-[600px] overflow-y-auto">
+            <div className="max-h-[600px] overflow-y-auto">
               {competitions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No competitions found</p>
               ) : (
-                competitions.map((comp, idx) => {
-                  const percentage = grandTotal > 0 ? (comp.total / grandTotal) * 100 : 0;
-                  return (
-                    <div key={idx} className="p-2 border-b last:border-b-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium truncate flex-1" title={`${comp.code} - ${comp.name}`}>
-                          {comp.code} - {comp.name}
-                        </span>
-                        <span className="text-xs font-bold ml-2">{formatNumber(comp.total)}</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${
-                            activeCategory === 'Kids' ? 'bg-emerald-500' :
-                            activeCategory === 'Teens' ? 'bg-blue-500' : 'bg-amber-500'
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-white border-b">
+                    <tr>
+                      <th className="text-left p-1.5 font-semibold">Competition</th>
+                      <th className="text-right p-1.5 font-semibold w-20">Total</th>
+                      <th className="p-1.5 w-32"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {competitions.map((comp, idx) => {
+                      const percentage = grandTotal > 0 ? (comp.total / grandTotal) * 100 : 0;
+                      return (
+                        <tr key={idx} className="border-b last:border-b-0 hover:bg-gray-50">
+                          <td className="p-1.5 truncate max-w-0" title={`${comp.code} - ${comp.name}`}>
+                            {comp.code} - {comp.name}
+                          </td>
+                          <td className="text-right p-1.5 font-medium">{formatNumber(comp.total)}</td>
+                          <td className="p-1.5">
+                            <div className="h-4 bg-gray-200 rounded overflow-hidden">
+                              <div 
+                                className={`h-full ${
+                                  activeCategory === 'Kids' ? 'bg-emerald-500' :
+                                  activeCategory === 'Teens' ? 'bg-blue-500' : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
             </div>
           </CardContent>
@@ -220,30 +231,41 @@ export default function EducationLevelDetailsPage() {
             <CardTitle className="text-base">By State - {activeCategory}</CardTitle>
           </CardHeader>
           <CardContent className="p-2">
-            <div className="space-y-1 max-h-[600px] overflow-y-auto">
+            <div className="max-h-[600px] overflow-y-auto">
               {states.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No states found</p>
               ) : (
-                states.map((state, idx) => {
-                  const percentage = grandTotal > 0 ? (state.total / grandTotal) * 100 : 0;
-                  return (
-                    <div key={idx} className="p-2 border-b last:border-b-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium">{state.state}</span>
-                        <span className="text-xs font-bold">{formatNumber(state.total)}</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${
-                            activeCategory === 'Kids' ? 'bg-emerald-500' :
-                            activeCategory === 'Teens' ? 'bg-blue-500' : 'bg-amber-500'
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-white border-b">
+                    <tr>
+                      <th className="text-left p-1.5 font-semibold">State</th>
+                      <th className="text-right p-1.5 font-semibold w-20">Total</th>
+                      <th className="p-1.5 w-32"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {states.map((state, idx) => {
+                      const percentage = grandTotal > 0 ? (state.total / grandTotal) * 100 : 0;
+                      return (
+                        <tr key={idx} className="border-b last:border-b-0 hover:bg-gray-50">
+                          <td className="p-1.5">{state.state}</td>
+                          <td className="text-right p-1.5 font-medium">{formatNumber(state.total)}</td>
+                          <td className="p-1.5">
+                            <div className="h-4 bg-gray-200 rounded overflow-hidden">
+                              <div 
+                                className={`h-full ${
+                                  activeCategory === 'Kids' ? 'bg-emerald-500' :
+                                  activeCategory === 'Teens' ? 'bg-blue-500' : 'bg-amber-500'
+                                }`}
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
             </div>
           </CardContent>
