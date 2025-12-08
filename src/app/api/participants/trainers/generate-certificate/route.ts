@@ -127,17 +127,27 @@ export async function POST(request: NextRequest) {
     let isNewCertificate = false
 
     if (existingCert) {
-      // Certificate record exists - just update it for regeneration
+      // Certificate record exists - update it for regeneration with latest data
       console.log('Updating existing certificate:', existingCert.id)
+      
+      // Get institution name from contingent (if available)
+      const institutionName = contingent?.school?.name ||
+        contingent?.higherInstitution?.name ||
+        contingent?.independent?.name ||
+        ''
+      
       certificate = await prisma.certificate.update({
         where: { id: existingCert.id },
         data: {
+          recipientName: manager.name, // Update with current name
+          recipientEmail: manager.email || null, // Update email
+          contingent_name: contingent?.name || null, // Update contingent name
           filePath: null, // On-demand generation
           status: 'READY',
           updatedAt: new Date()
         }
       })
-      console.log('Certificate updated successfully')
+      console.log('Certificate updated successfully with latest data')
     } else {
       // Create new certificate record
       isNewCertificate = true

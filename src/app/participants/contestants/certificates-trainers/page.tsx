@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, FileCheck, Loader2, Eye, Search, Users, Award, X, FileText } from 'lucide-react'
+import { Download, FileCheck, Loader2, Eye, Search, Users, Award, X, FileText, RefreshCw } from 'lucide-react'
 
 interface Certificate {
   id: number
@@ -54,6 +54,12 @@ export default function TrainersCertificatesPage() {
     type: 'success' | 'error'
     title: string
     message: string
+  } | null>(null)
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
+  const [regenerateTarget, setRegenerateTarget] = useState<{
+    managerId: number
+    managerIc: string
+    managerName: string
   } | null>(null)
 
   useEffect(() => {
@@ -203,6 +209,67 @@ export default function TrainersCertificatesPage() {
     } finally {
       setGeneratingIds(prev => prev.filter(id => id !== managerId))
     }
+  }
+
+  const handleRegenerateCertificate = (managerId: number, managerIc: string, managerName: string) => {
+    setRegenerateTarget({ managerId, managerIc, managerName })
+    setShowRegenerateConfirm(true)
+  }
+
+  const confirmRegenerate = async () => {
+    if (!regenerateTarget) return
+
+    const { managerId, managerIc, managerName } = regenerateTarget
+    setShowRegenerateConfirm(false)
+    setGeneratingIds(prev => [...prev, managerId])
+    
+    try {
+      const response = await fetch('/api/participants/trainers/generate-certificate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          managerId,
+          managerIc
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to regenerate certificate')
+      }
+
+      // Show success message
+      setMessageModal({
+        type: 'success',
+        title: 'Berjaya',
+        message: `Sijil berjaya dijana semula untuk ${managerName} dengan data terkini!`
+      })
+      setShowMessageModal(true)
+      
+      // Refresh the trainers list
+      fetchTrainers()
+    } catch (error) {
+      console.error('Regeneration error:', error)
+      
+      // Show error message
+      setMessageModal({
+        type: 'error',
+        title: 'Ralat',
+        message: `Gagal menjana semula sijil: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+      setShowMessageModal(true)
+    } finally {
+      setGeneratingIds(prev => prev.filter(id => id !== managerId))
+      setRegenerateTarget(null)
+    }
+  }
+
+  const cancelRegenerate = () => {
+    setShowRegenerateConfirm(false)
+    setRegenerateTarget(null)
   }
 
   const closeMessageModal = () => {
@@ -468,6 +535,22 @@ export default function TrainersCertificatesPage() {
                           >
                             <Download className="h-4 w-4" />
                           </button>
+                          <button
+                            onClick={() => handleRegenerateCertificate(
+                              trainer.managerId,
+                              trainer.managerIc,
+                              trainer.managerName
+                            )}
+                            disabled={generatingIds.includes(trainer.managerId)}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Jana Semula Sijil (untuk pembetulan nama/IC)"
+                          >
+                            {generatingIds.includes(trainer.managerId) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-center">
@@ -611,6 +694,64 @@ export default function TrainersCertificatesPage() {
                   Muat Turun Sijil
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate Confirmation Modal */}
+      {showRegenerateConfirm && regenerateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 bg-amber-50">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                  <RefreshCw className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-amber-900">
+                    Jana Semula Sijil
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <p className="text-gray-700 mb-2">
+                Adakah anda pasti untuk menjana semula sijil untuk:
+              </p>
+              <p className="text-lg font-semibold text-gray-900 mb-4">
+                {regenerateTarget.managerName}
+              </p>
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-2">
+                <p className="text-sm text-blue-900">
+                  <strong>Nota:</strong> Sijil akan dikemas kini dengan data terkini dari pangkalan data (nama, email, kontinjen).
+                </p>
+              </div>
+              <div className="bg-green-50 border-l-4 border-green-500 p-4">
+                <p className="text-sm text-green-900">
+                  <strong>Nombor Siri dijamin tidak berubah</strong> - Sijil yang sama akan dikemas kini tanpa mencipta pendua.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={cancelRegenerate}
+                className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmRegenerate}
+                className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Jana Semula
+              </button>
             </div>
           </div>
         </div>
