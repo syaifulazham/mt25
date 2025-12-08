@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
         const schoolCertificates = await prisma.certificate.findMany({
           where: {
             ic_number: contestant.ic,
-            status: 'READY',
+            status: { in: ['READY', 'LISTED'] },
             template: {
               targetType: 'GENERAL'
             }
@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
           FROM certificate c
           INNER JOIN cert_template ct ON c.templateId = ct.id
           LEFT JOIN event e ON ct.eventId = e.id
-          WHERE c.status = 'READY'
+          WHERE c.status IN ('READY', 'LISTED')
             AND JSON_EXTRACT(c.ownership, '$.contingentId') = ${contestant.contingent?.id}
             AND c.ic_number = ${contestant.ic}
             AND e.scopeArea IN ('ZONE', 'ONLINE_STATE', 'NATIONAL')
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
             ct.quizId
           FROM certificate c
           INNER JOIN cert_template ct ON c.templateId = ct.id
-          WHERE c.status = 'READY'
+          WHERE c.status IN ('READY', 'LISTED')
             AND c.ic_number = ${contestant.ic}
             AND ct.targetType IN ('QUIZ_PARTICIPANT', 'QUIZ_WINNER')
         `
