@@ -30,10 +30,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { MoreHorizontal, Eye, Download, Mail, Printer, FileText, Search, X } from 'lucide-react'
+import { Checkbox } from "@/components/ui/checkbox"
+import { MoreHorizontal, Eye, Download, Mail, Printer, FileText, Search, X, Filter, CheckSquare, Square, Package } from 'lucide-react'
 import { format } from 'date-fns'
 import { ViewCertificateModal } from './ViewCertificateModal'
 import { EditCertificateModal } from './EditCertificateModal'
+import { TemplateFilterModal } from './TemplateFilterModal'
 
 // Certificate interface
 interface Certificate {
@@ -81,6 +83,14 @@ export function CertificateList({ certificates: initialCertificates, pagination:
   const [generatingCertificateId, setGeneratingCertificateId] = useState<number | null>(null)
   const [targetTypeFilter, setTargetTypeFilter] = useState<string>('all')
   const [localSearchTerm, setLocalSearchTerm] = useState('')
+  const [templateFilterModalOpen, setTemplateFilterModalOpen] = useState(false)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null)
+  const [selectedTemplateName, setSelectedTemplateName] = useState<string>('All Templates')
+  const [selectedCertificates, setSelectedCertificates] = useState<Set<number>>(new Set())
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false)
+  const [saveToServer, setSaveToServer] = useState(true)
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const router = useRouter()
   
   // Role-based permissions
@@ -111,6 +121,7 @@ export function CertificateList({ certificates: initialCertificates, pagination:
         ...(searchTerm && { search: searchTerm }),
         ...(localSearchTerm && { search: localSearchTerm }),
         ...(targetTypeFilter && targetTypeFilter !== 'all' && { targetType: targetTypeFilter }),
+        ...(selectedTemplateId && { templateId: selectedTemplateId.toString() }),
       })
       
       const response = await fetch(`/api/certificates?${queryParams}`)
@@ -164,14 +175,14 @@ export function CertificateList({ certificates: initialCertificates, pagination:
   // Fetch certificates when search term, filters or page changes
   useEffect(() => {
     fetchCertificates()
-  }, [searchTerm, localSearchTerm, targetTypeFilter, currentPage, pagination.limit])
+  }, [searchTerm, localSearchTerm, targetTypeFilter, selectedTemplateId, currentPage, pagination.limit])
   
   // Reset to page 1 when filters change
   useEffect(() => {
     if (currentPage !== 1) {
       setCurrentPage(1)
     }
-  }, [targetTypeFilter, localSearchTerm])
+  }, [targetTypeFilter, localSearchTerm, selectedTemplateId])
   
   // Filter certificates based on search term and targetType (client side filtering for immediate feedback)
   const filteredCertificates = certificates.filter(certificate => {
@@ -188,14 +199,137 @@ export function CertificateList({ certificates: initialCertificates, pagination:
     return matchesSearch && matchesTargetType
   })
   
+  // Handle template selection
+  const handleTemplateSelect = (templateId: number | null, templateName: string) => {
+    setSelectedTemplateId(templateId)
+    setSelectedTemplateName(templateName)
+  }
+  
+  // Bulk selection handlers
+  const toggleCertificateSelection = (certId: number) => {
+    setSelectedCertificates(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(certId)) {
+        newSet.delete(certId)
+      } else {
+        newSet.add(certId)
+      }
+      return newSet
+    })
+  }
+  
+  const toggleSelectAll = () => {
+    if (selectedCertificates.size === filteredCertificates.length) {
+      setSelectedCertificates(new Set())
+    } else {
+      setSelectedCertificates(new Set(filteredCertificates.map(c => c.id)))
+    }
+  }
+  
+  const isAllSelected = filteredCertificates.length > 0 && selectedCertificates.size === filteredCertificates.length
+  const isSomeSelected = selectedCertificates.size > 0 && selectedCertificates.size < filteredCertificates.length
+  
+  // Handle bulk PDF generation
+  const handleBulkGenerate = async () => {
+    if (selectedCertificates.size === 0) return
+    
+    console.log('Starting bulk PDF generation...')
+    console.log('Selected certificates:', Array.from(selectedCertificates))
+    console.log('Save to server:', saveToServer)
+    
+    setIsBulkGenerating(true)
+    setShowBulkModal(false)
+    setSuccessMessage(null)
+    setError(null)
+    
+    try {
+      console.log('Sending request to API...')
+      const response = await fetch('/api/certificates/bulk-generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          certificateIds: Array.from(selectedCertificates),
+          saveToServer
+        })
+      })
+      
+      console.log('Response received:', response.status, response.statusText)
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
+      
+      if (!response.ok) {
+        console.error('Response not OK:', response.status)
+        const errorData = await response.json()
+        console.error('Error data:', errorData)
+        
+        // If all certificates failed, show detailed error
+        if (errorData.error === 'All certificates failed to generate') {
+          const failureReasons = errorData.details
+            .map((d: any) => `${d.recipientName}: ${d.error}`)
+            .join('\n')
+          throw new Error(`All certificates failed to generate:\n\n${failureReasons}`)
+        }
+        
+        throw new Error(errorData.error || 'Failed to generate certificates')
+      }
+      
+      // Get generation results from headers
+      const totalCerts = parseInt(response.headers.get('X-Total-Certificates') || '0')
+      const successCount = parseInt(response.headers.get('X-Successful-Count') || '0')
+      const failedCount = parseInt(response.headers.get('X-Failed-Count') || '0')
+      
+      console.log('Generation results:', { totalCerts, successCount, failedCount })
+      
+      // Download ZIP file
+      console.log('Converting response to blob...')
+      const blob = await response.blob()
+      console.log('Blob size:', blob.size, 'bytes')
+      
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const filename = `certificates-bulk-${Date.now()}.zip`
+      a.download = filename
+      console.log('Triggering download:', filename)
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      console.log('Download triggered successfully')
+      
+      // Refresh the certificate list
+      await fetchCertificates()
+      
+      // Clear selection
+      setSelectedCertificates(new Set())
+      
+      // Show appropriate message based on results
+      setError(null)
+      if (failedCount > 0) {
+        setSuccessMessage(`✅ ${successCount} certificate${successCount !== 1 ? 's' : ''} generated successfully. ⚠️ ${failedCount} failed (check metadata.json in ZIP for details).`)
+      } else {
+        setSuccessMessage(`✅ All ${successCount} certificate${successCount !== 1 ? 's' : ''} generated successfully!`)
+      }
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate certificates')
+      console.error('Error generating certificates:', err)
+    } finally {
+      setIsBulkGenerating(false)
+    }
+  }
+  
   // Clear filters
   const clearFilters = () => {
     setTargetTypeFilter('all')
     setLocalSearchTerm('')
+    setSelectedTemplateId(null)
+    setSelectedTemplateName('All Templates')
   }
   
   // Check if any filters are active
-  const hasActiveFilters = targetTypeFilter !== 'all' || localSearchTerm !== ''
+  const hasActiveFilters = targetTypeFilter !== 'all' || localSearchTerm !== '' || selectedTemplateId !== null
   
   // Handle certificate sending
   const handleSendCertificate = async (certificateId: number) => {
@@ -343,6 +477,16 @@ export function CertificateList({ certificates: initialCertificates, pagination:
           </Select>
         </div>
         
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setTemplateFilterModalOpen(true)}
+          className={`h-9 gap-1 ${selectedTemplateId ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100' : ''}`}
+        >
+          <Filter className="h-4 w-4" />
+          <span>{selectedTemplateName}</span>
+        </Button>
+        
         {hasActiveFilters && (
           <Button
             variant="outline"
@@ -360,6 +504,30 @@ export function CertificateList({ certificates: initialCertificates, pagination:
         </div>
       </div>
       
+      {/* Success message display */}
+      {successMessage && (
+        <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm text-green-700 whitespace-pre-line">{successMessage}</p>
+            </div>
+            <div className="ml-3">
+              <button
+                onClick={() => setSuccessMessage(null)}
+                className="text-green-500 hover:text-green-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Error display */}
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
@@ -370,7 +538,90 @@ export function CertificateList({ certificates: initialCertificates, pagination:
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700 whitespace-pre-line">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Bulk Actions Bar */}
+      {selectedCertificates.size > 0 && canManageCertificates && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckSquare className="h-5 w-5 text-blue-600" />
+              <span className="font-medium text-blue-900">
+                {selectedCertificates.size} certificate{selectedCertificates.size !== 1 ? 's' : ''} selected
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedCertificates(new Set())}
+                className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+              >
+                Clear Selection
+              </Button>
+            </div>
+            <Button
+              onClick={() => setShowBulkModal(true)}
+              disabled={isBulkGenerating}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isBulkGenerating ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Package className="h-4 w-4 mr-2" />
+                  Generate & Download PDFs
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      {/* Bulk Generation Modal */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Bulk PDF Generation</h3>
+            <p className="text-gray-600 mb-4">
+              Generate PDFs for {selectedCertificates.size} selected certificate{selectedCertificates.size !== 1 ? 's' : ''} and download as a ZIP file.
+            </p>
+            
+            <div className="mb-6">
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <Checkbox
+                  checked={saveToServer}
+                  onCheckedChange={(checked) => setSaveToServer(checked as boolean)}
+                />
+                <div className="flex-1">
+                  <div className="font-medium text-sm">Save PDFs to server</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    If enabled, generated PDFs will be saved to the server and certificate status will be updated to READY. 
+                    If disabled, PDFs will only be included in the download ZIP.
+                  </div>
+                </div>
+              </label>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkGenerate}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Generate & Download
+              </Button>
             </div>
           </div>
         </div>
@@ -390,6 +641,16 @@ export function CertificateList({ certificates: initialCertificates, pagination:
           <Table>
             <TableHeader>
               <TableRow>
+                {canManageCertificates && (
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                      className={isSomeSelected && !isAllSelected ? 'opacity-50' : ''}
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Recipient</TableHead>
                 <TableHead>Certificate Name</TableHead>
                 <TableHead>Award / Contest</TableHead>
@@ -408,7 +669,7 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                 return (
                   <TableRow key={certificate.id} className={isGenerating ? 'bg-blue-50 relative' : ''}>
                     {isGenerating && (
-                      <td colSpan={7} className="absolute inset-0 pointer-events-none">
+                      <td colSpan={canManageCertificates ? 8 : 7} className="absolute inset-0 pointer-events-none">
                         <div className="relative h-full">
                           <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-200">
                             <div className="h-full bg-blue-600 animate-pulse" style={{ width: '100%' }}></div>
@@ -421,6 +682,15 @@ export function CertificateList({ certificates: initialCertificates, pagination:
                           </div>
                         </div>
                       </td>
+                    )}
+                    {canManageCertificates && (
+                      <TableCell className="w-12">
+                        <Checkbox
+                          checked={selectedCertificates.has(certificate.id)}
+                          onCheckedChange={() => toggleCertificateSelection(certificate.id)}
+                          aria-label={`Select certificate for ${certificate.recipientName}`}
+                        />
+                      </TableCell>
                     )}
                     <TableCell>
                       <div className="font-medium">{certificate.recipientName}</div>
@@ -632,6 +902,14 @@ export function CertificateList({ certificates: initialCertificates, pagination:
           onSuccess={handleEditSuccess}
         />
       )}
+      
+      {/* Template Filter Modal */}
+      <TemplateFilterModal
+        isOpen={templateFilterModalOpen}
+        onClose={() => setTemplateFilterModalOpen(false)}
+        onSelectTemplate={handleTemplateSelect}
+        selectedTemplateId={selectedTemplateId}
+      />
     </div>
   )
 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Session } from 'next-auth'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Search, Filter, UserPlus, FileText, PlusCircle } from 'lucide-react'
+import { Search, Filter, UserPlus, FileText, PlusCircle, Upload } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { CertTemplateList } from './CertTemplateList'
@@ -148,15 +148,28 @@ export function CertificateHub({
           </Button>
           
           {canManageCertificates && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-9 gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Create a Cert</span>
-            </Button>
+            <>
+              <Link href="/organizer/certificates/bulk-generate-nonparticipant">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-9 gap-1 border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>Generate Bulk Certs</span>
+                </Button>
+              </Link>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-9 gap-1 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Create a Cert</span>
+              </Button>
+            </>
           )}
         </div>
       </div>

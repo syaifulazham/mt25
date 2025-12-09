@@ -36,8 +36,17 @@ export async function GET(request: NextRequest) {
     // Validate parameters
     const validatedParams = templateQuerySchema.parse(queryParams)
     
+    // Map pageSize to limit for the service (service expects 'limit', but API accepts 'pageSize')
+    const serviceParams: any = {
+      search: validatedParams.search,
+      status: validatedParams.status,
+      targetType: validatedParams.targetType,
+      page: validatedParams.page,
+      limit: validatedParams.pageSize, // Map pageSize -> limit
+    }
+    
     // Fetch templates
-    const result = await TemplateService.listTemplates(validatedParams)
+    const result = await TemplateService.listTemplates(serviceParams)
 
     return NextResponse.json(result)
   } catch (error) {
