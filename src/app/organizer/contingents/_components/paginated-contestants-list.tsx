@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Award, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert, User } from "lucide-react";
+import { Award, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert, User, UserCircle2 } from "lucide-react";
 import Link from "next/link";
 import AssignContestsModal from "./assign-contests-modal";
 
@@ -117,12 +117,22 @@ export function PaginatedContestantsList({ contestants, contingentId, refreshDat
                         )}
                       </div>
                       <CardDescription className="flex flex-col gap-1">
-                        <div>
-                          ID: {contestant.ic || 'N/A'} 
+                        <div className="flex items-center gap-2">
+                          <span>ID: {contestant.ic || 'N/A'}</span>
                           {contestant.gender && (
-                            <span className="ml-2">
-                              Gender: {contestant.gender === 'M' ? 'Male' : 'Female'}
-                            </span>
+                            <Badge 
+                              variant="outline" 
+                              className={`flex items-center gap-1 ${
+                                contestant.gender === 'MALE' 
+                                  ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                                  : contestant.gender === 'FEMALE'
+                                  ? 'bg-pink-50 text-pink-700 border-pink-200'
+                                  : 'bg-gray-50 text-gray-700 border-gray-200'
+                              }`}
+                            >
+                              <UserCircle2 className="h-3 w-3" />
+                              {contestant.gender === 'MALE' ? 'Male' : contestant.gender === 'FEMALE' ? 'Female' : contestant.gender}
+                            </Badge>
                           )}
                         </div>
                         {contestant.class_grade && contestant.class_name && (

@@ -82,8 +82,8 @@ export function generateContestantsDocx(contestants: Contestant[], title: string
   // Create data rows
   const rows = contestants.map((contestant, index) => {
     // Format gender text
-    const gender = contestant.gender === 'M' ? 'Lelaki' : 
-                  contestant.gender === 'F' ? 'Perempuan' : 
+    const gender = contestant.gender === 'MALE' ? 'Lelaki' : 
+                  contestant.gender === 'FEMALE' ? 'Perempuan' : 
                   contestant.gender;
     
     // Format class display - combine class_grade and class_name

@@ -319,9 +319,9 @@ async function fetchContingentData(tab: string, search: string, stateFilter: str
         }
         
         // Count by gender
-        if (contestant.gender === 'male') {
+        if (contestant.gender === 'MALE') {
           maleCount++;
-        } else if (contestant.gender === 'female') {
+        } else if (contestant.gender === 'FEMALE') {
           femaleCount++;
         }
       });

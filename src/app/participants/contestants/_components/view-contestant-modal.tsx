@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Eye } from 'lucide-react';
+import { Eye, UserCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
@@ -54,9 +54,25 @@ export default function ViewContestantModal({ contestant }: ViewContestantModalP
               </div>
               <div>
                 <p className="text-xs text-gray-500">Gender</p>
-                <p className="text-sm font-medium">
-                  {contestant.gender === 'M' ? 'Male' : contestant.gender === 'F' ? 'Female' : '-'}
-                </p>
+                <div className="mt-1">
+                  {contestant.gender ? (
+                    <Badge 
+                      variant="outline" 
+                      className={`flex items-center gap-1 w-fit ${
+                        contestant.gender === 'MALE' 
+                          ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                          : contestant.gender === 'FEMALE'
+                          ? 'bg-pink-50 text-pink-700 border-pink-200'
+                          : 'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      <UserCircle2 className="h-3 w-3" />
+                      {contestant.gender === 'MALE' ? 'Male' : contestant.gender === 'FEMALE' ? 'Female' : contestant.gender}
+                    </Badge>
+                  ) : (
+                    <p className="text-sm font-medium">-</p>
+                  )}
+                </div>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Age</p>
