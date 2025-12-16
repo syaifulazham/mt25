@@ -49,6 +49,7 @@ interface Certificate {
   contestName: string | null
   awardTitle: string | null
   uniqueCode: string
+  serialNumber?: string | null
   filePath: string | null
   status: string
   issuedAt: string | null
@@ -192,7 +193,8 @@ export function CertificateList({ certificates: initialCertificates, pagination:
       certificate.templateName.toLowerCase().includes(searchFilter.toLowerCase()) ||
       (certificate.contestName && certificate.contestName.toLowerCase().includes(searchFilter.toLowerCase())) ||
       (certificate.awardTitle && certificate.awardTitle.toLowerCase().includes(searchFilter.toLowerCase())) ||
-      certificate.uniqueCode.toLowerCase().includes(searchFilter.toLowerCase())
+      certificate.uniqueCode.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (certificate.serialNumber && certificate.serialNumber.toLowerCase().includes(searchFilter.toLowerCase()))
     
     const matchesTargetType = targetTypeFilter === 'all' || certificate.templateTargetType === targetTypeFilter
     
@@ -446,7 +448,7 @@ export function CertificateList({ certificates: initialCertificates, pagination:
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search by name, template, code..."
+              placeholder="Search by name, template, code, serial..."
               value={localSearchTerm}
               onChange={(e) => setLocalSearchTerm(e.target.value)}
               className="pl-9 h-9"

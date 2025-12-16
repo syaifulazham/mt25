@@ -46,6 +46,7 @@ interface Certificate {
   contestName: string | null
   awardTitle: string | null
   uniqueCode: string
+  serialNumber?: string | null
   filePath: string | null
   status: string
   issuedAt: string | null

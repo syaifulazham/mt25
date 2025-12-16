@@ -284,6 +284,7 @@ export class CertificateService {
         { recipientName: { contains: search } },
         { recipientEmail: { contains: search } },
         { uniqueCode: { contains: search } },
+        { serialNumber: { contains: search } },
         { contestName: { contains: search } },
         { awardTitle: { contains: search } }
       ];
