@@ -90,6 +90,8 @@ export async function GET(request: NextRequest) {
     // Fetch certificates for all contestants
     const contestantsWithCerts = await Promise.all(
       contestants.map(async (contestant) => {
+        const contestantIcTrimmed = (contestant.ic || '').trim()
+
         // Get school certificates (GENERAL) - match by IC number
         const schoolCertificates = await prisma.certificate.findMany({
           where: {
@@ -139,11 +141,20 @@ export async function GET(request: NextRequest) {
           LEFT JOIN event e ON ct.eventId = e.id
           WHERE c.status IN ('READY', 'LISTED')
             AND JSON_EXTRACT(c.ownership, '$.contingentId') = ${contestant.contingent?.id}
-            AND c.ic_number = ${contestant.ic}
+            AND (
+              (
+                JSON_EXTRACT(c.ownership, '$.contestantId') IS NOT NULL
+                AND JSON_EXTRACT(c.ownership, '$.contestantId') = ${contestant.id}
+              )
+              OR (
+                ${contestantIcTrimmed} <> ''
+                AND TRIM(c.ic_number) = ${contestantIcTrimmed}
+              )
+            )
             AND e.scopeArea IN ('ZONE', 'ONLINE_STATE', 'NATIONAL')
         `
 
-        // Get quiz certificates - match by IC and targetType
+        // Get quiz certificates - match by ownership.contestantId when possible, otherwise by trimmed IC
         const quizCertificates = await prisma.$queryRaw<Array<{
           id: number
           templateId: number
@@ -168,12 +179,23 @@ export async function GET(request: NextRequest) {
           FROM certificate c
           INNER JOIN cert_template ct ON c.templateId = ct.id
           WHERE c.status IN ('READY', 'LISTED')
-            AND c.ic_number = ${contestant.ic}
+            AND (
+              (
+                JSON_EXTRACT(c.ownership, '$.contestantId') IS NOT NULL
+                AND JSON_EXTRACT(c.ownership, '$.contestantId') = ${contestant.id}
+              )
+              OR (
+                ${contestantIcTrimmed} <> ''
+                AND TRIM(c.ic_number) = ${contestantIcTrimmed}
+              )
+            )
             AND ct.targetType IN ('QUIZ_PARTICIPANT', 'QUIZ_WINNER')
         `
 
         // Debug logging
-        if (contestant.contingent?.id === 202) {
+        const debugContingentIdRaw = process.env.DEBUG_CERT_CONTINGENT_ID
+        const debugContingentId = debugContingentIdRaw ? parseInt(debugContingentIdRaw) : null
+        if (debugContingentId && contestant.contingent?.id === debugContingentId) {
           console.log(`\n[DEBUG] Contestant: ${contestant.name} (IC: ${contestant.ic})`)
           console.log(`  Contingent ID: ${contestant.contingent?.id}`)
           console.log(`  School certs found: ${schoolCertificates.length}`)
