@@ -58,6 +58,8 @@ export default function CertificatesPage() {
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
   const [showBulkModal, setShowBulkModal] = useState(false)
   const [showOnlinePenyertaanModal, setShowOnlinePenyertaanModal] = useState(false)
   const [showOnlinePencapaianModal, setShowOnlinePencapaianModal] = useState(false)
@@ -101,6 +103,11 @@ export default function CertificatesPage() {
     applyFilters()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contestants, searchQuery, filterSchool, filterState, filterOnline, filterNational, filterQuiz])
+
+  useEffect(() => {
+    setCurrentPage(1)
+    setSelectedIds(new Set())
+  }, [searchQuery, filterSchool, filterState, filterOnline, filterNational, filterQuiz])
 
   const checkSchoolWinnerTemplate = async () => {
     try {
@@ -196,16 +203,32 @@ export default function CertificatesPage() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredContestants.length) {
-      setSelectedIds(new Set())
+    const pageIds = paginatedContestants.map(c => c.id)
+    const allSelectedOnPage = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id))
+    if (allSelectedOnPage) {
+      const next = new Set(selectedIds)
+      pageIds.forEach(id => next.delete(id))
+      setSelectedIds(next)
     } else {
-      setSelectedIds(new Set(filteredContestants.map(c => c.id)))
+      const next = new Set(selectedIds)
+      pageIds.forEach(id => next.add(id))
+      setSelectedIds(next)
     }
   }
 
   const getSelectedContestants = () => {
     return contestants.filter(c => selectedIds.has(c.id))
   }
+
+  const totalItems = filteredContestants.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * pageSize
+  const endIndex = Math.min(startIndex + pageSize, totalItems)
+  const paginatedContestants = filteredContestants.slice(startIndex, endIndex)
+
+  const isAllSelectedOnPage =
+    paginatedContestants.length > 0 && paginatedContestants.every(c => selectedIds.has(c.id))
 
   // Bulk actions
   const handleBulkGenerate = async (all: boolean) => {
@@ -1033,7 +1056,7 @@ export default function CertificatesPage() {
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <input
                     type="checkbox"
-                    checked={selectedIds.size > 0 && selectedIds.size === filteredContestants.length}
+                    checked={isAllSelectedOnPage}
                     onChange={toggleSelectAll}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
@@ -1075,7 +1098,7 @@ export default function CertificatesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredContestants.map((contestant, index) => (
+                paginatedContestants.map((contestant, index) => (
                   <tr key={contestant.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-center">
                       <input
@@ -1086,7 +1109,7 @@ export default function CertificatesPage() {
                       />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {index + 1}
+                      {startIndex + index + 1}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">
@@ -1162,6 +1185,67 @@ export default function CertificatesPage() {
             </tbody>
           </table>
         </div>
+
+        {filteredContestants.length > 0 && (
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-gray-50">
+            <div className="text-sm text-gray-600">
+              Menunjukkan <span className="font-medium">{startIndex + 1}</span> hingga{' '}
+              <span className="font-medium">{endIndex}</span> daripada{' '}
+              <span className="font-medium">{totalItems}</span> peserta
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-600">
+                Papar
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const next = Number(e.target.value)
+                    setPageSize(next)
+                    setCurrentPage(1)
+                    setSelectedIds(new Set())
+                  }}
+                  className="mx-2 h-9 px-2 border border-gray-300 rounded-md bg-white"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                / muka
+              </label>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage <= 1}
+                className={`h-9 px-3 rounded-md border text-sm font-medium transition-colors ${
+                  safeCurrentPage <= 1
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Sebelum
+              </button>
+
+              <div className="text-sm text-gray-700">
+                Muka <span className="font-medium">{safeCurrentPage}</span> /{' '}
+                <span className="font-medium">{totalPages}</span>
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage >= totalPages}
+                className={`h-9 px-3 rounded-md border text-sm font-medium transition-colors ${
+                  safeCurrentPage >= totalPages
+                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                Seterusnya
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer note */}
