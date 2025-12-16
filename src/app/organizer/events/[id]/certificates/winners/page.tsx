@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Trophy, FileText, Plus, Loader2, CheckCircle, Eye, Download } from 'lucide-react'
+import { ArrowLeft, Trophy, FileText, Plus, Loader2, CheckCircle, Eye, Download, X } from 'lucide-react'
 
 interface TeamRanking {
   rank: number
@@ -98,6 +98,20 @@ export default function WinnersCertificatesPage() {
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [errorModalMessage, setErrorModalMessage] = useState('')
 
+  const [isCleaningUnranked, setIsCleaningUnranked] = useState(false)
+  const [showCleanupUnrankedConfirm, setShowCleanupUnrankedConfirm] = useState(false)
+  const [cleanupUnrankedTeamIds, setCleanupUnrankedTeamIds] = useState<number[]>([])
+  const [showCleanupUnrankedResults, setShowCleanupUnrankedResults] = useState(false)
+  const [cleanupUnrankedResults, setCleanupUnrankedResults] = useState<{ removedTeams: number; removedCertificates: number; message?: string } | null>(null)
+
+  const [hideUnranked, setHideUnranked] = useState(false)
+
+  const displayedTeamRankings = hideUnranked
+    ? teamRankings.filter((t) => Number(t.averageScore) !== 0)
+    : teamRankings
+
+  const unrankedCount = teamRankings.filter((t) => Number(t.averageScore) === 0).length
+
   // Fetch event details to get scopeArea
   useEffect(() => {
     const fetchEventDetails = async () => {
@@ -121,6 +135,85 @@ export default function WinnersCertificatesPage() {
 
     fetchEventDetails()
   }, [eventId])
+
+  const handleRemoveUnrankedTeamCerts = async () => {
+    if (!selectedContest) {
+      setErrorModalMessage('Please select a contest first')
+      setShowErrorModal(true)
+      return
+    }
+
+    // Unranked definition: teams with 0 score
+    const unrankedTeamIds = teamRankings
+      .filter(t => t.team?.id && Number(t.averageScore) === 0)
+      .map(t => t.team!.id)
+
+    if (unrankedTeamIds.length === 0) {
+      setErrorModalMessage('No unranked (0 score) teams found for this contest.')
+      setShowErrorModal(true)
+      return
+    }
+
+    setCleanupUnrankedTeamIds(unrankedTeamIds)
+    setShowCleanupUnrankedConfirm(true)
+  }
+
+  const confirmRemoveUnrankedTeamCerts = async () => {
+    if (!selectedContest) {
+      setShowCleanupUnrankedConfirm(false)
+      setErrorModalMessage('Please select a contest first')
+      setShowErrorModal(true)
+      return
+    }
+
+    if (cleanupUnrankedTeamIds.length === 0) {
+      setShowCleanupUnrankedConfirm(false)
+      setErrorModalMessage('No unranked (0 score) teams found for this contest.')
+      setShowErrorModal(true)
+      return
+    }
+
+    setShowCleanupUnrankedConfirm(false)
+    setIsCleaningUnranked(true)
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/judging/remove-unranked-winner-certs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contestId: selectedContest,
+          unrankedTeamIds: cleanupUnrankedTeamIds
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove certificates')
+      }
+
+      setCleanupUnrankedResults({
+        removedTeams: Number(data.removedTeams || 0),
+        removedCertificates: Number(data.removedCertificates || 0),
+        message: data.message
+      })
+      setShowCleanupUnrankedResults(true)
+
+      // Refresh rankings
+      const refresh = await fetch(
+        `/api/events/${eventId}/judging/team-rankings?contestId=${selectedContest}&rankByState=${splitByState}`
+      )
+      if (refresh.ok) {
+        const refreshed = await refresh.json()
+        setTeamRankings(refreshed.rankings || [])
+      }
+    } catch (err) {
+      console.error(err)
+      setErrorModalMessage(err instanceof Error ? err.message : 'Failed to remove certificates')
+      setShowErrorModal(true)
+    } finally {
+      setIsCleaningUnranked(false)
+    }
+  }
 
   // Check if winner templates exist for this event
   useEffect(() => {
@@ -1170,7 +1263,7 @@ export default function WinnersCertificatesPage() {
   const groupedByState = () => {
     const groups: { [key: string]: TeamRanking[] } = {}
     
-    teamRankings.forEach(team => {
+    displayedTeamRankings.forEach(team => {
       const stateName = team.state?.name || 'No State'
       if (!groups[stateName]) {
         groups[stateName] = []
@@ -1269,6 +1362,96 @@ export default function WinnersCertificatesPage() {
         </div>
       )}
 
+      {/* Remove Unranked Certificates Confirmation Modal */}
+      {showCleanupUnrankedConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Confirm Cleanup
+              </h3>
+            </div>
+
+            <div className="p-6">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-red-900">
+                  Remove certificates for UNRANKED teams?
+                </p>
+                <p className="text-xs text-red-700 mt-2">
+                  This will delete winner certificates (if any) for teams that have 0 score in the current contest. Teams with score &gt; 0 will NOT be affected.
+                </p>
+              </div>
+
+              <div className="mt-4 text-xs text-gray-600">
+                Unranked (0 score) teams detected: <span className="font-medium">{cleanupUnrankedTeamIds.length}</span>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowCleanupUnrankedConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemoveUnrankedTeamCerts}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Unranked Certificates Results Modal */}
+      {showCleanupUnrankedResults && cleanupUnrankedResults && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">
+                Cleanup Results
+              </h3>
+            </div>
+
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-red-700">
+                    {cleanupUnrankedResults.removedTeams}
+                  </div>
+                  <div className="text-xs text-red-700 mt-1">Unranked teams</div>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-700">
+                    {cleanupUnrankedResults.removedCertificates}
+                  </div>
+                  <div className="text-xs text-blue-700 mt-1">Certificates removed</div>
+                </div>
+              </div>
+              {cleanupUnrankedResults.message && (
+                <p className="text-xs text-gray-600 mt-4">
+                  {cleanupUnrankedResults.message}
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end">
+              <button
+                onClick={() => {
+                  setShowCleanupUnrankedResults(false)
+                  setCleanupUnrankedResults(null)
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
           <p className="text-red-700">{error}</p>
@@ -1313,6 +1496,22 @@ export default function WinnersCertificatesPage() {
           {selectedContest && hasWinnerTemplates && (
             <div className="flex gap-2">
               <button
+                onClick={() => setHideUnranked(v => !v)}
+                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors border ${
+                  hideUnranked
+                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-gray-800'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+                title={hideUnranked ? 'Unhide Unranked Teams' : 'Hide Unranked Teams'}
+              >
+                {hideUnranked ? 'Unhide Unranked' : 'Hide Unranked'}
+                <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
+                  hideUnranked ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {unrankedCount}
+                </span>
+              </button>
+              <button
                 onClick={() => setShowPreGenerateModal(true)}
                 className="inline-flex items-center px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-md hover:bg-purple-700 transition-colors"
               >
@@ -1325,6 +1524,25 @@ export default function WinnersCertificatesPage() {
               >
                 <Trophy className="h-4 w-4 mr-2" />
                 Bulk Generate Certificates
+              </button>
+              <button
+                onClick={handleRemoveUnrankedTeamCerts}
+                disabled={isCleaningUnranked}
+                className={`inline-flex items-center px-4 py-2 text-white text-sm font-medium rounded-md transition-colors ${
+                  isCleaningUnranked ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isCleaningUnranked ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Removing...
+                  </>
+                ) : (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Remove Unranked Certs
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -1425,14 +1643,14 @@ export default function WinnersCertificatesPage() {
                   }`}>
                     {splitByState ? (
                       <>
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span>State-Specific Rankings</span>
                       </>
                     ) : (
                       <>
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                         </svg>
                         <span>Combined Results</span>
@@ -1482,7 +1700,7 @@ export default function WinnersCertificatesPage() {
                       </svg>
                     ) : (
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                       </svg>
                     )}
                   </div>
@@ -1654,7 +1872,7 @@ export default function WinnersCertificatesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {teamRankings.map((team) => (
+                  {displayedTeamRankings.map((team) => (
                     <tr
                       key={team.attendanceTeamId}
                       className={
