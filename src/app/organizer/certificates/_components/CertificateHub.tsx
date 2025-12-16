@@ -45,6 +45,7 @@ interface Certificate {
   recipientType: 'PARTICIPANT' | 'CONTESTANT' | 'JUDGE' | 'ORGANIZER'
   contestName: string | null
   awardTitle: string | null
+  contingent_name?: string | null
   uniqueCode: string
   serialNumber?: string | null
   filePath: string | null

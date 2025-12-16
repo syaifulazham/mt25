@@ -283,6 +283,7 @@ export class CertificateService {
       where.OR = [
         { recipientName: { contains: search } },
         { recipientEmail: { contains: search } },
+        { contingent_name: { contains: search } },
         { uniqueCode: { contains: search } },
         { serialNumber: { contains: search } },
         { contestName: { contains: search } },

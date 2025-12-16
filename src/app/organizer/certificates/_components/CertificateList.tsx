@@ -48,6 +48,7 @@ interface Certificate {
   recipientType: 'PARTICIPANT' | 'CONTESTANT' | 'JUDGE' | 'ORGANIZER'
   contestName: string | null
   awardTitle: string | null
+  contingent_name?: string | null
   uniqueCode: string
   serialNumber?: string | null
   filePath: string | null
@@ -191,6 +192,7 @@ export function CertificateList({ certificates: initialCertificates, pagination:
     const matchesSearch = !searchFilter || 
       certificate.recipientName.toLowerCase().includes(searchFilter.toLowerCase()) ||
       certificate.templateName.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      (certificate.contingent_name && certificate.contingent_name.toLowerCase().includes(searchFilter.toLowerCase())) ||
       (certificate.contestName && certificate.contestName.toLowerCase().includes(searchFilter.toLowerCase())) ||
       (certificate.awardTitle && certificate.awardTitle.toLowerCase().includes(searchFilter.toLowerCase())) ||
       certificate.uniqueCode.toLowerCase().includes(searchFilter.toLowerCase()) ||

@@ -40,6 +40,9 @@ export default function CertificatesPage() {
   const [contestants, setContestants] = useState<Contestant[]>([])
   const [filteredContestants, setFilteredContestants] = useState<Contestant[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadingStage, setLoadingStage] = useState<'starting' | 'fetching' | 'parsing' | 'finalizing'>('starting')
+  const [loadingElapsedMs, setLoadingElapsedMs] = useState(0)
+  const [loadedCount, setLoadedCount] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [prerequisiteModal, setPrerequisiteModal] = useState<PrerequisiteModalData | null>(null)
@@ -51,6 +54,7 @@ export default function CertificatesPage() {
   const [filterState, setFilterState] = useState(false)
   const [filterOnline, setFilterOnline] = useState(false)
   const [filterNational, setFilterNational] = useState(false)
+  const [filterQuiz, setFilterQuiz] = useState(false)
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -79,9 +83,24 @@ export default function CertificatesPage() {
   }, [])
 
   useEffect(() => {
+    if (!isLoading) return
+
+    const startedAt = Date.now()
+    setLoadingElapsedMs(0)
+
+    const interval = window.setInterval(() => {
+      setLoadingElapsedMs(Date.now() - startedAt)
+    }, 250)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [isLoading])
+
+  useEffect(() => {
     applyFilters()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contestants, searchQuery, filterSchool, filterState, filterOnline, filterNational])
+  }, [contestants, searchQuery, filterSchool, filterState, filterOnline, filterNational, filterQuiz])
 
   const checkSchoolWinnerTemplate = async () => {
     try {
@@ -98,13 +117,22 @@ export default function CertificatesPage() {
 
   const fetchContestants = async () => {
     setIsLoading(true)
+    setLoadingStage('starting')
+    setLoadedCount(null)
     setError(null)
 
     try {
+      setLoadingStage('fetching')
       const response = await fetch('/api/participants/contestants/certificates')
       if (!response.ok) throw new Error('Failed to fetch')
+
+      setLoadingStage('parsing')
       const data = await response.json()
-      setContestants(data.contestants || [])
+
+      const list = (data.contestants || []) as Contestant[]
+      setLoadedCount(list.length)
+      setContestants(list)
+      setLoadingStage('finalizing')
     } catch (err) {
       console.error('Error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load data')
@@ -127,7 +155,7 @@ export default function CertificatesPage() {
     }
 
     // Certificate availability filters
-    const hasAnyFilter = filterSchool || filterState || filterOnline || filterNational
+    const hasAnyFilter = filterSchool || filterState || filterOnline || filterNational || filterQuiz
     
     if (hasAnyFilter) {
       filtered = filtered.filter(c => {
@@ -137,6 +165,7 @@ export default function CertificatesPage() {
         if (filterState) matches.push(c.certificates.state.length > 0)
         if (filterOnline) matches.push(c.certificates.online.length > 0)
         if (filterNational) matches.push(c.certificates.national.length > 0)
+        if (filterQuiz) matches.push(c.certificates.quiz.length > 0)
         
         // Return true if ANY of the selected filters match
         return matches.some(match => match)
@@ -152,6 +181,7 @@ export default function CertificatesPage() {
     setFilterState(false)
     setFilterOnline(false)
     setFilterNational(false)
+    setFilterQuiz(false)
   }
 
   // Selection handlers
@@ -587,11 +617,56 @@ export default function CertificatesPage() {
   }
 
   if (isLoading) {
+    const elapsedSeconds = Math.floor(loadingElapsedMs / 1000)
+    const stageLabel =
+      loadingStage === 'starting'
+        ? 'Bersedia...'
+        : loadingStage === 'fetching'
+          ? 'Mengambil data peserta & sijil...'
+          : loadingStage === 'parsing'
+            ? 'Memproses data...'
+            : 'Menyusun paparan...'
+
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Memuatkan sijil...</p>
+      <div className="flex items-center justify-center min-h-screen px-4">
+        <div className="w-full max-w-md bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900">Memuatkan sijil peserta</p>
+              <p className="text-xs text-gray-600">{stageLabel}</p>
+            </div>
+            <div className="text-xs text-gray-500 tabular-nums">{elapsedSeconds}s</div>
+          </div>
+
+          <div className="mt-5 space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700">Mengambil data</span>
+              <span className={loadingStage === 'fetching' || loadingStage === 'parsing' || loadingStage === 'finalizing' ? 'text-green-700' : 'text-gray-400'}>
+                {loadingStage === 'fetching' || loadingStage === 'parsing' || loadingStage === 'finalizing' ? 'OK' : '-'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700">Memproses data</span>
+              <span className={loadingStage === 'parsing' || loadingStage === 'finalizing' ? 'text-green-700' : 'text-gray-400'}>
+                {loadingStage === 'parsing' || loadingStage === 'finalizing' ? 'OK' : '-'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-gray-700">Menyediakan paparan</span>
+              <span className={loadingStage === 'finalizing' ? 'text-green-700' : 'text-gray-400'}>
+                {loadingStage === 'finalizing' ? 'OK' : '-'}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5 text-xs text-gray-600">
+            {loadedCount !== null ? (
+              <span>{loadedCount} peserta ditemui.</span>
+            ) : (
+              <span>Jika mengambil masa lama, ini biasanya kerana senarai peserta/sijil agak besar.</span>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -687,12 +762,22 @@ export default function CertificatesPage() {
                 />
                 <span className="ml-2 text-sm text-gray-700">Sijil Kebangsaan</span>
               </label>
+
+              <label className="inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={filterQuiz}
+                  onChange={(e) => setFilterQuiz(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Sijil Kuiz</span>
+              </label>
             </div>
           </div>
         </div>
 
         {/* Clear Filters Button */}
-        {(searchQuery || filterSchool || filterState || filterOnline || filterNational) && (
+        {(searchQuery || filterSchool || filterState || filterOnline || filterNational || filterQuiz) && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <button
               onClick={clearFilters}
