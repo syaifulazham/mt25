@@ -66,6 +66,18 @@ type Quiz = {
   questions?: QuizQuestion[];
 };
 
+type ParticipationStateSummary = {
+  state: string;
+  stateId: number | null;
+  participants: number;
+};
+
+type ParticipationSummaryResponse = {
+  quizId: number;
+  totalParticipants: number;
+  stateSummaries: ParticipationStateSummary[];
+};
+
 export default function QuizDetailPage({ params }: { params: { id: string } }) {
   const quizId = parseInt(params.id);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -82,6 +94,9 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
   const [selectedNextQuizId, setSelectedNextQuizId] = useState<number | null>(null);
   const [progressionLoading, setProgressionLoading] = useState(false);
   const [nextQuizName, setNextQuizName] = useState<string>('');
+  const [participationSummary, setParticipationSummary] = useState<ParticipationSummaryResponse | null>(null);
+  const [isParticipationLoading, setIsParticipationLoading] = useState(false);
+  const [participationError, setParticipationError] = useState<string | null>(null);
   
   // Fetch next quiz name when nextQuizId changes
   useEffect(() => {
@@ -136,6 +151,32 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
     
     if (quizId) {
       fetchQuizData();
+    }
+  }, [quizId]);
+
+  useEffect(() => {
+    const fetchParticipationSummary = async () => {
+      try {
+        setIsParticipationLoading(true);
+        setParticipationError(null);
+
+        const response = await fetch(`/api/organizer/quizzes/${quizId}/participation-states`);
+        if (!response.ok) {
+          throw new Error('Failed to load participation summary');
+        }
+
+        const data = await response.json();
+        setParticipationSummary(data);
+      } catch (error) {
+        console.error('Error loading participation summary:', error);
+        setParticipationError(error instanceof Error ? error.message : 'An unknown error occurred');
+      } finally {
+        setIsParticipationLoading(false);
+      }
+    };
+
+    if (quizId) {
+      fetchParticipationSummary();
     }
   }, [quizId]);
 
@@ -628,6 +669,49 @@ export default function QuizDetailPage({ params }: { params: { id: string } }) {
                     </Dialog>
                   </div>
                 </CardFooter>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Participation Summary</CardTitle>
+                  <CardDescription>
+                    Number of quiz participants by state
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isParticipationLoading ? (
+                    <p className="text-sm text-gray-500">Loading participation data...</p>
+                  ) : participationError ? (
+                    <p className="text-sm text-red-600">{participationError}</p>
+                  ) : !participationSummary || participationSummary.stateSummaries.length === 0 ? (
+                    <p className="text-sm text-gray-500">No participation data available yet.</p>
+                  ) : (
+                    <div className="border rounded-md overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>State</TableHead>
+                            <TableHead className="text-right">Participants</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {participationSummary.stateSummaries.map((row) => (
+                            <TableRow key={row.stateId ?? row.state}>
+                              <TableCell>{row.state}</TableCell>
+                              <TableCell className="text-right font-medium">{row.participants}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow>
+                            <TableCell className="font-semibold">Total</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {participationSummary.totalParticipants}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
               </Card>
             </TabsContent>
 
