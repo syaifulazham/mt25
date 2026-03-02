@@ -51,6 +51,58 @@ type Event = {
   stateName: string | null;
 };
 
+interface ContestGroupSummaryFromApi {
+  contestGroup: string;
+  contestGroupSummary: {
+    totalContingents: number;
+    totalTeams?: number;
+    totalContestants: number;
+    totalContests?: number;
+  };
+}
+
+interface StateFromApi {
+  stateName: string | null;
+  contestGroups: ContestGroupSummaryFromApi[];
+}
+
+interface CompetitionsOverviewData {
+  states: StateFromApi[];
+}
+
+interface CompetitionsOverviewResponse {
+  scopeArea: string;
+  data: CompetitionsOverviewData;
+}
+
+interface ZoneSummaryRow {
+  stateName: string;
+  kidsContingents: number;
+  kidsContestants: number;
+  teensContingents: number;
+  teensContestants: number;
+  youthContingents: number;
+  youthContestants: number;
+}
+
+interface ZoneSummaryTotals {
+  kidsContingents: number;
+  kidsContestants: number;
+  teensContingents: number;
+  teensContestants: number;
+  youthContingents: number;
+  youthContestants: number;
+}
+
+interface ZoneSummaryDialogState {
+  open: boolean;
+  loading: boolean;
+  eventId: number | null;
+  eventName: string;
+  rows: ZoneSummaryRow[];
+  totals: ZoneSummaryTotals;
+}
+
 export default function MonitoringPage() {
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
@@ -68,6 +120,21 @@ export default function MonitoringPage() {
     currentStatus: '', 
     verificationCode: '',
     userInput: ''
+  });
+  const [zoneSummaryDialog, setZoneSummaryDialog] = useState<ZoneSummaryDialogState>({
+    open: false,
+    loading: false,
+    eventId: null,
+    eventName: "",
+    rows: [],
+    totals: {
+      kidsContingents: 0,
+      kidsContestants: 0,
+      teensContingents: 0,
+      teensContestants: 0,
+      youthContingents: 0,
+      youthContestants: 0,
+    },
   });
   
   const fetchEvents = async () => {
@@ -195,6 +262,100 @@ export default function MonitoringPage() {
     }
   };
 
+  const buildZoneSummaryMatrix = (states: StateFromApi[]): { rows: ZoneSummaryRow[]; totals: ZoneSummaryTotals } => {
+    const rows: ZoneSummaryRow[] = [];
+    const totals: ZoneSummaryTotals = {
+      kidsContingents: 0,
+      kidsContestants: 0,
+      teensContingents: 0,
+      teensContestants: 0,
+      youthContingents: 0,
+      youthContestants: 0,
+    };
+
+    states.forEach((state) => {
+      const row: ZoneSummaryRow = {
+        stateName: state.stateName || "All States",
+        kidsContingents: 0,
+        kidsContestants: 0,
+        teensContingents: 0,
+        teensContestants: 0,
+        youthContingents: 0,
+        youthContestants: 0,
+      };
+
+      state.contestGroups.forEach((group) => {
+        const key = (group.contestGroup || "").toUpperCase();
+        if (key === "KIDS") {
+          row.kidsContingents += group.contestGroupSummary.totalContingents;
+          row.kidsContestants += group.contestGroupSummary.totalContestants;
+        } else if (key === "TEENS") {
+          row.teensContingents += group.contestGroupSummary.totalContingents;
+          row.teensContestants += group.contestGroupSummary.totalContestants;
+        } else if (key === "YOUTH") {
+          row.youthContingents += group.contestGroupSummary.totalContingents;
+          row.youthContestants += group.contestGroupSummary.totalContestants;
+        }
+      });
+
+      totals.kidsContingents += row.kidsContingents;
+      totals.kidsContestants += row.kidsContestants;
+      totals.teensContingents += row.teensContingents;
+      totals.teensContestants += row.teensContestants;
+      totals.youthContingents += row.youthContingents;
+      totals.youthContestants += row.youthContestants;
+
+      rows.push(row);
+    });
+
+    return { rows, totals };
+  };
+
+  const handleOpenZoneSummary = async (event: Event) => {
+    setZoneSummaryDialog((prev) => ({
+      ...prev,
+      open: true,
+      loading: true,
+      eventId: event.id,
+      eventName: event.name,
+      rows: [],
+      totals: {
+        kidsContingents: 0,
+        kidsContestants: 0,
+        teensContingents: 0,
+        teensContestants: 0,
+        youthContingents: 0,
+        youthContestants: 0,
+      },
+    }));
+
+    try {
+      const response = await fetch(`/api/organizer/events/${event.id}/reports/competitions-overview`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch competitions overview");
+      }
+      const overview: CompetitionsOverviewResponse = await response.json();
+      const matrix = buildZoneSummaryMatrix(overview.data.states);
+      setZoneSummaryDialog((prev) => ({
+        ...prev,
+        loading: false,
+        rows: matrix.rows,
+        totals: matrix.totals,
+      }));
+    } catch (error) {
+      console.error("Error fetching competitions overview:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load zone summary for this event.",
+        variant: "destructive",
+      });
+      setZoneSummaryDialog((prev) => ({
+        ...prev,
+        loading: false,
+      }));
+    }
+  };
+
   const viewEventStats = (zoneId: number) => {
     router.push(`/organizer/events/stats/${zoneId}`);
   };
@@ -254,10 +415,16 @@ export default function MonitoringPage() {
                     className={isOnlineEvent ? 'bg-blue-50 hover:bg-blue-100' : ''}
                   >
                     <TableCell className="font-medium">
-                      <div>{event.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(event.startDate), 'dd MMM yyyy')} - {format(new Date(event.endDate), 'dd MMM yyyy')}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenZoneSummary(event)}
+                        className="text-left hover:underline text-blue-700"
+                      >
+                        <div>{event.name}</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(event.startDate), 'dd MMM yyyy')} - {format(new Date(event.endDate), 'dd MMM yyyy')}
+                        </div>
+                      </button>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`
@@ -429,6 +596,113 @@ export default function MonitoringPage() {
               disabled={!confirmDialog.userInput || confirmDialog.userInput.length !== 5}
             >
               {confirmDialog.currentStatus === "OPEN" ? "Confirm Cutoff" : "Change to Open"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={zoneSummaryDialog.open}
+        onOpenChange={(open) =>
+          setZoneSummaryDialog((prev) => ({
+            ...prev,
+            open,
+          }))
+        }
+      >
+        <DialogContent
+          className="max-h-[90vh]"
+          style={{ width: "95vw", maxWidth: "95vw" }}
+        >
+          <DialogHeader>
+            <DialogTitle>Zone Summary</DialogTitle>
+            <DialogDescription>
+              {zoneSummaryDialog.eventName
+                ? `Zone summary by contest group for ${zoneSummaryDialog.eventName}`
+                : "Zone summary by contest group"}
+            </DialogDescription>
+          </DialogHeader>
+          {zoneSummaryDialog.loading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner />
+            </div>
+          ) : zoneSummaryDialog.rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No zone summary data available for this event.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead rowSpan={2}>State</TableHead>
+                    <TableHead colSpan={2} className="text-center bg-green-100">
+                      SEKOLAH RENDAH (Kids)
+                    </TableHead>
+                    <TableHead colSpan={2} className="text-center bg-blue-100">
+                      SEKOLAH MENENGAH (Teens)
+                    </TableHead>
+                    <TableHead colSpan={2} className="text-center bg-orange-100">
+                      BELIA (Youth)
+                    </TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="text-right text-xs">Contingents</TableHead>
+                    <TableHead className="text-right text-xs">Participants</TableHead>
+                    <TableHead className="text-right text-xs">Contingents</TableHead>
+                    <TableHead className="text-right text-xs">Participants</TableHead>
+                    <TableHead className="text-right text-xs">Contingents</TableHead>
+                    <TableHead className="text-right text-xs">Participants</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {zoneSummaryDialog.rows.map((row) => (
+                    <TableRow key={row.stateName}>
+                      <TableCell className="font-medium">{row.stateName}</TableCell>
+                      <TableCell className="text-right">{row.kidsContingents}</TableCell>
+                      <TableCell className="text-right">{row.kidsContestants}</TableCell>
+                      <TableCell className="text-right">{row.teensContingents}</TableCell>
+                      <TableCell className="text-right">{row.teensContestants}</TableCell>
+                      <TableCell className="text-right">{row.youthContingents}</TableCell>
+                      <TableCell className="text-right">{row.youthContestants}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell className="font-semibold">TOTAL</TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {zoneSummaryDialog.totals.kidsContingents}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {zoneSummaryDialog.totals.kidsContestants}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {zoneSummaryDialog.totals.teensContingents}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {zoneSummaryDialog.totals.teensContestants}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {zoneSummaryDialog.totals.youthContingents}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {zoneSummaryDialog.totals.youthContestants}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setZoneSummaryDialog((prev) => ({
+                  ...prev,
+                  open: false,
+                }))
+              }
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

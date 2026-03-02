@@ -183,6 +183,102 @@ export default function CompetitionsOverviewPage() {
   // Data is already hierarchically structured from the API
   const hierarchicalData = data.data;
 
+  const contestGroupSummaryOverall = (() => {
+    const summaryMap = new Map<
+      string,
+      {
+        totalContingents: number;
+        totalTeams: number;
+        totalContestants: number;
+        totalContests: number;
+      }
+    >();
+
+    hierarchicalData.states.forEach((state) => {
+      state.contestGroups.forEach((group) => {
+        const key = group.contestGroup || "Unknown Group";
+        const existing =
+          summaryMap.get(key) || {
+            totalContingents: 0,
+            totalTeams: 0,
+            totalContestants: 0,
+            totalContests: 0,
+          };
+
+        existing.totalContingents += group.contestGroupSummary.totalContingents;
+        existing.totalTeams += group.contestGroupSummary.totalTeams;
+        existing.totalContestants +=
+          group.contestGroupSummary.totalContestants;
+        existing.totalContests += group.contestGroupSummary.totalContests;
+
+        summaryMap.set(key, existing);
+      });
+    });
+
+    return Array.from(summaryMap.entries()).map(([contestGroup, summary]) => ({
+      contestGroup,
+      ...summary,
+    }));
+  })();
+
+  const stateContestGroupMatrix = (() => {
+    const rows: {
+      stateName: string;
+      kidsContingents: number;
+      kidsContestants: number;
+      teensContingents: number;
+      teensContestants: number;
+      youthContingents: number;
+      youthContestants: number;
+    }[] = [];
+
+    const totals = {
+      kidsContingents: 0,
+      kidsContestants: 0,
+      teensContingents: 0,
+      teensContestants: 0,
+      youthContingents: 0,
+      youthContestants: 0,
+    };
+
+    hierarchicalData.states.forEach((state) => {
+      const row = {
+        stateName: state.stateName || "All States",
+        kidsContingents: 0,
+        kidsContestants: 0,
+        teensContingents: 0,
+        teensContestants: 0,
+        youthContingents: 0,
+        youthContestants: 0,
+      };
+
+      state.contestGroups.forEach((group) => {
+        const key = (group.contestGroup || "").toUpperCase();
+        if (key === "KIDS") {
+          row.kidsContingents += group.contestGroupSummary.totalContingents;
+          row.kidsContestants += group.contestGroupSummary.totalContestants;
+        } else if (key === "TEENS") {
+          row.teensContingents += group.contestGroupSummary.totalContingents;
+          row.teensContestants += group.contestGroupSummary.totalContestants;
+        } else if (key === "YOUTH") {
+          row.youthContingents += group.contestGroupSummary.totalContingents;
+          row.youthContestants += group.contestGroupSummary.totalContestants;
+        }
+      });
+
+      totals.kidsContingents += row.kidsContingents;
+      totals.kidsContestants += row.kidsContestants;
+      totals.teensContingents += row.teensContingents;
+      totals.teensContestants += row.teensContestants;
+      totals.youthContingents += row.youthContingents;
+      totals.youthContestants += row.youthContestants;
+
+      rows.push(row);
+    });
+
+    return { rows, totals };
+  })();
+
   return (
     <DashboardShell>
       <div className="space-y-6 mx-4 md:mx-6 lg:mx-8">
@@ -236,6 +332,132 @@ export default function CompetitionsOverviewPage() {
                 </TableRow>
               </TableBody>
             </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Contest Group Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {contestGroupSummaryOverall.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No contest group data available for this event.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contest Group</TableHead>
+                    <TableHead className="text-right">Contests</TableHead>
+                    <TableHead className="text-right">Contingents</TableHead>
+                    <TableHead className="text-right">Teams</TableHead>
+                    <TableHead className="text-right">Contestants</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contestGroupSummaryOverall.map((row) => (
+                    <TableRow key={row.contestGroup}>
+                      <TableCell className="font-medium">
+                        {row.contestGroup}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {row.totalContests}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.totalContingents}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.totalTeams}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {row.totalContestants}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Building className="h-5 w-5" />
+              Zone Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stateContestGroupMatrix.rows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No state-level contest group data available for this event.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead rowSpan={2}>State</TableHead>
+                      <TableHead colSpan={2} className="text-center bg-green-100">
+                        SEKOLAH RENDAH (Kids)
+                      </TableHead>
+                      <TableHead colSpan={2} className="text-center bg-blue-100">
+                        SEKOLAH MENENGAH (Teens)
+                      </TableHead>
+                      <TableHead colSpan={2} className="text-center bg-orange-100">
+                        BELIA (Youth)
+                      </TableHead>
+                    </TableRow>
+                    <TableRow>
+                      <TableHead className="text-right text-xs">Contingents</TableHead>
+                      <TableHead className="text-right text-xs">Participants</TableHead>
+                      <TableHead className="text-right text-xs">Contingents</TableHead>
+                      <TableHead className="text-right text-xs">Participants</TableHead>
+                      <TableHead className="text-right text-xs">Contingents</TableHead>
+                      <TableHead className="text-right text-xs">Participants</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stateContestGroupMatrix.rows.map((row) => (
+                      <TableRow key={row.stateName}>
+                        <TableCell className="font-medium">{row.stateName}</TableCell>
+                        <TableCell className="text-right">{row.kidsContingents}</TableCell>
+                        <TableCell className="text-right">{row.kidsContestants}</TableCell>
+                        <TableCell className="text-right">{row.teensContingents}</TableCell>
+                        <TableCell className="text-right">{row.teensContestants}</TableCell>
+                        <TableCell className="text-right">{row.youthContingents}</TableCell>
+                        <TableCell className="text-right">{row.youthContestants}</TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow>
+                      <TableCell className="font-semibold">TOTAL</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stateContestGroupMatrix.totals.kidsContingents}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stateContestGroupMatrix.totals.kidsContestants}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stateContestGroupMatrix.totals.teensContingents}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stateContestGroupMatrix.totals.teensContestants}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stateContestGroupMatrix.totals.youthContingents}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {stateContestGroupMatrix.totals.youthContestants}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
